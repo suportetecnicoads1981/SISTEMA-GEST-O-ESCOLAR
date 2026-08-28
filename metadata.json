@@ -1,0 +1,6 @@
+{
+  "name": "EduGestão Pro - Sistema Integrado de Gestão Escolar",
+  "description": "Sistema completo de gestão escolar com secretária acadêmica, matrícula, banco de questões, provas com correção automática instantânea, relatórios pedagógicos, análise de evolução de notas, arquitetura cliente/servidor, instalador de rede e backup.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
