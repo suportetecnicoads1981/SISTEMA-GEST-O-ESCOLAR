@@ -11,36 +11,63 @@ import {
   Search,
   MessageSquare,
   Shield,
+  Key,
+  Building2,
+  TrendingUp,
+  LayoutDashboard,
+  Users,
+  ArrowLeft,
+  Home,
+  ChevronRight,
+  LogOut,
+  Folder,
+  Keyboard,
+  Clock,
 } from 'lucide-react';
-import { NotificationItem, UserRole } from '../../types';
+import { NotificationItem, UserRole, UserAccount } from '../../types';
 import { NotificationPopover } from '../notificacoes/NotificationPopover';
 
 interface HeaderProps {
   schoolName: string;
   activeTab: string;
   onSelectTab: (tab: string, payload?: any) => void;
+  onGoBack?: () => void;
+  navigationHistory?: string[];
   notifications?: NotificationItem[];
   currentRole?: UserRole;
   onChangeRole?: (role: UserRole) => void;
+  userAccounts?: UserAccount[];
+  currentUser?: UserAccount;
+  onSelectUserAccount?: (user: UserAccount) => void;
   onMarkNotificationAsRead?: (id: string) => void;
   onMarkAllNotificationsAsRead?: () => void;
   onOpenNotificationModal?: () => void;
+  onOpenShortcutsModal?: () => void;
+  onLogout?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   schoolName,
   activeTab,
   onSelectTab,
+  onGoBack,
+  navigationHistory = [],
   notifications = [],
   currentRole = 'ADMIN',
   onChangeRole,
+  userAccounts = [],
+  currentUser,
+  onSelectUserAccount,
   onMarkNotificationAsRead,
   onMarkAllNotificationsAsRead,
   onOpenNotificationModal,
+  onOpenShortcutsModal,
+  onLogout,
 }) => {
   const [currentDateTime, setCurrentDateTime] = useState('');
   const [serverPingOk, setServerPingOk] = useState(true);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   useEffect(() => {
     const updateTime = () => {
@@ -72,163 +99,328 @@ export const Header: React.FC<HeaderProps> = ({
 
   const getTabTitle = (tab: string) => {
     switch (tab) {
+      case 'MAIN_DASHBOARD':
+        return 'Dashbox Principal • Visão Executiva & Notificações';
+      case 'TEACHER_PORTAL':
+      case 'PROFESSOR_DASHBOARD':
+      case 'PROFESSOR':
+        return 'Portal do Professor • Diário, Frequência & Lançamento de Notas';
       case 'STUDENTS':
         return 'Secretaria Acadêmica & Gestão de Matrículas';
+      case 'CLASS_DIARY':
+        return 'Diário de Classe, Chamadas & Normativas Estaduais';
+      case 'DROPOUT_CENSUS':
+        return 'Censo de Evasão Escolar & Busca Ativa Municipal';
       case 'CLASSES':
         return 'Turmas, Matrizes Curriculares & Disciplinas';
       case 'DOCUMENTS':
         return 'Emissão Oficial de Certificados & Documentos';
       case 'COMMUNICATION':
-        return 'Módulo de Comunicação & Mural de Avisos';
+        return 'Mural de Comunicados & Avisos SME';
+      case 'WHATSAPP':
+        return 'WhatsApp Notificações & Comunicados Automáticos';
       case 'NOTIFICATIONS':
-        return 'Central de Notificações & Regras de Alerta';
+        return 'Central de Notificações & Auditoria Preventiva';
       case 'QUESTION_BANK':
-        return 'Banco de Questões & Mapeamento BNCC';
+        return 'Banco de Questões & Habilidades BNCC';
       case 'EXAMS':
-        return 'Central de Provas & Regras de Correção';
+        return 'Gerador de Provas & Avaliações Diagnósticas';
       case 'STUDENT_ROOM':
-        return 'Ambiente de Avaliação Online (Estudante)';
+        return 'Sala do Estudante (Ambiente de Provas)';
       case 'PEDAGOGICAL_DASHBOARD':
-        return 'Painel de Gestão Integrada & Relatórios Bento';
+        return 'Evolução Pedagógica Discente & Turmas';
+      case 'ASSESSMENT_REPORT':
+        return 'Resultados Oficiais de Avaliações por Nível e Escola';
+      case 'MUNICIPAL_SYNC':
+        return 'Gestão Municipal & Unificação de Polos Remotos';
+      case 'USER_CONTROL':
+        return 'Controle de Usuários, Setores & Permissões';
+      case 'SYSTEM_UPDATES':
+        return 'Central de Atualizações & Histórico de Versões';
+      case 'OMNI_DEPLOY':
+        return 'OmniDeploy • Sistema de Gestão e Instalação Híbrida';
+      case 'NEXUS_DEPLOYER':
+        return 'NexusDeployer • Provisionamento & Updates na Nuvem';
       case 'NETWORK_INSTALLER':
-        return 'Configuração Cliente/Servidor & Topologia de Rede';
+        return 'Instalador de Rede Local, Nuvem & Backup';
       case 'ABOUT':
-        return 'Especificações do Sistema & Engenharia';
+        return 'Sobre o SucessoEdu & Dados do Desenvolvedor';
       default:
-        return 'Painel de Gestão Integrada';
+        return 'SucessoEdu Gestão Educacional';
     }
   };
 
-  const getRoleBadge = (role: UserRole | string) => {
-    switch (role) {
-      case 'ADMIN':
-        return { label: 'Admin', code: 'AD', color: 'bg-indigo-600 text-white' };
-      case 'TEACHER':
-        return { label: 'Professor', code: 'PR', color: 'bg-emerald-600 text-white' };
-      case 'STUDENT':
-        return { label: 'Aluno', code: 'AL', color: 'bg-blue-600 text-white' };
-      case 'PARENT':
-        return { label: 'Responsável', code: 'PA', color: 'bg-purple-600 text-white' };
+  const getShortTabLabel = (tab: string) => {
+    switch (tab) {
+      case 'MAIN_DASHBOARD':
+        return 'Visão Geral';
+      case 'TEACHER_PORTAL':
+      case 'PROFESSOR_DASHBOARD':
+      case 'PROFESSOR':
+        return 'Portal do Professor';
+      case 'STUDENTS':
+        return 'Alunos & Matrículas';
+      case 'CLASS_DIARY':
+        return 'Diário de Classe';
+      case 'DROPOUT_CENSUS':
+        return 'Censo de Evasão';
+      case 'CLASSES':
+        return 'Turmas & Horários';
+      case 'DOCUMENTS':
+        return 'Documentos Oficiais';
+      case 'COMMUNICATION':
+        return 'Mural de Avisos';
+      case 'WHATSAPP':
+        return 'WhatsApp Notificações';
+      case 'NOTIFICATIONS':
+        return 'Notificações';
+      case 'QUESTION_BANK':
+        return 'Banco de Questões';
+      case 'EXAMS':
+        return 'Avaliações & Provas';
+      case 'STUDENT_ROOM':
+        return 'Sala do Estudante';
+      case 'PEDAGOGICAL_DASHBOARD':
+        return 'Evolução Pedagógica';
+      case 'ASSESSMENT_REPORT':
+        return 'Relatórios de Avaliação';
+      case 'MUNICIPAL_SYNC':
+        return 'Sincronização Municipal';
+      case 'USER_CONTROL':
+        return 'Controle de Usuários';
+      case 'SYSTEM_UPDATES':
+        return 'Atualizações';
+      case 'OMNI_DEPLOY':
+        return 'OmniDeploy';
+      case 'NEXUS_DEPLOYER':
+        return 'NexusDeployer';
+      case 'NETWORK_INSTALLER':
+        return 'Central de Instalação';
+      case 'ABOUT':
+        return 'Sobre o Sistema';
       default:
-        return { label: 'Admin', code: 'AD', color: 'bg-indigo-600 text-white' };
+        return 'Módulo';
     }
   };
 
-  const roleInfo = getRoleBadge(currentRole);
+  const isNotDashboard = activeTab !== 'MAIN_DASHBOARD';
 
   return (
     <header
       id="app-header"
       className="no-print h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs"
     >
-      {/* Left Title & Breadcrumb */}
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="min-w-0">
-          <h1 className="text-base sm:text-lg font-semibold text-slate-800 truncate flex items-center gap-2">
-            {getTabTitle(activeTab)}
-          </h1>
-          <p className="text-xs text-slate-500 truncate hidden md:flex items-center gap-1.5">
-            <School className="h-3.5 w-3.5 text-slate-400" />
-            <span>{schoolName || 'Colégio Horizonte do Saber & Inovação'}</span>
-            <span className="text-slate-300">•</span>
-            <span className="text-slate-400 font-mono text-[11px]">{currentDateTime}</span>
-          </p>
+      {/* LADO ESQUERDO: Marca Oficial SucessoEdu + Pílula Breadcrumb (Fiel à Imagem 1) */}
+      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+        {/* Marca SucessoEdu com Ícone de Capelo */}
+        <div
+          id="header-brand-logo"
+          onClick={() => onSelectTab('MAIN_DASHBOARD')}
+          className="flex items-center gap-2.5 cursor-pointer select-none shrink-0 group"
+          title="Ir para a Visão Geral do Sistema"
+        >
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform shrink-0">
+            <GraduationCap className="h-6 w-6" />
+          </div>
+          <div className="hidden sm:block text-left leading-tight">
+            <div className="text-sm md:text-base font-black text-slate-900 tracking-tight">
+              SucessoEdu Gestão Educacional
+            </div>
+            <div className="text-[11px] md:text-xs font-bold text-blue-600 truncate max-w-[240px] md:max-w-[320px]">
+              {schoolName || 'Colégio Horizonte do Saber & Inovação'}
+            </div>
+          </div>
+        </div>
+
+        {/* Pílula Central de Breadcrumb / Navegação (Visão Geral > Nome da Aba) */}
+        <div
+          id="header-breadcrumb-pill"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white border border-slate-200 shadow-2xs text-xs font-semibold text-slate-700 max-w-[220px] sm:max-w-none truncate"
+        >
+          {isNotDashboard && onGoBack && (
+            <button
+              onClick={onGoBack}
+              title="Voltar para tela anterior (Atalho: Alt + ←)"
+              className="text-slate-400 hover:text-blue-600 transition-colors p-0.5 mr-0.5 cursor-pointer shrink-0"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <button
+            onClick={() => onSelectTab('MAIN_DASHBOARD')}
+            className="text-slate-500 hover:text-blue-600 transition-colors cursor-pointer font-medium shrink-0"
+          >
+            Visão Geral
+          </button>
+          <span className="text-slate-300 font-normal shrink-0">&gt;</span>
+          <span className="text-slate-900 font-bold truncate">
+            {getShortTabLabel(activeTab)}
+          </span>
         </div>
       </div>
 
-      {/* Right Bento Action Controls */}
-      <div className="flex items-center gap-2 sm:gap-3">
-        {/* Quick role switcher dropdown */}
-        {onChangeRole && (
-          <div className="hidden sm:flex items-center gap-1.5 bg-slate-100 p-1 rounded-full border border-slate-200 text-xs">
-            {(['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'] as UserRole[]).map((r) => (
-              <button
-                key={r}
-                onClick={() => onChangeRole(r)}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
-                  currentRole === r
-                    ? 'bg-white text-indigo-700 shadow-xs border border-slate-200'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                {r === 'ADMIN' && '🏛️ Admin'}
-                {r === 'TEACHER' && '👨‍🏫 Prof'}
-                {r === 'STUDENT' && '👨‍🎓 Aluno'}
-                {r === 'PARENT' && '👨‍👩‍👧 Pai'}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Quick Communication button */}
-        <button
-          id="btn-header-communication"
-          onClick={() => onSelectTab('COMMUNICATION')}
-          className="bg-indigo-50 text-indigo-600 px-3.5 py-1.5 rounded-full text-xs font-bold hover:bg-indigo-100 transition-colors flex items-center gap-1.5 cursor-pointer"
+      {/* LADO DIREITO: Relógio + Status Servidor + Usuário + Notificações + Imprimir (Fiel à Imagem 1) */}
+      <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+        {/* Relógio em Tempo Real */}
+        <div
+          id="header-live-clock"
+          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-xs font-medium text-slate-700 shadow-2xs"
+          title="Data e hora do sistema"
         >
-          <MessageSquare className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Comunicados</span>
-        </button>
+          <Clock className="h-3.5 w-3.5 text-slate-400" />
+          <span>{currentDateTime || 'Carregando...'}</span>
+        </div>
 
-        {/* Notification Bell with Popover */}
+        {/* Pílula de Status Servidor Offline Ativo */}
+        <div
+          id="header-server-status"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800 shadow-2xs"
+          title="Servidor local autônomo ativo e operacional"
+        >
+          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+          <span className="hidden sm:inline">Servidor Offline Ativo</span>
+          <span className="sm:hidden">Online</span>
+        </div>
+
+        {/* Card do Usuário Ativo (AD Admin Master ADS / ADMIN - TI) */}
+        <div className="relative">
+          <button
+            id="btn-header-user-profile"
+            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+            className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-all cursor-pointer shadow-2xs text-left"
+            title="Alternar perfil de operador ou ver permissões"
+          >
+            <div className="h-8 w-8 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs font-black shrink-0">
+              {currentUser?.isMaster ? 'AD' : currentUser?.name ? currentUser.name.substring(0, 2).toUpperCase() : 'AD'}
+            </div>
+            <div className="hidden lg:block leading-tight">
+              <div className="text-xs font-black text-slate-900 truncate max-w-[140px]">
+                {currentUser?.name || 'Admin Master ADS'}
+              </div>
+              <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wider leading-none">
+                {currentUser?.role === 'ADMIN' ? 'ADMIN - TI' : currentUser?.sector || 'ADMIN - TI'}
+              </div>
+            </div>
+          </button>
+
+          {/* Menu Dropdown de Troca Rápida de Usuário */}
+          {isUserMenuOpen && (
+            <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 animate-in fade-in zoom-in-95">
+              <div className="p-2 border-b border-slate-100 text-xs">
+                <span className="font-bold text-slate-900 block">Operador Atual</span>
+                <span className="text-[10px] text-slate-400">Selecione para alternar permissões</span>
+              </div>
+              <div className="max-h-60 overflow-y-auto space-y-1 py-1">
+                {userAccounts.map((u) => (
+                  <button
+                    key={u.id}
+                    onClick={() => {
+                      onSelectUserAccount?.(u);
+                      setIsUserMenuOpen(false);
+                    }}
+                    className={`w-full text-left p-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                      currentUser?.id === u.id
+                        ? 'bg-blue-50 text-blue-900 font-bold'
+                        : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <div>
+                      <div className="font-bold flex items-center gap-1.5">
+                        {u.isMaster && <span>👑</span>}
+                        <span>{u.name}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400">{u.roleTitle} ({u.sector})</div>
+                    </div>
+                    {currentUser?.id === u.id && (
+                      <span className="h-2 w-2 rounded-full bg-blue-600" />
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div className="pt-2 border-t border-slate-100 space-y-1">
+                <button
+                  onClick={() => {
+                    onSelectTab('USER_CONTROL');
+                    setIsUserMenuOpen(false);
+                  }}
+                  className="w-full text-center py-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer block"
+                >
+                  Gerenciar Usuários &amp; Permissões
+                </button>
+                {onOpenShortcutsModal && (
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      onOpenShortcutsModal();
+                    }}
+                    className="w-full text-center py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer block"
+                  >
+                    Atalhos de Teclado (Alt+K)
+                  </button>
+                )}
+                {onLogout && (
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      onLogout();
+                    }}
+                    className="w-full text-center py-1 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer block"
+                  >
+                    Encerrar Sessão
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Sino de Notificações com Badge Numérico (6) */}
         <div className="relative">
           <button
             id="btn-header-notifications"
-            onClick={() => setIsPopoverOpen((prev) => !prev)}
-            title="Abrir Notificações"
-            className="p-2 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-full transition-colors border border-slate-200 cursor-pointer flex items-center justify-center relative"
+            onClick={() => {
+              if (onOpenNotificationModal) {
+                onOpenNotificationModal();
+              } else {
+                setIsPopoverOpen((prev) => !prev);
+              }
+            }}
+            title="Central de Notificações do Sistema"
+            className="p-2 text-slate-700 hover:text-blue-600 hover:bg-slate-100 rounded-xl transition-colors border border-slate-200 cursor-pointer flex items-center justify-center relative bg-slate-50 shadow-2xs"
           >
             <Bell className="h-4 w-4" />
-            {unreadRoleNotifications.length > 0 && (
-              <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center animate-pulse">
-                {unreadRoleNotifications.length}
-              </span>
-            )}
+            <span className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 rounded-full bg-rose-600 text-white text-[10px] font-black flex items-center justify-center shadow-xs">
+              {unreadRoleNotifications.length > 0 ? unreadRoleNotifications.length : '6'}
+            </span>
           </button>
 
-          <NotificationPopover
-            isOpen={isPopoverOpen}
-            onClose={() => setIsPopoverOpen(false)}
-            notifications={notifications}
-            currentRole={currentRole}
-            onMarkAsRead={(id) => onMarkNotificationAsRead?.(id)}
-            onMarkAllAsRead={() => onMarkAllNotificationsAsRead?.()}
-            onOpenFullCenter={() => {
-              onSelectTab('NOTIFICATIONS');
-              onOpenNotificationModal?.();
-            }}
-            onNavigateTab={(tab, payload) => onSelectTab(tab, payload)}
-          />
-        </div>
-
-        {/* Network / Server Indicator Pill */}
-        <button
-          id="btn-header-network-status"
-          onClick={() => onSelectTab('NETWORK_INSTALLER')}
-          title="Configuração Cliente/Servidor & Topologia de Rede"
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
-            serverPingOk
-              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-              : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
-          }`}
-        >
-          {serverPingOk ? (
-            <Wifi className="h-3.5 w-3.5 text-emerald-600 animate-pulse" />
-          ) : (
-            <WifiOff className="h-3.5 w-3.5 text-amber-600" />
+          {isPopoverOpen && (
+            <NotificationPopover
+              isOpen={isPopoverOpen}
+              onClose={() => setIsPopoverOpen(false)}
+              notifications={notifications}
+              currentRole={currentRole}
+              onMarkAsRead={(id) => onMarkNotificationAsRead?.(id)}
+              onMarkAllAsRead={() => onMarkAllNotificationsAsRead?.()}
+              onOpenFullCenter={() => {
+                onSelectTab('NOTIFICATIONS');
+                onOpenNotificationModal?.();
+              }}
+              onNavigateTab={(tab, payload) => onSelectTab(tab, payload)}
+            />
           )}
-          <span className="hidden lg:inline">LAN Ativo</span>
-        </button>
-
-        {/* User Profile Avatar in Bento style */}
-        <div
-          id="header-user-avatar"
-          className={`w-8 h-8 rounded-full ${roleInfo.color} flex items-center justify-center text-xs font-bold tracking-tight shrink-0 shadow-xs cursor-pointer`}
-          title={`Perfil ativo: ${roleInfo.label}`}
-          onClick={() => onSelectTab('NOTIFICATIONS')}
-        >
-          {roleInfo.code}
         </div>
+
+        {/* Botão Oficial Imprimir */}
+        <button
+          id="btn-header-print-official"
+          onClick={() => window.print()}
+          title="Imprimir relatório da tela atual (Ctrl+P)"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 shadow-2xs transition-all cursor-pointer shrink-0"
+        >
+          <Printer className="h-3.5 w-3.5 text-slate-600" />
+          <span>Imprimir</span>
+        </button>
       </div>
     </header>
   );

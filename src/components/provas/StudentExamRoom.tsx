@@ -24,6 +24,7 @@ interface StudentExamRoomProps {
   students: Student[];
   onFinishSubmission: (submission: ExamSubmission) => void;
   onExit: () => void;
+  onNavigate?: (tab: string, payload?: any) => void;
 }
 
 export const StudentExamRoom: React.FC<StudentExamRoomProps> = ({
@@ -32,6 +33,7 @@ export const StudentExamRoom: React.FC<StudentExamRoomProps> = ({
   students,
   onFinishSubmission,
   onExit,
+  onNavigate,
 }) => {
   // Available questions in this exam
   const examQuestions = useMemo(() => {
@@ -186,12 +188,21 @@ export const StudentExamRoom: React.FC<StudentExamRoomProps> = ({
         </div>
 
         <div className="flex items-center justify-between gap-3 pt-2">
-          <button
-            onClick={onExit}
-            className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
-          >
-            Voltar para Lista
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onNavigate ? onNavigate('MAIN_DASHBOARD') : onExit()}
+              className="px-3.5 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl flex items-center gap-1.5 cursor-pointer"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Voltar ao Início</span>
+            </button>
+            <button
+              onClick={onExit}
+              className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+            >
+              Voltar para Provas
+            </button>
+          </div>
           <button
             onClick={() => setHasStarted(true)}
             className="px-6 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-200 flex items-center gap-2 cursor-pointer"
@@ -228,17 +239,24 @@ export const StudentExamRoom: React.FC<StudentExamRoomProps> = ({
 
             <div className="flex items-center gap-2">
               <button
+                onClick={() => onNavigate ? onNavigate('MAIN_DASHBOARD') : onExit()}
+                className="px-3.5 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl flex items-center gap-1.5 cursor-pointer no-print"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>Voltar ao Início</span>
+              </button>
+              <button
                 onClick={() => window.print()}
                 className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl flex items-center gap-1.5 cursor-pointer no-print"
               >
                 <Printer className="h-4 w-4" />
-                <span>Imprimir Espelho da Prova</span>
+                <span>Imprimir Espelho</span>
               </button>
               <button
                 onClick={onExit}
                 className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md no-print cursor-pointer"
               >
-                Concluir & Retornar
+                Voltar para Provas
               </button>
             </div>
           </div>

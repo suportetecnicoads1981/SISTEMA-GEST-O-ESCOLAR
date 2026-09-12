@@ -26,6 +26,12 @@ import {
   Shield,
   UploadCloud,
   FileCheck,
+  BarChart3,
+  Upload,
+  FileSpreadsheet,
+  ArrowLeft,
+  Home,
+  ChevronRight,
 } from 'lucide-react';
 import {
   CommunicationMessage,
@@ -46,6 +52,9 @@ interface CommunicationModuleProps {
   onConfirmRead: (messageId: string, userId: string, userName: string, userRole: UserRole) => void;
   onDeleteMessage: (messageId: string) => void;
   onTriggerPushNotification: (title: string, body: string) => void;
+  onBatchImportMessages?: (messages: CommunicationMessage[]) => void;
+  onBack?: () => void;
+  onNavigate?: (tab: string, payload?: any) => void;
 }
 
 export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
@@ -58,6 +67,9 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
   onConfirmRead,
   onDeleteMessage,
   onTriggerPushNotification,
+  onBatchImportMessages,
+  onBack,
+  onNavigate,
 }) => {
   // Navigation & filter state
   const [activeTab, setActiveTab] = useState<'FEED' | 'COMPOSE'>('FEED');
@@ -66,6 +78,11 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
   const [filterPriority, setFilterPriority] = useState<string>('ALL');
   const [selectedMessageForDetails, setSelectedMessageForDetails] = useState<CommunicationMessage | null>(null);
   const [attachmentPreview, setAttachmentPreview] = useState<CommunicationAttachment | null>(null);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importFeedback, setImportFeedback] = useState<string | null>(null);
 
   // Compose form state
   const [title, setTitle] = useState('');
@@ -205,6 +222,102 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
     }, 400);
   };
 
+  const handleExportCSV = () => {
+    const headers = ['Data', 'Título', 'Categoria', 'Prioridade', 'Remetente', 'Destinatários', 'Confirmações de Leitura'];
+    const rows = filteredMessages.map((m) => [
+      `"${new Date(m.createdAt).toLocaleDateString('pt-BR')}"`,
+      `"${m.title.replace(/"/g, '""')}"`,
+      `"${m.category}"`,
+      `"${m.priority}"`,
+      `"${m.senderName}"`,
+      `"${m.recipientType}"`,
+      m.readConfirmations.length,
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `comunicados_escolares_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleProcessImport = () => {
+    try {
+      let imported: CommunicationMessage[] = [];
+      const trimmed = importText.trim();
+      if (!trimmed) {
+        setImportFeedback('Insira dados no formato JSON ou linhas de texto.');
+        return;
+      }
+
+      if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+        const parsed = JSON.parse(trimmed);
+        imported = Array.isArray(parsed) ? parsed : [parsed];
+      } else {
+        const lines = trimmed.split('\n').filter((l) => l.trim().length > 0);
+        lines.forEach((line, idx) => {
+          if (idx === 0 && line.toLowerCase().includes('título')) return;
+          const parts = line.includes(';') ? line.split(';') : line.split(',');
+          const msgTitle = parts[0]?.replace(/"/g, '').trim() || `Comunicado ${idx + 1}`;
+          const msgContent = parts[1]?.replace(/"/g, '').trim() || 'Aviso oficial da equipe pedagógica.';
+          const msgCategory = (parts[2]?.replace(/"/g, '').trim() as any) || 'GERAL';
+
+          imported.push({
+            id: `comm-imp-${Date.now()}-${idx}`,
+            title: msgTitle,
+            content: msgContent,
+            category: msgCategory,
+            priority: 'NORMAL',
+            senderRole: currentRole,
+            senderName: currentUserName,
+            recipientType: 'ALL',
+            targetRoles: ['STUDENT', 'TEACHER', 'PARENT', 'ADMIN'],
+            sendPushNotification: true,
+            status: 'ENVIADO',
+            attachments: [],
+            requireReadConfirmation: true,
+            readConfirmations: [],
+            createdAt: new Date().toISOString(),
+          });
+        });
+      }
+
+      if (imported.length > 0) {
+        if (onBatchImportMessages) {
+          onBatchImportMessages(imported);
+        } else {
+          imported.forEach((msg) => {
+            onSendMessage({
+              title: msg.title,
+              content: msg.content,
+              category: msg.category,
+              priority: msg.priority,
+              senderRole: msg.senderRole,
+              senderName: msg.senderName,
+              recipientType: msg.recipientType,
+              targetRoles: msg.targetRoles,
+              targetClassId: msg.targetClassId,
+              targetStudentId: msg.targetStudentId,
+              attachments: msg.attachments,
+              requireReadConfirmation: msg.requireReadConfirmation,
+            });
+          });
+        }
+        setImportFeedback(`Sucesso! ${imported.length} comunicados importados.`);
+        setTimeout(() => {
+          setIsImportModalOpen(false);
+          setImportFeedback(null);
+          setImportText('');
+        }, 1200);
+      }
+    } catch (e: any) {
+      setImportFeedback(`Erro no processamento: ${e.message}`);
+    }
+  };
+
   // Filter messages
   const filteredMessages = messages.filter((msg) => {
     const matchesSearch =
@@ -244,7 +357,70 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
       : 'parent-001';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Module Navigation Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onBack ? onBack() : onNavigate?.('MAIN_DASHBOARD')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 text-xs font-bold transition-all border border-slate-200 cursor-pointer shadow-2xs group"
+            title="Voltar ao Dashbox Principal"
+          >
+            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+            <span>Voltar ao Início</span>
+          </button>
+          {activeTab === 'COMPOSE' && (
+            <button
+              onClick={() => setActiveTab('FEED')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-all border border-indigo-200 cursor-pointer"
+            >
+              <span>← Voltar ao Mural</span>
+            </button>
+          )}
+          <div className="hidden sm:flex items-center gap-1 text-xs text-slate-400 ml-1">
+            <span>Início</span>
+            <ChevronRight className="h-3 w-3 text-slate-300" />
+            <span className="font-bold text-slate-800">Comunicação Escolar</span>
+          </div>
+        </div>
+
+        {/* Quick Tab Switcher */}
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setActiveTab('FEED')}
+            className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'FEED'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            <span>Mural ({messages.length})</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('COMPOSE')}
+            className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'COMPOSE'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>Novo Comunicado</span>
+          </button>
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('WHATSAPP')}
+              className="px-3 py-1 text-xs font-bold rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer flex items-center gap-1.5"
+              title="Abrir Central de Disparos WhatsApp"
+            >
+              <Smartphone className="h-3.5 w-3.5 text-emerald-600" />
+              <span>WhatsApp Notificações</span>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Bento Grid Header Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Metric 1: Total Messages */}
@@ -314,7 +490,7 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
 
       {/* Main Tab Navigation & Actions */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setActiveTab('FEED')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
@@ -339,7 +515,43 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
             }`}
           >
             <Plus className="h-4 w-4" />
-            <span>Novo Comunicado / Enviar Mensagem</span>
+            <span>Novo Comunicado</span>
+          </button>
+
+          <div className="h-5 w-[1px] bg-slate-200 mx-1 hidden sm:block"></div>
+
+          <button
+            onClick={() => setIsReportModalOpen(true)}
+            className="px-3 py-2 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl border border-indigo-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+            title="Relatório de Confirmação e Leitura"
+          >
+            <BarChart3 className="h-4 w-4 text-indigo-600" />
+            <span>Gerar Relatório</span>
+          </button>
+
+          <button
+            onClick={() => setIsPrintModalOpen(true)}
+            className="px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+            title="Imprimir Mural Físico"
+          >
+            <Printer className="h-4 w-4 text-slate-600" />
+            <span>Imprimir Mural</span>
+          </button>
+
+          <button
+            onClick={handleExportCSV}
+            className="px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <FileSpreadsheet className="h-4 w-4 text-slate-600" />
+            <span>CSV</span>
+          </button>
+
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="px-3 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl border border-indigo-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <Upload className="h-4 w-4 text-indigo-600" />
+            <span>Importar</span>
           </button>
         </div>
 
@@ -1038,6 +1250,250 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
                   <span>Baixar Documento</span>
                 </a>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal de Relatório de Engajamento e Leituras */}
+      {isReportModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden my-6">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white">
+                  <BarChart3 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">
+                    Relatório de Eficácia & Leitura de Comunicados
+                  </h2>
+                  <p className="text-xs text-slate-500">Engajamento de pais, alunos e confirmações de ciência</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsReportModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto text-xs">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Total Transmitido</span>
+                  <p className="text-2xl font-black text-slate-900">{messages.length}</p>
+                </div>
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+                  <span className="text-[10px] uppercase font-bold text-emerald-700">Leituras Confirmadas</span>
+                  <p className="text-2xl font-black text-emerald-700">
+                    {messages.reduce((acc, m) => acc + m.readConfirmations.length, 0)}
+                  </p>
+                </div>
+                <div className="p-3 bg-rose-50 rounded-xl border border-rose-200">
+                  <span className="text-[10px] uppercase font-bold text-rose-700">Avisos Urgentes</span>
+                  <p className="text-2xl font-black text-rose-700">
+                    {messages.filter((m) => m.priority === 'URGENTE').length}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-800 mb-2">Detalhamento por Comunicado</h4>
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+                        <th className="p-2.5">Data</th>
+                        <th className="p-2.5">Título</th>
+                        <th className="p-2.5">Categoria</th>
+                        <th className="p-2.5">Prioridade</th>
+                        <th className="p-2.5">Remetente</th>
+                        <th className="p-2.5 text-center">Confirmações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {messages.map((m) => (
+                        <tr key={m.id} className="hover:bg-slate-50">
+                          <td className="p-2.5 text-slate-500 font-mono">
+                            {new Date(m.createdAt).toLocaleDateString('pt-BR')}
+                          </td>
+                          <td className="p-2.5 font-bold text-slate-800">{m.title}</td>
+                          <td className="p-2.5">{m.category}</td>
+                          <td className="p-2.5">
+                            <span
+                              className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                                m.priority === 'URGENTE'
+                                  ? 'bg-rose-100 text-rose-700'
+                                  : 'bg-slate-100 text-slate-600'
+                              }`}
+                            >
+                              {m.priority}
+                            </span>
+                          </td>
+                          <td className="p-2.5">{m.senderName}</td>
+                          <td className="p-2.5 text-center font-bold text-indigo-600">
+                            {m.readConfirmations.length}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+              <button
+                onClick={handleExportCSV}
+                className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-semibold flex items-center gap-1.5 cursor-pointer text-xs"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                <span>Exportar CSV</span>
+              </button>
+              <button
+                onClick={() => setIsReportModalOpen(false)}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs cursor-pointer"
+              >
+                Fechar Relatório
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Impressão de Mural Oficial */}
+      {isPrintModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden my-6">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between no-print">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white">
+                  <Printer className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">
+                    Impressão de Mural Oficial de Comunicados & Portaria
+                  </h2>
+                  <p className="text-xs text-slate-500">Documento diagramado para afixação física no colégio</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsPrintModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="px-6 py-3 bg-indigo-50/50 border-b border-indigo-100 flex items-center justify-between no-print text-xs">
+              <p className="text-indigo-900 font-semibold">Exibindo {filteredMessages.length} comunicados recentes</p>
+              <button
+                onClick={() => window.print()}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-sm flex items-center gap-2 cursor-pointer"
+              >
+                <Printer className="h-4 w-4" />
+                <span>Imprimir Mural (Ctrl+P / PDF)</span>
+              </button>
+            </div>
+
+            <div className="p-8 max-h-[70vh] overflow-y-auto bg-white text-slate-900 font-serif leading-relaxed text-sm space-y-6">
+              <div className="border-b-2 border-slate-900 pb-3 text-center space-y-1">
+                <h1 className="text-base font-bold uppercase tracking-wider font-sans">
+                  COLÉGIO INTEGRADO • QUADRO OFICIAL DE AVISOS & COMUNICADOS
+                </h1>
+                <p className="text-xs text-slate-600 font-sans">
+                  INFORMAÇÕES À COMUNIDADE ESCOLAR, RESPONSÁVEIS E CORPO DOCENTE
+                </p>
+                <div className="pt-2 text-xs font-sans flex justify-between border-t border-slate-200 mt-2 text-slate-700">
+                  <span>Atualizado em: {new Date().toLocaleDateString('pt-BR')}</span>
+                  <span>Portaria & Secretaria Central</span>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {filteredMessages.map((m) => (
+                  <div key={m.id} className="border border-slate-300 rounded-xl p-4 space-y-2 bg-slate-50/50 font-sans">
+                    <div className="flex justify-between items-start">
+                      <h3 className="font-bold text-slate-900 text-sm">{m.title}</h3>
+                      <span className="text-[11px] font-semibold text-slate-500 font-mono">
+                        {new Date(m.createdAt).toLocaleDateString('pt-BR')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-700 whitespace-pre-line leading-relaxed">{m.content}</p>
+                    <div className="pt-2 border-t border-slate-200 text-[10px] text-slate-500 flex justify-between">
+                      <span>Emitido por: {m.senderName} ({m.senderRole})</span>
+                      <span>Categoria: {m.category}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Importação de Comunicados */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden my-6">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white">
+                  <Upload className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">Importação em Lote de Comunicados</h2>
+                  <p className="text-xs text-slate-500">Cole mensagens no formato CSV (Título; Conteúdo; Categoria) ou JSON</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsImportModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs">
+              {importFeedback && (
+                <div
+                  className={`p-3 rounded-xl font-medium ${
+                    importFeedback.includes('Sucesso')
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      : 'bg-rose-50 text-rose-800 border border-rose-200'
+                  }`}
+                >
+                  {importFeedback}
+                </div>
+              )}
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Dados dos Comunicados (linha CSV ou JSON):
+                </label>
+                <textarea
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  placeholder={`Exemplo CSV:\nReunião com Pais; Lembramos a reunião pedagógica amanhã às 19h; PEDAGOGICO\nFeira de Ciências 2026; Inscrições abertas para projetos da feira; EVENTO\nRecesso Escolar; Informamos o período de recesso de 15 a 22 de Julho; GERAL`}
+                  className="w-full h-44 p-3 rounded-xl border border-slate-200 font-mono text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setIsImportModalOpen(false)}
+                className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-semibold rounded-xl text-xs cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleProcessImport}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs cursor-pointer shadow-sm"
+              >
+                Cadastrar Comunicados
+              </button>
             </div>
           </div>
         </div>

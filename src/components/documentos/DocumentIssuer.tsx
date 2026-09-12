@@ -12,6 +12,11 @@ import {
   ShieldCheck,
   QrCode,
   Sparkles,
+  ArrowLeft,
+  Home,
+  ChevronRight,
+  Users,
+  Layers,
 } from 'lucide-react';
 import {
   Student,
@@ -34,6 +39,8 @@ interface DocumentIssuerProps {
   settings: SchoolSettings;
   preSelectedStudentId?: string;
   preSelectedDocType?: DocumentType;
+  onBack?: () => void;
+  onNavigate?: (tab: string, payload?: any) => void;
 }
 
 export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
@@ -43,6 +50,8 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
   settings,
   preSelectedStudentId,
   preSelectedDocType = 'CERTIFICADO_CONCLUSAO',
+  onBack,
+  onNavigate,
 }) => {
   const [selectedStudentId, setSelectedStudentId] = useState<string>(
     preSelectedStudentId || students[0]?.id || ''
@@ -75,7 +84,78 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Module Navigation Bar (Hidden on Print) */}
+      <div className="no-print flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onBack ? onBack() : onNavigate?.('MAIN_DASHBOARD')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 text-xs font-bold transition-all border border-slate-200 cursor-pointer shadow-2xs group"
+            title="Voltar ao Dashbox Principal"
+          >
+            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+            <span>Voltar ao Início</span>
+          </button>
+          <button
+            onClick={() => onNavigate?.('STUDENTS')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all cursor-pointer"
+            title="Voltar para a Lista de Alunos"
+          >
+            <Users className="h-3.5 w-3.5 text-slate-500" />
+            <span>Voltar para Alunos</span>
+          </button>
+          <div className="hidden md:flex items-center gap-1 text-xs text-slate-400 ml-2">
+            <span>Início</span>
+            <ChevronRight className="h-3 w-3 text-slate-300" />
+            <span className="font-bold text-slate-800">Documentos & Certificados</span>
+          </div>
+        </div>
+
+        {/* Quick Document Type Tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto">
+          <button
+            onClick={() => setDocumentType('CERTIFICADO_CONCLUSAO')}
+            className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+              documentType === 'CERTIFICADO_CONCLUSAO'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Certificado
+          </button>
+          <button
+            onClick={() => setDocumentType('DECLARACAO_MATRICULA')}
+            className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+              documentType === 'DECLARACAO_MATRICULA'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Declaração
+          </button>
+          <button
+            onClick={() => setDocumentType('HISTORICO_ESCOLAR')}
+            className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+              documentType === 'HISTORICO_ESCOLAR'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Histórico
+          </button>
+          <button
+            onClick={() => setDocumentType('BOLETIM_ESCOLAR')}
+            className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+              documentType === 'BOLETIM_ESCOLAR'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Boletim
+          </button>
+        </div>
+      </div>
+
       {/* Top Controls Bar (Hidden on Print) */}
       <div className="no-print bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

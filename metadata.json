@@ -1,6 +1,6 @@
 {
-  "name": "EduGestão Pro - Sistema Integrado de Gestão Escolar",
-  "description": "Sistema completo de gestão escolar com secretária acadêmica, matrícula, banco de questões, provas com correção automática instantânea, relatórios pedagógicos, análise de evolução de notas, arquitetura cliente/servidor, instalador de rede e backup.",
+  "name": "SucessoEdu Gestão Educacional",
+  "description": "Plataforma completa de gestão educacional e ecossistema DataSync Pro Supabase com controle de schema Safe-Mode, backups consolidados em ZIP, otimização de mídias WebP/GIF e RLS rigoroso.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

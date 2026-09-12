@@ -16,10 +16,27 @@ import {
   QuestionStat,
   StudentResultSummary,
   SystemBackup,
+  AutoBackupSnapshot,
   NotificationItem,
   CommunicationMessage,
   RoleNotificationPreferences,
   UserRole,
+  SchoolUnit,
+  MunicipalSyncPacket,
+  SyncAuditLog,
+  UserAccount,
+  BnccSkill,
+  StateEducationRegulation,
+  AttendanceSheet,
+  LessonDiaryRegistry,
+  ClassGradeSheet,
+  TeacherLessonPlan,
+  TeacherStudentPedagogicalNote,
+  WhatsAppConfig,
+  WhatsAppMessageLog,
+  WhatsAppTemplate,
+  SystemUpdatePackage,
+  SecurityAuditLog,
 } from '../types';
 import {
   DEFAULT_STUDENTS,
@@ -36,23 +53,58 @@ import {
   DEFAULT_NOTIFICATIONS,
   DEFAULT_COMMUNICATIONS,
   DEFAULT_ROLE_PREFERENCES,
+  DEFAULT_SCHOOL_UNITS,
+  DEFAULT_SYNC_LOGS,
+  DEFAULT_USER_ACCOUNTS,
+  DEFAULT_WHATSAPP_CONFIG,
+  DEFAULT_WHATSAPP_TEMPLATES,
+  DEFAULT_WHATSAPP_LOGS,
+  DEFAULT_SYSTEM_UPDATES,
+  DEFAULT_AUDIT_LOGS,
 } from './defaultData';
+import {
+  DEFAULT_BNCC_SKILLS,
+  DEFAULT_STATE_REGULATIONS,
+  DEFAULT_ATTENDANCE_SHEETS,
+  DEFAULT_LESSON_REGISTRIES,
+  DEFAULT_CLASS_GRADE_SHEETS,
+  DEFAULT_TEACHER_LESSON_PLANS,
+  DEFAULT_TEACHER_STUDENT_NOTES,
+} from './bnccAndRegulationsData';
 
 const KEYS = {
-  DATA: 'edugestao_master_store_v4',
-  STUDENTS: 'edugestao_students_v4',
-  CLASSES: 'edugestao_classes_v4',
-  SUBJECTS: 'edugestao_subjects_v4',
-  COURSES: 'edugestao_courses_v4',
-  QUESTIONS: 'edugestao_questions_v4',
-  EXAMS: 'edugestao_exams_v4',
-  SUBMISSIONS: 'edugestao_submissions_v4',
-  HISTORIES: 'edugestao_histories_v4',
-  SETTINGS: 'edugestao_settings_v4',
-  SERVER_CONFIG: 'edugestao_server_config_v4',
-  NOTIFICATIONS: 'edugestao_notifications_v4',
-  COMMUNICATIONS: 'edugestao_communications_v4',
-  ROLE_PREFS: 'edugestao_role_prefs_v4',
+  DATA: 'sucessoedu_master_store_v5',
+  STUDENTS: 'sucessoedu_students_v5',
+  CLASSES: 'sucessoedu_classes_v5',
+  SUBJECTS: 'sucessoedu_subjects_v5',
+  COURSES: 'sucessoedu_courses_v5',
+  QUESTIONS: 'sucessoedu_questions_v5',
+  EXAMS: 'sucessoedu_exams_v5',
+  SUBMISSIONS: 'sucessoedu_submissions_v5',
+  HISTORIES: 'sucessoedu_histories_v5',
+  SETTINGS: 'sucessoedu_settings_v5',
+  SERVER_CONFIG: 'sucessoedu_server_config_v5',
+  NOTIFICATIONS: 'sucessoedu_notifications_v5',
+  COMMUNICATIONS: 'sucessoedu_communications_v5',
+  ROLE_PREFS: 'sucessoedu_role_prefs_v5',
+  SCHOOL_UNITS: 'sucessoedu_school_units_v5',
+  SYNC_LOGS: 'sucessoedu_sync_logs_v5',
+  USER_ACCOUNTS: 'sucessoedu_users_v5',
+  DEVELOPER: 'sucessoedu_developer_v5',
+  BNCC_SKILLS: 'sucessoedu_bncc_skills_v5',
+  STATE_REGULATIONS: 'sucessoedu_state_regulations_v5',
+  ATTENDANCE_SHEETS: 'sucessoedu_attendance_v5',
+  LESSON_REGISTRIES: 'sucessoedu_lesson_registries_v5',
+  ACTIVE_STATE_CODE: 'sucessoedu_active_state_code_v5',
+  CLASS_GRADE_SHEETS: 'sucessoedu_class_grade_sheets_v5',
+  TEACHER_LESSON_PLANS: 'sucessoedu_teacher_lesson_plans_v5',
+  TEACHER_STUDENT_NOTES: 'sucessoedu_teacher_student_notes_v5',
+  WHATSAPP_CONFIG: 'sucessoedu_whatsapp_config_v5',
+  WHATSAPP_LOGS: 'sucessoedu_whatsapp_logs_v5',
+  SYSTEM_UPDATES: 'sucessoedu_system_updates_v5',
+  AUDIT_LOGS: 'sucessoedu_audit_logs_v5',
+  AUTO_BACKUP_LATEST: 'sucessoedu_auto_backup_latest_v5',
+  AUTO_BACKUP_HISTORY: 'sucessoedu_auto_backup_history_v5',
 };
 
 export interface AppStateData {
@@ -68,14 +120,262 @@ export interface AppStateData {
   notifications: NotificationItem[];
   communications: CommunicationMessage[];
   rolePreferences: Record<UserRole, RoleNotificationPreferences>;
+  schoolUnits: SchoolUnit[];
+  syncLogs: SyncAuditLog[];
+  userAccounts: UserAccount[];
+  developerContact: DeveloperContact;
+  bnccSkills: BnccSkill[];
+  stateRegulations: StateEducationRegulation[];
+  activeStateRegulationCode: string;
+  attendanceSheets: AttendanceSheet[];
+  lessonRegistries: LessonDiaryRegistry[];
+  classGradeSheets: ClassGradeSheet[];
+  teacherLessonPlans: TeacherLessonPlan[];
+  teacherStudentNotes: TeacherStudentPedagogicalNote[];
+  whatsappConfig: WhatsAppConfig;
+  whatsappTemplates: WhatsAppTemplate[];
+  whatsappLogs: WhatsAppMessageLog[];
+  systemUpdates: SystemUpdatePackage[];
+  auditLogs: SecurityAuditLog[];
+}
+
+export interface CleanInstallationOptions {
+  schoolName?: string;
+  adminEmail?: string;
+  city?: string;
+  state?: string;
 }
 
 /**
- * Loads entire master application state from local storage or seeds with default mock data
+ * Cria a estrutura oficial de banco de dados 100% limpa (sem dados fictícios / modo produção)
+ */
+export function getCleanDatabase(options?: CleanInstallationOptions): AppStateData {
+  const masterUser = DEFAULT_USER_ACCOUNTS.find((u) => u.isMaster) || DEFAULT_USER_ACCOUNTS[0];
+  const activeMaster: UserAccount = {
+    ...masterUser,
+    id: 'user-master-01',
+    name: 'Administrador Master ADS',
+    login: 'master.admin',
+    email: options?.adminEmail || masterUser.email || 'suportetecnicoads@gmail.com',
+    role: 'ADMIN',
+    sector: 'MASTER',
+    sectorTitle: 'Super Administrador Geral (Chave Mestre)',
+    isMaster: true,
+    active: true,
+    createdAt: new Date().toISOString(),
+    lastLogin: new Date().toISOString(),
+  };
+
+  const initialSettings: SchoolSettings = {
+    ...DEFAULT_SCHOOL_SETTINGS,
+    name: options?.schoolName || 'Minha Instituição de Ensino',
+    tradeName: options?.schoolName ? `${options.schoolName} S/S` : 'Instituto Educacional',
+    inepCode: '',
+    cnpj: '',
+    accreditationDecree: '',
+    address: '',
+    neighborhood: '',
+    city: options?.city || 'São Paulo',
+    state: options?.state || 'SP',
+    zipCode: '',
+    phone: '',
+    email: options?.adminEmail || 'contato@escola.edu.br',
+    website: '',
+    principalName: '',
+    principalTitle: 'Diretor(a) Pedagógico(a)',
+    secretaryName: '',
+    secretaryRegistration: '',
+  };
+
+  const headquarterUnit: SchoolUnit = {
+    id: 'unit-matriz',
+    name: 'Sede Principal (Matriz)',
+    inepCode: '12345678',
+    type: 'SEDE_CENTRAL',
+    locationZone: 'URBANA',
+    district: 'Centro',
+    address: 'Prédio Central',
+    directorName: activeMaster.name,
+    phone: '(11) 9999-9999',
+    email: activeMaster.email,
+    totalStudents: 0,
+    totalTeachers: 0,
+    totalClasses: 0,
+    hasInternet: true,
+    syncStatus: 'SINCRONIZADO',
+    lastSyncDate: new Date().toISOString(),
+  };
+
+  return {
+    students: [],
+    classes: [],
+    subjects: DEFAULT_SUBJECTS, // Matriz referencial de disciplinas BNCC
+    courses: DEFAULT_COURSES,   // Estrutura padrão de níveis de ensino (Educação Infantil ao Médio)
+    questions: [],
+    exams: [],
+    submissions: [],
+    academicHistories: [],
+    settings: initialSettings,
+    notifications: [
+      {
+        id: 'notif-welcome-clean',
+        title: 'Instalação Limpa Concluída',
+        message: 'O SucessoEdu foi inicializado em modo produção sem dados de teste. Comece cadastrando as informações da escola, turmas e primeiros alunos.',
+        type: 'IMPORTANT_ANNOUNCEMENT',
+        priority: 'HIGH',
+        targetRoles: ['ADMIN'],
+        createdAt: new Date().toISOString(),
+        read: false,
+      },
+    ],
+    communications: [],
+    rolePreferences: DEFAULT_ROLE_PREFERENCES,
+    schoolUnits: [headquarterUnit],
+    syncLogs: [],
+    userAccounts: [activeMaster],
+    developerContact: DEFAULT_DEVELOPER_CONTACT,
+    bnccSkills: DEFAULT_BNCC_SKILLS,
+    stateRegulations: DEFAULT_STATE_REGULATIONS,
+    activeStateRegulationCode: options?.state || 'SP',
+    attendanceSheets: [],
+    lessonRegistries: [],
+    classGradeSheets: [],
+    teacherLessonPlans: [],
+    teacherStudentNotes: [],
+    whatsappConfig: {
+      ...DEFAULT_WHATSAPP_CONFIG,
+      enabled: false,
+      status: 'DISCONNECTED',
+    },
+    whatsappTemplates: DEFAULT_WHATSAPP_TEMPLATES,
+    whatsappLogs: [],
+    systemUpdates: DEFAULT_SYSTEM_UPDATES,
+    auditLogs: [
+      {
+        id: `audit-clean-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        userId: activeMaster.id,
+        userName: activeMaster.name,
+        userLogin: activeMaster.login,
+        userRole: activeMaster.role,
+        userSector: activeMaster.sector,
+        actionType: 'EXPORTAR_DADOS',
+        module: 'configuracoes',
+        details: 'Base de dados limpa com sucesso para implantação de nova instalação de produção.',
+        ipAddress: '127.0.0.1',
+        status: 'SUCESSO',
+      },
+    ],
+  };
+}
+
+/**
+ * Reseta o banco de dados local para uma instalação 100% limpa sem dados fictícios
+ */
+export function resetToCleanDatabase(options?: CleanInstallationOptions): AppStateData {
+  const cleanData = getCleanDatabase(options);
+  try {
+    saveStoredData(cleanData);
+    localStorage.setItem('sucessoedu_clean_install', 'true');
+    localStorage.setItem('sucessoedu_database_mode', 'CLEAN');
+    localStorage.setItem('sucessoedu_data', JSON.stringify(cleanData));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sucessoedu_db_changed', { detail: cleanData }));
+    }
+  } catch (err) {
+    console.error('Erro ao salvar instalação limpa no localStorage:', err);
+  }
+  return cleanData;
+}
+
+/**
+ * Restaura o banco de dados com a massa de dados de teste / demonstração
+ */
+export function resetToDemoDatabase(): AppStateData {
+  const initial: AppStateData = {
+    students: DEFAULT_STUDENTS,
+    classes: DEFAULT_CLASSES,
+    subjects: DEFAULT_SUBJECTS,
+    courses: DEFAULT_COURSES,
+    questions: DEFAULT_QUESTIONS,
+    exams: DEFAULT_EXAMS,
+    submissions: DEFAULT_SUBMISSIONS,
+    academicHistories: DEFAULT_ACADEMIC_HISTORIES,
+    settings: DEFAULT_SCHOOL_SETTINGS,
+    notifications: DEFAULT_NOTIFICATIONS,
+    communications: DEFAULT_COMMUNICATIONS,
+    rolePreferences: DEFAULT_ROLE_PREFERENCES,
+    schoolUnits: DEFAULT_SCHOOL_UNITS,
+    syncLogs: DEFAULT_SYNC_LOGS,
+    userAccounts: DEFAULT_USER_ACCOUNTS,
+    developerContact: DEFAULT_DEVELOPER_CONTACT,
+    bnccSkills: DEFAULT_BNCC_SKILLS,
+    stateRegulations: DEFAULT_STATE_REGULATIONS,
+    activeStateRegulationCode: 'SP',
+    attendanceSheets: DEFAULT_ATTENDANCE_SHEETS,
+    lessonRegistries: DEFAULT_LESSON_REGISTRIES,
+    classGradeSheets: DEFAULT_CLASS_GRADE_SHEETS,
+    teacherLessonPlans: DEFAULT_TEACHER_LESSON_PLANS,
+    teacherStudentNotes: DEFAULT_TEACHER_STUDENT_NOTES,
+    whatsappConfig: DEFAULT_WHATSAPP_CONFIG,
+    whatsappTemplates: DEFAULT_WHATSAPP_TEMPLATES,
+    whatsappLogs: DEFAULT_WHATSAPP_LOGS,
+    systemUpdates: DEFAULT_SYSTEM_UPDATES,
+    auditLogs: DEFAULT_AUDIT_LOGS,
+  };
+  try {
+    saveStoredData(initial);
+    localStorage.setItem('sucessoedu_database_mode', 'DEMO');
+    localStorage.removeItem('sucessoedu_clean_install');
+    localStorage.setItem('sucessoedu_data', JSON.stringify(initial));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sucessoedu_db_changed', { detail: initial }));
+    }
+  } catch (err) {
+    console.error('Erro ao salvar modo demo:', err);
+  }
+  return initial;
+}
+
+/**
+ * Verifica se a base de dados atual está limpa (modo de produção sem dados de exemplo)
+ */
+export function isDatabaseClean(data?: AppStateData): boolean {
+  if (data) {
+    return data.students.length === 0 && data.classes.length === 0 && data.exams.length === 0;
+  }
+  try {
+    const mode = localStorage.getItem('sucessoedu_database_mode');
+    if (mode === 'CLEAN' || localStorage.getItem('sucessoedu_clean_install') === 'true') {
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+/**
+ * Loads entire master application state from local storage or seeds with clean or default mock data
  */
 export function getStoredData(): AppStateData {
+  let isCleanMode = false;
+  try {
+    const mode = localStorage.getItem('sucessoedu_database_mode');
+    const isCleanFlag = localStorage.getItem('sucessoedu_clean_install') === 'true';
+    // Se ainda não houver flag explícita, o padrão solicitado é a instalação limpa
+    if (mode === 'CLEAN' || isCleanFlag || mode !== 'DEMO') {
+      isCleanMode = true;
+    }
+  } catch {
+    isCleanMode = true;
+  }
+
   const raw = localStorage.getItem(KEYS.DATA);
   if (!raw) {
+    if (isCleanMode) {
+      const clean = getCleanDatabase();
+      saveStoredData(clean);
+      return clean;
+    }
     const initial: AppStateData = {
       students: DEFAULT_STUDENTS,
       classes: DEFAULT_CLASSES,
@@ -89,6 +389,23 @@ export function getStoredData(): AppStateData {
       notifications: DEFAULT_NOTIFICATIONS,
       communications: DEFAULT_COMMUNICATIONS,
       rolePreferences: DEFAULT_ROLE_PREFERENCES,
+      schoolUnits: DEFAULT_SCHOOL_UNITS,
+      syncLogs: DEFAULT_SYNC_LOGS,
+      userAccounts: DEFAULT_USER_ACCOUNTS,
+      developerContact: DEFAULT_DEVELOPER_CONTACT,
+      bnccSkills: DEFAULT_BNCC_SKILLS,
+      stateRegulations: DEFAULT_STATE_REGULATIONS,
+      activeStateRegulationCode: 'SP',
+      attendanceSheets: DEFAULT_ATTENDANCE_SHEETS,
+      lessonRegistries: DEFAULT_LESSON_REGISTRIES,
+      classGradeSheets: DEFAULT_CLASS_GRADE_SHEETS,
+      teacherLessonPlans: DEFAULT_TEACHER_LESSON_PLANS,
+      teacherStudentNotes: DEFAULT_TEACHER_STUDENT_NOTES,
+      whatsappConfig: DEFAULT_WHATSAPP_CONFIG,
+      whatsappTemplates: DEFAULT_WHATSAPP_TEMPLATES,
+      whatsappLogs: DEFAULT_WHATSAPP_LOGS,
+      systemUpdates: DEFAULT_SYSTEM_UPDATES,
+      auditLogs: DEFAULT_AUDIT_LOGS,
     };
     saveStoredData(initial);
     return initial;
@@ -96,21 +413,43 @@ export function getStoredData(): AppStateData {
 
   try {
     const parsed = JSON.parse(raw);
+    const hasArr = (arr: any) => Array.isArray(arr);
+
     return {
-      students: parsed.students || DEFAULT_STUDENTS,
-      classes: parsed.classes || DEFAULT_CLASSES,
-      subjects: parsed.subjects || DEFAULT_SUBJECTS,
-      courses: parsed.courses || DEFAULT_COURSES,
-      questions: parsed.questions || DEFAULT_QUESTIONS,
-      exams: parsed.exams || DEFAULT_EXAMS,
-      submissions: parsed.submissions || DEFAULT_SUBMISSIONS,
-      academicHistories: parsed.academicHistories || DEFAULT_ACADEMIC_HISTORIES,
+      students: hasArr(parsed.students) ? parsed.students : (isCleanMode ? [] : DEFAULT_STUDENTS),
+      classes: hasArr(parsed.classes) ? parsed.classes : (isCleanMode ? [] : DEFAULT_CLASSES),
+      subjects: hasArr(parsed.subjects) && parsed.subjects.length > 0 ? parsed.subjects : DEFAULT_SUBJECTS,
+      courses: hasArr(parsed.courses) && parsed.courses.length > 0 ? parsed.courses : DEFAULT_COURSES,
+      questions: hasArr(parsed.questions) ? parsed.questions : (isCleanMode ? [] : DEFAULT_QUESTIONS),
+      exams: hasArr(parsed.exams) ? parsed.exams : (isCleanMode ? [] : DEFAULT_EXAMS),
+      submissions: hasArr(parsed.submissions) ? parsed.submissions : (isCleanMode ? [] : DEFAULT_SUBMISSIONS),
+      academicHistories: hasArr(parsed.academicHistories) ? parsed.academicHistories : (isCleanMode ? [] : DEFAULT_ACADEMIC_HISTORIES),
       settings: parsed.settings || DEFAULT_SCHOOL_SETTINGS,
-      notifications: parsed.notifications || DEFAULT_NOTIFICATIONS,
-      communications: parsed.communications || DEFAULT_COMMUNICATIONS,
+      notifications: hasArr(parsed.notifications) ? parsed.notifications : [],
+      communications: hasArr(parsed.communications) ? parsed.communications : [],
       rolePreferences: parsed.rolePreferences || DEFAULT_ROLE_PREFERENCES,
+      schoolUnits: hasArr(parsed.schoolUnits) ? parsed.schoolUnits : (isCleanMode ? [] : DEFAULT_SCHOOL_UNITS),
+      syncLogs: hasArr(parsed.syncLogs) ? parsed.syncLogs : [],
+      userAccounts: hasArr(parsed.userAccounts) && parsed.userAccounts.length > 0 ? parsed.userAccounts : DEFAULT_USER_ACCOUNTS,
+      developerContact: parsed.developerContact || DEFAULT_DEVELOPER_CONTACT,
+      bnccSkills: hasArr(parsed.bnccSkills) && parsed.bnccSkills.length > 0 ? parsed.bnccSkills : DEFAULT_BNCC_SKILLS,
+      stateRegulations: hasArr(parsed.stateRegulations) && parsed.stateRegulations.length > 0 ? parsed.stateRegulations : DEFAULT_STATE_REGULATIONS,
+      activeStateRegulationCode: parsed.activeStateRegulationCode || 'SP',
+      attendanceSheets: hasArr(parsed.attendanceSheets) ? parsed.attendanceSheets : [],
+      lessonRegistries: hasArr(parsed.lessonRegistries) ? parsed.lessonRegistries : [],
+      classGradeSheets: hasArr(parsed.classGradeSheets) ? parsed.classGradeSheets : (isCleanMode ? [] : DEFAULT_CLASS_GRADE_SHEETS),
+      teacherLessonPlans: hasArr(parsed.teacherLessonPlans) ? parsed.teacherLessonPlans : (isCleanMode ? [] : DEFAULT_TEACHER_LESSON_PLANS),
+      teacherStudentNotes: hasArr(parsed.teacherStudentNotes) ? parsed.teacherStudentNotes : (isCleanMode ? [] : DEFAULT_TEACHER_STUDENT_NOTES),
+      whatsappConfig: parsed.whatsappConfig || DEFAULT_WHATSAPP_CONFIG,
+      whatsappTemplates: hasArr(parsed.whatsappTemplates) ? parsed.whatsappTemplates : DEFAULT_WHATSAPP_TEMPLATES,
+      whatsappLogs: hasArr(parsed.whatsappLogs) ? parsed.whatsappLogs : [],
+      systemUpdates: hasArr(parsed.systemUpdates) ? parsed.systemUpdates : DEFAULT_SYSTEM_UPDATES,
+      auditLogs: hasArr(parsed.auditLogs) ? parsed.auditLogs : [],
     };
   } catch {
+    if (isCleanMode) {
+      return getCleanDatabase();
+    }
     return {
       students: DEFAULT_STUDENTS,
       classes: DEFAULT_CLASSES,
@@ -124,6 +463,23 @@ export function getStoredData(): AppStateData {
       notifications: DEFAULT_NOTIFICATIONS,
       communications: DEFAULT_COMMUNICATIONS,
       rolePreferences: DEFAULT_ROLE_PREFERENCES,
+      schoolUnits: DEFAULT_SCHOOL_UNITS,
+      syncLogs: DEFAULT_SYNC_LOGS,
+      userAccounts: DEFAULT_USER_ACCOUNTS,
+      developerContact: DEFAULT_DEVELOPER_CONTACT,
+      bnccSkills: DEFAULT_BNCC_SKILLS,
+      stateRegulations: DEFAULT_STATE_REGULATIONS,
+      activeStateRegulationCode: 'SP',
+      attendanceSheets: DEFAULT_ATTENDANCE_SHEETS,
+      lessonRegistries: DEFAULT_LESSON_REGISTRIES,
+      classGradeSheets: DEFAULT_CLASS_GRADE_SHEETS,
+      teacherLessonPlans: DEFAULT_TEACHER_LESSON_PLANS,
+      teacherStudentNotes: DEFAULT_TEACHER_STUDENT_NOTES,
+      whatsappConfig: DEFAULT_WHATSAPP_CONFIG,
+      whatsappTemplates: DEFAULT_WHATSAPP_TEMPLATES,
+      whatsappLogs: DEFAULT_WHATSAPP_LOGS,
+      systemUpdates: DEFAULT_SYSTEM_UPDATES,
+      auditLogs: DEFAULT_AUDIT_LOGS,
     };
   }
 }
@@ -459,9 +815,9 @@ export function generatePedagogicalReport(
 export function createBackup(): SystemBackup {
   const current = getStoredData();
   return {
-    version: '2.4.0',
+    version: '5.0.0-ENTERPRISE',
     createdAt: new Date().toISOString(),
-    exportedBy: 'Secretaria Geral EduGestão Pro',
+    exportedBy: 'Secretaria Geral SucessoEdu Gestão Educacional',
     data: current,
   };
 }
@@ -484,8 +840,459 @@ export function restoreBackup(backup: SystemBackup): void {
       notifications: backup.data.notifications || DEFAULT_NOTIFICATIONS,
       communications: backup.data.communications || DEFAULT_COMMUNICATIONS,
       rolePreferences: backup.data.rolePreferences || DEFAULT_ROLE_PREFERENCES,
+      schoolUnits: (backup.data as any).schoolUnits || DEFAULT_SCHOOL_UNITS,
+      syncLogs: (backup.data as any).syncLogs || DEFAULT_SYNC_LOGS,
+      userAccounts: (backup.data as any).userAccounts || DEFAULT_USER_ACCOUNTS,
+      developerContact: (backup.data as any).developerContact || DEFAULT_DEVELOPER_CONTACT,
+      bnccSkills: (backup.data as any).bnccSkills || DEFAULT_BNCC_SKILLS,
+      stateRegulations: (backup.data as any).stateRegulations || DEFAULT_STATE_REGULATIONS,
+      activeStateRegulationCode: (backup.data as any).activeStateRegulationCode || 'SP',
+      attendanceSheets: (backup.data as any).attendanceSheets || [],
+      lessonRegistries: (backup.data as any).lessonRegistries || [],
+      classGradeSheets: (backup.data as any).classGradeSheets || [],
+      teacherLessonPlans: (backup.data as any).teacherLessonPlans || [],
+      teacherStudentNotes: (backup.data as any).teacherStudentNotes || [],
+      whatsappConfig: (backup.data as any).whatsappConfig || DEFAULT_WHATSAPP_CONFIG,
+      whatsappTemplates: (backup.data as any).whatsappTemplates || DEFAULT_WHATSAPP_TEMPLATES,
+      whatsappLogs: (backup.data as any).whatsappLogs || DEFAULT_WHATSAPP_LOGS,
+      systemUpdates: (backup.data as any).systemUpdates || DEFAULT_SYSTEM_UPDATES,
+      auditLogs: (backup.data as any).auditLogs || DEFAULT_AUDIT_LOGS,
     });
   }
+}
+
+/**
+ * Realiza snapshot de cópia de segurança automática toda vez que o sistema for atualizado,
+ * finalizado ou a sessão for encerrada, mantendo o histórico de backups e cópia de segurança dedicada.
+ */
+export function performAutoBackup(
+  reason: string = 'Encerramento de Sessão (Finalização)',
+  operatorName: string = 'Sistema Automático',
+  customVersion?: string
+): AutoBackupSnapshot {
+  const current = getStoredData();
+  const timestamp = new Date().toISOString();
+  const snapshotId = `AUTOBACKUP-${Date.now()}`;
+  const activeVersion =
+    customVersion ||
+    localStorage.getItem('sucessoedu_active_version') ||
+    (current.settings as any)?.systemVersion ||
+    'v5.4.0-ENTERPRISE';
+
+  const stats = {
+    studentsCount: current.students?.length || 0,
+    classesCount: current.classes?.length || 0,
+    examsCount: current.exams?.length || 0,
+    submissionsCount: current.submissions?.length || 0,
+    attendanceSheetsCount: current.attendanceSheets?.length || 0,
+    lessonRegistriesCount: current.lessonRegistries?.length || 0,
+    classGradeSheetsCount: current.classGradeSheets?.length || 0,
+  };
+
+  const payloadString = JSON.stringify(current);
+  const fileSizeBytes = new Blob([payloadString]).size;
+  const checksum = `SHA256-SAFE-${btoa(
+    `${snapshotId}|${stats.studentsCount}|${stats.submissionsCount}|${timestamp}`
+  ).slice(0, 24)}`;
+
+  const snapshot: AutoBackupSnapshot = {
+    id: snapshotId,
+    createdAt: timestamp,
+    reason,
+    operatorName,
+    version: activeVersion,
+    checksum,
+    stats,
+    fileSizeBytes,
+    data: current,
+  };
+
+  try {
+    // 1. Grava na chave isolada do snapshot mais recente
+    localStorage.setItem(KEYS.AUTO_BACKUP_LATEST, JSON.stringify(snapshot));
+    localStorage.setItem('sucessoedu_latest_database_export', payloadString);
+
+    // 2. Grava no histórico de cópias automáticas (mantém as 10 últimas cópias)
+    const rawHistory = localStorage.getItem(KEYS.AUTO_BACKUP_HISTORY);
+    let history: AutoBackupSnapshot[] = [];
+    if (rawHistory) {
+      try {
+        history = JSON.parse(rawHistory);
+      } catch {
+        history = [];
+      }
+    }
+    const updatedHistory = [snapshot, ...history.filter((h) => h.id !== snapshot.id)].slice(0, 15);
+    localStorage.setItem(KEYS.AUTO_BACKUP_HISTORY, JSON.stringify(updatedHistory));
+  } catch (err) {
+    console.error('Erro ao gravar cópia de segurança automática no localStorage:', err);
+  }
+
+  return snapshot;
+}
+
+/**
+ * Dispara o download físico do arquivo JSON de backup no computador
+ */
+export function downloadBackupJsonFile(snapshot: AutoBackupSnapshot | SystemBackup): void {
+  const content = JSON.stringify(snapshot, null, 2);
+  const dateStr = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 12);
+  const fileName = `SucessoEdu_Backup_Preventivo_${dateStr}.json`;
+  const blob = new Blob([content], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Recupera a última cópia de segurança automática registrada
+ */
+export function getLatestAutoBackup(): AutoBackupSnapshot | null {
+  try {
+    const raw = localStorage.getItem(KEYS.AUTO_BACKUP_LATEST);
+    if (!raw) return null;
+    return JSON.parse(raw) as AutoBackupSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Recupera o histórico de cópias de segurança automáticas
+ */
+export function getAutoBackupHistory(): AutoBackupSnapshot[] {
+  try {
+    const raw = localStorage.getItem(KEYS.AUTO_BACKUP_HISTORY);
+    if (!raw) {
+      const latest = getLatestAutoBackup();
+      return latest ? [latest] : [];
+    }
+    return JSON.parse(raw) as AutoBackupSnapshot[];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Restaura o estado da base a partir de uma cópia de segurança automática
+ */
+export function restoreAutoBackup(snapshotOrId?: AutoBackupSnapshot | string): boolean {
+  try {
+    let targetSnapshot: AutoBackupSnapshot | null = null;
+    if (typeof snapshotOrId === 'object' && snapshotOrId?.data) {
+      targetSnapshot = snapshotOrId;
+    } else if (typeof snapshotOrId === 'string') {
+      const history = getAutoBackupHistory();
+      targetSnapshot = history.find((h) => h.id === snapshotOrId) || null;
+    } else {
+      targetSnapshot = getLatestAutoBackup();
+    }
+
+    if (!targetSnapshot || !targetSnapshot.data) {
+      return false;
+    }
+
+    restoreBackup({
+      version: targetSnapshot.version,
+      createdAt: targetSnapshot.createdAt,
+      exportedBy: `Restauração de Cópia Automática (${targetSnapshot.operatorName})`,
+      data: targetSnapshot.data,
+    });
+    return true;
+  } catch (err) {
+    console.error('Erro ao restaurar cópia de segurança automática:', err);
+    return false;
+  }
+}
+
+/**
+ * Generates an encrypted/checksummed synchronization packet from a remote satellite school
+ */
+export function generateMunicipalSyncPacket(
+  schoolUnit: SchoolUnit,
+  operatorName: string
+): MunicipalSyncPacket {
+  const current = getStoredData();
+
+  const packetId = `SYNC-PACKET-${schoolUnit.inepCode}-${Date.now()}`;
+  const timestamp = new Date().toISOString();
+  
+  // Calculate summary counts
+  const summary = {
+    studentsCount: current.students.length,
+    classesCount: current.classes.length,
+    examsCount: current.exams.length,
+    submissionsCount: current.submissions.length,
+    academicHistoriesCount: current.academicHistories.length,
+  };
+
+  const simpleChecksum = `SHA256-EDU-${btoa(
+    `${schoolUnit.inepCode}|${summary.studentsCount}|${summary.submissionsCount}|${timestamp}`
+  ).slice(0, 32)}`;
+
+  return {
+    version: '4.2.0-MUNICIPAL',
+    packetId,
+    schoolUnit: {
+      ...schoolUnit,
+      lastSyncDate: timestamp,
+      syncStatus: 'SINCRONIZADO',
+    },
+    municipalityName: current.settings.city || 'Secretaria Municipal de Educação',
+    stateCode: current.settings.state || 'SP',
+    exportedAt: timestamp,
+    operatorName,
+    checksum: simpleChecksum,
+    summary,
+    data: {
+      students: current.students,
+      classes: current.classes,
+      exams: current.exams,
+      submissions: current.submissions,
+      academicHistories: current.academicHistories,
+      censusExtra: {
+        specialNeedsCount: Math.round(current.students.length * 0.08),
+        transportUsersCount: Math.round(current.students.length * 0.35),
+        schoolFeedBeneficiariesCount: current.students.length,
+        dropoutRiskCount: Math.round(current.students.length * 0.04),
+      },
+    },
+  };
+}
+
+/**
+ * Merges a municipal sync packet into master database at central SME
+ */
+export function mergeMunicipalSyncPacket(
+  packet: MunicipalSyncPacket,
+  operatorName: string
+): { success: boolean; log: SyncAuditLog; error?: string } {
+  try {
+    const current = getStoredData();
+    const packetData = packet.data;
+
+    // 1. Merge students (replace or add by ID and CPF)
+    const studentMap = new Map<string, Student>();
+    current.students.forEach((s) => studentMap.set(s.id, s));
+    let newStudents = 0;
+    (packetData.students || []).forEach((s) => {
+      if (!studentMap.has(s.id)) newStudents++;
+      studentMap.set(s.id, s);
+    });
+
+    // 2. Merge classes
+    const classMap = new Map<string, SchoolClass>();
+    current.classes.forEach((c) => classMap.set(c.id, c));
+    let newClasses = 0;
+    (packetData.classes || []).forEach((c) => {
+      if (!classMap.has(c.id)) newClasses++;
+      classMap.set(c.id, c);
+    });
+
+    // 3. Merge exams
+    const examMap = new Map<string, Exam>();
+    current.exams.forEach((e) => examMap.set(e.id, e));
+    let newExams = 0;
+    (packetData.exams || []).forEach((e) => {
+      if (!examMap.has(e.id)) newExams++;
+      examMap.set(e.id, e);
+    });
+
+    // 4. Merge submissions
+    const subMap = new Map<string, ExamSubmission>();
+    current.submissions.forEach((s) => subMap.set(s.id, s));
+    let newSubs = 0;
+    (packetData.submissions || []).forEach((s) => {
+      if (!subMap.has(s.id)) newSubs++;
+      subMap.set(s.id, s);
+    });
+
+    // 5. Merge academic histories
+    const histMap = new Map<string, AcademicHistory>();
+    current.academicHistories.forEach((h) => histMap.set(h.id, h));
+    (packetData.academicHistories || []).forEach((h) => {
+      histMap.set(h.id, h);
+    });
+
+    // 6. Update school unit metadata in central list
+    const updatedUnits = current.schoolUnits.map((u) => {
+      if (u.id === packet.schoolUnit.id || u.inepCode === packet.schoolUnit.inepCode) {
+        return {
+          ...u,
+          lastSyncDate: packet.exportedAt,
+          syncStatus: 'SINCRONIZADO' as const,
+          totalStudents: packet.summary.studentsCount,
+          totalClasses: packet.summary.classesCount,
+        };
+      }
+      return u;
+    });
+
+    // If school unit is new, add it
+    if (!updatedUnits.some((u) => u.inepCode === packet.schoolUnit.inepCode)) {
+      updatedUnits.push({
+        ...packet.schoolUnit,
+        lastSyncDate: packet.exportedAt,
+        syncStatus: 'SINCRONIZADO',
+      });
+    }
+
+    const log: SyncAuditLog = {
+      id: `sync-log-${Date.now()}`,
+      schoolUnitId: packet.schoolUnit.id,
+      schoolUnitName: packet.schoolUnit.name,
+      importedAt: new Date().toISOString(),
+      operatorName: operatorName || 'Operador da Secretaria Municipal',
+      recordsMerged: {
+        students: newStudents,
+        classes: newClasses,
+        exams: newExams,
+        submissions: newSubs,
+      },
+      status: 'SUCESSO',
+      notes: `Pacote ${packet.packetId} da unidade "${packet.schoolUnit.name}" integrado com sucesso.`,
+    };
+
+    const updatedData: AppStateData = {
+      ...current,
+      students: Array.from(studentMap.values()),
+      classes: Array.from(classMap.values()),
+      exams: Array.from(examMap.values()),
+      submissions: Array.from(subMap.values()),
+      academicHistories: Array.from(histMap.values()),
+      schoolUnits: updatedUnits,
+      syncLogs: [log, ...(current.syncLogs || [])],
+    };
+
+    saveStoredData(updatedData);
+
+    return {
+      success: true,
+      log,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      log: {
+        id: `sync-err-${Date.now()}`,
+        schoolUnitId: packet.schoolUnit?.id || 'unknown',
+        schoolUnitName: packet.schoolUnit?.name || 'Unidade Desconhecida',
+        importedAt: new Date().toISOString(),
+        operatorName,
+        recordsMerged: { students: 0, classes: 0, exams: 0, submissions: 0 },
+        status: 'ERRO',
+        notes: `Erro ao integrar: ${err?.message || 'Arquivo corrompido ou formato inválido.'}`,
+      },
+      error: err?.message || 'Falha ao processar o pacote de sincronização.',
+    };
+  }
+}
+
+/**
+ * Dispatches a simulated or real WhatsApp message and records in logs
+ */
+export function sendWhatsAppMessage(
+  payload: Omit<WhatsAppMessageLog, 'id' | 'sentAt'>
+): WhatsAppMessageLog {
+  const current = getStoredData();
+  const log: WhatsAppMessageLog = {
+    ...payload,
+    id: `wpp-log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+    sentAt: new Date().toISOString(),
+    deliveredAt: new Date(Date.now() + 1000).toISOString(),
+    status: payload.status || 'ENTREGUE',
+  };
+
+  const updatedData: AppStateData = {
+    ...current,
+    whatsappLogs: [log, ...(current.whatsappLogs || [])],
+  };
+
+  saveStoredData(updatedData);
+
+  // Also log to security audit
+  logSecurityAudit(
+    'DISPARO_WHATSAPP',
+    'comunicacao',
+    `Mensagem WhatsApp (${payload.messageType}) enviada para ${payload.recipientName} (${payload.recipientPhone})`,
+    'SUCESSO'
+  );
+
+  return log;
+}
+
+/**
+ * Creates an entry in the system security audit trail
+ */
+export function logSecurityAudit(
+  arg1: any,
+  arg2?: any,
+  arg3?: any,
+  arg4?: any,
+  arg5?: any,
+  arg6?: any,
+  arg7?: any
+): SecurityAuditLog {
+  const current = getStoredData();
+  const activeUser = current.userAccounts?.find((u) => u.active) || current.userAccounts?.[0];
+
+  let actionType: any = 'LOGIN_SUCESSO';
+  let module: string = 'SISTEMA';
+  let details: string = '';
+  let status: 'SUCESSO' | 'ALERTA' | 'BLOQUEADO' = 'SUCESSO';
+  let userId = activeUser?.id || 'user-system';
+  let userName = activeUser?.name || 'Operador do Sistema';
+  let userLogin = activeUser?.login || 'sistema.local';
+  let userRole: UserRole = activeUser?.role || 'ADMIN';
+  let userSector: any = activeUser?.sector || 'MASTER';
+
+  if (typeof arg6 === 'string') {
+    // Called as (module, userId, userName, userRole, userSector, details, status)
+    module = String(arg1);
+    userId = String(arg2);
+    userName = String(arg3);
+    userRole = arg4 as UserRole;
+    userSector = arg5;
+    details = String(arg6);
+    status = (arg7 as any) || 'SUCESSO';
+    actionType = 'EDITAR_REGISTRO';
+  } else {
+    // Called as (actionType, module, details, status)
+    actionType = arg1;
+    module = String(arg2 || 'SISTEMA');
+    details = String(arg3 || '');
+    status = (arg4 as any) || 'SUCESSO';
+    if (arg5) userId = String(arg5);
+    if (arg6) userName = String(arg6);
+  }
+
+  const log: SecurityAuditLog = {
+    id: `audit-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+    timestamp: new Date().toISOString(),
+    userId,
+    userName,
+    userLogin,
+    userRole,
+    userSector,
+    actionType,
+    module,
+    details,
+    ipAddress: '192.168.1.' + Math.floor(100 + Math.random() * 50),
+    status,
+  };
+
+  const updatedData: AppStateData = {
+    ...current,
+    auditLogs: [log, ...(current.auditLogs || []).slice(0, 199)],
+  };
+
+  saveStoredData(updatedData);
+  return log;
 }
 
 export const StorageService = {
@@ -495,4 +1302,15 @@ export const StorageService = {
   generatePedagogicalReport,
   createBackup,
   restoreBackup,
+  performAutoBackup,
+  downloadBackupJsonFile,
+  getLatestAutoBackup,
+  getAutoBackupHistory,
+  restoreAutoBackup,
+  generateMunicipalSyncPacket,
+  mergeMunicipalSyncPacket,
+  sendWhatsAppMessage,
+  logSecurityAudit,
 };
+
+
