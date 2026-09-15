@@ -27,6 +27,7 @@ import {
   Printer,
   History,
   FileDown,
+  Box,
 } from 'lucide-react';
 import { StatusDashboard } from './StatusDashboard';
 import { NexusAuditReportModal } from './NexusAuditReportModal';
@@ -472,6 +473,17 @@ export const NexusDeployerHub: React.FC<NexusDeployerHubProps> = ({
           >
             <FileText className="h-4 w-4" />
             <span>Exportar Relatório PDF</span>
+          </button>
+
+          {/* Botão NexusInstall (Redes & Empacotador 1-Clique) */}
+          <button
+            onClick={() => onNavigate && onNavigate('NEXUS_INSTALL')}
+            id="nexus_btn_open_nexusinstall"
+            className="px-3.5 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
+            title="Abrir NexusInstall: Gerenciador de Portas Dinâmicas, Paridade Visual e Instalador 1-Clique"
+          >
+            <Box className="h-4 w-4" />
+            <span>NexusInstall (Rede & 1-Clique)</span>
           </button>
 
           {/* Quick Tabs */}

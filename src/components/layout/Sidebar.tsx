@@ -27,6 +27,7 @@ import {
   Server,
   Cpu,
   Database,
+  Box,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -165,6 +166,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label: 'NexusDeployer Cloud',
           icon: Cpu,
           badge: '12/12 Root',
+        },
+        {
+          id: 'NEXUS_INSTALL',
+          label: 'NexusInstall Manager',
+          icon: Box,
+          badge: 'Rede & Build',
+          shortcut: 'Alt+X',
         },
         {
           id: 'CLEANSLATE_HUB',

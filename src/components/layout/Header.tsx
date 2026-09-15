@@ -141,6 +141,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'OmniDeploy • Sistema de Gestão e Instalação Híbrida';
       case 'NEXUS_DEPLOYER':
         return 'NexusDeployer • Provisionamento & Updates na Nuvem';
+      case 'NEXUS_INSTALL':
+        return 'NexusInstall • Gerenciador de Módulos & Instaladores';
       case 'NETWORK_INSTALLER':
         return 'Instalador de Rede Local, Nuvem & Backup';
       case 'ABOUT':
@@ -194,6 +196,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'OmniDeploy';
       case 'NEXUS_DEPLOYER':
         return 'NexusDeployer';
+      case 'NEXUS_INSTALL':
+        return 'NexusInstall';
       case 'NETWORK_INSTALLER':
         return 'Central de Instalação';
       case 'ABOUT':

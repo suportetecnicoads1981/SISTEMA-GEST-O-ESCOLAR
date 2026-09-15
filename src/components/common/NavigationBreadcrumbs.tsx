@@ -24,6 +24,7 @@ const TAB_LABELS: Record<string, { label: string; group: string }> = {
   MAIN_DASHBOARD: { label: 'Visão Geral & Dashbox', group: 'Início' },
   OMNI_DEPLOY: { label: 'OmniDeploy • Gestão e Instalação Híbrida', group: 'Deploy & Nuvem' },
   NEXUS_DEPLOYER: { label: 'NexusDeployer • Provisionamento & Updates', group: 'Deploy & Nuvem' },
+  NEXUS_INSTALL: { label: 'NexusInstall • Gerenciador de Módulos e Instaladores', group: 'Deploy & Nuvem' },
   TEACHER_PORTAL: { label: 'Portal do Professor', group: 'Docente' },
   PROFESSOR_DASHBOARD: { label: 'Portal do Professor', group: 'Docente' },
   PROFESSOR: { label: 'Portal do Professor', group: 'Docente' },

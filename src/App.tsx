@@ -66,6 +66,7 @@ import { ModulesArchitectureDiagramModal } from './components/config/ModulesArch
 import { UniversalDataImportModal } from './components/secretaria/UniversalDataImportModal';
 import { OmniDeployHub } from './components/omnideploy/OmniDeployHub';
 import { NexusDeployerHub } from './components/nexusdeployer/NexusDeployerHub';
+import { NexusInstallHub } from './components/nexusinstall/NexusInstallHub';
 import { CleanSlateHub } from './components/cleanslate/CleanSlateHub';
 import { InstalaFlowHub } from './components/instalaflow/InstalaFlowHub';
 import { DataSyncProHub } from './components/datasync/DataSyncProHub';
@@ -1056,6 +1057,7 @@ export default function App() {
     if (tab === 'UPDATES' || tab === 'SYSTEM_UPDATE') target = 'SYSTEM_UPDATES';
     if (tab === 'OMNIDEPLOY' || tab === 'OMNI_DEPLOY' || tab === 'DEPLOY') target = 'OMNI_DEPLOY';
     if (tab === 'NEXUS' || tab === 'NEXUS_DEPLOYER' || tab === 'NEXUS_DEPLOY') target = 'NEXUS_DEPLOYER';
+    if (tab === 'NEXUS_INSTALL' || tab === 'NEXUSINSTALL' || tab === 'INSTALL_MANAGER' || tab === 'MODULE_INSTALLER') target = 'NEXUS_INSTALL';
 
     if (tab === 'PEDAGOGICAL_DASHBOARD' && payload?.section) {
       setPedagogicalInitialSection(payload.section);
@@ -1556,6 +1558,14 @@ export default function App() {
             {activeTab === 'NEXUS_DEPLOYER' && (
               <NexusDeployerHub
                 schoolName={data.settings?.name || 'SucessoEdu Gestão Educacional'}
+                onNavigate={handleNavigate}
+                onBack={handleGoBack}
+              />
+            )}
+
+            {/* TAB: NEXUS INSTALL - GERENCIADOR DE MÓDULOS, REDE DINÂMICA E INSTALADOR COMPACTO */}
+            {activeTab === 'NEXUS_INSTALL' && (
+              <NexusInstallHub
                 onNavigate={handleNavigate}
                 onBack={handleGoBack}
               />

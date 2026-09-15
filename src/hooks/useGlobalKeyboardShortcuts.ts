@@ -135,6 +135,15 @@ export const SYSTEM_SHORTCUTS: ShortcutDefinition[] = [
     description: 'Segurança desktop, updates em chunks de 64MB, Zero-Data e Ephemeral CLI.',
   },
   {
+    id: 'nexusinstall',
+    key: 'x',
+    displayKey: 'Alt + X',
+    label: 'NexusInstall Gerenciador',
+    tabId: 'NEXUS_INSTALL',
+    category: 'GESTAO_TI',
+    description: 'Alocação dinâmica de portas/IP, paridade visual absoluta e empacotador 1-clique.',
+  },
+  {
     id: 'instalaflow',
     key: 'f',
     displayKey: 'Alt + F',
