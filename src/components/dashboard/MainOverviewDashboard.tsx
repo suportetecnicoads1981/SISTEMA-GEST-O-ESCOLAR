@@ -33,6 +33,7 @@ import {
   MessageSquare,
   Smartphone,
   LogOut,
+  Sliders,
 } from 'lucide-react';
 import {
   Student,
@@ -810,6 +811,32 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
             </div>
             <div className="text-[11px] font-bold text-rose-600 flex items-center gap-1 pt-2 border-t border-slate-100">
               Configurar Acessos →
+            </div>
+          </button>
+
+          {/* Botão 10: Central de Administração & TI */}
+          <button
+            onClick={() => onNavigate('ADMIN_TI')}
+            className="p-5 bg-gradient-to-br from-indigo-50/70 to-slate-50 rounded-3xl border-2 border-indigo-200 hover:border-indigo-600 shadow-xs hover:shadow-lg transition-all text-left flex flex-col justify-between space-y-4 cursor-pointer group"
+          >
+            <div className="flex items-start justify-between">
+              <div className="h-12 w-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/30 group-hover:scale-105 transition-transform">
+                <Sliders className="h-6 w-6" />
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-[10px] font-bold flex items-center gap-1">
+                Hub Geral
+              </span>
+            </div>
+            <div>
+              <h3 className="font-black text-slate-900 text-sm group-hover:text-indigo-600 transition-colors flex items-center gap-1.5">
+                Central de Administração & TI
+              </h3>
+              <p className="text-xs text-slate-600 mt-1">
+                Painel unificado com todos os 11 módulos de Deploy, Cloud, Builds .EXE e Segurança.
+              </p>
+            </div>
+            <div className="text-[11px] font-bold text-indigo-600 flex items-center gap-1 pt-2 border-t border-indigo-100">
+              Acessar Hub Central (Alt+M) →
             </div>
           </button>
         </div>

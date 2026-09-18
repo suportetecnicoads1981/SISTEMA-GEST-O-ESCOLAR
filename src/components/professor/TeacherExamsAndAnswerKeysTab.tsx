@@ -111,12 +111,18 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
 
   // Questions available for adding
   const availableSubjectQuestions = useMemo(() => {
-    return questions.filter(
-      (q) =>
-        !activeSubject ||
-        q.subject.toLowerCase() === activeSubject.name.toLowerCase() ||
-        q.topic.toLowerCase().includes(activeSubject.name.toLowerCase())
-    );
+    return questions.filter((q) => {
+      if (!activeSubject) return true;
+      if (q.subjectId && q.subjectId === activeSubject.id) return true;
+      const qSub = (q.subject || '').toLowerCase().trim();
+      const actSub = (activeSubject.name || '').toLowerCase().trim();
+      return (
+        qSub === actSub ||
+        qSub.includes(actSub) ||
+        actSub.includes(qSub) ||
+        (q.topic && q.topic.toLowerCase().includes(actSub))
+      );
+    });
   }, [questions, activeSubject]);
 
   // Create Quick Exam Handler
@@ -137,6 +143,7 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
       title: newTitle || `Avaliação Bimestral de ${activeSubject.name}`,
       description: `Prova referente ao ${selectedTerm} - Ano Letivo 2026`,
       subject: activeSubject.name,
+      subjectId: activeSubject.id,
       classId: activeClass.id,
       teacherName: teacherName || activeSubject.teacherName || 'Docente Responsável',
       schoolYear: 2026,

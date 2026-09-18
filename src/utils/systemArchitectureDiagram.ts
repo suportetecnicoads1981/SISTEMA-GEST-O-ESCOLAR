@@ -12,15 +12,27 @@
  * 5. Envio automatizado do Diagrama para a Nuvem / Google Drive oficial (suportetecnicoads@gmail.com).
  */
 
+export type SystemModuleCategory =
+  | 'GESTÃO_CORE'
+  | 'ENSINO_PEDAGÓGICO'
+  | 'CONTROLE_LEGAL'
+  | 'INFRAESTRUTURA'
+  | 'DEVOPS_NUVEM';
+
 export interface SystemModuleInfo {
   id: string;
   number: string;
   name: string;
   tagline: string;
-  category: 'GESTÃO_CORE' | 'ENSINO_PEDAGÓGICO' | 'CONTROLE_LEGAL' | 'INFRAESTRUTURA';
+  category: SystemModuleCategory;
   tabId: string;
+  tier: 1 | 2 | 3 | 4 | 5;
+  tierName: string;
   color: string;
   badgeColor: string;
+  status: 'PRODUCAO' | 'HOMOLOGADO' | 'EXPANSAO';
+  dependencies: string[];
+  dependents: string[];
   sourceFiles: string[];
   components: string[];
   databaseEntities: string[];
@@ -28,6 +40,28 @@ export interface SystemModuleInfo {
   apiEndpoints: string[];
   recentImprovements: string[];
   maintenanceQuickGuide: string;
+}
+
+export type EngineeringRequestType = 'IMPLEMENTATION' | 'BUGFIX' | 'UPDATE';
+export type EngineeringRequestPriority = 'BAIXA' | 'MEDIA' | 'ALTA' | 'CRITICA';
+export type EngineeringRequestStatus = 'PENDENTE' | 'EM_ANALISE' | 'CONCLUIDO';
+
+export interface ModuleEngineeringRequest {
+  id: string;
+  moduleId: string;
+  moduleName: string;
+  type: EngineeringRequestType;
+  priority: EngineeringRequestPriority;
+  title: string;
+  description: string;
+  expectedBehavior: string;
+  affectedFiles: string[];
+  affectedComponents: string[];
+  affectedEntities: string[];
+  generatedPrompt: string;
+  createdAt: string;
+  status: EngineeringRequestStatus;
+  requesterEmail?: string;
 }
 
 export const SYSTEM_MODULES_CATALOG: SystemModuleInfo[] = [
@@ -38,17 +72,22 @@ export const SYSTEM_MODULES_CATALOG: SystemModuleInfo[] = [
     tagline: 'Painel executivo com métricas em tempo real, status do servidor e alertas sonoros',
     category: 'GESTÃO_CORE',
     tabId: 'MAIN_DASHBOARD',
+    tier: 1,
+    tierName: 'Apresentação & Portais',
     color: 'from-blue-600 to-indigo-700',
     badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
+    status: 'PRODUCAO',
+    dependencies: ['SECRETARIA_MATRICULAS', 'FREQUENCIA_CHAMADA', 'FINANCEIRO_MENSALIDADES', 'CONFIG_SERVIDORES_NUVEM'],
+    dependents: [],
     sourceFiles: [
       'src/components/dashboard/Dashboard.tsx',
       'src/components/dashboard/MetricsCards.tsx',
       'src/components/dashboard/AttendanceChart.tsx',
       'src/components/dashboard/QuickActions.tsx',
-      'src/components/common/Header.tsx',
-      'src/components/common/NotificationsCenter.tsx',
+      'src/components/layout/Header.tsx',
+      'src/components/notificacoes/NotificationPopover.tsx',
     ],
-    components: ['Dashboard', 'MetricsCards', 'AttendanceChart', 'NotificationsCenter', 'Header', 'QuickActions'],
+    components: ['Dashboard', 'MetricsCards', 'AttendanceChart', 'Header', 'QuickActions'],
     databaseEntities: ['SchoolSettings', 'Student', 'ClassGroup', 'AttendanceRecord', 'FinancialInvoice'],
     keyFunctions: [
       'calculateGeneralMetrics() - Consolida total de alunos, evasão, arrecadação e frequência',
@@ -70,8 +109,13 @@ export const SYSTEM_MODULES_CATALOG: SystemModuleInfo[] = [
     tagline: 'Gestão completa da vida discente, RA, NIS, documentos oficiais e fotos',
     category: 'GESTÃO_CORE',
     tabId: 'STUDENTS',
+    tier: 2,
+    tierName: 'Gestão Acadêmica & Sala de Aula',
     color: 'from-sky-600 to-blue-700',
     badgeColor: 'bg-sky-100 text-sky-800 border-sky-200',
+    status: 'PRODUCAO',
+    dependencies: ['TURMAS_ENTURMACAO'],
+    dependents: ['DASHBOARD_ANALYTICS', 'FREQUENCIA_CHAMADA', 'NOTAS_AVALIACOES', 'FINANCEIRO_MENSALIDADES', 'CENSO_EDUCACENSO'],
     sourceFiles: [
       'src/components/students/StudentsList.tsx',
       'src/components/students/StudentFormModal.tsx',
@@ -101,8 +145,13 @@ export const SYSTEM_MODULES_CATALOG: SystemModuleInfo[] = [
     tagline: 'Organização de turmas por ano/série, salas físicas, turnos e alocação de alunos',
     category: 'GESTÃO_CORE',
     tabId: 'CLASSES',
+    tier: 2,
+    tierName: 'Gestão Acadêmica & Sala de Aula',
     color: 'from-teal-600 to-emerald-700',
     badgeColor: 'bg-teal-100 text-teal-800 border-teal-200',
+    status: 'PRODUCAO',
+    dependencies: [],
+    dependents: ['SECRETARIA_MATRICULAS', 'PROFESSORES_DOCENCIA', 'FREQUENCIA_CHAMADA', 'NOTAS_AVALIACOES'],
     sourceFiles: [
       'src/components/classes/ClassesList.tsx',
       'src/components/classes/ClassFormModal.tsx',
@@ -130,8 +179,13 @@ export const SYSTEM_MODULES_CATALOG: SystemModuleInfo[] = [
     tagline: 'Atribuição de disciplinas, controle de carga horária, diário online e pauta de aulas',
     category: 'ENSINO_PEDAGÓGICO',
     tabId: 'TEACHER_PORTAL',
+    tier: 1,
+    tierName: 'Apresentação & Portais',
     color: 'from-emerald-600 to-green-700',
     badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    status: 'PRODUCAO',
+    dependencies: ['TURMAS_ENTURMACAO', 'PLANEJAMENTO_BNCC'],
+    dependents: ['FREQUENCIA_CHAMADA', 'NOTAS_AVALIACOES'],
     sourceFiles: [
       'src/components/teachers/TeacherPortal.tsx',
       'src/components/teachers/TeachersList.tsx',
@@ -155,20 +209,26 @@ export const SYSTEM_MODULES_CATALOG: SystemModuleInfo[] = [
   {
     id: 'FREQUENCIA_CHAMADA',
     number: '05',
-    name: 'Frequência Diária & Busca Ativa',
-    tagline: 'Chamada rápida, cálculo biométrico/percentual de 75% LDB e combate à evasão',
+    name: 'Frequência Diária, Chamada & Diário de Classe',
+    tagline: 'Chamada rápida, cálculo de 75% LDB, diário estadual e alerta de busca ativa',
     category: 'CONTROLE_LEGAL',
     tabId: 'ATTENDANCE',
+    tier: 2,
+    tierName: 'Gestão Acadêmica & Sala de Aula',
     color: 'from-amber-600 to-orange-700',
     badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
+    status: 'PRODUCAO',
+    dependencies: ['SECRETARIA_MATRICULAS', 'TURMAS_ENTURMACAO', 'CALENDARIO_EVENTOS'],
+    dependents: ['DASHBOARD_ANALYTICS', 'CENSO_EDUCACENSO', 'RELATORIOS_AUDITORIA'],
     sourceFiles: [
       'src/components/attendance/AttendanceModule.tsx',
+      'src/components/diary/ClassDiaryModule.tsx',
       'src/components/attendance/DailyRollCallModal.tsx',
       'src/components/attendance/AttendanceReportsModal.tsx',
       'src/components/attendance/ActiveSearchModal.tsx',
     ],
-    components: ['AttendanceModule', 'DailyRollCallModal', 'AttendanceReportsModal', 'ActiveSearchModal'],
-    databaseEntities: ['AttendanceRecord', 'AttendanceSummary', 'AbsenceJustification', 'ActiveSearchCase'],
+    components: ['AttendanceModule', 'ClassDiaryModule', 'DailyRollCallModal', 'AttendanceReportsModal', 'ActiveSearchModal'],
+    databaseEntities: ['AttendanceRecord', 'AttendanceSummary', 'AbsenceJustification', 'ActiveSearchCase', 'ClassDiaryEntry'],
     keyFunctions: [
       'submitDailyRollCall(classId, date, statusMap) - Grava presença diária em lote',
       'calculateAttendancePercentage(studentId) - Apuração legal com base em 200 dias letivos',
@@ -176,7 +236,7 @@ export const SYSTEM_MODULES_CATALOG: SystemModuleInfo[] = [
     ],
     apiEndpoints: ['POST /api/attendance/roll-call', 'GET /api/attendance/summary'],
     recentImprovements: [
-      'Chamada com 1 clique (marcar todos como presentes e alterar apenas ausentes).',
+      'Chamada com 1 clique (marcar todos como presentes e alternar apenas faltas).',
       'Painel de Busca Ativa com fichas para notificação do Conselho Tutelar.',
       'Exportação da folha de frequência bimestral conforme padrão MEC/LDB.',
     ],
@@ -185,12 +245,17 @@ export const SYSTEM_MODULES_CATALOG: SystemModuleInfo[] = [
   {
     id: 'NOTAS_AVALIACOES',
     number: '06',
-    name: 'Notas, Avaliações & Boletim Escolar',
+    name: 'Notas, Avaliações, Boletim & Provas',
     tagline: 'Pauta bimestral, médias ponderadas, conselho de classe, banco de questões e provas online',
     category: 'ENSINO_PEDAGÓGICO',
     tabId: 'GRADES',
+    tier: 2,
+    tierName: 'Gestão Acadêmica & Sala de Aula',
     color: 'from-violet-600 to-purple-800',
     badgeColor: 'bg-violet-100 text-violet-800 border-violet-200',
+    status: 'PRODUCAO',
+    dependencies: ['SECRETARIA_MATRICULAS', 'TURMAS_ENTURMACAO', 'PLANEJAMENTO_BNCC'],
+    dependents: ['RELATORIOS_AUDITORIA', 'DASHBOARD_ANALYTICS'],
     sourceFiles: [
       'src/components/grades/GradesManager.tsx',
       'src/components/grades/GradeEntryModal.tsx',
@@ -221,8 +286,13 @@ export const SYSTEM_MODULES_CATALOG: SystemModuleInfo[] = [
     tagline: 'Gestão de mensalidades, carnês, QR Code PIX copia-e-cola, fluxo de caixa e inadimplência',
     category: 'GESTÃO_CORE',
     tabId: 'FINANCIAL',
+    tier: 4,
+    tierName: 'Finanças, Rede Municipal & Comunicação',
     color: 'from-emerald-700 to-teal-800',
     badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    status: 'PRODUCAO',
+    dependencies: ['SECRETARIA_MATRICULAS'],
+    dependents: ['DASHBOARD_ANALYTICS'],
     sourceFiles: [
       'src/components/financial/FinancialModule.tsx',
       'src/components/financial/InvoiceModal.tsx',
@@ -247,18 +317,24 @@ export const SYSTEM_MODULES_CATALOG: SystemModuleInfo[] = [
   {
     id: 'CENSO_EDUCACENSO',
     number: '08',
-    name: 'Censo Escolar / INEP / Educacenso',
-    tagline: 'Auditoria de dados obrigatórios do MEC, validação de consistência e exportação estruturada',
+    name: 'Censo Escolar, INEP & Busca Ativa',
+    tagline: 'Auditoria de dados obrigatórios do MEC, combate à evasão e exportação estruturada',
     category: 'CONTROLE_LEGAL',
-    tabId: 'CENSUS',
+    tabId: 'DROPOUT_CENSUS',
+    tier: 3,
+    tierName: 'Regulação Legal, BNCC & Censo',
     color: 'from-blue-700 to-slate-800',
     badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
+    status: 'PRODUCAO',
+    dependencies: ['SECRETARIA_MATRICULAS', 'FREQUENCIA_CHAMADA', 'TURMAS_ENTURMACAO'],
+    dependents: ['RELATORIOS_AUDITORIA'],
     sourceFiles: [
       'src/components/census/CensusModule.tsx',
+      'src/components/students/DropoutCensusModule.tsx',
       'src/components/census/InepExportModal.tsx',
       'src/components/census/CensusValidationModal.tsx',
     ],
-    components: ['CensusModule', 'InepExportModal', 'CensusValidationModal'],
+    components: ['CensusModule', 'DropoutCensusModule', 'InepExportModal', 'CensusValidationModal'],
     databaseEntities: ['CensusSchoolRecord', 'CensusStudentFormat', 'CensusTeacherFormat', 'CensusClassFormat'],
     keyFunctions: [
       'auditCensusConsistency() - Verifica CPFs, certidões de nascimento, cor/raça e deficiências',
@@ -279,8 +355,13 @@ export const SYSTEM_MODULES_CATALOG: SystemModuleInfo[] = [
     tagline: 'Apuração dos 200 dias letivos e 800 horas (LDB), bimestres, feriados e conselhos',
     category: 'CONTROLE_LEGAL',
     tabId: 'CALENDAR',
+    tier: 3,
+    tierName: 'Regulação Legal, BNCC & Censo',
     color: 'from-amber-700 to-yellow-800',
     badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
+    status: 'PRODUCAO',
+    dependencies: [],
+    dependents: ['FREQUENCIA_CHAMADA', 'NOTAS_AVALIACOES'],
     sourceFiles: [
       'src/components/calendar/SchoolCalendar.tsx',
       'src/components/calendar/EventFormModal.tsx',
@@ -307,8 +388,13 @@ export const SYSTEM_MODULES_CATALOG: SystemModuleInfo[] = [
     tagline: 'Matriz curricular alinhada à BNCC, descritores SAEB e banco de mais de 2.000 questões',
     category: 'ENSINO_PEDAGÓGICO',
     tabId: 'PEDAGOGICAL_DASHBOARD',
+    tier: 3,
+    tierName: 'Regulação Legal, BNCC & Censo',
     color: 'from-purple-700 to-pink-800',
     badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
+    status: 'PRODUCAO',
+    dependencies: [],
+    dependents: ['PROFESSORES_DOCENCIA', 'NOTAS_AVALIACOES'],
     sourceFiles: [
       'src/components/pedagogical/PedagogicalDashboard.tsx',
       'src/components/pedagogical/BnccSkillPickerModal.tsx',
@@ -333,18 +419,24 @@ export const SYSTEM_MODULES_CATALOG: SystemModuleInfo[] = [
   {
     id: 'RELATORIOS_AUDITORIA',
     number: '11',
-    name: 'Relatórios Oficiais & Auditoria',
+    name: 'Documentos Oficiais, Certificados & Relatórios',
     tagline: 'Histórico escolar, atas finais, declarações oficiais, exportação Excel/PDF e logs de auditoria',
     category: 'CONTROLE_LEGAL',
-    tabId: 'REPORTS',
+    tabId: 'DOCUMENTS',
+    tier: 3,
+    tierName: 'Regulação Legal, BNCC & Censo',
     color: 'from-slate-600 to-slate-800',
     badgeColor: 'bg-slate-100 text-slate-800 border-slate-200',
+    status: 'PRODUCAO',
+    dependencies: ['SECRETARIA_MATRICULAS', 'NOTAS_AVALIACOES', 'FREQUENCIA_CHAMADA'],
+    dependents: [],
     sourceFiles: [
+      'src/components/documents/DocumentCenter.tsx',
       'src/components/reports/ReportsHub.tsx',
       'src/components/reports/SystemAuditLogsModal.tsx',
       'src/components/reports/PrintTemplatesModal.tsx',
     ],
-    components: ['ReportsHub', 'SystemAuditLogsModal', 'PrintTemplatesModal'],
+    components: ['DocumentCenter', 'ReportsHub', 'SystemAuditLogsModal', 'PrintTemplatesModal'],
     databaseEntities: ['SystemAuditLog', 'ReportTemplate', 'OfficialDocumentRecord'],
     keyFunctions: [
       'generateAcademicTranscript(studentId) - Histórico escolar do Ensino Fundamental e Médio',
@@ -357,74 +449,288 @@ export const SYSTEM_MODULES_CATALOG: SystemModuleInfo[] = [
       'Modelos vetoriais homologados pela LDB para impressão sem borrões.',
       'Exportação instantânea de todas as tabelas em planilhas Excel (.xlsx) e CSV.',
     ],
-    maintenanceQuickGuide: 'Para adicionar novos modelos de relatórios ou certificados, edite `src/components/reports/ReportsHub.tsx`.',
+    maintenanceQuickGuide: 'Para adicionar novos modelos de relatórios ou certificados, edite `src/components/documents/DocumentCenter.tsx`.',
+  },
+  {
+    id: 'MUNICIPAL_SYNC_NETWORK',
+    number: '12',
+    name: 'Polos Remotos, Gestão Municipal & Sincronização',
+    tagline: 'Sede e escolas satélites, pacotes desacoplados .edusync e consolidação na SME',
+    category: 'GESTÃO_CORE',
+    tabId: 'MUNICIPAL_SYNC',
+    tier: 4,
+    tierName: 'Finanças, Rede Municipal & Comunicação',
+    color: 'from-cyan-700 to-blue-800',
+    badgeColor: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+    status: 'PRODUCAO',
+    dependencies: ['SECRETARIA_MATRICULAS', 'NOTAS_AVALIACOES'],
+    dependents: [],
+    sourceFiles: [
+      'src/components/sync/MunicipalSyncModule.tsx',
+      'src/components/sync/RemoteUnitConfigModal.tsx',
+      'src/components/sync/EduSyncPackager.ts',
+    ],
+    components: ['MunicipalSyncModule', 'RemoteUnitConfigModal'],
+    databaseEntities: ['SchoolUnit', 'SyncPackageLog', 'MunicipalAggregation'],
+    keyFunctions: [
+      'generateEduSyncPackage() - Compacta banco local em arquivo criptografado .edusync para transporte',
+      'applyRemoteSyncDelta(packageData) - Aplica alterações de polos rurais sem sobrescrever dados da sede',
+    ],
+    apiEndpoints: ['POST /api/sync/upload-edusync', 'GET /api/sync/status'],
+    recentImprovements: [
+      'Suporte a operação 100% offline em polos rurais com sincronização via pendrive.',
+      'Conferência hash SHA-256 no pacote .edusync contra corrupção em trânsito.',
+    ],
+    maintenanceQuickGuide: 'Para ajustar regras de merge de dados municipais, veja `src/components/sync/MunicipalSyncModule.tsx`.',
+  },
+  {
+    id: 'COMMUNICATION_WHATSAPP',
+    number: '13',
+    name: 'Mural de Avisos, Comunicação & Notificações',
+    tagline: 'Mural digital SME, central de notificações atômicas e disparos via WhatsApp',
+    category: 'GESTÃO_CORE',
+    tabId: 'COMMUNICATION',
+    tier: 4,
+    tierName: 'Finanças, Rede Municipal & Comunicação',
+    color: 'from-blue-600 to-sky-700',
+    badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
+    status: 'PRODUCAO',
+    dependencies: ['SECRETARIA_MATRICULAS'],
+    dependents: [],
+    sourceFiles: [
+      'src/components/communication/CommunicationHub.tsx',
+      'src/components/communication/WhatsAppNotifyModal.tsx',
+      'src/components/notificacoes/NotificationPopover.tsx',
+    ],
+    components: ['CommunicationHub', 'WhatsAppNotifyModal', 'NotificationPopover'],
+    databaseEntities: ['AnnouncementItem', 'NotificationItem', 'WhatsAppMessageQueue'],
+    keyFunctions: [
+      'publishAnnouncement(targetRoles, content) - Publica aviso no mural por segmento',
+      'queueWhatsAppNotification(phone, template, params) - Envia cobranças e comunicados aos responsáveis',
+    ],
+    apiEndpoints: ['POST /api/announcements', 'POST /api/whatsapp/send'],
+    recentImprovements: [
+      'Modelos prontos de mensagens WhatsApp para lembrete de mensalidade e reuniões.',
+      'Pop-over flutuante no cabeçalho com contagem de notificações não lidas.',
+    ],
+    maintenanceQuickGuide: 'Para alterar os templates de comunicação, acesse `src/components/communication/CommunicationHub.tsx`.',
+  },
+  {
+    id: 'ADMIN_TI_RBAC',
+    number: '14',
+    name: 'Central de Administração, Usuários (RBAC) & Segurança',
+    tagline: 'Painel Master ADS, controle de operadores, permissões setoriais e auditoria imutável',
+    category: 'INFRAESTRUTURA',
+    tabId: 'ADMIN_TI',
+    tier: 5,
+    tierName: 'Infraestrutura, DevOps & Deploy',
+    color: 'from-slate-700 to-indigo-900',
+    badgeColor: 'bg-slate-100 text-slate-800 border-slate-200',
+    status: 'PRODUCAO',
+    dependencies: [],
+    dependents: ['DASHBOARD_ANALYTICS', 'NEXUSCORE_PRODUCTION'],
+    sourceFiles: [
+      'src/components/admin/AdminTIHub.tsx',
+      'src/components/admin/UserControlModal.tsx',
+      'src/components/admin/MasterKeyGateModal.tsx',
+      'src/services/nexus/AuditService.ts',
+    ],
+    components: ['AdminTIHub', 'UserControlModal', 'MasterKeyGateModal'],
+    databaseEntities: ['UserAccount', 'UserRole', 'MasterSecurityKey', 'NexusAuditEntry'],
+    keyFunctions: [
+      'authenticateMasterKey(passcode) - Liberação de operações de alto privilégio com chave de segurança',
+      'recordAuditEvent(eventData) - Gravação de logs de auditoria imutáveis com ator, IP e diff',
+      'switchActiveOperator(userAccount) - Troca ágil de perfil na sessão sem perda de contexto',
+    ],
+    apiEndpoints: ['POST /api/auth/master-key', 'GET /api/admin/audit-history'],
+    recentImprovements: [
+      'Barra superior com troca rápida de operador e perfil ativo.',
+      'Bloqueio com chave mestra para operações destrutivas e redefinições.',
+    ],
+    maintenanceQuickGuide: 'Para alterar permissões de papéis e papéis de usuário, veja `src/components/admin/AdminTIHub.tsx`.',
+  },
+  {
+    id: 'NEXUSCORE_PRODUCTION',
+    number: '15',
+    name: 'NexusCore ERP & Pipeline de Produção',
+    tagline: 'Auditoria dos 4 módulos (Auth, CRM, Financeiro, Inventário), Cloud Storage e release no Drive',
+    category: 'DEVOPS_NUVEM',
+    tabId: 'NEXUS_DEPLOYER',
+    tier: 5,
+    tierName: 'Infraestrutura, DevOps & Deploy',
+    color: 'from-purple-700 to-indigo-900',
+    badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
+    status: 'PRODUCAO',
+    dependencies: ['ADMIN_TI_RBAC', 'SECRETARIA_MATRICULAS', 'FINANCEIRO_MENSALIDADES'],
+    dependents: ['CONFIG_SERVIDORES_NUVEM'],
+    sourceFiles: [
+      'src/components/nexusdeployer/NexusDeployerHub.tsx',
+      'src/components/nexusdeployer/NexusAuditReportModal.tsx',
+      'src/services/nexus/AuditService.ts',
+      'src/services/nexus/InstallManager.ts',
+    ],
+    components: ['NexusDeployerHub', 'NexusAuditReportModal'],
+    databaseEntities: ['NexusBundleMetadata', 'NexusAuditEntry', 'MigrationProgress', 'CloudStorageSnapshot'],
+    keyFunctions: [
+      'runNexusCoreProductionDeploy() - Pipeline atômico de deploy com snapshot preventivo e smoke test',
+      'triggerCloudStorageSnapshot() - Backup de emergência em gs://nexuscore-production-backups',
+      'syncOfficialReleaseToDrive() - Publicação de artefatos na pasta "Atualizações e melhorias" (suportetecnicoads@gmail.com)',
+    ],
+    apiEndpoints: ['POST /api/nexus/deploy-production', 'POST /api/nexus/snapshot', 'GET /api/nexus/status'],
+    recentImprovements: [
+      'Barra de migração sem timeout de interface e bloqueio de concorrência atômico.',
+      'Sincronização garantida com Google Drive na pasta "Atualizações e melhorias".',
+      'Homologação completa dos 4 módulos essenciais em produção definitiva.',
+    ],
+    maintenanceQuickGuide: 'Para ajustar passos de build e empacotamento do NexusCore, veja `src/components/nexusdeployer/NexusDeployerHub.tsx`.',
+  },
+  {
+    id: 'NEXUS_INSTALL_BUILD',
+    number: '16',
+    name: 'NexusInstall, NexusBuild Total & CleanSlate',
+    tagline: 'Gerador de executáveis .EXE, instaladores de rede, higienização zero-data e verificação SHA-256',
+    category: 'INFRAESTRUTURA',
+    tabId: 'NEXUS_INSTALL',
+    tier: 5,
+    tierName: 'Infraestrutura, DevOps & Deploy',
+    color: 'from-emerald-700 to-slate-900',
+    badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    status: 'PRODUCAO',
+    dependencies: ['CONFIG_SERVIDORES_NUVEM'],
+    dependents: [],
+    sourceFiles: [
+      'src/components/nexusinstall/NexusInstallHub.tsx',
+      'src/components/nexusbuild/NexusBuildHub.tsx',
+      'src/components/cleanslate/CleanSlateHub.tsx',
+      'src/utils/fileIntegrityChecker.ts',
+    ],
+    components: ['NexusInstallHub', 'NexusBuildHub', 'CleanSlateHub'],
+    databaseEntities: ['InstallerConfig', 'BuildManifest', 'FileIntegrityReport'],
+    keyFunctions: [
+      'generateTotalNexusBuildExe() - Gera pacote compilado .EXE com instalador embutido',
+      'performZeroDataCleanSlate() - Higienização com backup preventivo no Desktop do usuário',
+      'verifyIntegritySha256() - Auditoria de integridade com auto-reparo de arquivos corrompidos',
+    ],
+    apiEndpoints: ['POST /api/nexus/build-exe', 'POST /api/nexus/cleanslate-audit'],
+    recentImprovements: [
+      'Garantia de pasta raiz C:\\SucessoEdu em todos os scripts de compilação.',
+      'Higienização com backup automático obrigatório antes da exclusão de dados.',
+    ],
+    maintenanceQuickGuide: 'Para alterar geração de instaladores de estação/cliente, veja `src/components/nexusinstall/NexusInstallHub.tsx`.',
   },
   {
     id: 'CONFIG_SERVIDORES_NUVEM',
-    number: '12',
+    number: '17',
     name: 'Configurações, Rede, Nuvem & Instaladores',
-    tagline: 'Pasta raiz C:\\SucessoEdu, instaladores Windows (.bat/.ps1/.vbs), backups e Google Drive',
+    tagline: 'Pasta raiz C:\\SucessoEdu, micro-servidor local (.ps1/.vbs), backups e Google Drive',
     category: 'INFRAESTRUTURA',
     tabId: 'SYSTEM_UPDATES',
+    tier: 5,
+    tierName: 'Infraestrutura, DevOps & Deploy',
     color: 'from-indigo-700 to-slate-900',
     badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+    status: 'PRODUCAO',
+    dependencies: [],
+    dependents: ['DASHBOARD_ANALYTICS', 'NEXUSCORE_PRODUCTION', 'NEXUS_INSTALL_BUILD'],
     sourceFiles: [
       'src/components/config/SystemUpdateModule.tsx',
       'src/components/config/NetworkInstaller.tsx',
       'src/components/config/AppIntegrityChecker.tsx',
-      'src/components/config/UpdateTutorialGuide.tsx',
-      'src/components/config/GoogleDriveConnectivityTester.tsx',
       'src/components/config/ScheduledBackupManager.tsx',
       'src/services/backupSchedulerService.ts',
-      'src/utils/fileIntegrityChecker.ts',
       'src/utils/installerGenerator.ts',
       'src/utils/standaloneAppHtml.ts',
       'src/services/googleDriveService.ts',
-      'src/utils/updatePackageHelper.ts',
-      'src/utils/systemArchitectureDiagram.ts',
       'server.ts',
     ],
     components: [
       'SystemUpdateModule',
       'NetworkInstaller',
       'AppIntegrityChecker',
-      'UpdateTutorialGuide',
-      'WelcomeUpdateModal',
-      'GoogleDriveConnectivityTester',
       'ScheduledBackupManager',
     ],
-    databaseEntities: ['SchoolSettings', 'SystemUpdatePackage', 'BackupSnapshot', 'CloudFolderConfig', 'BackupSchedulerConfig', 'FileIntegrityReport'],
+    databaseEntities: ['SchoolSettings', 'SystemUpdatePackage', 'BackupSnapshot', 'CloudFolderConfig'],
     keyFunctions: [
-      'performLocalIntegrityAudit(filesMap, school, port, ip) - Auditoria criptográfica SHA-256 dos 17 arquivos críticos comparados ao manifesto oficial v5.4.0',
-      'createAutoRepairZipBundle(filesToRepair, config) - Pacote cirúrgico de auto-reparo e auto-cura de arquivos corrompidos ou ausentes na pasta C:\\SucessoEdu',
-      'generateCryptographicManifest() - Gera manifesto imutável com hashes esperados, tamanhos e criticidade de cada componente',
-      'generateIntegrityVerificationBat() - Script Windows .bat com auto-elevação UAC e reparo via robocopy e PowerShell',
-      'executeScheduledBackupNow(reason) - Executa rotina agendada enviando backup ao Google Drive e notificando administradores',
-      'notifyAdminBackupSuccess(params) - Dispara mensagem interna detalhada com estatísticas, hash e anexo do backup',
-      'generateUnifiedWindowsBat(config) - Cria instalador Windows com garantia de pasta raiz C:\\SucessoEdu e contagem de arquivos',
-      'generateUninstallBat(port, school) - Utilitário nativo de desinstalação segura, limpeza de serviços/portas e backup preventivo no Desktop',
-      'syncSystemArchitectureDiagrams() - Sincroniza e versiona automaticamente os diagramas do sistema a cada melhoria',
+      'performLocalIntegrityAudit() - Auditoria criptográfica SHA-256 dos 17 arquivos críticos em C:\\SucessoEdu',
+      'createAutoRepairZipBundle() - Pacote cirúrgico de auto-reparo de arquivos corrompidos ou ausentes',
+      'generateUnifiedWindowsBat() - Cria instalador Windows com garantia de pasta raiz C:\\SucessoEdu',
+      'executeScheduledBackupNow() - Executa rotina agendada enviando backup ao Google Drive oficial',
     ],
     apiEndpoints: [
       'GET /api/updates/cloud-repository',
       'POST /api/updates/cloud-test',
-      'POST /api/updates/seed-cloud-folder',
       'POST /api/updates/upload-diagram',
       'POST /api/updates/apply',
     ],
     recentImprovements: [
-      'Módulo de Desinstalação e Limpeza Completa (DESINSTALAR_OU_LIMPAR_SUCESSOEDU.bat): Suporta Desinstalação Segura com backup no Desktop, Reset Total e Parada Emergencial de Serviços e Liberação de Portas.',
-      'Blindagem de Escapes e Caminhos no Drive C:: Correção cirúrgica de barras invertidas em scripts .bat/.ps1 eliminando falhas de criação da pasta C:\\SucessoEdu.',
-      'Instalação e Atualização Intuitivas Passo a Passo: Telas orientadas e guias práticos tanto no Instalador Unificado quanto no manual offline.',
-      'Auditoria Criptográfica de Arquivos & Auto-Reparo SHA-256: Verificação de integridade dos 17 arquivos críticos em C:\\SucessoEdu comparados ao manifesto oficial v5.4.0, com correção cirúrgica automática de arquivos corrompidos ou ausentes.',
-      'Scripts Nativos Windows de Verificação & Reparo (Verificar_Integridade_e_AutoReparo.bat e verificar_integridade_e_reparo.ps1) com UAC e robocopy.',
-      'Agendamento de Backup Automático no Google Drive: rotina periódica que salva dados e notifica administradores via Mensagens Internas.',
-      'Garantia de Criação da Pasta Raiz C:\\SucessoEdu: auto-elevação UAC com preservação do diretório de trabalho, criação multi-camadas (CMD/PowerShell), desbloqueio total de permissões (icacls) e validação de contagem de arquivos.',
-      'Utilitário de Teste de Conectividade e Escrita no Google Drive integrado ao NetworkInstaller com upload de arquivo .txt.',
-      'Atualização e sincronização contínua e automática dos diagramas de arquitetura a cada modificação do sistema.',
-      'Atalho único oficial no Desktop com ícone exclusivo e limpeza de atalhos duplicados.',
+      'Módulo de Desinstalação e Limpeza Completa (DESINSTALAR_OU_LIMPAR_SUCESSOEDU.bat) com backup preventivo no Desktop.',
+      'Blindagem de escapes de barra invertida em scripts .bat/.ps1 eliminando falhas de criação de C:\\SucessoEdu.',
+      'Auditoria Criptográfica de Arquivos & Auto-Reparo SHA-256 dos 17 arquivos críticos.',
+      'Agendamento de Backup Automático no Google Drive com notificação via Mensagens Internas.',
     ],
-    maintenanceQuickGuide: 'Para alterar instaladores Windows, veja `src/utils/installerGenerator.ts`. Para auditoria SHA-256 e auto-reparo, veja `src/utils/fileIntegrityChecker.ts` e `AppIntegrityChecker.tsx`.',
+    maintenanceQuickGuide: 'Para alterar instaladores Windows, veja `src/utils/installerGenerator.ts`. Para auditoria SHA-256, veja `src/utils/fileIntegrityChecker.ts`.',
+  },
+  {
+    id: 'DATASYNC_RELATIONAL_INTEGRITY',
+    number: '18',
+    name: 'DataSync Pro, Integridade Relacional (FK) & Supabase Cloud',
+    tagline: 'Auditoria e auto-cura de chaves estrangeiras, schemas DDL, WebP media e banco de dados em nuvem',
+    category: 'DEVOPS_NUVEM',
+    tabId: 'DATASYNC_PRO',
+    tier: 5,
+    tierName: 'Infraestrutura, DevOps & Deploy',
+    color: 'from-emerald-600 to-teal-800',
+    badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    status: 'PRODUCAO',
+    dependencies: ['CONFIG_SERVIDORES_NUVEM', 'ADMIN_TI_RBAC'],
+    dependents: ['DASHBOARD_ANALYTICS', 'SECRETARIA_MATRICULAS', 'AVALIACOES_GABARITOS'],
+    sourceFiles: [
+      'src/services/relationalIntegrityService.ts',
+      'src/components/admin/RelationalIntegrityDashboard.tsx',
+      'src/components/datasync/DataSyncProHub.tsx',
+      'src/services/datasync/SupabaseDatabaseService.ts',
+      'src/services/datasync/SchemaManager.ts',
+    ],
+    components: [
+      'RelationalIntegrityDashboard',
+      'DataSyncProHub',
+      'SupabaseLiveDatabaseView',
+      'SQLArchitect',
+      'SafetyVaultDashboard',
+    ],
+    databaseEntities: [
+      'students',
+      'school_classes',
+      'subjects',
+      'courses',
+      'questions',
+      'exams',
+      'exam_submissions',
+      'academic_histories',
+      'attendance_sheets',
+      'lesson_registries',
+      'class_grade_sheets',
+      'school_units',
+      'user_accounts',
+    ],
+    keyFunctions: [
+      'audit(data) - Auditoria detalhada e emissão de laudo de integridade referencial entre 13 tabelas',
+      'autoHeal(data) - Normalização cirúrgica de chaves estrangeiras quebradas e reatribuição de registros órfãos',
+      'getComprehensiveProvisioningScript() - DDL SQL com índices relacionais de alta performance e RLS',
+      'testConnection() - Validação de latência e TLS 1.3 com endpoint Postgres/Supabase',
+    ],
+    apiEndpoints: [
+      'POST /api/datasync/test',
+      'POST /api/datasync/schema-sync',
+      'GET /api/datasync/relational-audit',
+    ],
+    recentImprovements: [
+      'Motor RelationalIntegrityService com auto-cura e score 100% em 13 tabelas.',
+      'Dashboard visual interativo de integridade relacional integrado ao DataSync Pro e Admin TI.',
+      'Índices relacionais e garantia de integridade nas migrações SQL do Supabase.',
+    ],
+    maintenanceQuickGuide:
+      'Para ajustar regras de integridade ou chaves estrangeiras, consulte `src/services/relationalIntegrityService.ts` e `src/components/admin/RelationalIntegrityDashboard.tsx`.',
   },
 ];
 
@@ -483,6 +789,281 @@ export function syncSystemArchitectureDiagrams(
  */
 export function recordSystemImprovement(moduleId: string, improvementText: string): void {
   syncSystemArchitectureDiagrams(moduleId, improvementText);
+}
+
+/**
+ * Gera um prompt estruturado de engenharia de software pronto para copiar e colar para o Gemini / AI Studio
+ * a fim de implementar novas funcionalidades, corrigir bugs ou atualizar módulos.
+ */
+export function generateAiEngineeringPrompt(
+  request: Omit<ModuleEngineeringRequest, 'id' | 'createdAt' | 'generatedPrompt' | 'status'>
+): string {
+  const targetModule = SYSTEM_MODULES_CATALOG.find((m) => m.id === request.moduleId);
+  const moduleName = targetModule ? targetModule.name : request.moduleName;
+  const moduleTab = targetModule ? targetModule.tabId : 'N/A';
+  const tierInfo = targetModule ? `Tier ${targetModule.tier} (${targetModule.tierName})` : 'N/A';
+
+  const typeLabels: Record<EngineeringRequestType, string> = {
+    IMPLEMENTATION: '🚀 NOVA IMPLEMENTAÇÃO / RECURSO',
+    BUGFIX: '🐛 CORREÇÃO DE BUG (BUGFIX)',
+    UPDATE: '⚡ ATUALIZAÇÃO / MELHORIA DE ARQUITETURA',
+  };
+
+  const priorityLabels: Record<EngineeringRequestPriority, string> = {
+    BAIXA: '🟢 BAIXA - Melhoria estética ou ajuste secundário',
+    MEDIA: '🟡 MÉDIA - Ajuste de fluxo operacional comum',
+    ALTA: '🟠 ALTA - Funcionalidade prioritária para a gestão',
+    CRITICA: '🔴 CRÍTICA / BLOQUEANTE - Interrupção de processo ou exigência legal imediata',
+  };
+
+  return `# 📋 SOLICITAÇÃO OFICIAL DE ENGENHARIA - SUCESSOEDU GESTÃO EDUCACIONAL
+
+**Tipo:** ${typeLabels[request.type] || request.type}
+**Prioridade:** ${priorityLabels[request.priority] || request.priority}
+**Módulo Alvo:** ${moduleName} (ID: \`${request.moduleId}\`)
+**Camada Arquitetural:** ${tierInfo}
+**Aba de Navegação:** \`${moduleTab}\`
+**Data:** ${new Date().toLocaleString('pt-BR')}
+
+---
+
+## 🎯 1. TÍTULO E OBJETIVO DA DEMANDA
+### "${request.title}"
+
+${request.description}
+
+---
+
+## 📂 2. ARQUIVOS E COMPONENTES AFETADOS NO PROJETO
+Por favor, foque a intervenção técnica nos seguintes arquivos e módulos mapeados:
+${
+  request.affectedFiles && request.affectedFiles.length > 0
+    ? request.affectedFiles.map((f) => `- \`${f}\``).join('\n')
+    : targetModule?.sourceFiles.map((f) => `- \`${f}\``).join('\n') || '- `src/App.tsx`'
+}
+
+${
+  request.affectedComponents && request.affectedComponents.length > 0
+    ? `**Componentes Relacionados:** ${request.affectedComponents.map((c) => `\`${c}\``).join(', ')}`
+    : targetModule?.components
+    ? `**Componentes Relacionados:** ${targetModule.components.map((c) => `\`${c}\``).join(', ')}`
+    : ''
+}
+
+---
+
+## 💾 3. ENTIDADES DE DADOS ENVOLVIDAS
+${
+  request.affectedEntities && request.affectedEntities.length > 0
+    ? request.affectedEntities.map((e) => `- Entidade/Tabela: \`${e}\``).join('\n')
+    : targetModule?.databaseEntities.map((e) => `- Entidade: \`${e}\``).join('\n') || '- `SchoolSettings`'
+}
+
+---
+
+## ✅ 4. COMPORTAMENTO ESPERADO E CRITÉRIOS DE ACEITE
+${request.expectedBehavior || 'Executar a solicitação garantindo fluidez visual, resposta imediata e persistência de dados.'}
+
+---
+
+## 🛡️ 5. REGRAS DE ARQUITETURA E DIRETRIZES TÉCNICAS MANDATÓRIAS
+1. **Padrão Visual:** Manter fidelidade estética ao Tailwind CSS existente, sem quebras de layout ou contrastes baixos.
+2. **Ícones:** Importar exclusivamente da biblioteca oficial \`lucide-react\`.
+3. **Ambiente Híbrido:** Manter compatibilidade com execução tanto na nuvem quanto no micro-servidor local (\`C:\\SucessoEdu\`).
+4. **Sem Perda de Dados:** Preservar a integridade das entidades existentes no \`localStorage\` / mock data.
+5. **Tipagem Estrita:** Atualizar \`src/types.ts\` caso novas propriedades sejam adicionadas.
+6. **Auditoria:** Após implementar a solicitação, registrar a alteração chamando \`recordSystemImprovement('${request.moduleId}', '${request.title}')\`.
+
+---
+*Solicitação gerada através do Diagrama Interativo de Módulos e Engenharia do SucessoEdu Gestão Educacional.*`;
+}
+
+const LOCAL_STORAGE_REQUESTS_KEY = 'sucessoedu_module_engineering_requests';
+
+/**
+ * Salva uma solicitação de engenharia no armazenamento persistente do navegador.
+ */
+export function saveEngineeringRequest(
+  data: Omit<ModuleEngineeringRequest, 'id' | 'createdAt' | 'generatedPrompt' | 'status'> & {
+    id?: string;
+    status?: EngineeringRequestStatus;
+  }
+): ModuleEngineeringRequest {
+  const requests = getEngineeringRequests();
+  const id = data.id || `REQ-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const createdAt = new Date().toISOString();
+  const status: EngineeringRequestStatus = data.status || 'PENDENTE';
+  const generatedPrompt = generateAiEngineeringPrompt(data);
+
+  const newRequest: ModuleEngineeringRequest = {
+    ...data,
+    id,
+    createdAt,
+    status,
+    generatedPrompt,
+  };
+
+  const existingIndex = requests.findIndex((r) => r.id === id);
+  if (existingIndex >= 0) {
+    requests[existingIndex] = newRequest;
+  } else {
+    requests.unshift(newRequest);
+  }
+
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LOCAL_STORAGE_REQUESTS_KEY, JSON.stringify(requests));
+    }
+  } catch (err) {
+    console.warn('Erro ao salvar solicitação de engenharia:', err);
+  }
+
+  return newRequest;
+}
+
+/**
+ * Retorna todas as solicitações de engenharia cadastradas.
+ */
+export function getEngineeringRequests(): ModuleEngineeringRequest[] {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem(LOCAL_STORAGE_REQUESTS_KEY);
+      if (saved) {
+        return JSON.parse(saved) as ModuleEngineeringRequest[];
+      }
+    }
+  } catch (err) {
+    console.warn('Erro ao carregar solicitações de engenharia:', err);
+  }
+
+  // Se vazio, gerar 2 solicitações de exemplo demonstrativas
+  return [
+    {
+      id: 'REQ-EXEMPLO-01',
+      moduleId: 'FREQUENCIA_CHAMADA',
+      moduleName: 'Frequência Diária, Chamada & Diário de Classe',
+      type: 'IMPLEMENTATION',
+      priority: 'ALTA',
+      title: 'Adicionar exportação em PDF timbrado com assinatura digital para o Diário de Classe',
+      description: 'Permitir que o coordenador ou professor exporte a folha mensal de frequência diretamente em PDF com cabeçalho oficial da escola e QR Code de autenticação.',
+      expectedBehavior: 'Ao clicar no botão "Imprimir Diário", gerar arquivo PDF vetorial pronto com todos os 30 alunos da turma, percentual LDB e espaço para visto da coordenação.',
+      affectedFiles: [
+        'src/components/diary/ClassDiaryModule.tsx',
+        'src/components/attendance/AttendanceReportsModal.tsx',
+      ],
+      affectedComponents: ['ClassDiaryModule', 'AttendanceReportsModal'],
+      affectedEntities: ['ClassDiaryEntry', 'AttendanceSummary'],
+      generatedPrompt: '',
+      createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
+      status: 'EM_ANALISE',
+      requesterEmail: 'suportetecnicoads@gmail.com',
+    },
+    {
+      id: 'REQ-EXEMPLO-02',
+      moduleId: 'FINANCEIRO_MENSALIDADES',
+      moduleName: 'Financeiro, Mensalidades & PIX',
+      type: 'UPDATE',
+      priority: 'MEDIA',
+      title: 'Implementar envio automático de lembrete PIX via WhatsApp 3 dias antes do vencimento',
+      description: 'Disparar notificação amigável com a chave PIX copia-e-cola diretamente pelo WhatsApp dos responsáveis cadastrados.',
+      expectedBehavior: 'O sistema lista as faturas a vencer nos próximos 3 dias com um botão direto de disparo de mensagem WhatsApp pré-formatada.',
+      affectedFiles: [
+        'src/components/financial/FinancialModule.tsx',
+        'src/components/financial/PixPaymentModal.tsx',
+      ],
+      affectedComponents: ['FinancialModule', 'PixPaymentModal'],
+      affectedEntities: ['FinancialInvoice', 'GuardianContact'],
+      generatedPrompt: '',
+      createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
+      status: 'PENDENTE',
+      requesterEmail: 'suportetecnicoads@gmail.com',
+    },
+  ];
+}
+
+/**
+ * Atualiza o status de uma solicitação no backlog.
+ */
+export function updateEngineeringRequestStatus(id: string, status: EngineeringRequestStatus): void {
+  const requests = getEngineeringRequests();
+  const target = requests.find((r) => r.id === id);
+  if (target) {
+    target.status = status;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(LOCAL_STORAGE_REQUESTS_KEY, JSON.stringify(requests));
+      }
+    } catch (err) {
+      console.warn('Erro ao atualizar status da solicitação:', err);
+    }
+  }
+}
+
+/**
+ * Exclui uma solicitação de engenharia do backlog.
+ */
+export function deleteEngineeringRequest(id: string): void {
+  let requests = getEngineeringRequests();
+  requests = requests.filter((r) => r.id !== id);
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(LOCAL_STORAGE_REQUESTS_KEY, JSON.stringify(requests));
+    }
+  } catch (err) {
+    console.warn('Erro ao excluir solicitação:', err);
+  }
+}
+
+/**
+ * Salva o backlog completo de solicitações em formato Markdown no computador do usuário.
+ */
+export function exportEngineeringRequestsMarkdown(): void {
+  const requests = getEngineeringRequests();
+  let md = `# BACKLOG OFICIAL DE SOLICITAÇÕES DE ENGENHARIA - SUCESSOEDU
+**Data de Emissão:** ${new Date().toLocaleString('pt-BR')}
+**Total de Demandas Registradas:** ${requests.length}
+
+---
+
+`;
+
+  requests.forEach((req, idx) => {
+    md += `## ${idx + 1}. [${req.type}] ${req.title}
+- **ID:** \`${req.id}\`
+- **Módulo:** ${req.moduleName} (\`${req.moduleId}\`)
+- **Prioridade:** ${req.priority}
+- **Status:** ${req.status}
+- **Criado em:** ${new Date(req.createdAt).toLocaleString('pt-BR')}
+
+### Descrição:
+${req.description}
+
+### Comportamento Esperado:
+${req.expectedBehavior}
+
+### Arquivos Afetados:
+${req.affectedFiles?.map((f) => `- \`${f}\``).join('\n')}
+
+### Prompt de Engenharia para o Gemini / AI Studio:
+\`\`\`markdown
+${req.generatedPrompt || generateAiEngineeringPrompt(req)}
+\`\`\`
+
+---
+
+`;
+  });
+
+  downloadFile('SOLICITACOES_ENGENHARIA_SUCESSOEDU.md', md, 'text/markdown;charset=utf-8');
+}
+
+/**
+ * Salva o backlog completo de solicitações em JSON.
+ */
+export function exportEngineeringRequestsJson(): void {
+  const requests = getEngineeringRequests();
+  const json = JSON.stringify(requests, null, 2);
+  downloadFile('SOLICITACOES_ENGENHARIA_SUCESSOEDU.json', json, 'application/json;charset=utf-8');
 }
 
 /**
@@ -813,11 +1394,11 @@ export function generateArchitectureDiagramHtml(
     <div class="overview-stats">
       <div class="stat-card">
         <div class="label">Total de Módulos Canônicos</div>
-        <div class="value">12 Módulos Ativos</div>
+        <div class="value">${SYSTEM_MODULES_CATALOG.length} Módulos Ativos</div>
       </div>
       <div class="stat-card">
         <div class="label">Arquivos-Fonte Mapeados</div>
-        <div class="value">48 Componentes & Scripts</div>
+        <div class="value">${SYSTEM_MODULES_CATALOG.reduce((acc, m) => acc + m.sourceFiles.length, 0)} Componentes & Scripts</div>
       </div>
       <div class="stat-card">
         <div class="label">Diretório Raiz Oficial</div>
@@ -977,7 +1558,7 @@ O **SucessoEdu** foi projetado com uma arquitetura modular desacoplada que opera
 
 ---
 
-## 2. MAPA CANÔNICO DOS 12 MÓDULOS
+## 2. MAPA CANÔNICO DOS ${SYSTEM_MODULES_CATALOG.length} MÓDULOS
 
 `;
 

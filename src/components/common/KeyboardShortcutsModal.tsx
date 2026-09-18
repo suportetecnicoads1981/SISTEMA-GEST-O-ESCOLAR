@@ -21,6 +21,11 @@ import {
   Info,
   Bell,
   ArrowRight,
+  Sliders,
+  Box,
+  Wrench,
+  ShieldCheck,
+  Database,
 } from 'lucide-react';
 import { SYSTEM_SHORTCUTS, ShortcutDefinition } from '../../hooks/useGlobalKeyboardShortcuts';
 
@@ -67,6 +72,7 @@ const CATEGORY_METADATA: Record<
 
 const TAB_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   MAIN_DASHBOARD: LayoutDashboard,
+  ADMIN_TI: Sliders,
   STUDENTS: Users,
   EXAMS: ClipboardList,
   CLASSES: Layers,
@@ -78,6 +84,10 @@ const TAB_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   DROPOUT_CENSUS: UserX,
   MUNICIPAL_SYNC: Building2,
   USER_CONTROL: Key,
+  NEXUS_INSTALL: Box,
+  NEXUS_BUILD: Wrench,
+  CLEANSLATE_HUB: ShieldCheck,
+  DATASYNC_PRO: Database,
   NETWORK_INSTALLER: Network,
   WHATSAPP: MessageSquare,
   ABOUT: Info,

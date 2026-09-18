@@ -29,8 +29,17 @@ import { SupabaseLiveDatabaseView } from './SupabaseLiveDatabaseView';
 import { SchemaManager } from '../../services/datasync/SchemaManager';
 import { StorageController } from '../../services/datasync/StorageController';
 import { BackupZipRecord, StoredAsset } from '../../types/datasync';
+import { RelationalIntegrityDashboard } from '../admin/RelationalIntegrityDashboard';
+import { getStoredData, AppStateData } from '../../data/storage';
 
-type DataSyncTab = 'DATABASE_SYNC' | 'UPLOADER' | 'SQL_ARCHITECT' | 'SAFETY_VAULT' | 'STORAGE_FILES' | 'AUTH_AUTOMATOR';
+type DataSyncTab =
+  | 'DATABASE_SYNC'
+  | 'UPLOADER'
+  | 'SQL_ARCHITECT'
+  | 'RELATIONAL_INTEGRITY'
+  | 'SAFETY_VAULT'
+  | 'STORAGE_FILES'
+  | 'AUTH_AUTOMATOR';
 
 export const DataSyncProHub: React.FC = () => {
   const [activeTab, setActiveTab] = useState<DataSyncTab>('DATABASE_SYNC');
@@ -48,6 +57,7 @@ export const DataSyncProHub: React.FC = () => {
 
   const [backupList, setBackupList] = useState<BackupZipRecord[]>(() => SchemaManager.getBackupHistory());
   const [storedAssets, setStoredAssets] = useState<StoredAsset[]>(() => StorageController.getAssets());
+  const [appData, setAppData] = useState<AppStateData>(() => getStoredData());
 
   const handleTestConnection = async () => {
     setConnectionStatus((prev) => ({ ...prev, isChecking: true }));
@@ -210,6 +220,18 @@ export const DataSyncProHub: React.FC = () => {
         </button>
 
         <button
+          onClick={() => setActiveTab('RELATIONAL_INTEGRITY')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'RELATIONAL_INTEGRITY'
+              ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+              : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4" />
+          Integridade Relacional (FK & Normalização)
+        </button>
+
+        <button
           onClick={() => setActiveTab('SAFETY_VAULT')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'SAFETY_VAULT'
@@ -264,6 +286,14 @@ export const DataSyncProHub: React.FC = () => {
 
         {activeTab === 'SQL_ARCHITECT' && (
           <SQLArchitect onBackupGenerated={handleBackupGenerated} />
+        )}
+
+        {activeTab === 'RELATIONAL_INTEGRITY' && (
+          <RelationalIntegrityDashboard
+            appData={appData}
+            onUpdateData={(d) => setAppData(d)}
+            onRefresh={() => setAppData(getStoredData())}
+          />
         )}
 
         {activeTab === 'SAFETY_VAULT' && (

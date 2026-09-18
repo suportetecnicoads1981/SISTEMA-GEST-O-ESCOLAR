@@ -129,6 +129,7 @@ export interface Student {
   courseId: string;
   classId: string;
   schoolUnitId?: string; // Unidade Escolar onde está matriculado
+  inepCode?: string; // Código INEP do Aluno (Censo Escolar)
   status: StudentStatus;
   cadastralStatus?: CadastralStatus; // Situação do Cadastro (OK, Pendência de Documentos, etc.)
   entryDate: string;
@@ -339,6 +340,7 @@ export interface Question {
   id: string;
   code: string;
   subject: string;
+  subjectId?: string; // Chave estrangeira para Subject.id (ex: sub-mat)
   topic: string;
   gradeLevel: string;
   bnccSkill?: string; // Código de habilidade BNCC (e.g. EM13MAT301)
@@ -375,6 +377,7 @@ export interface Exam {
   title: string;
   description: string;
   subject: string;
+  subjectId?: string; // Chave estrangeira para Subject.id (ex: sub-mat)
   classId: string;
   teacherName: string;
   schoolYear: number;
@@ -496,6 +499,7 @@ export interface SchoolSettings {
   secretaryRegistration: string;
   logoUrl?: string;
   stampUrl?: string;
+  systemVersion?: string;
 }
 
 export interface SystemBackup {

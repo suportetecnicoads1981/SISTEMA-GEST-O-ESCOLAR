@@ -17,6 +17,12 @@ import {
 } from 'lucide-react';
 import { Exam, Question, Student, ExamSubmission, ExamAnswer } from '../../types';
 import { gradeExamSubmission } from '../../data/storage';
+import {
+  saveExamDraft,
+  getExamDraft,
+  clearExamDraft,
+  ExamDraftRecord,
+} from '../../services/examIndexedDbService';
 
 interface StudentExamRoomProps {
   exam: Exam;
@@ -55,10 +61,91 @@ export const StudentExamRoom: React.FC<StudentExamRoomProps> = ({
   const [submissionResult, setSubmissionResult] = useState<ExamSubmission | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
 
+  // Resiliência de Rede & Auto-Save IndexedDB com Last-Write-Wins (LWW)
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [lastSavedTimestamp, setLastSavedTimestamp] = useState<string | null>(null);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'IDLE' | 'SAVING' | 'SAVED'>('IDLE');
+  const [draftRestoredMsg, setDraftRestoredMsg] = useState<string | null>(null);
+
   const currentStudent = students.find((s) => s.id === selectedStudentId) || students[0];
   const currentQ = examQuestions[currentQuestionIndex];
 
-  // Timer countdown
+  // Monitorar conectividade de rede sem interromper a prova
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Verificar e carregar rascunho salvo anteriormente via Last-Write-Wins (LWW)
+  useEffect(() => {
+    if (!exam.id || !selectedStudentId) return;
+
+    let isMounted = true;
+    getExamDraft(exam.id, selectedStudentId).then((draft) => {
+      if (!isMounted || !draft) return;
+      if (Object.keys(draft.answers || {}).length > 0 || draft.timeLeftSeconds > 0) {
+        setAnswers(draft.answers || {});
+        if (draft.timeLeftSeconds > 10 && draft.timeLeftSeconds < exam.timeLimitMinutes * 60) {
+          setTimeLeftSeconds(draft.timeLeftSeconds);
+        }
+        if (typeof draft.currentQuestionIndex === 'number') {
+          setCurrentQuestionIndex(Math.min(draft.currentQuestionIndex, examQuestions.length - 1));
+        }
+        const savedTime = draft.lastSavedAt ? new Date(draft.lastSavedAt).toLocaleTimeString('pt-BR') : '';
+        setDraftRestoredMsg(`Rascunho recuperado via IndexedDB/LocalStorage (LWW) salvo às ${savedTime}`);
+        setLastSavedTimestamp(savedTime);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [exam.id, selectedStudentId, examQuestions.length, exam.timeLimitMinutes]);
+
+  // Rotina de Auto-Save Periódico a cada 30 segundos no IndexedDB
+  useEffect(() => {
+    if (!hasStarted || isFinished) return;
+
+    const interval = setInterval(() => {
+      triggerDraftAutoSave();
+    }, 30000); // 30 segundos cravados
+
+    return () => clearInterval(interval);
+  }, [hasStarted, isFinished, answers, timeLeftSeconds, currentQuestionIndex, selectedStudentId]);
+
+  const triggerDraftAutoSave = async () => {
+    if (!hasStarted || isFinished) return;
+    try {
+      setAutoSaveStatus('SAVING');
+      await saveExamDraft({
+        examId: exam.id,
+        studentId: selectedStudentId,
+        studentName: currentStudent.name,
+        answers,
+        timeLeftSeconds,
+        currentQuestionIndex,
+        lastSavedAt: new Date().toISOString(),
+        isSyncedWithServer: isOnline,
+      });
+      const nowStr = new Date().toLocaleTimeString('pt-BR');
+      setLastSavedTimestamp(nowStr);
+      setAutoSaveStatus('SAVED');
+      setTimeout(() => setAutoSaveStatus('IDLE'), 2500);
+    } catch (err) {
+      console.error('Falha no auto-save da prova:', err);
+      setAutoSaveStatus('IDLE');
+    }
+  };
+
+  // Timer countdown: continua correndo normalmente mesmo se offline
   useEffect(() => {
     if (!hasStarted || isFinished) return;
 
@@ -83,13 +170,27 @@ export const StudentExamRoom: React.FC<StudentExamRoomProps> = ({
   };
 
   const handleSelectOption = (questionId: string, optionId: string) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: {
-        ...prev[questionId],
-        selectedOptionId: optionId,
-      },
-    }));
+    setAnswers((prev) => {
+      const next = {
+        ...prev,
+        [questionId]: {
+          ...prev[questionId],
+          selectedOptionId: optionId,
+        },
+      };
+      // Salva imediatamente em background
+      saveExamDraft({
+        examId: exam.id,
+        studentId: selectedStudentId,
+        studentName: currentStudent.name,
+        answers: next,
+        timeLeftSeconds,
+        currentQuestionIndex,
+        lastSavedAt: new Date().toISOString(),
+        isSyncedWithServer: isOnline,
+      }).catch(() => {});
+      return next;
+    });
   };
 
   const handleEssayChange = (questionId: string, text: string) => {
@@ -106,7 +207,7 @@ export const StudentExamRoom: React.FC<StudentExamRoomProps> = ({
     handleSubmitExam();
   };
 
-  const handleSubmitExam = () => {
+  const handleSubmitExam = async () => {
     const rawAnswers: ExamAnswer[] = examQuestions.map((q) => {
       const ans = answers[q.id];
       return {
@@ -122,6 +223,12 @@ export const StudentExamRoom: React.FC<StudentExamRoomProps> = ({
     const graded = gradeExamSubmission(exam, questions, rawAnswers, selectedStudentId);
     setSubmissionResult(graded);
     setIsFinished(true);
+
+    // Limpar rascunho persistido após conclusão bem-sucedida
+    try {
+      await clearExamDraft(exam.id, selectedStudentId);
+    } catch {}
+
     onFinishSubmission(graded);
   };
 
@@ -465,27 +572,76 @@ export const StudentExamRoom: React.FC<StudentExamRoomProps> = ({
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* Top Header / Timer Bar */}
-      <div className="sticky top-2 z-40 bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-slate-200 shadow-lg flex items-center justify-between gap-4">
+      <div className="sticky top-2 z-40 bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-slate-200 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-sm font-bold text-slate-900">{exam.title}</h2>
-          <p className="text-[11px] text-slate-500">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-bold text-slate-900">{exam.title}</h2>
+            {isOnline ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Online
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                Modo Offline (Auto-Save Ativo)
+              </span>
+            )}
+            {lastSavedTimestamp && (
+              <span className="text-[10px] text-slate-400 font-mono hidden sm:inline-block">
+                • Salvo às {lastSavedTimestamp} (IndexedDB)
+              </span>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-500 mt-0.5">
             Estudante: <strong className="text-slate-800">{currentStudent.name}</strong> • Questão{' '}
             {currentQuestionIndex + 1} de {examQuestions.length}
           </p>
         </div>
 
-        {/* Timer */}
-        <div
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono font-black text-sm border transition-colors ${
-            isTimeLow
-              ? 'bg-rose-50 border-rose-300 text-rose-700 animate-pulse'
-              : 'bg-slate-100 border-slate-200 text-slate-800'
-          }`}
-        >
-          <Clock className="h-4 w-4" />
-          <span>{formatTimer(timeLeftSeconds)}</span>
+        <div className="flex items-center gap-3">
+          {autoSaveStatus === 'SAVING' && (
+            <span className="text-[10px] font-bold text-indigo-600 flex items-center gap-1">
+              <RefreshCw className="w-3 h-3 animate-spin" />
+              Gravando...
+            </span>
+          )}
+          {autoSaveStatus === 'SAVED' && (
+            <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" />
+              Salvo
+            </span>
+          )}
+
+          {/* Timer */}
+          <div
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono font-black text-sm border transition-colors ${
+              isTimeLow
+                ? 'bg-rose-50 border-rose-300 text-rose-700 animate-pulse'
+                : 'bg-slate-100 border-slate-200 text-slate-800'
+            }`}
+          >
+            <Clock className="h-4 w-4" />
+            <span>{formatTimer(timeLeftSeconds)}</span>
+          </div>
         </div>
       </div>
+
+      {/* Alerta de Rascunho Recuperado (LWW) */}
+      {draftRestoredMsg && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center justify-between">
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            {draftRestoredMsg}
+          </span>
+          <button
+            onClick={() => setDraftRestoredMsg(null)}
+            className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 cursor-pointer"
+          >
+            Dispensar
+          </button>
+        </div>
+      )}
 
       {/* Question Selector Quick Bar */}
       <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-2 overflow-x-auto">

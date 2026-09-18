@@ -11,7 +11,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   Flame,
-  HardDrive
+  HardDrive,
+  Wrench
 } from 'lucide-react';
 import { NetworkMonitor } from './NetworkMonitor';
 import { VisualValidator } from './VisualValidator';
@@ -170,6 +171,18 @@ export const NexusInstallHub: React.FC<NexusInstallHubProps> = ({
               {auditReport?.isParityVerified ? 'Paridade 100%' : 'Mismatch Detectado'}
             </span>
           </div>
+
+          {/* Navegação rápida para NexusBuild */}
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('NEXUS_BUILD')}
+              className="px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 border border-indigo-500 text-xs font-semibold text-white transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+              title="Ir para o Instalador Total (C:\SucessoEduSistema)"
+            >
+              <Wrench className="w-3.5 h-3.5" />
+              SucessoEduSistema Total .EXE
+            </button>
+          )}
 
           {/* Navegação rápida para NexusDeployer */}
           {onNavigate && (

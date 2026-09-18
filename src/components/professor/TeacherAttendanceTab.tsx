@@ -25,6 +25,7 @@ import {
   AttendanceStatus,
   SchoolSettings,
 } from '../../types';
+import { triggerAttendanceAlert } from '../../services/messageQueueService';
 
 interface TeacherAttendanceTabProps {
   teacherName: string;
@@ -202,8 +203,29 @@ export const TeacherAttendanceTab: React.FC<TeacherAttendanceTabProps> = ({
     };
 
     onSaveAttendanceSheet(newSheet);
-    setSaveSuccessAlert(`Chamada do dia ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')} (${activeClass.name}) salva com sucesso!`);
-    setTimeout(() => setSaveSuccessAlert(null), 4000);
+
+    // Trigger trg_attendance_alert: Enfileirar alertas imediatos na message_queue para faltas
+    let enqueuedCount = 0;
+    entries.forEach((ent) => {
+      if (ent.status === 'FALTA') {
+        const studentObj = classStudents.find((s) => s.id === ent.studentId);
+        triggerAttendanceAlert({
+          studentId: ent.studentId,
+          studentName: ent.studentName,
+          guardianName: studentObj?.guardianName,
+          guardianPhone: studentObj?.guardianPhone,
+          className: activeClass.name,
+          subjectName: activeSubject.name,
+          date: selectedDate,
+          lessonNumber,
+        });
+        enqueuedCount++;
+      }
+    });
+
+    const triggerNote = enqueuedCount > 0 ? ` 🔔 [trg_attendance_alert]: ${enqueuedCount} alerta(s) de falta enfileirados na message_queue.` : '';
+    setSaveSuccessAlert(`Chamada do dia ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')} (${activeClass.name}) salva com sucesso!${triggerNote}`);
+    setTimeout(() => setSaveSuccessAlert(null), 5000);
   };
 
   // Official Attendance Sheet Print Handler

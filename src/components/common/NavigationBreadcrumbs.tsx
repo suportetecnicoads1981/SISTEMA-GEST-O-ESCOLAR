@@ -9,6 +9,7 @@ import {
   School,
   Clock,
   Compass,
+  Search,
 } from 'lucide-react';
 
 interface NavigationBreadcrumbsProps {
@@ -18,13 +19,19 @@ interface NavigationBreadcrumbsProps {
   onNavigate: (tab: string, payload?: any) => void;
   schoolName?: string;
   customTitle?: string;
+  onOpenQuickSearch?: () => void;
 }
 
 const TAB_LABELS: Record<string, { label: string; group: string }> = {
   MAIN_DASHBOARD: { label: 'Visão Geral & Dashbox', group: 'Início' },
+  ADMIN_TI: { label: 'Central de Administração & TI', group: 'Administração & TI' },
   OMNI_DEPLOY: { label: 'OmniDeploy • Gestão e Instalação Híbrida', group: 'Deploy & Nuvem' },
   NEXUS_DEPLOYER: { label: 'NexusDeployer • Provisionamento & Updates', group: 'Deploy & Nuvem' },
   NEXUS_INSTALL: { label: 'NexusInstall • Gerenciador de Módulos e Instaladores', group: 'Deploy & Nuvem' },
+  NEXUS_BUILD: { label: 'NexusBuild • Diagnóstico, Instalação & Empacotamento Total', group: 'Deploy & Nuvem' },
+  CLEANSLATE_HUB: { label: 'CleanSlate Enterprise • Reset e Higienização', group: 'Segurança & Dados' },
+  INSTALAFLOW: { label: 'InstalaFlow Híbrido • Supabase & Nuvem', group: 'Deploy & Nuvem' },
+  DATASYNC_PRO: { label: 'DataSync Pro • Sincronização e Schema DDL', group: 'Banco de Dados' },
   TEACHER_PORTAL: { label: 'Portal do Professor', group: 'Docente' },
   PROFESSOR_DASHBOARD: { label: 'Portal do Professor', group: 'Docente' },
   PROFESSOR: { label: 'Portal do Professor', group: 'Docente' },
@@ -54,6 +61,7 @@ export const NavigationBreadcrumbs: React.FC<NavigationBreadcrumbsProps> = ({
   onNavigate,
   schoolName = 'SucessoEdu',
   customTitle,
+  onOpenQuickSearch,
 }) => {
   const [isHistoryDropdownOpen, setIsHistoryDropdownOpen] = useState(false);
   const isDashboard = activeTab === 'MAIN_DASHBOARD';
@@ -173,9 +181,23 @@ export const NavigationBreadcrumbs: React.FC<NavigationBreadcrumbsProps> = ({
         </div>
       </div>
 
-      {/* Identificação de Contexto e Conexão Híbrida */}
-      <div className="hidden lg:flex items-center gap-2 shrink-0 text-xs">
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white border border-slate-200 shadow-2xs">
+      {/* Identificação de Contexto e Conexão Híbrida + Busca Rápida */}
+      <div className="flex items-center gap-2 shrink-0 text-xs">
+        {onOpenQuickSearch && (
+          <button
+            onClick={onOpenQuickSearch}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 text-slate-700 hover:text-indigo-600 shadow-2xs transition-all cursor-pointer group active:scale-95"
+            title="Abrir Busca Rápida de Módulos (Ctrl+K ou Alt+J)"
+          >
+            <Search className="h-3.5 w-3.5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
+            <span className="hidden sm:inline font-semibold text-[11px]">Buscar Módulo</span>
+            <kbd className="hidden md:inline-block text-[9px] font-mono px-1.5 py-0.2 bg-slate-100 group-hover:bg-indigo-100/60 rounded text-slate-500 group-hover:text-indigo-700 border border-slate-200">
+              Ctrl+K
+            </kbd>
+          </button>
+        )}
+
+        <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white border border-slate-200 shadow-2xs">
           <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
           <span className="text-[11px] font-semibold text-slate-700">Modo Híbrido Ativo</span>
           <span className="text-slate-300">•</span>

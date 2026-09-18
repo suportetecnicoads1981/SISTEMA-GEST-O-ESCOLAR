@@ -179,13 +179,16 @@ export const CleanSlateHub: React.FC<CleanSlateHubProps> = ({
 
       {activeTab === 'EPHEMERAL_CLI' && <EphemeralTerminalCLI />}
 
-      {activeTab === 'LGPD_PRIVACY' && <LgpdPrivacyDashboard />}
+      {activeTab === 'LGPD_PRIVACY' && (
+        <LgpdPrivacyDashboard onClose={() => setActiveTab('ZERO_DATA')} />
+      )}
 
       {/* Modal de Consentimento LGPD */}
       <LgpdConsentModal
         isOpen={isConsentModalOpen}
         onAccept={handleConsentAccepted}
         onDecline={handleConsentDeclined}
+        onClose={() => setIsConsentModalOpen(false)}
       />
     </div>
   );

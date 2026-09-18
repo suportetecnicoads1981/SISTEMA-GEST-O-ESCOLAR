@@ -11,16 +11,36 @@ import {
   AlertTriangle,
   RotateCcw,
   Sparkles,
+  X,
 } from 'lucide-react';
 import { HardwareTelemetryLGPD, LgpdConsentPreferences } from '../../types/cleanslate';
 import { LgpdSecurityService } from '../../services/cleanslate/LgpdSecurityService';
 
-export const LgpdPrivacyDashboard: React.FC = () => {
+interface LgpdPrivacyDashboardProps {
+  onClose?: () => void;
+}
+
+export const LgpdPrivacyDashboard: React.FC<LgpdPrivacyDashboardProps> = ({ onClose }) => {
   const [telemetry, setTelemetry] = useState<HardwareTelemetryLGPD | null>(null);
   const [consentPrefs, setConsentPrefs] = useState<LgpdConsentPreferences | null>(() =>
     LgpdSecurityService.getStoredConsent()
   );
   const [isRotatingSalt, setIsRotatingSalt] = useState(false);
+
+  // Fecha o painel ao pressionar a tecla ESC (Escape) se onClose fornecido
+  useEffect(() => {
+    if (!onClose) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   useEffect(() => {
     LgpdSecurityService.getAnonymizedHardwareTelemetry(Boolean(consentPrefs?.technicalTelemetry)).then(
@@ -70,6 +90,22 @@ export const LgpdPrivacyDashboard: React.FC = () => {
               <RotateCcw className={`h-3.5 w-3.5 ${isRotatingSalt ? 'animate-spin' : 'text-emerald-400'}`} />
               <span>Rotacionar Salt do Vault</span>
             </button>
+
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-2 bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 rounded-md transition-colors cursor-pointer flex items-center gap-1.5"
+                title="Fechar Módulo de Privacidade (Tecla Esc)"
+                aria-label="Fechar módulo"
+              >
+                <span className="text-[10px] font-mono text-slate-400 hidden sm:inline px-1 bg-slate-900 rounded border border-slate-800">
+                  Esc
+                </span>
+                <X className="h-4 w-4" />
+                <span className="text-xs font-mono font-bold hidden sm:inline">Fechar</span>
+              </button>
+            )}
           </div>
         </div>
 

@@ -43,6 +43,7 @@ interface AboutSystemProps {
   onUpdateSettings?: (settings: SchoolSettings) => void;
   onBack?: () => void;
   onNavigate?: (tab: string, payload?: any) => void;
+  onOpenVersionControl?: () => void;
 }
 
 export const AboutSystem: React.FC<AboutSystemProps> = ({
@@ -52,6 +53,7 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
   onUpdateSettings,
   onBack,
   onNavigate,
+  onOpenVersionControl,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<DeveloperContact>({ ...developerContact });
@@ -487,17 +489,45 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
             </div>
 
             <div className="space-y-3 bg-slate-50 p-5 rounded-2xl border border-slate-200 text-xs">
-              <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
-                <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                <span>Licenciamento & Versão</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
+                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                  <span>Licenciamento &amp; Versão</span>
+                </div>
+                {onOpenVersionControl && (
+                  <button
+                    onClick={onOpenVersionControl}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold border border-indigo-200 transition cursor-pointer flex items-center gap-1"
+                  >
+                    <Sparkles className="w-3 h-3 text-indigo-600" />
+                    <span>Ver Novidades</span>
+                  </button>
+                )}
               </div>
-              <div className="text-slate-900 font-bold text-sm">{developerContact.systemVersion}</div>
+              <div className="flex items-center justify-between">
+                <div className="text-slate-900 font-bold text-sm font-mono">
+                  {developerContact.systemVersion || 'v5.4.1-ENTERPRISE'}
+                </div>
+                {onOpenVersionControl && (
+                  <button
+                    onClick={onOpenVersionControl}
+                    className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    Controle de Versões &rarr;
+                  </button>
+                )}
+              </div>
               <div className="text-slate-600 text-[11px] leading-relaxed">
                 {developerContact.license}
               </div>
-              <div className="pt-2 border-t border-slate-200 flex items-center gap-1.5 text-emerald-700 font-bold text-[11px]">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                Software Homologado & Ativo
+              <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-emerald-700 font-bold text-[11px]">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Software Homologado &amp; Ativo
+                </div>
+                <span className="text-[10px] font-mono text-slate-400 bg-white px-2 py-0.5 rounded border border-slate-200">
+                  C:\SucessoEdu
+                </span>
               </div>
             </div>
           </div>

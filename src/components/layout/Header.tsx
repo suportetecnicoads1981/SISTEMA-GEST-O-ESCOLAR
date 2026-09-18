@@ -23,6 +23,8 @@ import {
   Folder,
   Keyboard,
   Clock,
+  GitBranch,
+  History,
 } from 'lucide-react';
 import { NotificationItem, UserRole, UserAccount } from '../../types';
 import { NotificationPopover } from '../notificacoes/NotificationPopover';
@@ -43,6 +45,10 @@ interface HeaderProps {
   onMarkAllNotificationsAsRead?: () => void;
   onOpenNotificationModal?: () => void;
   onOpenShortcutsModal?: () => void;
+  onOpenQuickSearch?: () => void;
+  onOpenArchitectureDiagram?: () => void;
+  onOpenVersionControl?: () => void;
+  currentVersion?: string;
   onLogout?: () => void;
 }
 
@@ -62,6 +68,10 @@ export const Header: React.FC<HeaderProps> = ({
   onMarkAllNotificationsAsRead,
   onOpenNotificationModal,
   onOpenShortcutsModal,
+  onOpenQuickSearch,
+  onOpenArchitectureDiagram,
+  onOpenVersionControl,
+  currentVersion,
   onLogout,
 }) => {
   const [currentDateTime, setCurrentDateTime] = useState('');
@@ -133,6 +143,14 @@ export const Header: React.FC<HeaderProps> = ({
         return 'Resultados Oficiais de Avaliações por Nível e Escola';
       case 'MUNICIPAL_SYNC':
         return 'Gestão Municipal & Unificação de Polos Remotos';
+      case 'ADMIN_TI':
+        return 'Central de Administração & TI • Painel Geral';
+      case 'CLEANSLATE_HUB':
+        return 'CleanSlate Enterprise • Reset e Higienização de Banco';
+      case 'INSTALAFLOW':
+        return 'InstalaFlow Híbrido • Gestão de Deploy e Instalação Supabase';
+      case 'DATASYNC_PRO':
+        return 'DataSync Pro • Sincronização & Migração Supabase';
       case 'USER_CONTROL':
         return 'Controle de Usuários, Setores & Permissões';
       case 'SYSTEM_UPDATES':
@@ -143,6 +161,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'NexusDeployer • Provisionamento & Updates na Nuvem';
       case 'NEXUS_INSTALL':
         return 'NexusInstall • Gerenciador de Módulos & Instaladores';
+      case 'NEXUS_BUILD':
+        return 'NexusBuild • Diagnóstico, Instalação & Empacotamento Total';
       case 'NETWORK_INSTALLER':
         return 'Instalador de Rede Local, Nuvem & Backup';
       case 'ABOUT':
@@ -188,6 +208,14 @@ export const Header: React.FC<HeaderProps> = ({
         return 'Relatórios de Avaliação';
       case 'MUNICIPAL_SYNC':
         return 'Sincronização Municipal';
+      case 'ADMIN_TI':
+        return 'Administração & TI';
+      case 'CLEANSLATE_HUB':
+        return 'CleanSlate';
+      case 'INSTALAFLOW':
+        return 'InstalaFlow';
+      case 'DATASYNC_PRO':
+        return 'DataSync Pro';
       case 'USER_CONTROL':
         return 'Controle de Usuários';
       case 'SYSTEM_UPDATES':
@@ -198,6 +226,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'NexusDeployer';
       case 'NEXUS_INSTALL':
         return 'NexusInstall';
+      case 'NEXUS_BUILD':
+        return 'NexusBuild';
       case 'NETWORK_INSTALLER':
         return 'Central de Instalação';
       case 'ABOUT':
@@ -263,8 +293,51 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* LADO DIREITO: Relógio + Status Servidor + Usuário + Notificações + Imprimir (Fiel à Imagem 1) */}
+      {/* LADO DIREITO: Busca Rápida + Relógio + Status Servidor + Usuário + Notificações + Imprimir (Fiel à Imagem 1) */}
       <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+        {/* Botão de Busca Rápida de Módulos (Ctrl+K) */}
+        {onOpenQuickSearch && (
+          <button
+            id="btn-header-quick-search"
+            onClick={onOpenQuickSearch}
+            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 text-xs text-slate-600 hover:text-indigo-600 shadow-2xs transition-all cursor-pointer group"
+            title="Abrir Busca Rápida de Módulos (Ctrl+K)"
+          >
+            <Search className="h-3.5 w-3.5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
+            <span className="font-semibold text-[11px]">Navegar</span>
+            <kbd className="text-[9px] font-mono px-1.5 py-0.2 bg-white rounded text-slate-400 group-hover:text-indigo-700 border border-slate-200 shadow-2xs">
+              Ctrl+K
+            </kbd>
+          </button>
+        )}
+
+        {/* Botão de Diagrama de Módulos & Central de Solicitações IA */}
+        {onOpenArchitectureDiagram && (
+          <button
+            id="btn-header-diagram-hub"
+            onClick={onOpenArchitectureDiagram}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-xs font-bold text-indigo-700 shadow-2xs transition-all cursor-pointer"
+            title="Ver Diagrama de Arquitetura e Central de Solicitações para IA"
+          >
+            <GitBranch className="h-3.5 w-3.5 text-indigo-600" />
+            <span className="hidden sm:inline">Diagrama & IA</span>
+          </button>
+        )}
+
+        {/* Botão Oficial de Controle de Versões & Melhorias */}
+        {onOpenVersionControl && (
+          <button
+            id="btn-header-version-control"
+            onClick={onOpenVersionControl}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-50 hover:bg-purple-100 border border-purple-200 text-xs font-bold text-purple-700 shadow-2xs transition-all cursor-pointer group"
+            title="Ver Controle de Versões & Apresentação de Melhorias"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-purple-600 group-hover:rotate-12 transition-transform" />
+            <span className="font-mono text-[11px] text-purple-800 font-bold">{currentVersion || 'v5.4.1'}</span>
+            <span className="hidden xl:inline text-[9px] bg-purple-200/80 text-purple-900 px-1.5 py-0.5 rounded-md font-sans uppercase">Novidades</span>
+          </button>
+        )}
+
         {/* Relógio em Tempo Real */}
         <div
           id="header-live-clock"
@@ -351,6 +424,18 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   Gerenciar Usuários &amp; Permissões
                 </button>
+                {onOpenVersionControl && (
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      onOpenVersionControl();
+                    }}
+                    className="w-full text-center py-1 text-xs font-bold text-purple-700 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <History className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Controle de Versões &amp; Melhorias</span>
+                  </button>
+                )}
                 {onOpenShortcutsModal && (
                   <button
                     onClick={() => {

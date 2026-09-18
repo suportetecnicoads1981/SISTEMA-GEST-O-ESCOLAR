@@ -77,7 +77,7 @@ export function toSafeBatchAscii(str: string): string {
 // menu de contexto inteligente, notificações balão e HTTP server nativo sem janela preta.
 // -------------------------------------------------------------
 
-export function generateServerTrayPs1(port = 3000, schoolName = 'SucessoEdu Gestão Educacional'): string {
+export function generateServerTrayPs1(port = 8088, schoolName = 'SucessoEdu Gestão Educacional'): string {
   const cleanSchool = schoolName.replace(/"/g, '');
   return `# ===============================================================================
 # SUCESSOEDU GESTAO EDUCACIONAL - SERVIDOR BANDEJA DO SISTEMA (SYSTEM TRAY)
@@ -573,7 +573,7 @@ $notifyIcon.Add_BalloonTipClicked({
 `;
 }
 
-export function generateFloatingServerWidgetPs1(port = 3000): string {
+export function generateFloatingServerWidgetPs1(port = 8088): string {
   return `# ===============================================================================
 # SUCESSOEDU GESTAO EDUCACIONAL - WIDGET FLUTUANTE DA ÁREA DE TRABALHO
 # Monitor de status do servidor em tempo real (Always on Top e Arrastável)
@@ -829,7 +829,7 @@ $timer.Start()
 `;
 }
 
-export function generateMicroServerPs1(port = 3000): string {
+export function generateMicroServerPs1(port = 8088): string {
   return `# ===============================================================================
 # SUCESSOEDU GESTAO EDUCACIONAL - MICRO-SERVIDOR HTTP NATIVO WINDOWS
 # Executa servidor web local na porta ${port} no diretório raiz C:\\SucessoEdu.
@@ -1057,7 +1057,7 @@ while ($listener.IsListening) {
 `;
 }
 
-export function generateMicroServerBat(port = 3000): string {
+export function generateMicroServerBat(port = 8088): string {
   return `@echo off
 chcp 65001 >nul
 title SucessoEdu - Servidor Local Offline [Porta ${port}]
@@ -1106,7 +1106,7 @@ exit /b
 `;
 }
 
-export function generateSilentMicroServerVbs(port = 3000): string {
+export function generateSilentMicroServerVbs(port = 8088): string {
   return `' ===============================================================================
 ' SUCESSOEDU GESTAO EDUCACIONAL - INICIALIZADOR SILENCIOSO DE SERVIDOR
 ' Inicia o servidor local na barra de tarefas (System Tray) e o Widget Flutuante
@@ -1145,7 +1145,7 @@ End If
 `;
 }
 
-export function generateAutoStartConfigBat(schoolName = 'Colégio SucessoEdu', port = 3000): string {
+export function generateAutoStartConfigBat(schoolName = 'Colégio SucessoEdu', port = 8088): string {
   const safeSchool = sanitizeBatchString(schoolName);
   return `@echo off
 chcp 65001 >nul
@@ -1215,7 +1215,7 @@ pause
 `;
 }
 
-export function generateStopServerBat(port = 3000): string {
+export function generateStopServerBat(port = 8088): string {
   return `@echo off
 chcp 65001 >nul
 title SucessoEdu - Encerrar Servidor Local
@@ -1238,7 +1238,7 @@ pause
 /**
  * Script de Abertura Direta Confiável do SucessoEdu no Navegador
  */
-export function generateOpenSucessoEduBat(port = 3000): string {
+export function generateOpenSucessoEduBat(port = 8088): string {
   return `@echo off
 chcp 65001 >nul
 title SucessoEdu Gestão Educacional - Abertura Direta
@@ -1271,7 +1271,7 @@ exit /b
 /**
  * Script de Abertura Direta Confiável para Estações de Trabalho
  */
-export function generateOpenStationBat(serverIp = '127.0.0.1', serverPort = 3000): string {
+export function generateOpenStationBat(serverIp = '127.0.0.1', serverPort = 8088): string {
   return `@echo off
 chcp 65001 >nul
 title SucessoEdu - Conexão com Servidor Central
@@ -1331,7 +1331,7 @@ for /f "tokens=*" %%i in ('powershell -NoProfile -ExecutionPolicy Bypass -Comman
 if "%LOCAL_IP%"=="" set "LOCAL_IP=127.0.0.1"
 
 set "RESOLVED_URL=${defaultUrl}"
-if "%RESOLVED_URL%"=="" set "RESOLVED_URL=http://%LOCAL_IP%:3000"
+if "%RESOLVED_URL%"=="" set "RESOLVED_URL=http://%LOCAL_IP%:8088"
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $d = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Desktop); $s = $ws.CreateShortcut((Join-Path $d '${shortcutName}.lnk')); if (Test-Path 'C:\\SucessoEdu\\Abrir_SucessoEdu.bat') { $s.TargetPath = 'C:\\SucessoEdu\\Abrir_SucessoEdu.bat'; $s.WorkingDirectory = 'C:\\SucessoEdu'; } elseif (Test-Path 'Abrir_SucessoEdu.bat') { $s.TargetPath = (Join-Path $pwd.Path 'Abrir_SucessoEdu.bat'); $s.WorkingDirectory = $pwd.Path; } else { $s.TargetPath = '%RESOLVED_URL%'; }; if (Test-Path 'C:\\SucessoEdu\\sucessoedu.ico') { $s.IconLocation = 'C:\\SucessoEdu\\sucessoedu.ico,0' } elseif (Test-Path 'sucessoedu.ico') { $s.IconLocation = (Join-Path $pwd.Path 'sucessoedu.ico,0') }; $s.Description = '${shortcutName}'; $s.Save(); Write-Host '  [OK] Atalho funcional criado com sucesso na Area de Trabalho!' -ForegroundColor Green"
 
@@ -1828,6 +1828,23 @@ if not defined FOUND_OFFLINE if exist "%~dp001_MODULO_SERVIDOR_LOCAL_OFFLINE\\in
 if not defined FOUND_OFFLINE if exist "%SRC_DIR%\\..\\SucessoEdu_Aplicativo_Offline.html" set "FOUND_OFFLINE=%SRC_DIR%\\..\\SucessoEdu_Aplicativo_Offline.html"
 if not defined FOUND_OFFLINE if exist "%SRC_DIR%\\..\\index.html" set "FOUND_OFFLINE=%SRC_DIR%\\..\\index.html"
 if not defined FOUND_OFFLINE if exist "%LOCALAPPDATA%\\SucessoEdu\\SucessoEdu_Aplicativo_Offline.html" set "FOUND_OFFLINE=%LOCALAPPDATA%\\SucessoEdu\\SucessoEdu_Aplicativo_Offline.html"
+if not defined FOUND_OFFLINE if exist "%LOCALAPPDATA%\\SucessoEdu\\index.html" set "FOUND_OFFLINE=%LOCALAPPDATA%\\SucessoEdu\\index.html"
+if not defined FOUND_OFFLINE if exist "%USERPROFILE%\\Downloads\\SucessoEdu_Aplicativo_Offline.html" set "FOUND_OFFLINE=%USERPROFILE%\\Downloads\\SucessoEdu_Aplicativo_Offline.html"
+if not defined FOUND_OFFLINE if exist "%USERPROFILE%\\Downloads\\index.html" set "FOUND_OFFLINE=%USERPROFILE%\\Downloads\\index.html"
+if not defined FOUND_OFFLINE if exist "%USERPROFILE%\\Downloads\\01_MODULO_SERVIDOR_LOCAL_OFFLINE\\SucessoEdu_Aplicativo_Offline.html" set "FOUND_OFFLINE=%USERPROFILE%\\Downloads\\01_MODULO_SERVIDOR_LOCAL_OFFLINE\\SucessoEdu_Aplicativo_Offline.html"
+if not defined FOUND_OFFLINE if exist "%USERPROFILE%\\Downloads\\01_MODULO_SERVIDOR_LOCAL_OFFLINE\\index.html" set "FOUND_OFFLINE=%USERPROFILE%\\Downloads\\01_MODULO_SERVIDOR_LOCAL_OFFLINE\\index.html"
+
+:: Busca inteligente em pastas de backup anteriores
+if not defined FOUND_OFFLINE (
+    for /f "delims=" %%b in ('dir /b /s "%DEST_DIR%\\Backups\\*index.html" 2^>nul') do (
+        if not defined FOUND_OFFLINE if %%~zb gtr 10000 set "FOUND_OFFLINE=%%b"
+    )
+)
+if not defined FOUND_OFFLINE (
+    for /f "delims=" %%b in ('dir /b /s "%LOCALAPPDATA%\\SucessoEdu\\Backups\\*index.html" 2^>nul') do (
+        if not defined FOUND_OFFLINE if %%~zb gtr 10000 set "FOUND_OFFLINE=%%b"
+    )
+)
 
 if defined FOUND_OFFLINE (
     copy /y "%FOUND_OFFLINE%" "%DEST_DIR%\\index.html" >nul 2>&1
@@ -1836,8 +1853,8 @@ if defined FOUND_OFFLINE (
 
 :: 3. Garantir presenca da aplicacao offline completa SPA (index.html e SucessoEdu_Aplicativo_Offline.html)
 if not exist "%DEST_DIR%\\index.html" (
-    echo   [RECUPERACAO] Criando pagina inicial offline de contingencia...
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "$h = '<!DOCTYPE html><html lang=\"pt-BR\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"><title>SucessoEdu Gestao Educacional</title><style>body{font-family:Segoe UI,sans-serif;background:#0f172a;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column}h1{color:#38bdf8}p{color:#94a3b8}a{color:#f59e0b}</style></head><body><h1>SucessoEdu Gestao Educacional</h1><p>Sistema inicializado com sucesso em C:\\SucessoEdu.</p><p>Para sincronizar a interface completa, execute <b>ATUALIZAR_SISTEMA_LOCAL.bat</b>.</p></body></html>'; Set-Content -Path '%DEST_DIR%\\index.html' -Value $h -Encoding UTF8; Copy-Item '%DEST_DIR%\\index.html' '%DEST_DIR%\\SucessoEdu_Aplicativo_Offline.html' -Force -ErrorAction SilentlyContinue" >nul 2>&1
+    echo   [RECUPERACAO] Localizando pacote completo da aplicacao offline...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$f = Get-ChildItem -Path @($env:USERPROFILE + '\\Downloads', 'C:\\SucessoEdu', $env:LOCALAPPDATA + '\\SucessoEdu') -Filter 'SucessoEdu_Aplicativo_Offline.html' -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 15000 } | Select-Object -First 1; if ($f) { Copy-Item -Path $f.FullName -Destination '%DEST_DIR%\\index.html' -Force; Copy-Item -Path $f.FullName -Destination '%DEST_DIR%\\SucessoEdu_Aplicativo_Offline.html' -Force; Write-Host '  [OK] Aplicacao offline recuperada com sucesso de ' $f.FullName -ForegroundColor Green }" >nul 2>&1
 )
 if not exist "%DEST_DIR%\\SucessoEdu_Aplicativo_Offline.html" (
     if exist "%DEST_DIR%\\index.html" copy /y "%DEST_DIR%\\index.html" "%DEST_DIR%\\SucessoEdu_Aplicativo_Offline.html" >nul 2>&1
@@ -2478,8 +2495,8 @@ exit /b
   return toSafeBatchAscii(bat);
 }
 
-export function generateStandaloneOfflineHtml(schoolName: string, appUrl = ''): string {
-  return generateFullStandaloneAppHtml(schoolName, 3000, 'localhost');
+export function generateStandaloneOfflineHtml(schoolName: string, appUrl = '', initialData?: any): string {
+  return generateFullStandaloneAppHtml(schoolName, 3000, 'localhost', initialData);
 }
 
 // -------------------------------------------------------------
@@ -2688,7 +2705,7 @@ End If
 // Remove atalhos antigos/duplicados e cria EXATAMENTE UM atalho funcional na Área de Trabalho
 // -------------------------------------------------------------
 
-export function generateShortcutInstallerPs1(targetUrl: string, shortcutName: string, port = 3000): string {
+export function generateShortcutInstallerPs1(targetUrl: string, shortcutName: string, port = 8088): string {
   const cleanName = shortcutName.replace(/"/g, '');
   return `# ===============================================================================
 # SUCESSOEDU GESTAO EDUCACIONAL - CRIADOR EXCLUSIVO DE ATALHO NA AREA DE TRABALHO
@@ -3012,7 +3029,7 @@ On Error Goto 0
 // Localiza instantaneamente o IP do computador servidor na rede local sem configuração manual
 // -------------------------------------------------------------
 
-export function generateServerAutoDiscoveryPs1(port = 3000, defaultIp = '192.168.1.150'): string {
+export function generateServerAutoDiscoveryPs1(port = 8088, defaultIp = '192.168.1.150'): string {
   return `# ===============================================================================
 # SUCESSOEDU GESTAO EDUCACIONAL - MOTOR DE DESCOBERTA AUTOMATICA DO SERVIDOR LOCAL
 # Escaneia a sub-rede local em paralelo na porta ${port} e localiza o IP do servidor
@@ -3189,7 +3206,7 @@ if ($foundServerIp) {
 `;
 }
 
-export function generateServerAutoDiscoveryBat(port = 3000, defaultIp = '192.168.1.150'): string {
+export function generateServerAutoDiscoveryBat(port = 8088, defaultIp = '192.168.1.150'): string {
   return `@echo off
 chcp 65001 >nul
 title SucessoEdu - Busca Automatica de Servidor na Rede
@@ -3238,7 +3255,7 @@ for /f "tokens=*" %%i in ('powershell -NoProfile -ExecutionPolicy Bypass -Comman
 if "%LOCAL_IP%"=="" set "LOCAL_IP=127.0.0.1"
 
 set "TARGET_DEST=${targetUrlVar}"
-if "%TARGET_DEST%"=="" set "TARGET_DEST=http://%LOCAL_IP%:3000"
+if "%TARGET_DEST%"=="" set "TARGET_DEST=http://%LOCAL_IP%:8088"
 
 echo ===============================================================================
 echo   SUCESSOEDU GESTAO EDUCACIONAL - CRIADOR DE ATALHO DE APLICATIVO DESKTOP
@@ -5575,7 +5592,7 @@ Ao executar arquivos baixados da Internet, o Windows pode exibir avisos de segur
 Siga este procedimento caso o computador seja novo, recém-formatado ou nunca tenha recebido o SucessoEdu:
 
 ### Passo 1: Obter e Extrair o Pacote Oficial
-1. Baixe o pacote oficial \`SucessoEdu_Instalador_Completo_v5.4.0.zip\` da pasta do Google Drive homologada (\`suportetecnicoads@gmail.com\`) ou copie do pen drive oficial.
+1. Baixe o pacote oficial \`SucessoEdu_Instalador_Completo_v5.4.1.zip\` da pasta do Google Drive homologada (\`suportetecnicoads@gmail.com\`) ou copie do pen drive oficial.
 2. Clique com o botão direito no arquivo \`.zip\` e selecione **"Extrair Tudo..."** para uma pasta acessível (ex: \`Downloads\` ou \`Área de Trabalho\`).
 
 ### Passo 2: Executar o Instalador Unificado como Administrador
@@ -5704,7 +5721,7 @@ sudo systemctl start sucessoedu  # ou sudo docker-compose up -d --build
 /**
  * Gera o script Windows Batch (.bat) com UAC e chamada ao verificador de integridade SHA-256
  */
-export function generateIntegrityVerificationBat(serverPort = 3000, schoolName = 'SucessoEdu Gestão Educacional'): string {
+export function generateIntegrityVerificationBat(serverPort = 8088, schoolName = 'SucessoEdu Gestão Educacional'): string {
   return `@echo off
 chcp 65001 >nul
 title SucessoEdu - Auditoria de Integridade e Auto-Reparo SHA-256
@@ -5764,7 +5781,8 @@ exit /b
 
 export async function generateZipBundle(
   type: 'SERVER' | 'CLIENT' | 'CLOUD' | 'SATELLITE' | 'FULL',
-  config: InstallerConfig
+  config: InstallerConfig,
+  initialData?: any
 ): Promise<Blob> {
   const rawZip = new JSZip();
   const wrapFolder = (f: any) => {
@@ -5796,7 +5814,7 @@ export async function generateZipBundle(
   const microServerBat = generateMicroServerBat(config.serverPort);
   const silentMicroVbs = generateSilentMicroServerVbs(config.serverPort);
   const stopServerBat = generateStopServerBat(config.serverPort);
-  const standaloneHtml = generateStandaloneOfflineHtml(config.schoolName);
+  const standaloneHtml = generateStandaloneOfflineHtml(config.schoolName, '', initialData);
   const autoDiscoveryPs1 = generateServerAutoDiscoveryPs1(config.serverPort, config.serverIp);
   const autoDiscoveryBat = generateServerAutoDiscoveryBat(config.serverPort, config.serverIp);
   const desktopShortcutBat = generateWebDesktopShortcutBat(clientTargetUrl, config.schoolName);

@@ -1,23 +1,52 @@
-import React, { useState } from 'react';
-import { ShieldCheck, Lock, Check, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShieldCheck, Lock, Check, AlertCircle, X } from 'lucide-react';
 import { LgpdConsentPreferences } from '../../types/cleanslate';
 
 interface LgpdConsentModalProps {
   isOpen: boolean;
   onAccept: (prefs: LgpdConsentPreferences) => void;
   onDecline: () => void;
+  onClose?: () => void;
 }
 
 export const LgpdConsentModal: React.FC<LgpdConsentModalProps> = ({
   isOpen,
   onAccept,
   onDecline,
+  onClose,
 }) => {
   const [technicalTelemetry, setTechnicalTelemetry] = useState(true);
   const [performanceDiagnostics, setPerformanceDiagnostics] = useState(true);
   const [crashReports, setCrashReports] = useState(true);
 
+  // Fecha o modal ao pressionar a tecla ESC (Escape)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (onClose) {
+          onClose();
+        } else {
+          onDecline();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose, onDecline]);
+
   if (!isOpen) return null;
+
+  const handleClose = () => {
+    if (onClose) {
+      onClose();
+    } else {
+      onDecline();
+    }
+  };
 
   const handleSave = () => {
     onAccept({
@@ -30,9 +59,28 @@ export const LgpdConsentModal: React.FC<LgpdConsentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-xl bg-slate-950 border border-slate-800 rounded-md shadow-2xl p-6 space-y-5 text-slate-200">
-        <div className="flex items-start gap-4">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 animate-in fade-in duration-200"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) handleClose();
+      }}
+    >
+      <div className="relative w-full max-w-xl bg-slate-950 border border-slate-800 rounded-md shadow-2xl p-6 space-y-5 text-slate-200">
+        {/* Botão Fechar (X / Tecla Esc) */}
+        <button
+          type="button"
+          onClick={handleClose}
+          className="absolute top-4 right-4 p-1.5 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition-colors cursor-pointer group flex items-center gap-1.5"
+          title="Fechar janela (Tecla Esc)"
+          aria-label="Fechar"
+        >
+          <span className="text-[10px] font-mono text-slate-400 group-hover:text-slate-300 hidden sm:inline px-1 bg-slate-950 rounded border border-slate-800">
+            Esc
+          </span>
+          <X className="h-4 w-4" />
+        </button>
+
+        <div className="flex items-start gap-4 pr-10 sm:pr-12">
           <div className="p-3 bg-emerald-950/80 border border-emerald-700/80 text-emerald-400 rounded-md shrink-0">
             <ShieldCheck className="h-7 w-7" />
           </div>

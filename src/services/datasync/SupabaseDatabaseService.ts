@@ -1568,6 +1568,20 @@ BEGIN
         auth.role() = 'authenticated'
     );
 END $$;
+
+-- =========================================================================
+-- 20. ÍNDICES RELACIONAIS E PERFORMANCE DE INTEGRIDADE REFERENCIAL
+-- =========================================================================
+CREATE INDEX IF NOT EXISTS idx_students_class_id ON public.students(class_id);
+CREATE INDEX IF NOT EXISTS idx_students_school_unit_id ON public.students(school_unit_id);
+CREATE INDEX IF NOT EXISTS idx_classes_school_unit_id ON public.school_classes(school_unit_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_class_date ON public.attendance_sheets(class_id, date);
+CREATE INDEX IF NOT EXISTS idx_lessons_class_date ON public.lesson_registries(class_id, date);
+CREATE INDEX IF NOT EXISTS idx_grades_class_term ON public.class_grade_sheets(class_id, term);
+CREATE INDEX IF NOT EXISTS idx_academic_student_id ON public.academic_histories(student_id);
+CREATE INDEX IF NOT EXISTS idx_exams_class_id ON public.exams(class_id);
+CREATE INDEX IF NOT EXISTS idx_submissions_exam_student ON public.exam_submissions(exam_id, student_id);
+CREATE INDEX IF NOT EXISTS idx_questions_subject ON public.questions(subject);
 `;
   }
 

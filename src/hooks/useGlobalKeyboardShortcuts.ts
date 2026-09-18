@@ -97,7 +97,15 @@ export const SYSTEM_SHORTCUTS: ShortcutDefinition[] = [
     description: 'Ambiente seguro para aplicação digital de testes e provas.',
   },
 
-  // Gestão & TI
+  {
+    id: 'admin_ti',
+    key: 'm',
+    displayKey: 'Alt + M',
+    label: 'Central de Administração & TI',
+    tabId: 'ADMIN_TI',
+    category: 'GESTAO_TI',
+    description: 'Hub unificado com todos os módulos de infraestrutura, cloud, builds e segurança.',
+  },
   {
     id: 'censo',
     key: 'c',
@@ -142,6 +150,15 @@ export const SYSTEM_SHORTCUTS: ShortcutDefinition[] = [
     tabId: 'NEXUS_INSTALL',
     category: 'GESTAO_TI',
     description: 'Alocação dinâmica de portas/IP, paridade visual absoluta e empacotador 1-clique.',
+  },
+  {
+    id: 'nexusbuild',
+    key: 'b',
+    displayKey: 'Alt + B',
+    label: 'NexusBuild Total .EXE Suite',
+    tabId: 'NEXUS_BUILD',
+    category: 'GESTAO_TI',
+    description: 'Provisionamento C:\\NexusBuild, PostgreSQL, Firewall, Backup 03:00 AM e Inno Setup.',
   },
   {
     id: 'instalaflow',
@@ -211,6 +228,7 @@ export function useGlobalKeyboardShortcuts({
   isEnabled = true,
 }: UseGlobalKeyboardShortcutsOptions) {
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
+  const [isQuickSearchOpen, setIsQuickSearchOpen] = useState(false);
   const [activeShortcutToast, setActiveShortcutToast] = useState<{
     keyLabel: string;
     targetName: string;
@@ -229,9 +247,27 @@ export function useGlobalKeyboardShortcuts({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       // Allow Escape to close modals
-      if (event.key === 'Escape' && isShortcutsModalOpen) {
+      if (event.key === 'Escape') {
+        if (isShortcutsModalOpen) {
+          event.preventDefault();
+          setIsShortcutsModalOpen(false);
+          return;
+        }
+        if (isQuickSearchOpen) {
+          event.preventDefault();
+          setIsQuickSearchOpen(false);
+          return;
+        }
+      }
+
+      // Ctrl + K or Cmd + K or Alt + J to open quick jump modal
+      if (
+        ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') ||
+        (event.altKey && event.key.toLowerCase() === 'j')
+      ) {
         event.preventDefault();
-        setIsShortcutsModalOpen(false);
+        event.stopPropagation();
+        setIsQuickSearchOpen((prev) => !prev);
         return;
       }
 
@@ -287,11 +323,13 @@ export function useGlobalKeyboardShortcuts({
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true);
     };
-  }, [isEnabled, isShortcutsModalOpen, onNavigate, triggerToast]);
+  }, [isEnabled, isShortcutsModalOpen, isQuickSearchOpen, onNavigate, triggerToast]);
 
   return {
     isShortcutsModalOpen,
     setIsShortcutsModalOpen,
+    isQuickSearchOpen,
+    setIsQuickSearchOpen,
     activeShortcutToast,
     shortcuts: SYSTEM_SHORTCUTS,
   };

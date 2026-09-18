@@ -62,19 +62,25 @@ import { AboutSystem } from './components/sobre/AboutSystem';
 import { LoginScreen } from './components/auth/LoginScreen';
 import { TopOverviewBanner } from './components/layout/TopOverviewBanner';
 import { WelcomeUpdateModal } from './components/common/WelcomeUpdateModal';
+import { VersionControlModal } from './components/version/VersionControlModal';
 import { ModulesArchitectureDiagramModal } from './components/config/ModulesArchitectureDiagramModal';
+import { SystemArchitectureHub } from './components/architecture/SystemArchitectureHub';
 import { UniversalDataImportModal } from './components/secretaria/UniversalDataImportModal';
 import { OmniDeployHub } from './components/omnideploy/OmniDeployHub';
 import { NexusDeployerHub } from './components/nexusdeployer/NexusDeployerHub';
 import { NexusInstallHub } from './components/nexusinstall/NexusInstallHub';
+import { NexusBuildHub } from './components/nexusbuild/NexusBuildHub';
 import { CleanSlateHub } from './components/cleanslate/CleanSlateHub';
 import { InstalaFlowHub } from './components/instalaflow/InstalaFlowHub';
 import { DataSyncProHub } from './components/datasync/DataSyncProHub';
+import { AdminTIHub } from './components/admin/AdminTIHub';
 import { NavigationBreadcrumbs } from './components/common/NavigationBreadcrumbs';
+import { QuickJumpSearchModal } from './components/common/QuickJumpSearchModal';
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
 import { KeyboardShortcutsModal } from './components/common/KeyboardShortcutsModal';
 import { ShortcutToast } from './components/common/ShortcutToast';
 import { Bell, CheckCircle2, X } from 'lucide-react';
+import { startMessageQueueWorker, stopMessageQueueWorker } from './services/messageQueueService';
 
 export default function App() {
   const [data, setData] = useState(() => getStoredData());
@@ -91,11 +97,14 @@ export default function App() {
   });
   const [lastUpdatePackage, setLastUpdatePackage] = useState<SystemUpdatePackage | null>(null);
   const [isArchitectureDiagramModalOpen, setIsArchitectureDiagramModalOpen] = useState(false);
+  const [isVersionControlModalOpen, setIsVersionControlModalOpen] = useState(false);
 
-  // Global Keyboard Shortcuts Layer (Alt+D, Alt+S, Alt+P, Alt+K, etc.)
+  // Global Keyboard Shortcuts Layer (Alt+D, Alt+S, Alt+P, Alt+K, Ctrl+K, etc.)
   const {
     isShortcutsModalOpen,
     setIsShortcutsModalOpen,
+    isQuickSearchOpen,
+    setIsQuickSearchOpen,
     activeShortcutToast,
   } = useGlobalKeyboardShortcuts({
     onNavigate: (tabId) => handleNavigate(tabId),
@@ -153,6 +162,14 @@ export default function App() {
     };
     window.addEventListener('sucessoedu_db_changed', handleDbChange);
     return () => window.removeEventListener('sucessoedu_db_changed', handleDbChange);
+  }, []);
+
+  // Worker de segundo plano para fila de mensagens e notificações
+  useEffect(() => {
+    startMessageQueueWorker(15000);
+    return () => {
+      stopMessageQueueWorker();
+    };
   }, []);
 
   // Audio cue helper for notifications
@@ -1058,6 +1075,18 @@ export default function App() {
     if (tab === 'OMNIDEPLOY' || tab === 'OMNI_DEPLOY' || tab === 'DEPLOY') target = 'OMNI_DEPLOY';
     if (tab === 'NEXUS' || tab === 'NEXUS_DEPLOYER' || tab === 'NEXUS_DEPLOY') target = 'NEXUS_DEPLOYER';
     if (tab === 'NEXUS_INSTALL' || tab === 'NEXUSINSTALL' || tab === 'INSTALL_MANAGER' || tab === 'MODULE_INSTALLER') target = 'NEXUS_INSTALL';
+    if (tab === 'NEXUS_BUILD' || tab === 'NEXUSBUILD' || tab === 'BUILD_EXE' || tab === 'PACKAGER_EXE') target = 'NEXUS_BUILD';
+    if (
+      tab === 'ARCHITECTURE' ||
+      tab === 'DIAGRAM' ||
+      tab === 'DIAGRAMA' ||
+      tab === 'MODULES_DIAGRAM' ||
+      tab === 'ENGENHARIA' ||
+      tab === 'SOLICITACOES' ||
+      tab === 'AI_PROMPTS'
+    ) {
+      target = 'ARCHITECTURE_DIAGRAM';
+    }
 
     if (tab === 'PEDAGOGICAL_DASHBOARD' && payload?.section) {
       setPedagogicalInitialSection(payload.section);
@@ -1187,6 +1216,10 @@ export default function App() {
         onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead}
         onOpenNotificationModal={() => setIsNotificationModalOpen(true)}
         onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
+        onOpenQuickSearch={() => setIsQuickSearchOpen(true)}
+        onOpenArchitectureDiagram={() => setIsArchitectureDiagramModalOpen(true)}
+        onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
+        currentVersion={data.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
         onLogout={handleLogout}
       />
 
@@ -1198,6 +1231,8 @@ export default function App() {
           onSelectTab={(tab) => handleNavigate(tab)}
           onLogout={handleLogout}
           onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
+          onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
+          currentVersion={data.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
           counts={{
             students: data.students.length,
             exams: data.exams.length,
@@ -1211,8 +1246,17 @@ export default function App() {
         />
 
         {/* Content Area */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50">
-          <div className="max-w-7xl mx-auto space-y-6">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50 flex flex-col">
+          <div className="max-w-7xl mx-auto space-y-4 w-full flex-1 flex flex-col">
+            {/* Context Breadcrumbs with History Back & Quick Jump */}
+            <NavigationBreadcrumbs
+              activeTab={activeTab}
+              navigationHistory={navigationHistory}
+              onGoBack={handleGoBack}
+              onNavigate={handleNavigate}
+              schoolName={data.settings?.name}
+              onOpenQuickSearch={() => setIsQuickSearchOpen(true)}
+            />
             {/* TAB: DASHBOX PRINCIPAL (VISÃO EXECUTIVA & NOTIFICAÇÕES) */}
             {activeTab === 'MAIN_DASHBOARD' && (
               <MainOverviewDashboard
@@ -1522,11 +1566,12 @@ export default function App() {
             {/* TAB: ATUALIZAÇÕES WEB & HISTÓRICO DO SISTEMA */}
             {activeTab === 'SYSTEM_UPDATES' && (
               <SystemUpdateModule
-                currentVersion={data.settings?.systemVersion || '5.0.0-ENTERPRISE'}
+                currentVersion={data.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
                 updatePackages={data.systemUpdatePackages || []}
                 onApplyUpdate={handleApplySystemUpdate}
                 onBack={handleGoBack}
                 onNavigate={handleNavigate}
+                onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
                 currentUser={currentUser}
               />
             )}
@@ -1542,6 +1587,16 @@ export default function App() {
                 onSwitchCurrentUser={handleSwitchCurrentUser}
                 onBack={handleGoBack}
                 onNavigate={handleNavigate}
+              />
+            )}
+
+            {/* TAB: CENTRAL DE ADMINISTRAÇÃO & TI (PAINEL GERAL E HUB DE NAVEGAÇÃO RÁPIDA) */}
+            {activeTab === 'ADMIN_TI' && (
+              <AdminTIHub
+                schoolName={data.settings?.name || 'SucessoEdu Gestão Educacional'}
+                onNavigate={handleNavigate}
+                onBack={handleGoBack}
+                userAccountsCount={data.userAccounts?.length || 0}
               />
             )}
 
@@ -1566,6 +1621,14 @@ export default function App() {
             {/* TAB: NEXUS INSTALL - GERENCIADOR DE MÓDULOS, REDE DINÂMICA E INSTALADOR COMPACTO */}
             {activeTab === 'NEXUS_INSTALL' && (
               <NexusInstallHub
+                onNavigate={handleNavigate}
+                onBack={handleGoBack}
+              />
+            )}
+
+            {/* TAB: SUCESSOEDU SISTEMA - SISTEMA DE DIAGNÓSTICO, INSTALAÇÃO E EMPACOTAMENTO TOTAL (C:\SucessoEduSistema) */}
+            {activeTab === 'NEXUS_BUILD' && (
+              <NexusBuildHub
                 onNavigate={handleNavigate}
                 onBack={handleGoBack}
               />
@@ -1598,6 +1661,13 @@ export default function App() {
               />
             )}
 
+            {/* TAB: DIAGRAMA DE ARQUITETURA & CENTRAL DE SOLICITAÇÕES PARA IA */}
+            {activeTab === 'ARCHITECTURE_DIAGRAM' && (
+              <SystemArchitectureHub
+                onNavigateToTab={handleNavigate}
+              />
+            )}
+
             {/* TAB: SOBRE O SISTEMA & DADOS DO DESENVOLVEDOR */}
             {activeTab === 'ABOUT' && (
               <AboutSystem
@@ -1607,6 +1677,7 @@ export default function App() {
                 onUpdateSettings={handleUpdateSettings}
                 onBack={handleGoBack}
                 onNavigate={handleNavigate}
+                onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
               />
             )}
           </div>
@@ -1669,18 +1740,28 @@ export default function App() {
         isOpen={isWelcomeModalOpen}
         onClose={handleCloseWelcomeModal}
         onNavigate={handleNavigate}
-        currentVersion={data.settings?.systemVersion || 'v5.4.0-ENTERPRISE'}
+        currentVersion={data.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
         updatePackage={lastUpdatePackage}
         onOpenManual={() => handleNavigate('SYSTEM_UPDATES')}
         onOpenDiagram={() => setIsArchitectureDiagramModalOpen(true)}
+        onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
       />
 
-      {/* DIAGRAMA OFICIAL DOS 12 MÓDULOS (NUVEM & LOCAL) */}
+      {/* MODAL OFICIAL DE CONTROLE DE VERSÕES E APRESENTAÇÃO DE MELHORIAS */}
+      <VersionControlModal
+        isOpen={isVersionControlModalOpen}
+        onClose={() => setIsVersionControlModalOpen(false)}
+        currentVersion={data.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
+        packages={data.systemUpdatePackages}
+        onNavigateToModule={handleNavigate}
+      />
+
+      {/* DIAGRAMA OFICIAL DE ARQUITETURA DOS 17 MÓDULOS & CENTRAL DE SOLICITAÇÕES IA */}
       <ModulesArchitectureDiagramModal
         isOpen={isArchitectureDiagramModalOpen}
         onClose={() => setIsArchitectureDiagramModalOpen(false)}
-        currentVersion={data.settings?.systemVersion || 'v5.4.0-ENTERPRISE'}
-        onNavigate={handleNavigate}
+        version={data.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
+        onNavigateToTab={handleNavigate}
       />
 
       {/* MÓDULO UNIVERSAL DE IMPORTAÇÃO DE DADOS & POLOS REMOTOS */}
@@ -1698,6 +1779,14 @@ export default function App() {
         onNavigateToSchoolUnits={() => {
           setActiveTab('MUNICIPAL_SYNC');
         }}
+      />
+
+      {/* BUSCA RÁPIDA GLOBAL DE MÓDULOS (CTRL+K OU ALT+J) */}
+      <QuickJumpSearchModal
+        isOpen={isQuickSearchOpen}
+        onClose={() => setIsQuickSearchOpen(false)}
+        onNavigate={handleNavigate}
+        currentActiveTab={activeTab}
       />
 
       {/* GUIA DE ATALHOS DE TECLADO GLOBAIS (ALT+D, ALT+S, ALT+P, ETC.) */}

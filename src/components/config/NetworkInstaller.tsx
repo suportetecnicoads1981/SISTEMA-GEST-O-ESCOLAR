@@ -297,7 +297,8 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
   const handleDownloadZip = async (type: 'SERVER' | 'CLIENT' | 'CLOUD' | 'SATELLITE' | 'FULL') => {
     setIsDownloading(true);
     try {
-      const blob = await generateZipBundle(type, currentConfig);
+      const currentData = getStoredData();
+      const blob = await generateZipBundle(type, currentConfig, currentData);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

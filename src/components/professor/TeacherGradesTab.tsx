@@ -24,6 +24,7 @@ import {
   StudentBimonthlyGradeEntry,
   SchoolSettings,
 } from '../../types';
+import { triggerGradePublished } from '../../services/messageQueueService';
 
 interface TeacherGradesTabProps {
   teacherName: string;
@@ -270,8 +271,31 @@ export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
     };
 
     onSaveGradeSheet(newSheet);
-    setSaveSuccessAlert(`Pauta de Notas do ${selectedTerm} (${activeClass.name} - ${activeSubject.name}) salva e homologada com sucesso!`);
-    setTimeout(() => setSaveSuccessAlert(null), 4000);
+
+    // Trigger trg_grade_published: Enfileirar boletim na message_queue para alunos avaliados
+    let enqueuedCount = 0;
+    gradesArray.forEach((grd) => {
+      const studentObj = classStudents.find((s) => s.id === grd.studentId);
+      if (grd.termAverage > 0 || grd.status !== 'EM_ANDAMENTO') {
+        triggerGradePublished({
+          studentId: grd.studentId,
+          studentName: grd.studentName,
+          guardianName: studentObj?.guardianName,
+          guardianPhone: studentObj?.guardianPhone,
+          className: activeClass.name,
+          subjectName: activeSubject.name,
+          term: selectedTerm,
+          average: grd.termAverage,
+          passingScore,
+          status: grd.status,
+        });
+        enqueuedCount++;
+      }
+    });
+
+    const triggerNote = enqueuedCount > 0 ? ` 📢 [trg_grade_published]: ${enqueuedCount} boletim(ns) enfileirados na message_queue.` : '';
+    setSaveSuccessAlert(`Pauta de Notas do ${selectedTerm} (${activeClass.name} - ${activeSubject.name}) salva e homologada com sucesso!${triggerNote}`);
+    setTimeout(() => setSaveSuccessAlert(null), 5000);
   };
 
   // Class Stats

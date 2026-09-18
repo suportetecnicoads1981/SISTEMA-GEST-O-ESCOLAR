@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Users,
   Layers,
@@ -28,6 +28,14 @@ import {
   Cpu,
   Database,
   Box,
+  Wrench,
+  ChevronDown,
+  ChevronRight,
+  Folder,
+  Sliders,
+  Terminal,
+  Settings2,
+  GitBranch,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -36,6 +44,8 @@ interface SidebarProps {
   onSelectTab: (tab: string) => void;
   onLogout?: () => void;
   onOpenShortcutsModal?: () => void;
+  onOpenVersionControl?: () => void;
+  currentVersion?: string;
   counts?: {
     students?: number;
     exams?: number;
@@ -54,9 +64,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTab,
   onLogout,
   onOpenShortcutsModal,
+  onOpenVersionControl,
+  currentVersion,
   counts,
 }) => {
   const current = activeTab || currentTab || 'MAIN_DASHBOARD';
+  const [isAdminTIExpanded, setIsAdminTIExpanded] = useState(true);
+
+  // Check if current tab is any of the Admin/TI tools
+  const adminTITabs = [
+    'ARCHITECTURE_DIAGRAM',
+    'ADMIN_TI',
+    'OMNI_DEPLOY',
+    'NEXUS_DEPLOYER',
+    'NEXUS_INSTALL',
+    'NEXUS_BUILD',
+    'CLEANSLATE_HUB',
+    'INSTALAFLOW',
+    'DATASYNC_PRO',
+    'USER_CONTROL',
+    'SYSTEM_UPDATES',
+    'NETWORK_INSTALLER',
+    'ABOUT',
+  ];
+  const isCurrentInAdminTI = adminTITabs.includes(current);
 
   const menuSections = [
     {
@@ -68,6 +99,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: LayoutDashboard,
           badge: 'Principal',
           shortcut: 'Alt+D',
+        },
+        {
+          id: 'ARCHITECTURE_DIAGRAM',
+          label: 'Diagrama & Solicitações IA',
+          icon: GitBranch,
+          badge: '18 Módulos',
+          shortcut: 'Alt+A',
         },
         {
           id: 'NOTIFICATIONS',
@@ -154,7 +192,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       title: 'Administração & TI',
+      isCollapsible: true,
+      hubTab: 'ADMIN_TI',
+      hubLabel: 'Central de Administração & TI',
+      hubBadge: 'Hub Geral',
+      hubShortcut: 'Alt+M',
       items: [
+        {
+          id: 'ADMIN_TI',
+          label: 'Painel Central TI & Admin',
+          icon: Sliders,
+          badge: 'Geral',
+          shortcut: 'Alt+M',
+        },
         {
           id: 'OMNI_DEPLOY',
           label: 'OmniDeploy Híbrido',
@@ -173,6 +223,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: Box,
           badge: 'Rede & Build',
           shortcut: 'Alt+X',
+        },
+        {
+          id: 'NEXUS_BUILD',
+          label: 'NexusBuild Total .EXE',
+          icon: Wrench,
+          badge: 'C:\\ Raiz',
+          shortcut: 'Alt+B',
         },
         {
           id: 'CLEANSLATE_HUB',
@@ -222,88 +279,134 @@ export const Sidebar: React.FC<SidebarProps> = ({
     >
       {/* Brand Header */}
       <div className="p-5 border-b border-slate-800 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-gradient-to-tr from-indigo-600 to-indigo-500 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-md shadow-indigo-500/30">
+        <div
+          onClick={onOpenVersionControl}
+          className="flex items-center gap-3 cursor-pointer group/ver"
+          title="Clique para ver o Controle de Versões e Apresentação de Melhorias"
+        >
+          <div className="w-9 h-9 bg-gradient-to-tr from-indigo-600 to-indigo-500 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-md shadow-indigo-500/30 group-hover/ver:scale-105 transition-transform">
             <GraduationCap className="h-5 w-5" />
           </div>
           <div>
-            <span className="text-white font-black tracking-tight text-sm block">SucessoEdu</span>
-            <span className="text-[10px] text-emerald-400 font-bold block">Gestão Educacional v5.0</span>
+            <span className="text-white font-black tracking-tight text-sm block group-hover/ver:text-indigo-300 transition-colors">
+              SucessoEdu
+            </span>
+            <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1 group-hover/ver:text-emerald-300">
+              <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+              <span>{currentVersion || 'v5.4.1'}</span>
+            </span>
           </div>
         </div>
       </div>
 
       {/* Navigation Links */}
       <nav className="flex-1 p-3 space-y-4 text-xs overflow-y-auto">
-        {menuSections.map((section) => (
-          <div key={section.title} className="space-y-1">
-            <div className="px-3 py-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">
-              {section.title}
-            </div>
-            <div className="space-y-0.5">
-              {section.items.map((item) => {
-                const Icon = item.icon;
-                const isActive = current === item.id;
-                return (
+        {menuSections.map((section) => {
+          const isCollapsible = (section as any).isCollapsible;
+          const isSectionActive = isCollapsible && isCurrentInAdminTI;
+
+          return (
+            <div key={section.title} className="space-y-1">
+              <div className="flex items-center justify-between px-3 py-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                <span className="flex items-center gap-1.5">
+                  {section.title}
+                  {isCollapsible && (
+                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-indigo-950 text-indigo-300 border border-indigo-800/60 lowercase">
+                      hub
+                    </span>
+                  )}
+                </span>
+                {isCollapsible && (
                   <button
-                    key={item.id}
-                    id={`sidebar-link-${item.id.toLowerCase()}`}
-                    onClick={() => onSelectTab(item.id)}
-                    title={item.shortcut ? `${item.label} (${item.shortcut})` : item.label}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer group ${
-                      isActive
-                        ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/40'
-                        : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
-                    }`}
+                    onClick={() => setIsAdminTIExpanded(!isAdminTIExpanded)}
+                    className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                    title={isAdminTIExpanded ? 'Recolher submenu' : 'Expandir submenu'}
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <Icon
-                        className={`h-4 w-4 shrink-0 ${
-                          isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'
-                        }`}
-                      />
-                      <span className="truncate">{item.label}</span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {item.shortcut && (
-                        <kbd
-                          className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded transition-colors ${
-                            isActive
-                              ? 'bg-white/20 text-white'
-                              : 'bg-slate-800 text-slate-400 group-hover:text-slate-200 group-hover:bg-slate-700/80 border border-slate-700/50'
-                          }`}
-                        >
-                          {item.shortcut}
-                        </kbd>
-                      )}
-
-                      {item.count !== undefined ? (
-                        <span
-                          className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
-                            isActive ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-400'
-                          }`}
-                        >
-                          {item.count}
-                        </span>
-                      ) : item.badge && !item.shortcut ? (
-                        <span
-                          className={`text-[9px] font-black px-1.5 py-0.5 rounded-md ${
-                            isActive
-                              ? 'bg-indigo-700 text-indigo-100'
-                              : 'bg-slate-800/90 text-slate-400'
-                          }`}
-                        >
-                          {item.badge}
-                        </span>
-                      ) : null}
-                    </div>
+                    {isAdminTIExpanded ? (
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    ) : (
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    )}
                   </button>
-                );
-              })}
+                )}
+              </div>
+
+              {/* Submenu items */}
+              {(!isCollapsible || isAdminTIExpanded) && (
+                <div className="space-y-0.5">
+                  {section.items.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = current === item.id;
+                    const isHubItem = item.id === 'ADMIN_TI';
+
+                    return (
+                      <button
+                        key={item.id}
+                        id={`sidebar-link-${item.id.toLowerCase()}`}
+                        onClick={() => onSelectTab(item.id)}
+                        title={item.shortcut ? `${item.label} (${item.shortcut})` : item.label}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-semibold transition-all cursor-pointer group ${
+                          isActive
+                            ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/40'
+                            : isHubItem
+                            ? 'text-indigo-300 hover:bg-indigo-950/40 hover:text-indigo-200 border border-indigo-900/30'
+                            : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <Icon
+                            className={`h-4 w-4 shrink-0 ${
+                              isActive
+                                ? 'text-white'
+                                : isHubItem
+                                ? 'text-indigo-400 group-hover:text-indigo-300'
+                                : 'text-slate-400 group-hover:text-slate-200'
+                            }`}
+                          />
+                          <span className="truncate">{item.label}</span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {item.shortcut && (
+                            <kbd
+                              className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded transition-colors ${
+                                isActive
+                                  ? 'bg-white/20 text-white'
+                                  : 'bg-slate-800 text-slate-400 group-hover:text-slate-200 group-hover:bg-slate-700/80 border border-slate-700/50'
+                              }`}
+                            >
+                              {item.shortcut}
+                            </kbd>
+                          )}
+
+                          {item.count !== undefined ? (
+                            <span
+                              className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                                isActive ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-400'
+                              }`}
+                            >
+                              {item.count}
+                            </span>
+                          ) : item.badge && !item.shortcut ? (
+                            <span
+                              className={`text-[9px] font-black px-1.5 py-0.5 rounded-md ${
+                                isActive
+                                  ? 'bg-indigo-700 text-indigo-100'
+                                  : 'bg-slate-800/90 text-slate-400'
+                              }`}
+                            >
+                              {item.badge}
+                            </span>
+                          ) : null}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Atalhos de Teclado Quick Button & Sair do Sistema */}

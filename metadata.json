@@ -1,6 +1,6 @@
 {
   "name": "SucessoEdu Gestão Educacional",
-  "description": "Plataforma completa de gestão educacional e ecossistema DataSync Pro Supabase com controle de schema Safe-Mode, backups consolidados em ZIP, otimização de mídias WebP/GIF e RLS rigoroso.",
+  "description": "Plataforma completa de gestão educacional com controle dinâmico de versões, apresentação interativa de melhorias por módulo, backups em ZIP e ecossistema híbrido online/offline.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

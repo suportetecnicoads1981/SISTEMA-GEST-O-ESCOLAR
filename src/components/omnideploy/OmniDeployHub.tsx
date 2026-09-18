@@ -141,43 +141,43 @@ export const OmniDeployHub: React.FC<OmniDeployHubProps> = ({
   };
 
   return (
-    <div className="space-y-6 text-[#202124] animate-in fade-in">
+    <div className="space-y-6 text-[#202124] animate-in fade-in overflow-y-auto max-h-[calc(100vh-4.5rem)] pr-1 sm:pr-2 text-xs sm:text-sm">
       {/* Banner Principal com Design System Material 3 */}
-      <div className="bg-[#1a73e8] rounded-2xl p-6 text-white shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-white/15 backdrop-blur-xs flex items-center justify-center text-white shrink-0">
-            <Server className="h-8 w-8" />
+      <div className="bg-[#1a73e8] rounded-2xl p-4 sm:p-6 text-white shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/15 backdrop-blur-xs flex items-center justify-center text-white shrink-0">
+            <Server className="h-6 w-6 sm:h-8 sm:w-8" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-white/20 text-white">
+              <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-white/20 text-white">
                 GOOGLE MATERIAL 3 • HÍBRIDO
               </span>
-              <span className="text-xs font-mono font-bold bg-black/20 px-2 py-0.5 rounded-md">
+              <span className="text-[11px] sm:text-xs font-mono font-bold bg-black/20 px-2 py-0.5 rounded-md">
                 {OMNI_DEPLOY_CURRENT_VERSION}
               </span>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight mt-1">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight mt-1">
               OmniDeploy • Sistema de Gestão e Instalação Híbrida
             </h1>
-            <p className="text-xs text-blue-100 mt-1 max-w-2xl leading-relaxed">
+            <p className="text-[11px] sm:text-xs text-blue-100 mt-1 max-w-2xl leading-relaxed">
               Instalação modular desacoplada com preservação estrita de <code>/data</code>,
               validação de hash SHA-256, gráficos parametrizáveis e integração nativa com o Firebase.
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
             onClick={() => setIsPresentationModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/20 flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/20 flex items-center gap-1.5 cursor-pointer"
           >
             <Sparkles className="h-4 w-4 text-amber-300" />
             <span>Ver Melhorias da Versão</span>
           </button>
           <button
-            onClick={() => onNavigate('NEXUS_DEPLOYER')}
-            className="px-3.5 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-900 text-white text-xs font-mono font-bold transition-all border border-indigo-400/40 flex items-center gap-1.5 cursor-pointer shadow-xs"
+            onClick={() => onNavigate && onNavigate('NEXUS_DEPLOYER')}
+            className="px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-900 text-white text-xs font-mono font-bold transition-all border border-indigo-400/40 flex items-center gap-1.5 cursor-pointer shadow-xs"
             title="Acessar NexusDeployer: Provisionamento Raiz 12/12 e Bundling Firebase"
           >
             <Cpu className="h-4 w-4 text-indigo-400" />
@@ -186,7 +186,7 @@ export const OmniDeployHub: React.FC<OmniDeployHubProps> = ({
           <button
             onClick={handleDownloadCompleteBundle}
             disabled={isGeneratingZip}
-            className="px-4 py-2 rounded-xl bg-white text-[#1a73e8] hover:bg-blue-50 text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            className="px-3.5 py-2 rounded-xl bg-white text-[#1a73e8] hover:bg-blue-50 text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
           >
             {isGeneratingZip ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             <span>Baixar Pacote Híbrido ZIP</span>
@@ -196,9 +196,9 @@ export const OmniDeployHub: React.FC<OmniDeployHubProps> = ({
 
       {/* Barra de Status Rápido Híbrido & Firebase */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-        <div className="p-4 bg-white rounded-xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+        <div className="p-3.5 sm:p-4 bg-white rounded-xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold text-slate-500 uppercase block">Diretório Raiz</span>
+            <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase block">Diretório Raiz</span>
             <strong className="text-xs font-mono text-slate-800">
               {installationRecord?.rootDir || 'C:\\SucessoEdu'}
             </strong>
@@ -206,9 +206,9 @@ export const OmniDeployHub: React.FC<OmniDeployHubProps> = ({
           <FolderLock className="h-5 w-5 text-[#1a73e8]" />
         </div>
 
-        <div className="p-4 bg-white rounded-xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+        <div className="p-3.5 sm:p-4 bg-white rounded-xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold text-slate-500 uppercase block">Preservação /data</span>
+            <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase block">Preservação /data</span>
             <strong className="text-xs text-emerald-700 font-bold flex items-center gap-1">
               <ShieldCheck className="h-3.5 w-3.5" />
               <span>Protegido 100%</span>
@@ -219,9 +219,9 @@ export const OmniDeployHub: React.FC<OmniDeployHubProps> = ({
           </span>
         </div>
 
-        <div className="p-4 bg-white rounded-xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+        <div className="p-3.5 sm:p-4 bg-white rounded-xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold text-slate-500 uppercase block">Firebase Cloud</span>
+            <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase block">Firebase Cloud</span>
             <strong className="text-xs text-slate-800">
               {firebaseStatus?.firestoreOnline ? 'Firestore & Storage Ativos' : 'Conectando / Standby'}
             </strong>
@@ -229,11 +229,11 @@ export const OmniDeployHub: React.FC<OmniDeployHubProps> = ({
           <Cloud className="h-5 w-5 text-indigo-600" />
         </div>
 
-        <div className="p-4 bg-white rounded-xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+        <div className="p-3.5 sm:p-4 bg-white rounded-xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold text-slate-500 uppercase block">Porta de Rede</span>
+            <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase block">Porta de Rede</span>
             <strong className="text-xs font-mono text-slate-800">
-              TCP {installationRecord?.activePort || 3000} (Liberada)
+              TCP {installationRecord?.activePort || 8088} (Liberada)
             </strong>
           </div>
           <Radio className="h-5 w-5 text-amber-500" />
@@ -254,7 +254,7 @@ export const OmniDeployHub: React.FC<OmniDeployHubProps> = ({
             <button
               key={tab.id}
               onClick={() => setActiveSubTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl transition-all cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-t-xl transition-all cursor-pointer whitespace-nowrap ${
                 isActive
                   ? 'bg-white text-[#1a73e8] border-t-2 border-x border-[#1a73e8] border-b-white font-bold shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border-t-2 border-transparent'
@@ -272,7 +272,7 @@ export const OmniDeployHub: React.FC<OmniDeployHubProps> = ({
         {activeSubTab === 'INSTALL_WIZARD' && (
           <InstallWizard
             schoolName={schoolName}
-            defaultPort={3000}
+            defaultPort={8088}
             onFinished={(record) => {
               setInstallationRecord(record);
             }}

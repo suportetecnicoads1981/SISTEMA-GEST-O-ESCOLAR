@@ -71,6 +71,7 @@ import {
   DEFAULT_TEACHER_LESSON_PLANS,
   DEFAULT_TEACHER_STUDENT_NOTES,
 } from './bnccAndRegulationsData';
+import { RelationalIntegrityService } from '../services/relationalIntegrityService';
 
 const KEYS = {
   DATA: 'sucessoedu_master_store_v5',
@@ -206,47 +207,35 @@ export function getCleanDatabase(options?: CleanInstallationOptions): AppStateDa
     lastSyncDate: new Date().toISOString(),
   };
 
+  // Garante que todas as contas de usuário estejam operacionais com a credencial mestre
+  const userAccounts = DEFAULT_USER_ACCOUNTS.map((u) => (u.isMaster ? activeMaster : u));
+
   return {
-    students: [],
-    classes: [],
-    subjects: DEFAULT_SUBJECTS, // Matriz referencial de disciplinas BNCC
+    students: [], // Excluído estritamente apenas os dados dos alunos já cadastrados
+    classes: DEFAULT_CLASSES, // Todas as turmas da grade acadêmica implementadas
+    subjects: DEFAULT_SUBJECTS, // Matriz referencial de disciplinas BNCC completa
     courses: DEFAULT_COURSES,   // Estrutura padrão de níveis de ensino (Educação Infantil ao Médio)
-    questions: [],
-    exams: [],
-    submissions: [],
-    academicHistories: [],
+    questions: DEFAULT_QUESTIONS, // Banco completo de questões com alinhamento BNCC
+    exams: DEFAULT_EXAMS, // Todas as avaliações estruturadas implementadas
+    submissions: [], // Submissões de alunos excluídas
+    academicHistories: [], // Históricos de alunos excluídos
     settings: initialSettings,
-    notifications: [
-      {
-        id: 'notif-welcome-clean',
-        title: 'Instalação Limpa Concluída',
-        message: 'O SucessoEdu foi inicializado em modo produção sem dados de teste. Comece cadastrando as informações da escola, turmas e primeiros alunos.',
-        type: 'IMPORTANT_ANNOUNCEMENT',
-        priority: 'HIGH',
-        targetRoles: ['ADMIN'],
-        createdAt: new Date().toISOString(),
-        read: false,
-      },
-    ],
-    communications: [],
+    notifications: DEFAULT_NOTIFICATIONS,
+    communications: DEFAULT_COMMUNICATIONS,
     rolePreferences: DEFAULT_ROLE_PREFERENCES,
-    schoolUnits: [headquarterUnit],
+    schoolUnits: DEFAULT_SCHOOL_UNITS, // Todas as unidades escolares (Sede e Polos)
     syncLogs: [],
-    userAccounts: [activeMaster],
+    userAccounts, // Todos os usuários (Administração, Coordenação, Secretaria, Professores)
     developerContact: DEFAULT_DEVELOPER_CONTACT,
     bnccSkills: DEFAULT_BNCC_SKILLS,
     stateRegulations: DEFAULT_STATE_REGULATIONS,
     activeStateRegulationCode: options?.state || 'SP',
     attendanceSheets: [],
-    lessonRegistries: [],
+    lessonRegistries: DEFAULT_LESSON_REGISTRIES, // Diários de aula homologados
     classGradeSheets: [],
-    teacherLessonPlans: [],
+    teacherLessonPlans: DEFAULT_TEACHER_LESSON_PLANS, // Planos de aula pedagógicos
     teacherStudentNotes: [],
-    whatsappConfig: {
-      ...DEFAULT_WHATSAPP_CONFIG,
-      enabled: false,
-      status: 'DISCONNECTED',
-    },
+    whatsappConfig: DEFAULT_WHATSAPP_CONFIG,
     whatsappTemplates: DEFAULT_WHATSAPP_TEMPLATES,
     whatsappLogs: [],
     systemUpdates: DEFAULT_SYSTEM_UPDATES,
@@ -261,7 +250,7 @@ export function getCleanDatabase(options?: CleanInstallationOptions): AppStateDa
         userSector: activeMaster.sector,
         actionType: 'EXPORTAR_DADOS',
         module: 'configuracoes',
-        details: 'Base de dados limpa com sucesso para implantação de nova instalação de produção.',
+        details: 'Base inicial configurada com todas as estruturas do sistema ativas e alunos zerados.',
         ipAddress: '127.0.0.1',
         status: 'SUCESSO',
       },
@@ -342,93 +331,64 @@ export function resetToDemoDatabase(): AppStateData {
  */
 export function isDatabaseClean(data?: AppStateData): boolean {
   if (data) {
-    return data.students.length === 0 && data.classes.length === 0 && data.exams.length === 0;
+    return data.students.length === 0;
   }
   try {
-    const mode = localStorage.getItem('sucessoedu_database_mode');
-    if (mode === 'CLEAN' || localStorage.getItem('sucessoedu_clean_install') === 'true') {
-      return true;
+    const raw = localStorage.getItem(KEYS.DATA);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed.students) && parsed.students.length === 0;
     }
   } catch {}
-  return false;
+  return true;
 }
 
 /**
  * Loads entire master application state from local storage or seeds with clean or default mock data
  */
 export function getStoredData(): AppStateData {
-  let isCleanMode = false;
-  try {
-    const mode = localStorage.getItem('sucessoedu_database_mode');
-    const isCleanFlag = localStorage.getItem('sucessoedu_clean_install') === 'true';
-    // Se ainda não houver flag explícita, o padrão solicitado é a instalação limpa
-    if (mode === 'CLEAN' || isCleanFlag || mode !== 'DEMO') {
-      isCleanMode = true;
-    }
-  } catch {
-    isCleanMode = true;
-  }
-
+  const MIGRATION_FLAG = 'sucessoedu_all_data_no_students_v541';
   const raw = localStorage.getItem(KEYS.DATA);
   if (!raw) {
-    if (isCleanMode) {
-      const clean = getCleanDatabase();
-      saveStoredData(clean);
-      return clean;
-    }
-    const initial: AppStateData = {
-      students: DEFAULT_STUDENTS,
-      classes: DEFAULT_CLASSES,
-      subjects: DEFAULT_SUBJECTS,
-      courses: DEFAULT_COURSES,
-      questions: DEFAULT_QUESTIONS,
-      exams: DEFAULT_EXAMS,
-      submissions: DEFAULT_SUBMISSIONS,
-      academicHistories: DEFAULT_ACADEMIC_HISTORIES,
-      settings: DEFAULT_SCHOOL_SETTINGS,
-      notifications: DEFAULT_NOTIFICATIONS,
-      communications: DEFAULT_COMMUNICATIONS,
-      rolePreferences: DEFAULT_ROLE_PREFERENCES,
-      schoolUnits: DEFAULT_SCHOOL_UNITS,
-      syncLogs: DEFAULT_SYNC_LOGS,
-      userAccounts: DEFAULT_USER_ACCOUNTS,
-      developerContact: DEFAULT_DEVELOPER_CONTACT,
-      bnccSkills: DEFAULT_BNCC_SKILLS,
-      stateRegulations: DEFAULT_STATE_REGULATIONS,
-      activeStateRegulationCode: 'SP',
-      attendanceSheets: DEFAULT_ATTENDANCE_SHEETS,
-      lessonRegistries: DEFAULT_LESSON_REGISTRIES,
-      classGradeSheets: DEFAULT_CLASS_GRADE_SHEETS,
-      teacherLessonPlans: DEFAULT_TEACHER_LESSON_PLANS,
-      teacherStudentNotes: DEFAULT_TEACHER_STUDENT_NOTES,
-      whatsappConfig: DEFAULT_WHATSAPP_CONFIG,
-      whatsappTemplates: DEFAULT_WHATSAPP_TEMPLATES,
-      whatsappLogs: DEFAULT_WHATSAPP_LOGS,
-      systemUpdates: DEFAULT_SYSTEM_UPDATES,
-      auditLogs: DEFAULT_AUDIT_LOGS,
-    };
-    saveStoredData(initial);
-    return initial;
+    const clean = getCleanDatabase();
+    saveStoredData(clean);
+    try {
+      localStorage.setItem(MIGRATION_FLAG, 'true');
+    } catch {}
+    return clean;
   }
 
   try {
     const parsed = JSON.parse(raw);
     const hasArr = (arr: any) => Array.isArray(arr);
 
-    return {
-      students: hasArr(parsed.students) ? parsed.students : (isCleanMode ? [] : DEFAULT_STUDENTS),
-      classes: hasArr(parsed.classes) ? parsed.classes : (isCleanMode ? [] : DEFAULT_CLASSES),
+    // Preserva com 100% de integridade os estudantes cadastrados pelo usuário.
+    // Exclui apenas os alunos de teste padrão (std-001 a std-009) se não tiverem sido personalizados.
+    const rawStudents = hasArr(parsed.students) ? parsed.students : [];
+    const isMigrated = localStorage.getItem(MIGRATION_FLAG) === 'true';
+    const students = rawStudents.filter((s: any) => {
+      if (!s || !s.id) return false;
+      // Remove somente os registros originais fictícios de teste std-001 a std-009 se não migrado
+      if (!isMigrated && String(s.id).startsWith('std-00') && s.enrollmentNumber === 'MAT-2026-001') {
+        return false;
+      }
+      return true;
+    });
+
+    const loadedState: AppStateData = {
+      students,
+      classes: hasArr(parsed.classes) && parsed.classes.length > 0 ? parsed.classes : DEFAULT_CLASSES,
       subjects: hasArr(parsed.subjects) && parsed.subjects.length > 0 ? parsed.subjects : DEFAULT_SUBJECTS,
       courses: hasArr(parsed.courses) && parsed.courses.length > 0 ? parsed.courses : DEFAULT_COURSES,
-      questions: hasArr(parsed.questions) ? parsed.questions : (isCleanMode ? [] : DEFAULT_QUESTIONS),
-      exams: hasArr(parsed.exams) ? parsed.exams : (isCleanMode ? [] : DEFAULT_EXAMS),
-      submissions: hasArr(parsed.submissions) ? parsed.submissions : (isCleanMode ? [] : DEFAULT_SUBMISSIONS),
-      academicHistories: hasArr(parsed.academicHistories) ? parsed.academicHistories : (isCleanMode ? [] : DEFAULT_ACADEMIC_HISTORIES),
+      questions: hasArr(parsed.questions) && parsed.questions.length > 0 ? parsed.questions : DEFAULT_QUESTIONS,
+      exams: hasArr(parsed.exams) && parsed.exams.length > 0 ? parsed.exams : DEFAULT_EXAMS,
+      submissions: hasArr(parsed.submissions) ? parsed.submissions : [],
+      academicHistories: hasArr(parsed.academicHistories) ? parsed.academicHistories : [],
       settings: parsed.settings || DEFAULT_SCHOOL_SETTINGS,
-      notifications: hasArr(parsed.notifications) ? parsed.notifications : [],
-      communications: hasArr(parsed.communications) ? parsed.communications : [],
+      notifications: hasArr(parsed.notifications) && parsed.notifications.length > 0 ? parsed.notifications : DEFAULT_NOTIFICATIONS,
+      communications: hasArr(parsed.communications) && parsed.communications.length > 0 ? parsed.communications : DEFAULT_COMMUNICATIONS,
       rolePreferences: parsed.rolePreferences || DEFAULT_ROLE_PREFERENCES,
-      schoolUnits: hasArr(parsed.schoolUnits) ? parsed.schoolUnits : (isCleanMode ? [] : DEFAULT_SCHOOL_UNITS),
+      schoolUnits: hasArr(parsed.schoolUnits) && parsed.schoolUnits.length > 0 ? parsed.schoolUnits : DEFAULT_SCHOOL_UNITS,
       syncLogs: hasArr(parsed.syncLogs) ? parsed.syncLogs : [],
       userAccounts: hasArr(parsed.userAccounts) && parsed.userAccounts.length > 0 ? parsed.userAccounts : DEFAULT_USER_ACCOUNTS,
       developerContact: parsed.developerContact || DEFAULT_DEVELOPER_CONTACT,
@@ -436,51 +396,33 @@ export function getStoredData(): AppStateData {
       stateRegulations: hasArr(parsed.stateRegulations) && parsed.stateRegulations.length > 0 ? parsed.stateRegulations : DEFAULT_STATE_REGULATIONS,
       activeStateRegulationCode: parsed.activeStateRegulationCode || 'SP',
       attendanceSheets: hasArr(parsed.attendanceSheets) ? parsed.attendanceSheets : [],
-      lessonRegistries: hasArr(parsed.lessonRegistries) ? parsed.lessonRegistries : [],
-      classGradeSheets: hasArr(parsed.classGradeSheets) ? parsed.classGradeSheets : (isCleanMode ? [] : DEFAULT_CLASS_GRADE_SHEETS),
-      teacherLessonPlans: hasArr(parsed.teacherLessonPlans) ? parsed.teacherLessonPlans : (isCleanMode ? [] : DEFAULT_TEACHER_LESSON_PLANS),
-      teacherStudentNotes: hasArr(parsed.teacherStudentNotes) ? parsed.teacherStudentNotes : (isCleanMode ? [] : DEFAULT_TEACHER_STUDENT_NOTES),
+      lessonRegistries: hasArr(parsed.lessonRegistries) && parsed.lessonRegistries.length > 0 ? parsed.lessonRegistries : DEFAULT_LESSON_REGISTRIES,
+      classGradeSheets: hasArr(parsed.classGradeSheets) ? parsed.classGradeSheets : [],
+      teacherLessonPlans: hasArr(parsed.teacherLessonPlans) && parsed.teacherLessonPlans.length > 0 ? parsed.teacherLessonPlans : DEFAULT_TEACHER_LESSON_PLANS,
+      teacherStudentNotes: hasArr(parsed.teacherStudentNotes) ? parsed.teacherStudentNotes : [],
       whatsappConfig: parsed.whatsappConfig || DEFAULT_WHATSAPP_CONFIG,
-      whatsappTemplates: hasArr(parsed.whatsappTemplates) ? parsed.whatsappTemplates : DEFAULT_WHATSAPP_TEMPLATES,
+      whatsappTemplates: hasArr(parsed.whatsappTemplates) && parsed.whatsappTemplates.length > 0 ? parsed.whatsappTemplates : DEFAULT_WHATSAPP_TEMPLATES,
       whatsappLogs: hasArr(parsed.whatsappLogs) ? parsed.whatsappLogs : [],
-      systemUpdates: hasArr(parsed.systemUpdates) ? parsed.systemUpdates : DEFAULT_SYSTEM_UPDATES,
+      systemUpdates: hasArr(parsed.systemUpdates) && parsed.systemUpdates.length > 0 ? parsed.systemUpdates : DEFAULT_SYSTEM_UPDATES,
       auditLogs: hasArr(parsed.auditLogs) ? parsed.auditLogs : [],
     };
-  } catch {
-    if (isCleanMode) {
-      return getCleanDatabase();
+
+    if (!isMigrated) {
+      try {
+        localStorage.setItem(MIGRATION_FLAG, 'true');
+        saveStoredData(loadedState);
+      } catch {}
     }
-    return {
-      students: DEFAULT_STUDENTS,
-      classes: DEFAULT_CLASSES,
-      subjects: DEFAULT_SUBJECTS,
-      courses: DEFAULT_COURSES,
-      questions: DEFAULT_QUESTIONS,
-      exams: DEFAULT_EXAMS,
-      submissions: DEFAULT_SUBMISSIONS,
-      academicHistories: DEFAULT_ACADEMIC_HISTORIES,
-      settings: DEFAULT_SCHOOL_SETTINGS,
-      notifications: DEFAULT_NOTIFICATIONS,
-      communications: DEFAULT_COMMUNICATIONS,
-      rolePreferences: DEFAULT_ROLE_PREFERENCES,
-      schoolUnits: DEFAULT_SCHOOL_UNITS,
-      syncLogs: DEFAULT_SYNC_LOGS,
-      userAccounts: DEFAULT_USER_ACCOUNTS,
-      developerContact: DEFAULT_DEVELOPER_CONTACT,
-      bnccSkills: DEFAULT_BNCC_SKILLS,
-      stateRegulations: DEFAULT_STATE_REGULATIONS,
-      activeStateRegulationCode: 'SP',
-      attendanceSheets: DEFAULT_ATTENDANCE_SHEETS,
-      lessonRegistries: DEFAULT_LESSON_REGISTRIES,
-      classGradeSheets: DEFAULT_CLASS_GRADE_SHEETS,
-      teacherLessonPlans: DEFAULT_TEACHER_LESSON_PLANS,
-      teacherStudentNotes: DEFAULT_TEACHER_STUDENT_NOTES,
-      whatsappConfig: DEFAULT_WHATSAPP_CONFIG,
-      whatsappTemplates: DEFAULT_WHATSAPP_TEMPLATES,
-      whatsappLogs: DEFAULT_WHATSAPP_LOGS,
-      systemUpdates: DEFAULT_SYSTEM_UPDATES,
-      auditLogs: DEFAULT_AUDIT_LOGS,
-    };
+
+    const { healedData, fixesApplied } = RelationalIntegrityService.autoHeal(loadedState);
+    if (fixesApplied.length > 0) {
+      saveStoredData(healedData);
+    }
+    return healedData;
+  } catch {
+    const clean = getCleanDatabase();
+    saveStoredData(clean);
+    return clean;
   }
 }
 
@@ -1072,29 +1014,78 @@ export function mergeMunicipalSyncPacket(
   packet: MunicipalSyncPacket,
   operatorName: string
 ): { success: boolean; log: SyncAuditLog; error?: string } {
+  // Transação Atômica: Ponto de Restauração Preventivo (Rollback Checkpoint)
+  const current = getStoredData();
+  const rollbackCheckpoint = JSON.parse(JSON.stringify(current));
+
   try {
-    const current = getStoredData();
     const packetData = packet.data;
+    if (!packet || !packet.schoolUnit || !packet.schoolUnit.id) {
+      throw new Error('Pacote .edusync inválido: Metadados da Unidade Escolar ausentes.');
+    }
 
-    // 1. Merge students (replace or add by ID and CPF)
-    const studentMap = new Map<string, Student>();
-    current.students.forEach((s) => studentMap.set(s.id, s));
-    let newStudents = 0;
-    (packetData.students || []).forEach((s) => {
-      if (!studentMap.has(s.id)) newStudents++;
-      studentMap.set(s.id, s);
-    });
+    // PASSO 1: Atualizar / Inserir Unidade Escolar (Escolas)
+    const unitMap = new Map<string, SchoolUnit>();
+    current.schoolUnits.forEach((u) => unitMap.set(u.id, u));
 
-    // 2. Merge classes
+    const targetUnitId = packet.schoolUnit.id;
+    const targetInep = packet.schoolUnit.inepCode;
+
+    // Localizar se já existe por ID ou Código INEP
+    let existingUnitKey = targetUnitId;
+    for (const [uid, u] of unitMap.entries()) {
+      if (u.id === targetUnitId || (targetInep && u.inepCode === targetInep)) {
+        existingUnitKey = uid;
+        break;
+      }
+    }
+
+    // PASSO 2: Inserir / Atualizar Turmas (com vínculo na escola)
     const classMap = new Map<string, SchoolClass>();
     current.classes.forEach((c) => classMap.set(c.id, c));
     let newClasses = 0;
+
     (packetData.classes || []).forEach((c) => {
+      if (!c.id || !c.name) {
+        throw new Error(`Falha de integridade relacional: Turma inválida sem identificador no pacote.`);
+      }
       if (!classMap.has(c.id)) newClasses++;
-      classMap.set(c.id, c);
+      classMap.set(c.id, {
+        ...c,
+        schoolUnitId: existingUnitKey,
+      });
     });
 
-    // 3. Merge exams
+    // PASSO 3: Inserir / Atualizar Alunos (com vínculo na turma e escola)
+    const studentMap = new Map<string, Student>();
+    current.students.forEach((s) => studentMap.set(s.id, s));
+    let newStudents = 0;
+
+    (packetData.students || []).forEach((s) => {
+      if (!s.id || !s.name) {
+        throw new Error(`Falha de integridade relacional: Aluno inválido sem nome ou ID no pacote.`);
+      }
+      if (!studentMap.has(s.id)) newStudents++;
+      studentMap.set(s.id, {
+        ...s,
+        schoolUnitId: existingUnitKey,
+        inepCode: targetInep || (s as any).inepCode,
+      });
+    });
+
+    // PASSO 4: Inserir / Atualizar Matrículas e Históricos Acadêmicos
+    const histMap = new Map<string, AcademicHistory>();
+    current.academicHistories.forEach((h) => histMap.set(h.id, h));
+    (packetData.academicHistories || []).forEach((h) => {
+      if (!h.id || !h.studentId) return;
+      // Validação de orfandade: se o aluno não existir, reverte o pacote
+      if (!studentMap.has(h.studentId)) {
+        throw new Error(`Integridade relacional violada: Histórico ${h.id} referencia aluno órfão ${h.studentId}.`);
+      }
+      histMap.set(h.id, h);
+    });
+
+    // PASSO 5: Inserir / Atualizar Provas e Submissões
     const examMap = new Map<string, Exam>();
     current.exams.forEach((e) => examMap.set(e.id, e));
     let newExams = 0;
@@ -1103,42 +1094,55 @@ export function mergeMunicipalSyncPacket(
       examMap.set(e.id, e);
     });
 
-    // 4. Merge submissions
     const subMap = new Map<string, ExamSubmission>();
     current.submissions.forEach((s) => subMap.set(s.id, s));
     let newSubs = 0;
-    (packetData.submissions || []).forEach((s) => {
-      if (!subMap.has(s.id)) newSubs++;
-      subMap.set(s.id, s);
+    (packetData.submissions || []).forEach((sub) => {
+      if (!subMap.has(sub.id)) newSubs++;
+      subMap.set(sub.id, sub);
     });
 
-    // 5. Merge academic histories
-    const histMap = new Map<string, AcademicHistory>();
-    current.academicHistories.forEach((h) => histMap.set(h.id, h));
-    (packetData.academicHistories || []).forEach((h) => {
-      histMap.set(h.id, h);
-    });
-
-    // 6. Update school unit metadata in central list
+    // PASSO 6: Consistência de Dados & Critério de Aceite 3
+    // Atualizar unidades escolares garantindo que totalStudents seja idêntico à soma real de alunos ativos
+    const allStudentsList = Array.from(studentMap.values());
     const updatedUnits = current.schoolUnits.map((u) => {
-      if (u.id === packet.schoolUnit.id || u.inepCode === packet.schoolUnit.inepCode) {
+      const isTarget = u.id === existingUnitKey || (targetInep && u.inepCode === targetInep);
+      const activeCountForThisUnit = allStudentsList.filter(
+        (s) =>
+          (s.schoolUnitId === u.id || (u.inepCode && (s as any).inepCode === u.inepCode)) &&
+          s.status === 'ACTIVE'
+      ).length;
+
+      if (isTarget) {
         return {
           ...u,
           lastSyncDate: packet.exportedAt,
           syncStatus: 'SINCRONIZADO' as const,
-          totalStudents: packet.summary.studentsCount,
-          totalClasses: packet.summary.classesCount,
+          totalStudents: activeCountForThisUnit,
+          totalClasses: Array.from(classMap.values()).filter((c) => c.schoolUnitId === u.id).length || packet.summary.classesCount,
         };
       }
-      return u;
+      return {
+        ...u,
+        totalStudents: activeCountForThisUnit,
+      };
     });
 
-    // If school unit is new, add it
-    if (!updatedUnits.some((u) => u.inepCode === packet.schoolUnit.inepCode)) {
+    // Se for uma nova escola satélite que não existia na lista
+    if (!updatedUnits.some((u) => u.id === existingUnitKey || (targetInep && u.inepCode === targetInep))) {
+      const activeCount = allStudentsList.filter(
+        (s) =>
+          (s.schoolUnitId === packet.schoolUnit.id || (targetInep && (s as any).inepCode === targetInep)) &&
+          s.status === 'ACTIVE'
+      ).length;
+
       updatedUnits.push({
         ...packet.schoolUnit,
+        id: existingUnitKey,
         lastSyncDate: packet.exportedAt,
         syncStatus: 'SINCRONIZADO',
+        totalStudents: activeCount,
+        totalClasses: packet.summary.classesCount,
       });
     }
 
@@ -1155,12 +1159,13 @@ export function mergeMunicipalSyncPacket(
         submissions: newSubs,
       },
       status: 'SUCESSO',
-      notes: `Pacote ${packet.packetId} da unidade "${packet.schoolUnit.name}" integrado com sucesso.`,
+      notes: `Pacote atômico ${packet.packetId} da unidade "${packet.schoolUnit.name}" homologado com sucesso. Paridade verificada: soma de alunos ativos sincronizada.`,
     };
 
+    // COMMIT DA TRANSAÇÃO ATÔMICA
     const updatedData: AppStateData = {
       ...current,
-      students: Array.from(studentMap.values()),
+      students: allStudentsList,
       classes: Array.from(classMap.values()),
       exams: Array.from(examMap.values()),
       submissions: Array.from(subMap.values()),
@@ -1176,6 +1181,9 @@ export function mergeMunicipalSyncPacket(
       log,
     };
   } catch (err: any) {
+    // ROLLBACK ATÔMICO IMEDIATO: Nenhuma alteração persiste no banco
+    saveStoredData(rollbackCheckpoint);
+
     return {
       success: false,
       log: {
@@ -1186,9 +1194,9 @@ export function mergeMunicipalSyncPacket(
         operatorName,
         recordsMerged: { students: 0, classes: 0, exams: 0, submissions: 0 },
         status: 'ERRO',
-        notes: `Erro ao integrar: ${err?.message || 'Arquivo corrompido ou formato inválido.'}`,
+        notes: `TRANSAÇÃO REVERTIDA (ROLLBACK ATÔMICO): ${err?.message || 'Erro durante a importação.'}`,
       },
-      error: err?.message || 'Falha ao processar o pacote de sincronização.',
+      error: err?.message || 'Falha na validação atômica do pacote de sincronização. Nenhuma tabela foi alterada.',
     };
   }
 }
