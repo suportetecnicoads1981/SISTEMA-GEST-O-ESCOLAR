@@ -180,7 +180,7 @@ export default function App() {
     } catch {}
     return defaultMasterUser;
   });
-  const currentRole: UserRole = currentUser.role || 'ADMIN';
+  const currentRole: UserRole = currentUser?.role || 'ADMIN';
 
   // Sub-navigation state for document issuance and exam taking
   const [documentSelectedStudentId, setDocumentSelectedStudentId] = useState<string | undefined>();
@@ -343,7 +343,7 @@ export default function App() {
       userAccounts: updatedUsers,
     }));
     // If the currently logged in user was modified, refresh their state
-    const currentInList = updatedUsers.find((u) => u.id === currentUser.id);
+    const currentInList = updatedUsers.find((u) => u.id === currentUser?.id);
     if (currentInList) {
       setCurrentUser(currentInList);
     }
@@ -412,10 +412,10 @@ export default function App() {
 
     logSecurityAudit(
       'LOGOUT',
-      currentUser.id,
-      currentUser.name,
-      currentUser.role,
-      currentUser.sector,
+      currentUser?.id || 'usr-master-001',
+      currentUser?.name || 'Administrador',
+      currentUser?.role || 'ADMIN',
+      currentUser?.sector || 'MASTER',
       `Sessão encerrada com sucesso. Cópia de segurança automática gerada (${autoBackup.stats.studentsCount} alunos, ${autoBackup.stats.classesCount} turmas, ${autoBackup.stats.examsCount} avaliações salvas).`
     );
     try {
@@ -1038,10 +1038,10 @@ export default function App() {
     }));
     logSecurityAudit(
       'SISTEMA',
-      currentUser.id,
-      currentUser.name,
-      currentUser.role,
-      currentUser.sector,
+      currentUser?.id || 'usr-master-001',
+      currentUser?.name || 'Administrador',
+      currentUser?.role || 'ADMIN',
+      currentUser?.sector || 'MASTER',
       `Configuração do WhatsApp atualizada. Status: ${newConfig.status}. Instância: ${newConfig.instanceName}`
     );
     triggerPushNotification(
@@ -1058,10 +1058,10 @@ export default function App() {
     }));
     logSecurityAudit(
       'COMUNICADO',
-      currentUser.id,
-      currentUser.name,
-      currentUser.role,
-      currentUser.sector,
+      currentUser?.id || 'usr-master-001',
+      currentUser?.name || 'Administrador',
+      currentUser?.role || 'ADMIN',
+      currentUser?.sector || 'MASTER',
       `Disparo de WhatsApp para ${logData.recipientName} (${logData.recipientPhone}) - Tipo: ${logData.messageType}`
     );
     triggerPushNotification(
@@ -1135,11 +1135,11 @@ export default function App() {
     });
     logSecurityAudit(
       'SISTEMA',
-      currentUser.id,
-      currentUser.name,
-      currentUser.role,
-      currentUser.sector,
-      `Pacote de Atualização ${pkg.version} instalado no sistema por ${currentUser.name}.`
+      currentUser?.id || 'usr-master-001',
+      currentUser?.name || 'Administrador',
+      currentUser?.role || 'ADMIN',
+      currentUser?.sector || 'MASTER',
+      `Pacote de Atualização ${pkg.version} instalado no sistema por ${currentUser?.name || 'Administrador'}.`
     );
     setLastUpdatePackage(pkg);
     setIsWelcomeModalOpen(true);
@@ -1454,7 +1454,7 @@ export default function App() {
                 submissions={data.submissions}
                 teacherLessonPlans={data.teacherLessonPlans || []}
                 teacherStudentNotes={data.teacherStudentNotes || []}
-                currentUserTeacherName={currentUser.role === 'TEACHER' ? currentUser.name : undefined}
+                currentUserTeacherName={currentUser?.role === 'TEACHER' ? currentUser?.name : undefined}
                 onSaveAttendanceSheet={handleSaveAttendanceSheet}
                 onSaveLessonRegistry={handleSaveLessonRegistry}
                 onDeleteLessonRegistry={handleDeleteLessonRegistry}
