@@ -25,4 +25,18 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
+// Registrar Service Worker com Workbox para suporte offline
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((registration) => {
+        console.log('[SucessoEdu] Service Worker registrado com sucesso:', registration.scope);
+      })
+      .catch((error) => {
+        console.warn('[SucessoEdu] Falha ao registrar Service Worker:', error);
+      });
+  });
+}
+
 
