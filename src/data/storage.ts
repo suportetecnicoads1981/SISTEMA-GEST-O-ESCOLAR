@@ -39,6 +39,7 @@ import {
   SystemUpdatePackage,
   SecurityAuditLog,
 } from '../types';
+import { SupabasePersistenceService } from '../services/supabasePersistenceService';
 import {
   DEFAULT_STUDENTS,
   DEFAULT_CLASSES,
@@ -503,6 +504,20 @@ export function isDatabaseClean(data?: AppStateData): boolean {
  * Loads entire master application state from local storage or seeds with clean or default mock data
  */
 export function getStoredData(): AppStateData {
+  if (typeof window !== 'undefined' && !(window as any).__sucessoedu_supabase_realtime_initialized) {
+    (window as any).__sucessoedu_supabase_realtime_initialized = true;
+    SupabasePersistenceService.initRealtimeSync((freshData) => {
+      safeLocalStorageSet(KEYS.DATA, JSON.stringify(freshData));
+      window.dispatchEvent(new CustomEvent('sucessoedu_db_changed', { detail: freshData }));
+    });
+    SupabasePersistenceService.fetchAppStateFromSupabase().then((remoteData) => {
+      if (remoteData) {
+        safeLocalStorageSet(KEYS.DATA, JSON.stringify(remoteData));
+        window.dispatchEvent(new CustomEvent('sucessoedu_db_changed', { detail: remoteData }));
+      }
+    }).catch(() => {});
+  }
+
   const CLEAN_SECRETARIA_ONLY_FLAG = 'sucessoedu_clean_secretaria_only_v542';
   if (typeof window !== 'undefined' && localStorage.getItem(CLEAN_SECRETARIA_ONLY_FLAG) !== 'true') {
     const clean = getCleanDatabase();
@@ -574,6 +589,7 @@ export function getStoredData(): AppStateData {
  */
 export function saveStoredData(data: AppStateData): void {
   safeLocalStorageSet(KEYS.DATA, JSON.stringify(data));
+  SupabasePersistenceService.saveAppStateToSupabase(data).catch(() => {});
 }
 
 /**

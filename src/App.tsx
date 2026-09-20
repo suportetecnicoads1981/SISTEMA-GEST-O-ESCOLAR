@@ -36,6 +36,7 @@ import {
   sendWhatsAppMessage,
   performAutoBackup,
 } from './data/storage';
+import { getSupabaseClient } from './services/supabaseClient';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { MainOverviewDashboard } from './components/dashboard/MainOverviewDashboard';
@@ -195,10 +196,52 @@ export default function App() {
   // Question Bank to Exam Builder bridging state
   const [preselectedQuestionIdsForExam, setPreselectedQuestionIdsForExam] = useState<string[]>([]);
 
-  // Sync to storage on data change
+  // Sync to storage on data change & Supabase Direct Upsert
   useEffect(() => {
     saveStoredData(data);
-  }, [data]);
+    
+    async function syncTablesToSupabase() {
+      try {
+        const supabase = getSupabaseClient();
+        if (data.students && data.students.length > 0) {
+          await supabase.from('students').upsert(data.students, { onConflict: 'id' });
+        }
+        if (data.exams && data.exams.length > 0) {
+          await supabase.from('exams').upsert(data.exams, { onConflict: 'id' });
+        }
+        if (data.notifications && data.notifications.length > 0) {
+          await supabase.from('notifications').upsert(data.notifications, { onConflict: 'id' });
+        }
+      } catch (err) {
+        console.warn('Supabase upsert sync error:', err);
+      }
+    }
+    syncTablesToSupabase();
+  }, [data.students, data.exams, data.notifications]);
+
+  // Load initial state from Supabase tables (students, exams, notifications)
+  useEffect(() => {
+    async function loadTablesFromSupabase() {
+      try {
+        const supabase = getSupabaseClient();
+        const [studentsRes, examsRes, notifsRes] = await Promise.all([
+          supabase.from('students').select('*'),
+          supabase.from('exams').select('*'),
+          supabase.from('notifications').select('*'),
+        ]);
+
+        setData(prev => ({
+          ...prev,
+          students: studentsRes.data && studentsRes.data.length > 0 ? studentsRes.data : prev.students,
+          exams: examsRes.data && examsRes.data.length > 0 ? examsRes.data : prev.exams,
+          notifications: notifsRes.data && notifsRes.data.length > 0 ? notifsRes.data : prev.notifications,
+        }));
+      } catch (err) {
+        console.warn('Supabase initial select warning:', err);
+      }
+    }
+    loadTablesFromSupabase();
+  }, []);
 
   // Sincronizar estado global instantaneamente quando ocorrer limpeza de base ou restauração demo
   useEffect(() => {
@@ -1304,7 +1347,7 @@ export default function App() {
 
       {/* Top Header */}
       <Header
-        schoolName={data.settings.name}
+        schoolName={data.settings?.name}
         activeTab={activeTab}
         onSelectTab={(tab, payload) => handleNavigate(tab, payload)}
         onGoBack={handleGoBack}
