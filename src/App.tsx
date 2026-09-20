@@ -82,6 +82,7 @@ import { QuickJumpSearchModal } from './components/common/QuickJumpSearchModal';
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
 import { KeyboardShortcutsModal } from './components/common/KeyboardShortcutsModal';
 import { ShortcutToast } from './components/common/ShortcutToast';
+import { GuidedTourModal } from './components/common/GuidedTourModal';
 import { Bell, CheckCircle2, X } from 'lucide-react';
 import { startMessageQueueWorker, stopMessageQueueWorker } from './services/messageQueueService';
 import { DatabaseAutomatorService } from './services/databaseAutomatorService';
@@ -112,6 +113,13 @@ export default function App() {
   const [isVersionControlModalOpen, setIsVersionControlModalOpen] = useState(false);
   const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isTourOpen, setIsTourOpen] = useState(() => {
+    try {
+      return localStorage.getItem('sucessoedu_tour_seen') !== 'true';
+    } catch {
+      return true;
+    }
+  });
 
   // Desktop Windows Keyboard Shortcuts Layer (Ctrl+Esc para Menu Iniciar, Alt+B para Sidebar)
   useEffect(() => {
@@ -1323,6 +1331,7 @@ export default function App() {
         onLogout={handleLogout}
         onToggleStartMenu={() => setIsStartMenuOpen((prev) => !prev)}
         isStartMenuOpen={isStartMenuOpen}
+        onOpenTour={() => setIsTourOpen(true)}
       />
 
       {/* Main Layout Shell */}
@@ -1939,6 +1948,18 @@ export default function App() {
 
       {/* FEEDBACK VISUAL FLUTUANTE DE ATALHO EXECUTADO */}
       <ShortcutToast toast={activeShortcutToast} />
+
+      {/* TOUR GUIADO (ONBOARDING) PARA NOVOS USUÁRIOS */}
+      <GuidedTourModal
+        isOpen={isTourOpen}
+        onClose={() => {
+          setIsTourOpen(false);
+          try {
+            localStorage.setItem('sucessoedu_tour_seen', 'true');
+          } catch {}
+        }}
+        onNavigate={handleNavigate}
+      />
     </div>
   );
 }

@@ -52,6 +52,7 @@ interface HeaderProps {
   onLogout?: () => void;
   onToggleStartMenu?: () => void;
   isStartMenuOpen?: boolean;
+  onOpenTour?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -77,6 +78,7 @@ export const Header: React.FC<HeaderProps> = ({
   onLogout,
   onToggleStartMenu,
   isStartMenuOpen = false,
+  onOpenTour,
 }) => {
   const [currentDateTime, setCurrentDateTime] = useState('');
   const [serverPingOk, setServerPingOk] = useState(true);
@@ -320,6 +322,19 @@ export const Header: React.FC<HeaderProps> = ({
             <Sparkles className="h-3.5 w-3.5 text-purple-600 group-hover:rotate-12 transition-transform" />
             <span className="font-mono text-[11px] text-purple-800 font-bold">{currentVersion || 'v5.4.1'}</span>
             <span className="hidden xl:inline text-[9px] bg-purple-200/80 text-purple-900 px-1.5 py-0.5 rounded-md font-sans uppercase">Novidades</span>
+          </button>
+        )}
+
+        {/* Botão do Tour Guiado */}
+        {onOpenTour && (
+          <button
+            id="btn-header-guided-tour"
+            onClick={onOpenTour}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 hover:bg-amber-100 border border-amber-200 text-xs font-bold text-amber-700 shadow-2xs transition-all cursor-pointer group"
+            title="Abrir Tour Guiado do Sistema"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-amber-600 group-hover:scale-110 transition-transform" />
+            <span className="hidden sm:inline">Tour Guiado</span>
           </button>
         )}
 

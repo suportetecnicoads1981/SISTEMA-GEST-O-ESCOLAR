@@ -1025,6 +1025,7 @@ ALTER TABLE public.students ADD COLUMN IF NOT EXISTS cadastral_status TEXT DEFAU
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS medical_observations TEXT;
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS has_aee BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS photo_url TEXT;
+ALTER TABLE public.students ADD COLUMN IF NOT EXISTS school_unit_id TEXT;
 
 -- =========================================================================
 -- 2. ATUALIZAÇÃO DA TABELA DE TURMAS (school_classes)

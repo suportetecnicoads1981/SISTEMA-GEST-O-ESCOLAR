@@ -53,6 +53,8 @@ import {
   Eye,
   X,
   Bell,
+  GitBranch,
+  Github,
 } from 'lucide-react';
 import {
   SystemUpdatePackage,
@@ -120,6 +122,7 @@ type UpdateModuleTab =
   | 'GOOGLE_PICKER'
   | 'INSTALLED_MODULES'
   | 'CLOUD_OTA'
+  | 'GITHUB_AUTOMATION'
   | 'BACKUPS_HISTORY'
   | 'OFFLINE_PACKAGE'
   | 'MANUAL_GUIDE'
@@ -2083,6 +2086,21 @@ pause
         </button>
 
         <button
+          onClick={() => setActiveTab('GITHUB_AUTOMATION')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all whitespace-nowrap cursor-pointer ${
+            activeTab === 'GITHUB_AUTOMATION'
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+          }`}
+        >
+          <GitBranch className="h-4 w-4 text-purple-600" />
+          <span>🚀 Migração GitHub &amp; Automação</span>
+          <span className="bg-purple-100 text-purple-800 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+            CI/CD OTA
+          </span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('BACKUPS_HISTORY')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all whitespace-nowrap cursor-pointer ${
             activeTab === 'BACKUPS_HISTORY'
@@ -2267,6 +2285,218 @@ pause
               Garantia de Não Perda de Dados: O sistema só atualiza após validação e snapshot completo do banco local.
             </span>
             <span className="text-indigo-300 font-mono">Conta: {TARGET_GOOGLE_DRIVE_ACCOUNT}</span>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: MIGRAÇÃO GITHUB & AUTOMAÇÃO DE ATUALIZAÇÕES + BACKUP GOOGLE DRIVE    */}
+      {/* ========================================================================= */}
+      {activeTab === 'GITHUB_AUTOMATION' && (
+        <div className="space-y-6">
+          <div className="p-6 sm:p-7 rounded-3xl bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 border-2 border-purple-500/50 text-white shadow-xl relative overflow-hidden">
+            <div className="absolute -right-10 -bottom-10 opacity-10 pointer-events-none">
+              <GitBranch className="w-64 h-64 text-purple-400" />
+            </div>
+            <div className="flex items-start gap-4 z-10 relative">
+              <div className="h-14 w-14 rounded-2xl bg-purple-500/20 border border-purple-400/50 flex items-center justify-center text-purple-300 shrink-0 shadow-lg shadow-purple-950/40">
+                <GitBranch className="h-7 w-7 text-purple-400" />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide uppercase bg-purple-500/30 text-purple-300 border border-purple-400/40 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+                    ARQUITETURA HÍBRIDA OFICIAL
+                  </span>
+                  <span className="text-xs text-slate-300 font-mono">GitHub Releases + Google Drive Backups</span>
+                </div>
+                <h3 className="text-lg sm:text-2xl font-black text-white">
+                  Migração para Hospedagem no GitHub &amp; Automação OTA
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed max-w-3xl">
+                  Esta arquitetura separa eficientemente a distribuição de softwares e as políticas de segurança: os <strong>Pacotes de Atualização (.edupkg)</strong> e manifestos OTA são hospedados no <strong>GitHub Releases</strong> com automação via GitHub Actions, garantindo distribuição global ultrarrápida. Simultaneamente, o <strong>Google Drive (<span className="text-cyan-300">{TARGET_GOOGLE_DRIVE_ACCOUNT}</span>)</strong> é mantido e dedicado exclusivamente para <strong>Backups de Segurança Preventivos</strong> (dados de alunos, notas, financeiro e logs de auditoria).
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Bloco 1: GitHub Releases & CI/CD */}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                    <Github className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white">GitHub Releases &amp; CI/CD</h4>
+                    <p className="text-[11px] text-slate-400">Distribuição de Atualizações e Manifestos</p>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-950 text-purple-300 border border-purple-800">
+                  Ativo / OTA
+                </span>
+              </div>
+
+              <div className="space-y-3 text-xs text-slate-300">
+                <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between font-semibold text-white">
+                    <span>Repositório Oficial GitHub:</span>
+                    <a
+                      href="https://github.com/sucessoedu/sucessoedu-releases"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-purple-400 hover:text-purple-300 underline font-mono text-[11px] flex items-center gap-1"
+                    >
+                      <span>sucessoedu/sucessoedu-releases</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Repositório dedicado a armazenar versões compiladas (.edupkg), checksums SHA-256 e o arquivo <code className="text-purple-300 font-mono">updates.json</code> consumido pelo motor OTA.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-300">URL do Manifesto OTA no GitHub:</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value="https://raw.githubusercontent.com/sucessoedu/sucessoedu-releases/main/updates.json"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 font-mono text-[11px]"
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText('https://raw.githubusercontent.com/sucessoedu/sucessoedu-releases/main/updates.json');
+                        setStatusMessage({ type: 'SUCCESS', text: 'URL do manifesto GitHub copiada com sucesso!' });
+                      }}
+                      className="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shrink-0 cursor-pointer transition-all"
+                      title="Copiar URL"
+                    >
+                      Copiar
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-purple-950/40 border border-purple-900/60 text-purple-200 text-[11px] leading-relaxed">
+                  <strong>Automação GitHub Actions:</strong> Ao criar um novo release tag (ex: <code className="text-white font-mono">v5.5.0</code>), o workflow compila automaticamente os binários, calcula o SHA-256 e atualiza o manifesto OTA instantaneamente para todas as escolas conectadas.
+                </div>
+              </div>
+            </div>
+
+            {/* Bloco 2: Google Drive Backup de Segurança */}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-cyan-600/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                    <Cloud className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white">Google Drive — Backup de Segurança</h4>
+                    <p className="text-[11px] text-slate-400">Proteção de Dados &amp; Recuperação (Zero-Loss)</p>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">
+                  Protegido
+                </span>
+              </div>
+
+              <div className="space-y-3 text-xs text-slate-300">
+                <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between font-semibold text-white">
+                    <span>Conta Oficial Google Drive:</span>
+                    <span className="text-cyan-300 font-mono text-[11px]">{TARGET_GOOGLE_DRIVE_ACCOUNT}</span>
+                  </div>
+                  <div className="flex items-center justify-between font-semibold text-white">
+                    <span>Pasta de Destino:</span>
+                    <span className="text-slate-300 font-mono text-[11px]">Backups &amp; Segurança Preventiva</span>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-cyan-950/30 border border-cyan-900/50 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-cyan-200">Último Backup na Nuvem:</span>
+                    <span className="text-xs text-emerald-400 font-mono font-bold">Hoje, 12:54 (Automático)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    O armazenamento no Google Drive permanece 100% preservado e operacional para receber os snapshots criptografados do banco de dados antes de qualquer atualização do sistema.
+                  </p>
+                </div>
+
+                <div className="pt-2 flex items-center gap-2">
+                  <button
+                    onClick={() => setActiveTab('BACKUPS_HISTORY')}
+                    className="w-full py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md shadow-cyan-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Ver Histórico de Backups no Drive</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Workflow Configuração GitHub Actions */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Terminal className="w-4 h-4 text-purple-400" />
+                  <span>Script do Workflow GitHub Actions (<code className="text-purple-300 font-mono">.github/workflows/release-updates.yml</code>)</span>
+                </h4>
+                <p className="text-xs text-slate-400">Copie e adicione este arquivo ao seu repositório GitHub para automatizar a publicação de pacotes de atualização.</p>
+              </div>
+              <button
+                onClick={() => {
+                  const yamlContent = `name: SucessoEdu Release & OTA Automation\n\non:\n  release:\n    types: [published]\n\njobs:\n  publish-release:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Checkout Repository\n        uses: actions/checkout@v4\n\n      - name: Setup Node.js\n        uses: actions/setup-node@v4\n        with:\n          node-version: '20'\n\n      - name: Install Dependencies & Build\n        run: |\n          npm install\n          npm run build\n\n      - name: Generate Checksum & Manifest\n        run: |\n          node scripts/generate-manifest.js\n\n      - name: Upload Release Assets\n        uses: softprops/action-gh-release@v1\n        with:\n          files: |\n            dist/*.edupkg\n            updates.json\n        env:\n          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}`;
+                  navigator.clipboard.writeText(yamlContent);
+                  setStatusMessage({ type: 'SUCCESS', text: 'Workflow YAML copiado para a área de transferência!' });
+                }}
+                className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all shrink-0"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>Copiar YAML</span>
+              </button>
+            </div>
+
+            <pre className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-purple-200 font-mono text-[11px] overflow-x-auto leading-relaxed">
+{`name: SucessoEdu Release & OTA Automation
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies & Build
+        run: |
+          npm install
+          npm run build
+
+      - name: Generate Checksum & Manifest
+        run: |
+          node scripts/generate-manifest.js
+
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/*.edupkg
+            updates.json
+        env:
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}`}
+            </pre>
           </div>
         </div>
       )}

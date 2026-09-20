@@ -570,6 +570,33 @@ export const StudentList: React.FC<StudentListProps> = ({
     selectedGenderFilter,
   ]);
 
+  // Paginação da listagem de alunos
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(15);
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    searchTerm,
+    selectedUnitFilter,
+    selectedSeriesFilter,
+    selectedClassFilter,
+    selectedShiftFilter,
+    selectedStatusFilter,
+    selectedCadastralFilter,
+    selectedSpecialFilter,
+    selectedZoneFilter,
+    selectedGenderFilter,
+  ]);
+
+  const deferredFilteredStudents = React.useDeferredValue(filteredStudents);
+  const totalPages = Math.ceil(deferredFilteredStudents.length / itemsPerPage) || 1;
+  const paginatedStudents = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return deferredFilteredStudents.slice(start, start + itemsPerPage);
+  }, [deferredFilteredStudents, currentPage, itemsPerPage]);
+  const deferredPaginatedStudents = React.useDeferredValue(paginatedStudents);
+
   // Colunas do Painel de Impressão Configurável de Estudantes
   const studentPrintColumns: PrintColumnConfig[] = useMemo(
     () => [
@@ -1899,14 +1926,14 @@ export const StudentList: React.FC<StudentListProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredStudents.length === 0 ? (
+              {deferredPaginatedStudents.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-10 text-center text-slate-400">
                     Nenhum estudante encontrado para os filtros selecionados.
                   </td>
                 </tr>
               ) : (
-                filteredStudents.map((student) => {
+                deferredPaginatedStudents.map((student) => {
                   const className = classMap.get(student.classId) || 'Turma não atribuída';
                   const cadastralInfo = CADASTRAL_STATUS_INFO[student.cadastralStatus || 'OK'];
                   const reasonInfo = student.dropoutReason ? DROPOUT_REASON_INFO[student.dropoutReason] : null;
@@ -2086,6 +2113,73 @@ export const StudentList: React.FC<StudentListProps> = ({
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Pagination Controls Bar */}
+      <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+        <div className="text-xs text-slate-500 flex items-center gap-2">
+          <span>
+            Mostrando <strong>{filteredStudents.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}</strong> a{' '}
+            <strong>{Math.min(currentPage * itemsPerPage, filteredStudents.length)}</strong> de{' '}
+            <strong>{filteredStudents.length}</strong> estudantes filtrados (Total geral: {students.length})
+          </span>
+          <select
+            value={itemsPerPage}
+            onChange={(e) => {
+              setItemsPerPage(Number(e.target.value));
+              setCurrentPage(1);
+            }}
+            className="border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value={10}>10 / pág</option>
+            <option value={15}>15 / pág</option>
+            <option value={25}>25 / pág</option>
+            <option value={50}>50 / pág</option>
+            <option value={100}>100 / pág</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          >
+            Anterior
+          </button>
+          <div className="flex items-center gap-1 px-1">
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let pNum = i + 1;
+              if (totalPages > 5) {
+                if (currentPage > 3) {
+                  pNum = currentPage - 3 + i + 1;
+                  if (pNum > totalPages) pNum = totalPages - (4 - i);
+                }
+              }
+              if (pNum < 1 || pNum > totalPages) return null;
+              return (
+                <button
+                  key={pNum}
+                  onClick={() => setCurrentPage(pNum)}
+                  className={`w-7 h-7 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                    currentPage === pNum
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'border border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  {pNum}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+            disabled={currentPage >= totalPages}
+            className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          >
+            Próxima
+          </button>
         </div>
       </div>
 

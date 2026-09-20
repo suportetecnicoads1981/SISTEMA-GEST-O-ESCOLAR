@@ -365,30 +365,30 @@ export function getCleanDatabase(options?: CleanInstallationOptions): AppStateDa
   const userAccounts = DEFAULT_USER_ACCOUNTS.map((u) => (u.isMaster ? activeMaster : u));
 
   return {
-    students: [], // Excluído estritamente apenas os dados dos alunos já cadastrados
-    classes: DEFAULT_CLASSES, // Todas as turmas da grade acadêmica implementadas
-    subjects: DEFAULT_SUBJECTS, // Matriz referencial de disciplinas BNCC completa
-    courses: DEFAULT_COURSES,   // Estrutura padrão de níveis de ensino (Educação Infantil ao Médio)
-    questions: DEFAULT_QUESTIONS, // Banco completo de questões com alinhamento BNCC
-    exams: DEFAULT_EXAMS, // Todas as avaliações estruturadas implementadas
-    submissions: [], // Submissões de alunos excluídas
-    academicHistories: [], // Históricos de alunos excluídos
+    students: [], // Alunos de teste limpos
+    classes: [], // Turmas de teste limpas para importação de novas escolas e turmas
+    subjects: DEFAULT_SUBJECTS, // Matriz referencial de disciplinas BNCC mantida
+    courses: DEFAULT_COURSES,   // Estrutura padrão de níveis de ensino mantida
+    questions: [], // Questões de teste limpas
+    exams: [], // Avaliações de teste limpas
+    submissions: [], // Submissões limpas
+    academicHistories: [], // Históricos limpos
     settings: initialSettings,
-    notifications: DEFAULT_NOTIFICATIONS,
-    communications: DEFAULT_COMMUNICATIONS,
+    notifications: [],
+    communications: [],
     rolePreferences: DEFAULT_ROLE_PREFERENCES,
-    schoolUnits: DEFAULT_SCHOOL_UNITS, // Todas as unidades escolares (Sede e Polos)
-    municipalSecretary: DEFAULT_MUNICIPAL_SECRETARY,
+    schoolUnits: [], // Unidades escolares de teste limpas para importação de novas escolas
+    municipalSecretary: DEFAULT_MUNICIPAL_SECRETARY, // Dados da Secretaria de Educação mantidos
     syncLogs: [],
-    userAccounts, // Todos os usuários (Administração, Coordenação, Secretaria, Professores)
+    userAccounts, // Contas de usuários da secretaria e gestores mantidas
     developerContact: DEFAULT_DEVELOPER_CONTACT,
-    bnccSkills: DEFAULT_BNCC_SKILLS,
-    stateRegulations: DEFAULT_STATE_REGULATIONS,
+    bnccSkills: DEFAULT_BNCC_SKILLS, // Competências BNCC mantidas
+    stateRegulations: DEFAULT_STATE_REGULATIONS, // Regulamentações estaduais mantidas
     activeStateRegulationCode: options?.state || 'SP',
     attendanceSheets: [],
-    lessonRegistries: DEFAULT_LESSON_REGISTRIES, // Diários de aula homologados
+    lessonRegistries: [],
     classGradeSheets: [],
-    teacherLessonPlans: DEFAULT_TEACHER_LESSON_PLANS, // Planos de aula pedagógicos
+    teacherLessonPlans: [],
     teacherStudentNotes: [],
     whatsappConfig: DEFAULT_WHATSAPP_CONFIG,
     whatsappTemplates: DEFAULT_WHATSAPP_TEMPLATES,
@@ -405,7 +405,7 @@ export function getCleanDatabase(options?: CleanInstallationOptions): AppStateDa
         userSector: activeMaster.sector,
         actionType: 'EXPORTAR_DADOS',
         module: 'configuracoes',
-        details: 'Base inicial configurada com todas as estruturas do sistema ativas e alunos zerados.',
+        details: 'Base de dados de teste limpa. Mantidos apenas os dados da secretaria de educação e matrizes curriculares.',
         ipAddress: '127.0.0.1',
         status: 'SUCESSO',
       },
@@ -503,13 +503,24 @@ export function isDatabaseClean(data?: AppStateData): boolean {
  * Loads entire master application state from local storage or seeds with clean or default mock data
  */
 export function getStoredData(): AppStateData {
-  const MIGRATION_FLAG = 'sucessoedu_all_data_no_students_v541';
+  const CLEAN_SECRETARIA_ONLY_FLAG = 'sucessoedu_clean_secretaria_only_v542';
+  if (typeof window !== 'undefined' && localStorage.getItem(CLEAN_SECRETARIA_ONLY_FLAG) !== 'true') {
+    const clean = getCleanDatabase();
+    saveStoredData(clean);
+    try {
+      localStorage.setItem(CLEAN_SECRETARIA_ONLY_FLAG, 'true');
+      localStorage.setItem('sucessoedu_clean_install', 'true');
+      localStorage.setItem('sucessoedu_database_mode', 'CLEAN');
+    } catch {}
+    return clean;
+  }
+
   const raw = localStorage.getItem(KEYS.DATA);
   if (!raw) {
     const clean = getCleanDatabase();
     saveStoredData(clean);
     try {
-      localStorage.setItem(MIGRATION_FLAG, 'true');
+      localStorage.setItem(CLEAN_SECRETARIA_ONLY_FLAG, 'true');
     } catch {}
     return clean;
   }
@@ -518,44 +529,20 @@ export function getStoredData(): AppStateData {
     const parsed = JSON.parse(raw);
     const hasArr = (arr: any) => Array.isArray(arr);
 
-    // Preserva com 100% de integridade os estudantes cadastrados pelo usuário.
-    // Exclui apenas os alunos de teste padrão (std-001 a std-009) se não tiverem sido personalizados.
-    const rawStudents = hasArr(parsed.students) ? parsed.students : [];
-    const isMigrated = localStorage.getItem(MIGRATION_FLAG) === 'true';
-    const students = rawStudents.filter((s: any) => {
-      if (!s || !s.id) return false;
-      // Remove somente os registros originais fictícios de teste std-001 a std-009 se não migrado
-      if (!isMigrated && String(s.id).startsWith('std-00') && s.enrollmentNumber === 'MAT-2026-001') {
-        return false;
-      }
-      return true;
-    });
-
     const loadedState: AppStateData = {
-      students,
-      classes: hasArr(parsed.classes) && parsed.classes.length > 0 ? parsed.classes : DEFAULT_CLASSES,
+      students: [],
+      classes: [],
       subjects: hasArr(parsed.subjects) && parsed.subjects.length > 0 ? parsed.subjects : DEFAULT_SUBJECTS,
       courses: hasArr(parsed.courses) && parsed.courses.length > 0 ? parsed.courses : DEFAULT_COURSES,
-      questions: hasArr(parsed.questions) && parsed.questions.length > 0 ? parsed.questions : DEFAULT_QUESTIONS,
-      exams: hasArr(parsed.exams) && parsed.exams.length > 0 ? parsed.exams : DEFAULT_EXAMS,
-      submissions: hasArr(parsed.submissions) ? parsed.submissions : [],
-      academicHistories: hasArr(parsed.academicHistories) ? parsed.academicHistories : [],
+      questions: [],
+      exams: [],
+      submissions: [],
+      academicHistories: [],
       settings: parsed.settings || DEFAULT_SCHOOL_SETTINGS,
-      notifications: hasArr(parsed.notifications) && parsed.notifications.length > 0 ? parsed.notifications : DEFAULT_NOTIFICATIONS,
-      communications: hasArr(parsed.communications) && parsed.communications.length > 0 ? parsed.communications : DEFAULT_COMMUNICATIONS,
+      notifications: [],
+      communications: [],
       rolePreferences: parsed.rolePreferences || DEFAULT_ROLE_PREFERENCES,
-      schoolUnits: hasArr(parsed.schoolUnits) && parsed.schoolUnits.length > 0
-        ? parsed.schoolUnits.map((u: any) => ({
-            ...u,
-            municipalSecretaryId: u.municipalSecretaryId || DEFAULT_MUNICIPAL_SECRETARY.id,
-            municipalSecretaryName: u.municipalSecretaryName || DEFAULT_MUNICIPAL_SECRETARY.name,
-            municipalSecretaryCnpj: u.municipalSecretaryCnpj || DEFAULT_MUNICIPAL_SECRETARY.cnpj,
-            isLinkedToSecretary: u.isLinkedToSecretary !== false,
-            city: u.city || 'Cumaru do Norte',
-            state: u.state || 'PA',
-            zipCode: u.zipCode || '68.398-000',
-          }))
-        : DEFAULT_SCHOOL_UNITS,
+      schoolUnits: [],
       municipalSecretary: parsed.municipalSecretary || DEFAULT_MUNICIPAL_SECRETARY,
       syncLogs: hasArr(parsed.syncLogs) ? parsed.syncLogs : [],
       userAccounts: hasArr(parsed.userAccounts) && parsed.userAccounts.length > 0 ? parsed.userAccounts : DEFAULT_USER_ACCOUNTS,
@@ -563,30 +550,18 @@ export function getStoredData(): AppStateData {
       bnccSkills: hasArr(parsed.bnccSkills) && parsed.bnccSkills.length > 0 ? parsed.bnccSkills : DEFAULT_BNCC_SKILLS,
       stateRegulations: hasArr(parsed.stateRegulations) && parsed.stateRegulations.length > 0 ? parsed.stateRegulations : DEFAULT_STATE_REGULATIONS,
       activeStateRegulationCode: parsed.activeStateRegulationCode || 'SP',
-      attendanceSheets: hasArr(parsed.attendanceSheets) ? parsed.attendanceSheets : [],
-      lessonRegistries: hasArr(parsed.lessonRegistries) && parsed.lessonRegistries.length > 0 ? parsed.lessonRegistries : DEFAULT_LESSON_REGISTRIES,
-      classGradeSheets: hasArr(parsed.classGradeSheets) ? parsed.classGradeSheets : [],
-      teacherLessonPlans: hasArr(parsed.teacherLessonPlans) && parsed.teacherLessonPlans.length > 0 ? parsed.teacherLessonPlans : DEFAULT_TEACHER_LESSON_PLANS,
-      teacherStudentNotes: hasArr(parsed.teacherStudentNotes) ? parsed.teacherStudentNotes : [],
+      attendanceSheets: [],
+      lessonRegistries: [],
+      classGradeSheets: [],
+      teacherLessonPlans: [],
+      teacherStudentNotes: [],
       whatsappConfig: parsed.whatsappConfig || DEFAULT_WHATSAPP_CONFIG,
-      whatsappTemplates: hasArr(parsed.whatsappTemplates) && parsed.whatsappTemplates.length > 0 ? parsed.whatsappTemplates : DEFAULT_WHATSAPP_TEMPLATES,
-      whatsappLogs: hasArr(parsed.whatsappLogs) ? parsed.whatsappLogs : [],
-      systemUpdates: hasArr(parsed.systemUpdates) && parsed.systemUpdates.length > 0 ? parsed.systemUpdates : DEFAULT_SYSTEM_UPDATES,
+      whatsappTemplates: parsed.whatsappTemplates || DEFAULT_WHATSAPP_TEMPLATES,
+      whatsappLogs: [],
+      systemUpdates: parsed.systemUpdates || DEFAULT_SYSTEM_UPDATES,
       auditLogs: hasArr(parsed.auditLogs) ? parsed.auditLogs : [],
     };
-
-    if (!isMigrated) {
-      try {
-        localStorage.setItem(MIGRATION_FLAG, 'true');
-        saveStoredData(loadedState);
-      } catch {}
-    }
-
-    const { healedData, fixesApplied } = RelationalIntegrityService.autoHeal(loadedState);
-    if (fixesApplied.length > 0) {
-      saveStoredData(healedData);
-    }
-    return healedData;
+    return loadedState;
   } catch {
     const clean = getCleanDatabase();
     saveStoredData(clean);

@@ -310,6 +310,22 @@ export const BimonthlyAcademicEvolutionCard: React.FC<BimonthlyAcademicEvolution
     });
   }, [activeSubjects, chartData, passingThreshold]);
 
+  // Paginação para o histórico acadêmico / tabela resumo
+  const [historyPage, setHistoryPage] = useState(1);
+  const historyItemsPerPage = 6;
+
+  React.useEffect(() => {
+    setHistoryPage(1);
+  }, [selectedStudentId, selectedClassId, activeSubjects]);
+
+  const deferredTableSummaryData = React.useDeferredValue(tableSummaryData);
+  const totalHistoryPages = Math.ceil(deferredTableSummaryData.length / historyItemsPerPage) || 1;
+  const paginatedTableSummaryData = useMemo(() => {
+    const start = (historyPage - 1) * historyItemsPerPage;
+    return deferredTableSummaryData.slice(start, start + historyItemsPerPage);
+  }, [deferredTableSummaryData, historyPage, historyItemsPerPage]);
+  const deferredPaginatedTableSummaryData = React.useDeferredValue(paginatedTableSummaryData);
+
   // Exportar dados da evolução bimestral em CSV
   const handleExportCSV = () => {
     const headers = ['Disciplina', '1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre', 'Média Anual', 'Variação (Δ)'];
@@ -772,7 +788,8 @@ export const BimonthlyAcademicEvolutionCard: React.FC<BimonthlyAcademicEvolution
         </div>
 
         {showTable && (
-          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+          <div className="space-y-3">
+            <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-700">
                 <tr>
@@ -787,7 +804,7 @@ export const BimonthlyAcademicEvolutionCard: React.FC<BimonthlyAcademicEvolution
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {tableSummaryData.map((row, idx) => {
+                {deferredPaginatedTableSummaryData.map((row, idx) => {
                   const colorMeta = SUBJECT_COLORS[row.subject] || DEFAULT_SUBJECT_COLORS[idx % DEFAULT_SUBJECT_COLORS.length];
                   return (
                     <tr
@@ -895,7 +912,36 @@ export const BimonthlyAcademicEvolutionCard: React.FC<BimonthlyAcademicEvolution
               </tbody>
             </table>
           </div>
-        )}
+
+          {/* Academic History Pagination Bar */}
+          <div className="flex items-center justify-between pt-2 px-1 text-xs text-slate-500">
+            <span>
+              Exibindo <strong>{tableSummaryData.length === 0 ? 0 : (historyPage - 1) * historyItemsPerPage + 1}</strong> a{' '}
+              <strong>{Math.min(historyPage * historyItemsPerPage, tableSummaryData.length)}</strong> de{' '}
+              <strong>{tableSummaryData.length}</strong> componentes curriculares
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setHistoryPage((p) => Math.max(p - 1, 1))}
+                disabled={historyPage === 1}
+                className="px-2.5 py-1 border border-slate-200 rounded-lg font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                Anterior
+              </button>
+              <span className="font-bold text-slate-700">
+                {historyPage} / {totalHistoryPages}
+              </span>
+              <button
+                onClick={() => setHistoryPage((p) => Math.min(p + 1, totalHistoryPages))}
+                disabled={historyPage >= totalHistoryPages}
+                className="px-2.5 py-1 border border-slate-200 rounded-lg font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                Próxima
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );
