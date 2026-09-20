@@ -32,6 +32,7 @@ interface QuickJumpSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigate: (tabId: string) => void;
+  currentActiveTab?: string;
 }
 
 interface NavDestination {
@@ -261,6 +262,7 @@ export const QuickJumpSearchModal: React.FC<QuickJumpSearchModalProps> = ({
   isOpen,
   onClose,
   onNavigate,
+  currentActiveTab,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);

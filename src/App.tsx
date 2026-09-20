@@ -74,18 +74,30 @@ import { CleanSlateHub } from './components/cleanslate/CleanSlateHub';
 import { InstalaFlowHub } from './components/instalaflow/InstalaFlowHub';
 import { DataSyncProHub } from './components/datasync/DataSyncProHub';
 import { AdminTIHub } from './components/admin/AdminTIHub';
-import { NavigationBreadcrumbs } from './components/common/NavigationBreadcrumbs';
+import { WorkspaceTabsBar } from './components/layout/WorkspaceTabsBar';
+import { WindowsTitleBar } from './components/layout/WindowsTitleBar';
+import { WindowsStartMenu } from './components/layout/WindowsStartMenu';
+import { WindowsTaskbar } from './components/layout/WindowsTaskbar';
 import { QuickJumpSearchModal } from './components/common/QuickJumpSearchModal';
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
 import { KeyboardShortcutsModal } from './components/common/KeyboardShortcutsModal';
 import { ShortcutToast } from './components/common/ShortcutToast';
 import { Bell, CheckCircle2, X } from 'lucide-react';
 import { startMessageQueueWorker, stopMessageQueueWorker } from './services/messageQueueService';
+import { DatabaseAutomatorService } from './services/databaseAutomatorService';
 
 export default function App() {
   const [data, setData] = useState(() => getStoredData());
   const [activeTab, setActiveTab] = useState('MAIN_DASHBOARD');
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [openTabs, setOpenTabs] = useState<string[]>(['MAIN_DASHBOARD']);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    try {
+      const session = localStorage.getItem('sucessoedu_auth_session');
+      return session === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [isUniversalImportModalOpen, setIsUniversalImportModalOpen] = useState(false);
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(() => {
@@ -98,6 +110,26 @@ export default function App() {
   const [lastUpdatePackage, setLastUpdatePackage] = useState<SystemUpdatePackage | null>(null);
   const [isArchitectureDiagramModalOpen, setIsArchitectureDiagramModalOpen] = useState(false);
   const [isVersionControlModalOpen, setIsVersionControlModalOpen] = useState(false);
+  const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  // Desktop Windows Keyboard Shortcuts Layer (Ctrl+Esc para Menu Iniciar, Alt+B para Sidebar)
+  useEffect(() => {
+    const handleDesktopWindowsKeys = (e: KeyboardEvent) => {
+      // Ctrl+Esc para alternar o Menu Iniciar
+      if (e.ctrlKey && e.key === 'Escape') {
+        e.preventDefault();
+        setIsStartMenuOpen((prev) => !prev);
+      }
+      // Alt+B para alternar a barra lateral
+      if (e.altKey && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault();
+        setIsSidebarCollapsed((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleDesktopWindowsKeys);
+    return () => window.removeEventListener('keydown', handleDesktopWindowsKeys);
+  }, []);
 
   // Global Keyboard Shortcuts Layer (Alt+D, Alt+S, Alt+P, Alt+K, Ctrl+K, etc.)
   const {
@@ -118,18 +150,27 @@ export default function App() {
         id: 'usr-master-001',
         name: 'Administrador Master ADS',
         email: 'suportetecnicoads@gmail.com',
-        username: 'master',
+        login: 'master',
         role: 'ADMIN' as UserRole,
         sector: 'MASTER' as const,
-        roleTitle: 'Administrador de Infraestrutura & Engenheiro de Software',
+        sectorTitle: 'Administrador de Infraestrutura & Engenheiro de Software',
         isMaster: true,
-        isActive: true,
+        active: true,
         createdAt: '2026-01-01T08:00:00Z',
         lastLogin: new Date().toISOString(),
         permissions: {} as any,
       };
 
-  const [currentUser, setCurrentUser] = useState<UserAccount>(defaultMasterUser);
+  const [currentUser, setCurrentUser] = useState<UserAccount>(() => {
+    try {
+      const savedUserId = localStorage.getItem('sucessoedu_logged_user_id');
+      if (savedUserId && data.userAccounts) {
+        const found = data.userAccounts.find((u) => u.id === savedUserId);
+        if (found) return found;
+      }
+    } catch {}
+    return defaultMasterUser;
+  });
   const currentRole: UserRole = currentUser.role || 'ADMIN';
 
   // Sub-navigation state for document issuance and exam taking
@@ -160,8 +201,28 @@ export default function App() {
         setData(getStoredData());
       }
     };
+    const handleDbMigrated = () => {
+      setData(getStoredData());
+    };
     window.addEventListener('sucessoedu_db_changed', handleDbChange);
-    return () => window.removeEventListener('sucessoedu_db_changed', handleDbChange);
+    window.addEventListener('sucessoedu_database_migrated', handleDbMigrated);
+    return () => {
+      window.removeEventListener('sucessoedu_db_changed', handleDbChange);
+      window.removeEventListener('sucessoedu_database_migrated', handleDbMigrated);
+    };
+  }, []);
+
+  // Automação na Inicialização do Banco de Dados
+  useEffect(() => {
+    try {
+      const config = DatabaseAutomatorService.getConfig();
+      const check = DatabaseAutomatorService.checkIfMigrationNeeded();
+      if (config.autoMigrateOnStartup && check.needed) {
+        DatabaseAutomatorService.executeAutomatedUpdate().then(() => {
+          setData(getStoredData());
+        }).catch(() => {});
+      }
+    } catch {}
   }, []);
 
   // Worker de segundo plano para fila de mensagens e notificações
@@ -306,7 +367,12 @@ export default function App() {
       currentUser.sector,
       `Sessão encerrada com sucesso. Cópia de segurança automática gerada (${autoBackup.stats.studentsCount} alunos, ${autoBackup.stats.classesCount} turmas, ${autoBackup.stats.examsCount} avaliações salvas).`
     );
+    try {
+      localStorage.removeItem('sucessoedu_auth_session');
+      localStorage.removeItem('sucessoedu_logged_user_id');
+    } catch {}
     setIsAuthenticated(false);
+    setOpenTabs(['MAIN_DASHBOARD']);
     triggerPushNotification(
       '🔒 Sessão Encerrada com Cópia de Segurança',
       `Backup automático gerado com sucesso (${autoBackup.stats.studentsCount} alunos e ${autoBackup.stats.examsCount} avaliações salvos no snapshot).`
@@ -1121,9 +1187,24 @@ export default function App() {
         setNavigationHistory((prev) => [...prev, activeTab]);
       }
       setActiveTab(target);
+      setOpenTabs((prev) => (prev.includes(target) ? prev : [...prev, target]));
       if (target === 'STUDENT_ROOM' && !activeExamIdForTaking && (data.exams?.length || 0) > 0) {
         setActiveExamIdForTaking(data.exams[0].id);
       }
+    }
+  };
+
+  const handleCloseTab = (tabId: string) => {
+    if (tabId === 'MAIN_DASHBOARD') {
+      setActiveTab('MAIN_DASHBOARD');
+      return;
+    }
+    const nextTabs = openTabs.filter((t) => t !== tabId);
+    const safeTabs = nextTabs.length > 0 ? nextTabs : ['MAIN_DASHBOARD'];
+    setOpenTabs(safeTabs);
+    if (activeTab === tabId) {
+      const fallback = safeTabs[safeTabs.length - 1] || 'MAIN_DASHBOARD';
+      setActiveTab(fallback);
     }
   };
 
@@ -1153,6 +1234,11 @@ export default function App() {
         onLoginSuccess={(user) => {
           setCurrentUser(user);
           setIsAuthenticated(true);
+          setOpenTabs(['MAIN_DASHBOARD']);
+          try {
+            localStorage.setItem('sucessoedu_auth_session', 'true');
+            localStorage.setItem('sucessoedu_logged_user_id', user.id);
+          } catch {}
           logSecurityAudit(
             'LOGIN',
             user.id,
@@ -1172,7 +1258,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans antialiased relative">
+    <div className="h-screen max-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans antialiased relative overflow-hidden">
       {/* Toast Notification Banner */}
       {toastNotification && (
         <div className="fixed top-4 right-4 z-50 max-w-sm w-full bg-slate-900 text-white rounded-2xl shadow-2xl p-4 border border-slate-700 flex items-start gap-3 animate-in slide-in-from-top-4 duration-200">
@@ -1193,6 +1279,20 @@ export default function App() {
           </button>
         </div>
       )}
+
+      {/* Barra de Título Superior Estilo Windows (Titlebar & Janela Desktop) */}
+      <WindowsTitleBar
+        activeTab={activeTab}
+        schoolName={data.settings?.name}
+        onNavigate={handleNavigate}
+        onOpenQuickSearch={() => setIsQuickSearchOpen(true)}
+        onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
+        onOpenArchitectureDiagram={() => setIsArchitectureDiagramModalOpen(true)}
+        onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
+        onToggleSidebar={() => setIsSidebarCollapsed((prev) => !prev)}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onLogout={handleLogout}
+      />
 
       {/* Top Header */}
       <Header
@@ -1221,10 +1321,12 @@ export default function App() {
         onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
         currentVersion={data.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
         onLogout={handleLogout}
+        onToggleStartMenu={() => setIsStartMenuOpen((prev) => !prev)}
+        isStartMenuOpen={isStartMenuOpen}
       />
 
       {/* Main Layout Shell */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Left Navigation Sidebar */}
         <Sidebar
           activeTab={activeTab}
@@ -1233,6 +1335,8 @@ export default function App() {
           onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
           onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
           currentVersion={data.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
           counts={{
             students: data.students.length,
             exams: data.exams.length,
@@ -1248,15 +1352,17 @@ export default function App() {
         {/* Content Area */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50 flex flex-col">
           <div className="max-w-7xl mx-auto space-y-4 w-full flex-1 flex flex-col">
-            {/* Context Breadcrumbs with History Back & Quick Jump */}
-            <NavigationBreadcrumbs
+            {/* Workspace Navigation Tabs Bar (Abas, Fechar, Voltar, Histórico) */}
+            <WorkspaceTabsBar
+              openTabs={openTabs}
               activeTab={activeTab}
-              navigationHistory={navigationHistory}
+              onSelectTab={handleNavigate}
+              onCloseTab={handleCloseTab}
               onGoBack={handleGoBack}
-              onNavigate={handleNavigate}
-              schoolName={data.settings?.name}
+              canGoBack={navigationHistory.length > 0}
               onOpenQuickSearch={() => setIsQuickSearchOpen(true)}
             />
+
             {/* TAB: DASHBOX PRINCIPAL (VISÃO EXECUTIVA & NOTIFICAÇÕES) */}
             {activeTab === 'MAIN_DASHBOARD' && (
               <MainOverviewDashboard
@@ -1504,11 +1610,15 @@ export default function App() {
                 submissions={data.submissions}
                 academicHistories={data.academicHistories}
                 settings={data.settings}
+                municipalSecretary={data.municipalSecretary}
                 onUpdateSchoolUnits={(units) =>
                   setData((prev) => ({ ...prev, schoolUnits: units }))
                 }
                 onUpdateSyncLogs={(logs) =>
                   setData((prev) => ({ ...prev, syncLogs: logs }))
+                }
+                onUpdateMunicipalSecretary={(secretary) =>
+                  setData((prev) => ({ ...prev, municipalSecretary: secretary }))
                 }
                 onRefreshData={() => setData(getStoredData())}
                 onBack={() => handleNavigate('MAIN_DASHBOARD')}
@@ -1567,7 +1677,7 @@ export default function App() {
             {activeTab === 'SYSTEM_UPDATES' && (
               <SystemUpdateModule
                 currentVersion={data.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
-                updatePackages={data.systemUpdatePackages || []}
+                updatePackages={data.systemUpdates || []}
                 onApplyUpdate={handleApplySystemUpdate}
                 onBack={handleGoBack}
                 onNavigate={handleNavigate}
@@ -1684,6 +1794,36 @@ export default function App() {
         </main>
       </div>
 
+      {/* BARRA DE TAREFAS DO WINDOWS NO RODAPÉ (TASKBAR & STATUS BAR) */}
+      <WindowsTaskbar
+        activeTab={activeTab}
+        openTabs={openTabs}
+        onSelectTab={handleNavigate}
+        onCloseTab={handleCloseTab}
+        onToggleStartMenu={() => setIsStartMenuOpen((prev) => !prev)}
+        isStartMenuOpen={isStartMenuOpen}
+        onOpenQuickSearch={() => setIsQuickSearchOpen(true)}
+        onOpenNotifications={() => setIsNotificationModalOpen(true)}
+        unreadNotificationsCount={unreadNotificationCount}
+        schoolName={data.settings?.name}
+        totalStudents={data.students.length}
+        totalClasses={data.classes.length}
+      />
+
+      {/* MENU INICIAR DO WINDOWS 11 (START MENU) */}
+      <WindowsStartMenu
+        isOpen={isStartMenuOpen}
+        onClose={() => setIsStartMenuOpen(false)}
+        activeTab={activeTab}
+        onNavigate={handleNavigate}
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        schoolName={data.settings?.name}
+        onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
+        onOpenArchitectureDiagram={() => setIsArchitectureDiagramModalOpen(true)}
+        onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
+      />
+
       {/* CENTRAL DE NOTIFICAÇÕES MODAL */}
       <NotificationCenterModal
         isOpen={isNotificationModalOpen}
@@ -1752,7 +1892,7 @@ export default function App() {
         isOpen={isVersionControlModalOpen}
         onClose={() => setIsVersionControlModalOpen(false)}
         currentVersion={data.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
-        packages={data.systemUpdatePackages}
+        packages={data.systemUpdates || []}
         onNavigateToModule={handleNavigate}
       />
 

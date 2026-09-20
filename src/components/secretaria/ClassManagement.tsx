@@ -837,8 +837,8 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white"
                   >
                     {STANDARDIZED_GRADE_LEVELS.map((g) => (
-                      <option key={g} value={g}>
-                        {g}
+                      <option key={typeof g === 'string' ? g : g.level} value={typeof g === 'string' ? g : g.level}>
+                        {typeof g === 'string' ? g : g.level}
                       </option>
                     ))}
                   </select>

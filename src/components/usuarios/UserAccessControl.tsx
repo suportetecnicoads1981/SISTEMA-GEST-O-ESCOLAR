@@ -24,6 +24,7 @@ import {
   X,
   Users,
   Eye,
+  EyeOff,
   CheckSquare,
   Square,
   RefreshCw,
@@ -35,6 +36,8 @@ import {
   Camera,
   Upload,
   Activity,
+  Layers,
+  Check,
 } from 'lucide-react';
 import {
   UserAccount,
@@ -57,55 +60,73 @@ interface UserAccessControlProps {
   onNavigate?: (tab: string, payload?: any) => void;
 }
 
-
-const SECTOR_LABELS: Record<UserSector, { label: string; color: string; desc: string }> = {
+export const SECTOR_LABELS: Record<
+  UserSector,
+  { label: string; shortLabel: string; color: string; desc: string; defaultRole: UserRole }
+> = {
   MASTER: {
-    label: 'Cadastro Mestre (Super Admin)',
+    label: 'Cadastro Mestre (Super Admin TI)',
+    shortLabel: 'Master TI',
     color: 'bg-rose-100 text-rose-800 border-rose-300',
-    desc: 'Controle total irrestrito do sistema, infraestrutura e permissões globais.',
+    desc: 'Controle irrestrito total de banco, deploy, infraestrutura, usuários e permissões.',
+    defaultRole: 'ADMIN',
   },
   DIRETORIA: {
-    label: 'Diretoria & Gestão Escolar',
+    label: 'Diretoria & Gestão Executiva',
+    shortLabel: 'Diretoria',
     color: 'bg-indigo-100 text-indigo-800 border-indigo-300',
-    desc: 'Homologação institucional, atas, auditoria e relatórios executivos.',
+    desc: 'Homologação institucional, atas, auditoria geral, atas de conselho e relatórios executivos.',
+    defaultRole: 'ADMIN',
   },
   COORDENACAO: {
     label: 'Coordenação Pedagógica',
+    shortLabel: 'Coordenação',
     color: 'bg-purple-100 text-purple-800 border-purple-300',
-    desc: 'Gestão pedagógica, aprovação de provas BNCC, recuperação e pareceres.',
+    desc: 'Supervisão pedagógica, validação de pautas, banco de itens BNCC, recuperação e pareceres.',
+    defaultRole: 'ADMIN',
   },
   SECRETARIA: {
     label: 'Secretaria Acadêmica',
+    shortLabel: 'Secretaria',
     color: 'bg-blue-100 text-blue-800 border-blue-300',
-    desc: 'Matrículas, emissão de documentos oficiais, históricos e censo escolar.',
+    desc: 'Matrículas, emissão oficial de históricos e certificados, censo escolar e turmas.',
+    defaultRole: 'ADMIN',
   },
   PROFESSOR: {
-    label: 'Corpo Docente / Professores',
+    label: 'Corpo Docente / Professor',
+    shortLabel: 'Professor',
     color: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-    desc: 'Diário de classe, notas, frequências, elaboração e correção de avaliações.',
+    desc: 'Diário de classe, registro de presenças/chamada, notas, provas e planos de aula.',
+    defaultRole: 'TEACHER',
   },
   GESTOR_MUNICIPAL: {
     label: 'Secretaria Municipal de Educação (SME)',
+    shortLabel: 'Gestor SME',
     color: 'bg-amber-100 text-amber-800 border-amber-300',
-    desc: 'Visão da rede municipal, unificação de dados de polos e censo integrado.',
+    desc: 'Visão da rede municipal, censo unificado e sincronização de polos remotos .edusync.',
+    defaultRole: 'ADMIN',
   },
   ALUNO: {
-    label: 'Aluno / Estudante',
+    label: 'Aluno / Estudante Matriculado',
+    shortLabel: 'Aluno',
     color: 'bg-cyan-100 text-cyan-800 border-cyan-300',
-    desc: 'Acesso à sala de provas, consulta de notas, boletim e comunicados.',
+    desc: 'Acesso à sala de provas online, consulta de boletim, notas e comunicados escolares.',
+    defaultRole: 'STUDENT',
   },
   RESPONSAVEL: {
-    label: 'Pais & Responsáveis',
+    label: 'Pais & Responsáveis Legais',
+    shortLabel: 'Responsável',
     color: 'bg-slate-100 text-slate-800 border-slate-300',
-    desc: 'Acompanhamento do rendimento escolar, frequência e comunicados.',
+    desc: 'Acompanhamento do rendimento pedagógico do aluno, frequência e avisos da escola.',
+    defaultRole: 'PARENT',
   },
 };
 
-const MODULE_DEFINITIONS: { key: SystemModuleKey; label: string; description: string }[] = [
+export const MODULE_DEFINITIONS: { key: SystemModuleKey; label: string; description: string }[] = [
   { key: 'dashboard', label: 'Dashbox & Indicadores Gerais', description: 'Painel principal, alertas de anomalias e gráficos de saúde da rede' },
-  { key: 'portalProfessor', label: 'Portal do Professor & Gestão Docente', description: 'Painel completo do professor: diário, chamada, pauta de notas, provas e gabaritos' },
-  { key: 'diarioClasse', label: 'Diário de Classe & Frequência', description: 'Registro de conteúdos diários, normativas estaduais e controle de frequência' },
-  { key: 'secretaria', label: 'Secretaria & Matrículas', description: 'Cadastro de alunos, RA, dados cadastrais e transferências' },
+  { key: 'portalProfessor', label: 'Portal do Professor & Gestão Docente', description: 'Diário, chamada rápida, pauta de notas, provas e planos de aula' },
+  { key: 'diarioClasse', label: 'Diário de Classe & Frequência', description: 'Registro de conteúdos diários, normativas e controle de faltas' },
+  { key: 'secretaria', label: 'Secretaria & Matrículas', description: 'Cadastro de alunos, RA, dados cadastrais, turmas e transferências' },
   { key: 'turmas', label: 'Turmas & Matrizes Curriculares', description: 'Alocação de salas, capacidades, turnos e docentes' },
   { key: 'documentos', label: 'Documentos Oficiais & Certificados', description: 'Históricos escolares, declarações, boletins com autenticação' },
   { key: 'comunicacao', label: 'Mural de Avisos & Notificações', description: 'Envio de comunicados em massa, canais e avisos segmentados' },
@@ -116,6 +137,73 @@ const MODULE_DEFINITIONS: { key: SystemModuleKey; label: string; description: st
   { key: 'usuarios', label: 'Controle de Usuários & Perfis', description: 'Gerenciamento de contas, setores e matriz de permissões' },
   { key: 'configuracoes', label: 'Configurações do Sistema & Backup', description: 'Dados institucionais, instaladores de rede e snapshots de segurança' },
 ];
+
+export const getDefaultSectorPermissions = (
+  sector: UserSector
+): Record<SystemModuleKey, ModulePermission> => {
+  const res: any = {};
+  MODULE_DEFINITIONS.forEach((mod) => {
+    if (sector === 'MASTER') {
+      res[mod.key] = { canRead: true, canCreate: true, canEdit: true, canDelete: true, canApprove: true };
+    } else if (sector === 'DIRETORIA') {
+      res[mod.key] = { canRead: true, canCreate: true, canEdit: true, canDelete: false, canApprove: true };
+    } else if (sector === 'COORDENACAO') {
+      const isPedagogical = ['dashboard', 'portalProfessor', 'diarioClasse', 'questoes', 'provas', 'relatorios', 'comunicacao'].includes(mod.key);
+      res[mod.key] = {
+        canRead: true,
+        canCreate: isPedagogical,
+        canEdit: isPedagogical,
+        canDelete: false,
+        canApprove: isPedagogical,
+      };
+    } else if (sector === 'SECRETARIA') {
+      const isSec = ['dashboard', 'secretaria', 'turmas', 'documentos', 'comunicacao'].includes(mod.key);
+      res[mod.key] = {
+        canRead: isSec || ['relatorios'].includes(mod.key),
+        canCreate: isSec,
+        canEdit: isSec,
+        canDelete: false,
+        canApprove: isSec,
+      };
+    } else if (sector === 'PROFESSOR') {
+      const isTeacher = ['portalProfessor', 'diarioClasse', 'questoes', 'provas'].includes(mod.key);
+      res[mod.key] = {
+        canRead: isTeacher || ['dashboard', 'comunicacao', 'relatorios'].includes(mod.key),
+        canCreate: isTeacher,
+        canEdit: isTeacher,
+        canDelete: false,
+        canApprove: false,
+      };
+    } else if (sector === 'GESTOR_MUNICIPAL') {
+      const isGov = ['dashboard', 'gestaoMunicipal', 'relatorios', 'documentos', 'comunicacao'].includes(mod.key);
+      res[mod.key] = {
+        canRead: isGov,
+        canCreate: isGov,
+        canEdit: isGov,
+        canDelete: false,
+        canApprove: isGov,
+      };
+    } else if (sector === 'ALUNO') {
+      res[mod.key] = {
+        canRead: ['provas', 'relatorios', 'comunicacao', 'documentos'].includes(mod.key),
+        canCreate: false,
+        canEdit: false,
+        canDelete: false,
+        canApprove: false,
+      };
+    } else {
+      // RESPONSAVEL
+      res[mod.key] = {
+        canRead: ['relatorios', 'comunicacao', 'documentos'].includes(mod.key),
+        canCreate: false,
+        canEdit: false,
+        canDelete: false,
+        canApprove: false,
+      };
+    }
+  });
+  return res;
+};
 
 export const UserAccessControl: React.FC<UserAccessControlProps> = ({
   users,
@@ -129,15 +217,19 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSectorFilter, setSelectedSectorFilter] = useState<string>('ALL');
+  const [activeMainTab, setActiveMainTab] = useState<'USERS' | 'MATRIX' | 'AUDIT'>('USERS');
   const [isEditingModalOpen, setIsEditingModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
+  const [deleteCandidateUser, setDeleteCandidateUser] = useState<UserAccount | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
-  // Form State for Modal
+  // Form State for Create/Edit Modal
   const [formData, setFormData] = useState<{
     id: string;
     name: string;
     login: string;
+    password?: string;
     email: string;
     phone: string;
     sector: UserSector;
@@ -151,19 +243,19 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
     id: '',
     name: '',
     login: '',
+    password: '',
     email: '',
     phone: '',
     sector: 'SECRETARIA',
-    sectorTitle: 'Secretário Escolar',
+    sectorTitle: 'Secretário(a) Escolar',
     schoolUnitId: schoolUnits[0]?.id || '',
     isMaster: false,
     active: true,
     avatarUrl: '',
-    permissions: {} as any,
+    permissions: getDefaultSectorPermissions('SECRETARIA'),
   });
 
   const photoInputRef = useRef<HTMLInputElement>(null);
-  const [activeMainTab, setActiveMainTab] = useState<'USERS' | 'AUDIT'>('USERS');
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -179,40 +271,24 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
     }
   };
 
-  const getEmptyPermissions = (): Record<SystemModuleKey, ModulePermission> => {
-    const res: any = {};
-    MODULE_DEFINITIONS.forEach((mod) => {
-      res[mod.key] = {
-        canRead: true,
-        canCreate: false,
-        canEdit: false,
-        canDelete: false,
-        canApprove: false,
-      };
-    });
-    return res;
-  };
-
-  const getMasterPermissions = (): Record<SystemModuleKey, ModulePermission> => {
-    const res: any = {};
-    MODULE_DEFINITIONS.forEach((mod) => {
-      res[mod.key] = {
-        canRead: true,
-        canCreate: true,
-        canEdit: true,
-        canDelete: true,
-        canApprove: true,
-      };
-    });
-    return res;
+  const generateRandomPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$';
+    let pwd = 'Edu';
+    for (let i = 0; i < 6; i++) {
+      pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setFormData((prev) => ({ ...prev, password: pwd }));
+    setShowPassword(true);
   };
 
   const handleOpenCreateModal = () => {
     setEditingUser(null);
+    setShowPassword(false);
     setFormData({
-      id: `user-${Date.now()}`,
+      id: `usr-${Date.now()}`,
       name: '',
       login: '',
+      password: 'Edu' + Math.floor(1000 + Math.random() * 9000),
       email: '',
       phone: '',
       sector: 'SECRETARIA',
@@ -221,17 +297,19 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
       isMaster: false,
       active: true,
       avatarUrl: '',
-      permissions: getEmptyPermissions(),
+      permissions: getDefaultSectorPermissions('SECRETARIA'),
     });
     setIsEditingModalOpen(true);
   };
 
   const handleOpenEditModal = (user: UserAccount) => {
     setEditingUser(user);
+    setShowPassword(false);
     setFormData({
       id: user.id,
       name: user.name,
       login: user.login,
+      password: user.password || '••••••••',
       email: user.email,
       phone: user.phone || '',
       sector: user.sector,
@@ -240,9 +318,50 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
       isMaster: user.isMaster,
       active: user.active,
       avatarUrl: user.avatarUrl || '',
-      permissions: JSON.parse(JSON.stringify(user.permissions)),
+      permissions: user.permissions
+        ? JSON.parse(JSON.stringify(user.permissions))
+        : getDefaultSectorPermissions(user.sector),
     });
     setIsEditingModalOpen(true);
+  };
+
+  const handleSectorChangeInForm = (newSector: UserSector) => {
+    const secInfo = SECTOR_LABELS[newSector];
+    setFormData((prev) => ({
+      ...prev,
+      sector: newSector,
+      sectorTitle: secInfo.label,
+      isMaster: newSector === 'MASTER',
+      permissions: getDefaultSectorPermissions(newSector),
+    }));
+  };
+
+  const handleQuickChangeUserSector = (user: UserAccount, newSector: UserSector) => {
+    if (user.isMaster && newSector !== 'MASTER') {
+      if (!window.confirm('Deseja realmente remover o privilégio de Cadastro Mestre deste usuário?')) {
+        return;
+      }
+    }
+
+    const secInfo = SECTOR_LABELS[newSector];
+    const isMaster = newSector === 'MASTER';
+    const updatedUsers = users.map((u) => {
+      if (u.id === user.id) {
+        return {
+          ...u,
+          sector: newSector,
+          sectorTitle: secInfo.label,
+          role: secInfo.defaultRole,
+          isMaster: isMaster,
+          permissions: isMaster ? getDefaultSectorPermissions('MASTER') : getDefaultSectorPermissions(newSector),
+        };
+      }
+      return u;
+    });
+
+    onUpdateUsers(updatedUsers);
+    setSuccessMessage(`Nível de acesso de "${user.name}" alterado para "${secInfo.shortLabel}".`);
+    setTimeout(() => setSuccessMessage(null), 3500);
   };
 
   const handleSaveUser = (e: React.FormEvent) => {
@@ -253,26 +372,24 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
     }
 
     const unit = schoolUnits.find((u) => u.id === formData.schoolUnitId);
-    let mappedRole: UserRole = 'ADMIN';
-    if (formData.sector === 'PROFESSOR') mappedRole = 'TEACHER';
-    else if (formData.sector === 'ALUNO') mappedRole = 'STUDENT';
-    else if (formData.sector === 'RESPONSAVEL') mappedRole = 'PARENT';
+    const secInfo = SECTOR_LABELS[formData.sector];
 
     const updatedUserObj: UserAccount = {
       id: formData.id,
       name: formData.name.trim(),
       login: formData.login.trim(),
+      password: formData.password || undefined,
       email: formData.email.trim(),
       phone: formData.phone.trim(),
-      role: mappedRole,
+      role: secInfo.defaultRole,
       sector: formData.sector,
-      sectorTitle: formData.sectorTitle.trim() || SECTOR_LABELS[formData.sector].label,
+      sectorTitle: formData.sectorTitle.trim() || secInfo.label,
       schoolUnitId: formData.schoolUnitId || undefined,
       schoolUnitName: unit?.name || undefined,
       isMaster: formData.isMaster,
       active: formData.active,
       avatarUrl: formData.avatarUrl || undefined,
-      permissions: formData.isMaster ? getMasterPermissions() : formData.permissions,
+      permissions: formData.isMaster ? getDefaultSectorPermissions('MASTER') : formData.permissions,
       createdAt: editingUser ? editingUser.createdAt : new Date().toISOString(),
       lastLogin: editingUser ? editingUser.lastLogin : undefined,
     };
@@ -286,7 +403,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
 
     onUpdateUsers(updatedList);
     setIsEditingModalOpen(false);
-    setSuccessMessage(`Usuário "${updatedUserObj.name}" salvo com sucesso!`);
+    setSuccessMessage(`Usuário "${updatedUserObj.name}" salvo com sucesso com perfil de "${secInfo.shortLabel}"!`);
     setTimeout(() => setSuccessMessage(null), 4000);
   };
 
@@ -297,19 +414,28 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
     }
     const updated = users.map((u) => (u.id === user.id ? { ...u, active: !u.active } : u));
     onUpdateUsers(updated);
+    setSuccessMessage(`Status do usuário "${user.name}" alterado para ${!user.active ? 'Ativo' : 'Inativo'}.`);
+    setTimeout(() => setSuccessMessage(null), 3000);
   };
 
-  const handleDeleteUser = (user: UserAccount) => {
-    if (user.isMaster) {
+  const handleConfirmDeleteUser = () => {
+    if (!deleteCandidateUser) return;
+    if (deleteCandidateUser.isMaster) {
       alert('O Cadastro Mestre não pode ser excluído.');
+      setDeleteCandidateUser(null);
       return;
     }
-    if (window.confirm(`Tem certeza que deseja remover o usuário "${user.name}"?`)) {
-      const updated = users.filter((u) => u.id !== user.id);
-      onUpdateUsers(updated);
-      setSuccessMessage(`Usuário removido.`);
-      setTimeout(() => setSuccessMessage(null), 3000);
+    if (deleteCandidateUser.id === currentUser.id) {
+      alert('Você não pode excluir o próprio usuário com o qual está autenticado no momento.');
+      setDeleteCandidateUser(null);
+      return;
     }
+
+    const updated = users.filter((u) => u.id !== deleteCandidateUser.id);
+    onUpdateUsers(updated);
+    setSuccessMessage(`Usuário "${deleteCandidateUser.name}" excluído com sucesso.`);
+    setDeleteCandidateUser(null);
+    setTimeout(() => setSuccessMessage(null), 3500);
   };
 
   const handlePermissionChange = (
@@ -329,22 +455,6 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
     }));
   };
 
-  const handleSetFullModulePermission = (moduleKey: SystemModuleKey, grantAll: boolean) => {
-    setFormData((prev) => ({
-      ...prev,
-      permissions: {
-        ...prev.permissions,
-        [moduleKey]: {
-          canRead: grantAll,
-          canCreate: grantAll,
-          canEdit: grantAll,
-          canDelete: grantAll,
-          canApprove: grantAll,
-        },
-      },
-    }));
-  };
-
   const filteredUsers = users.filter((u) => {
     const matchSearch =
       u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -357,25 +467,38 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Module Navigation Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
+      {/* Module Universal Navigation Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => onBack ? onBack() : onNavigate?.('MAIN_DASHBOARD')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 text-xs font-bold transition-all border border-slate-200 cursor-pointer shadow-2xs group"
-            title="Voltar ao Dashbox Principal"
+            onClick={() => (onBack ? onBack() : onNavigate?.('MAIN_DASHBOARD'))}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 text-xs font-bold transition-all border border-slate-200 cursor-pointer shadow-2xs group"
+            title="Voltar para tela anterior"
           >
             <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
-            <span>Voltar ao Início</span>
+            <span>Voltar</span>
           </button>
-          <div className="hidden sm:flex items-center gap-1 text-xs text-slate-400 ml-1">
+
+          <button
+            onClick={() => onNavigate?.('MAIN_DASHBOARD')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-700 text-xs font-bold transition-all border border-slate-200 cursor-pointer shadow-2xs"
+            title="Fechar Módulo e voltar ao Início"
+          >
+            <X className="h-4 w-4" />
+            <span>Fechar Módulo</span>
+          </button>
+
+          <div className="hidden md:flex items-center gap-1 text-xs text-slate-400 ml-2">
             <span>Início</span>
+            <ChevronRight className="h-3 w-3 text-slate-300" />
+            <span>Administração</span>
             <ChevronRight className="h-3 w-3 text-slate-300" />
             <span className="font-bold text-slate-800">Controle de Usuários & Níveis de Acesso</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Abas Internas de Navegação do Módulo */}
+        <div className="flex items-center gap-1.5 flex-wrap">
           <button
             onClick={() => setActiveMainTab('USERS')}
             className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
@@ -389,6 +512,27 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
           </button>
 
           <button
+            onClick={handleOpenCreateModal}
+            className="px-3 py-1.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+            title="Cadastrar um novo usuário no sistema"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>Novo Usuário</span>
+          </button>
+
+          <button
+            onClick={() => setActiveMainTab('MATRIX')}
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeMainTab === 'MATRIX'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            <Shield className="h-3.5 w-3.5" />
+            <span>Matriz de Níveis de Acesso</span>
+          </button>
+
+          <button
             onClick={() => setActiveMainTab('AUDIT')}
             className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
               activeMainTab === 'AUDIT'
@@ -397,26 +541,27 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
             }`}
           >
             <Activity className="h-3.5 w-3.5 text-emerald-400" />
-            <span>Trilha de Auditoria & Logs ({auditLogs?.length || 0})</span>
+            <span>Auditoria & Logs ({auditLogs?.length || 0})</span>
           </button>
         </div>
       </div>
 
       {/* Top Banner with Master Badge */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl border border-indigo-900/50 relative overflow-hidden">
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-7 text-white shadow-xl border border-indigo-900/50 relative overflow-hidden">
         <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold">
               <ShieldCheck className="h-4 w-4" />
-              Segurança & Perfis de Acesso Multi-Setores
+              Gestão de Contas, Níveis de Acesso & Matriz de Permissões
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-              Controle de Usuários & Cadastro Mestre
+              Controle de Usuários & Níveis de Acesso
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              Defina com precisão cirúrgica os níveis de acesso para Diretoria, Coordenação, Secretaria, Professores, Gestores SME e Cadastro Mestre Irrestrito.
+              Adicione novos operadores, edite credenciais, selecione o nível de acesso em tempo real
+              e audite os privilégios da Diretoria, Coordenação, Secretaria, Professores e Super Admin Mestre.
             </p>
           </div>
 
@@ -424,7 +569,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15 shrink-0 min-w-[280px]">
             <div className="flex items-center justify-between gap-3 mb-2">
               <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">
-                Perfil em Uso no Momento:
+                Sessão Conectada:
               </span>
               {currentUser.isMaster && (
                 <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black tracking-wider uppercase">
@@ -447,44 +592,54 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
 
       {/* Success Notification Alert */}
       {successMessage && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3 text-emerald-800 text-sm font-semibold shadow-xs animate-fade-in">
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3 text-emerald-800 text-sm font-semibold shadow-xs animate-in fade-in-50 duration-200">
           <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
           <span>{successMessage}</span>
         </div>
       )}
 
-      {/* Sector Quick Metric Counters & Users List OR Audit Logs View */}
-      {activeMainTab === 'USERS' ? (
+      {/* VIEW 1: USUÁRIOS (LISTAGEM, BUSCA, ADICIONAR, EDITAR, EXCLUIR, SELECIONAR NÍVEL) */}
+      {activeMainTab === 'USERS' && (
         <>
-          {/* Sector Quick Metric Counters */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+          {/* Quick Metrics by Sector */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
             {(Object.keys(SECTOR_LABELS) as UserSector[]).map((sec) => {
               const count = users.filter((u) => u.sector === sec).length;
               const isSelected = selectedSectorFilter === sec;
+              const info = SECTOR_LABELS[sec];
               return (
                 <button
                   key={sec}
                   onClick={() => setSelectedSectorFilter(isSelected ? 'ALL' : sec)}
-                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                  className={`p-2.5 rounded-2xl border text-left transition-all cursor-pointer ${
                     isSelected
                       ? 'bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-300'
                       : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-300 hover:bg-slate-50'
                   }`}
+                  title={`Filtrar por ${info.label}`}
                 >
-                  <span className={`text-[10px] font-bold block uppercase truncate ${isSelected ? 'text-indigo-100' : 'text-slate-500'}`}>
-                    {sec === 'MASTER' ? '👑 Master' : sec}
+                  <span
+                    className={`text-[10px] font-bold block uppercase truncate ${
+                      isSelected ? 'text-indigo-100' : 'text-slate-500'
+                    }`}
+                  >
+                    {sec === 'MASTER' ? '👑 Master' : info.shortLabel}
                   </span>
-                  <div className="text-xl font-black mt-1">{count}</div>
-                  <span className={`text-[10px] truncate block ${isSelected ? 'text-indigo-200' : 'text-slate-400'}`}>
-                    {count === 1 ? '1 usuário' : `${count} usuários`}
+                  <div className="text-lg font-black mt-0.5">{count}</div>
+                  <span
+                    className={`text-[9px] truncate block ${
+                      isSelected ? 'text-indigo-200' : 'text-slate-400'
+                    }`}
+                  >
+                    {count === 1 ? '1 conta' : `${count} contas`}
                   </span>
                 </button>
               );
             })}
           </div>
 
-          {/* Search & Actions Bar */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+          {/* Search, Filter & Quick Add Bar */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-3 w-full sm:w-auto flex-1">
               <div className="relative flex-1 max-w-md">
                 <Search className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -500,7 +655,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
               <select
                 value={selectedSectorFilter}
                 onChange={(e) => setSelectedSectorFilter(e.target.value)}
-                className="px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-semibold"
               >
                 <option value="ALL">Todos os Setores ({users.length})</option>
                 {(Object.keys(SECTOR_LABELS) as UserSector[]).map((sec) => (
@@ -517,7 +672,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                 className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
               >
                 <Plus className="h-4 w-4" />
-                Novo Usuário / Operador
+                <span>Adicionar Novo Usuário</span>
               </button>
             </div>
           </div>
@@ -529,268 +684,400 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase text-[11px] tracking-wider">
                   <tr>
                     <th className="py-3.5 px-4">Operador / Login</th>
-                    <th className="py-3.5 px-4">Setor & Cargo</th>
+                    <th className="py-3.5 px-4">Nível de Acesso (Setor)</th>
                     <th className="py-3.5 px-4">Unidade de Lotação</th>
-                    <th className="py-3.5 px-4">Permissões</th>
+                    <th className="py-3.5 px-4">Permissões Ativas</th>
                     <th className="py-3.5 px-4">Status</th>
-                    <th className="py-3.5 px-4 text-right">Ações</th>
+                    <th className="py-3.5 px-4 text-right">Controles & Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {filteredUsers.map((user) => {
-                    const sectorInfo = SECTOR_LABELS[user.sector] || SECTOR_LABELS.SECRETARIA;
-                    const isCurrentlyLogged = currentUser.id === user.id;
-
-                    return (
-                      <tr
-                        key={user.id}
-                        className={`hover:bg-slate-50/80 transition-colors ${
-                          user.isMaster ? 'bg-rose-50/30' : ''
-                        }`}
-                      >
-                        {/* User info */}
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-3">
-                            {user.avatarUrl ? (
-                              <img
-                                src={user.avatarUrl}
-                                alt={user.name}
-                                className="h-9 w-9 rounded-xl object-cover border border-indigo-200 shrink-0 shadow-xs"
-                              />
-                            ) : (
-                              <div
-                                className={`h-9 w-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
-                                  user.isMaster
-                                    ? 'bg-rose-600 text-white shadow-sm'
-                                    : 'bg-indigo-100 text-indigo-700'
-                                }`}
-                              >
-                                {user.isMaster ? '👑' : user.name.charAt(0)}
-                              </div>
-                            )}
-                            <div>
-                              <div className="font-bold text-slate-900 flex items-center gap-2">
-                                <span>{user.name}</span>
-                                {user.isMaster && (
-                                  <span className="px-1.5 py-0.5 rounded-md bg-rose-100 border border-rose-300 text-rose-800 text-[10px] font-black">
-                                    MESTRE
-                                  </span>
-                                )}
-                                {isCurrentlyLogged && (
-                                  <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 border border-emerald-300 text-emerald-800 text-[10px] font-black">
-                                    VOCÊ
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-slate-400 text-xs flex items-center gap-2 mt-0.5">
-                                <span>@{user.login}</span>
-                                <span>•</span>
-                                <span>{user.email}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Sector */}
-                        <td className="py-3.5 px-4">
-                          <div className="space-y-1">
-                            <span
-                              className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold border ${sectorInfo.color}`}
-                            >
-                              {user.sectorTitle || sectorInfo.label}
-                            </span>
-                            <div className="text-[11px] text-slate-500 max-w-xs line-clamp-1">
-                              {sectorInfo.desc}
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* School Unit */}
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
-                            <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                            <span>{user.schoolUnitName || 'Rede Municipal Global (Todas)'}</span>
-                          </div>
-                        </td>
-
-                        {/* Permissions summary */}
-                        <td className="py-3.5 px-4">
-                          {user.isMaster ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 px-2 py-1 rounded-lg border border-rose-200">
-                              <Sparkles className="h-3.5 w-3.5 text-rose-500" />
-                              Acesso Total Irrestrito
-                            </span>
-                          ) : (
-                            <div className="text-xs space-y-0.5">
-                              <span className="font-semibold text-slate-800">
-                                {
-                                  Object.values(user.permissions || {}).filter(
-                                    (p: any) => p.canCreate || p.canEdit || p.canApprove
-                                  ).length
-                                }{' '}
-                                módulos ativos
-                              </span>
-                              <div className="text-[11px] text-slate-400">
-                                {user.permissions?.provas?.canApprove
-                                  ? 'Homologa Provas • '
-                                  : ''}
-                                {user.permissions?.secretaria?.canEdit ? 'Secretaria • ' : ''}
-                                {user.permissions?.gestaoMunicipal?.canRead ? 'Censo SME' : ''}
-                              </div>
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Status */}
-                        <td className="py-3.5 px-4">
-                          <button
-                            onClick={() => handleToggleUserActive(user)}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold cursor-pointer transition-colors ${
-                              user.active
-                                ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                          >
-                            <span
-                              className={`h-2 w-2 rounded-full ${
-                                user.active ? 'bg-emerald-500' : 'bg-slate-400'
-                              }`}
-                            />
-                            {user.active ? 'Ativo' : 'Inativo'}
-                          </button>
-                        </td>
-
-                        {/* Actions */}
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              onClick={() => onSwitchCurrentUser(user)}
-                              title="Alternar para este usuário e testar visão"
-                              className="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 border border-transparent hover:border-indigo-200 transition-colors cursor-pointer text-xs font-bold inline-flex items-center gap-1"
-                            >
-                              <RefreshCw className="h-3.5 w-3.5" />
-                              <span className="hidden xl:inline">Simular</span>
-                            </button>
-
-                            <button
-                              onClick={() => handleOpenEditModal(user)}
-                              title="Editar cadastro e permissões"
-                              className="p-1.5 rounded-lg text-slate-600 hover:text-indigo-600 hover:bg-slate-100 transition-colors cursor-pointer"
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </button>
-
-                            {!user.isMaster && (
-                              <button
-                                onClick={() => handleDeleteUser(user)}
-                                title="Remover usuário"
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
-      ) : (
-        /* AUDIT LOGS VIEW */
-        <div className="space-y-4">
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-emerald-600" />
-                  Trilha de Auditoria & Registro de Ações dos Operadores
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Auditoria em tempo real de autenticações, alterações de notas, emissão de documentos e comandos administrativos.
-                </p>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto rounded-2xl border border-slate-200">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
-                  <tr>
-                    <th className="py-3 px-4">Data / Hora</th>
-                    <th className="py-3 px-4">Operador</th>
-                    <th className="py-3 px-4">Ação Executada</th>
-                    <th className="py-3 px-4">Módulo</th>
-                    <th className="py-3 px-4">Endereço IP</th>
-                    <th className="py-3 px-4">Gravidade</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-mono text-[11px] text-slate-700">
-                  {auditLogs && auditLogs.length > 0 ? (
-                    auditLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-slate-50">
-                        <td className="py-3 px-4 text-slate-500 font-sans">
-                          {new Date(log.timestamp).toLocaleString()}
-                        </td>
-                        <td className="py-3 px-4 font-bold text-slate-900 font-sans">
-                          {log.userName} ({log.userRole})
-                        </td>
-                        <td className="py-3 px-4 font-sans text-slate-800">
-                          {log.details || log.actionType}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 uppercase font-bold text-[9px]">
-                            {log.module}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-slate-500">{log.ipAddress || '192.168.1.100'}</td>
-                        <td className="py-3 px-4 font-sans">
-                          <span
-                            className={`px-2 py-0.5 rounded-full font-bold text-[9px] ${
-                              log.status === 'BLOQUEADO'
-                                ? 'bg-rose-100 text-rose-800'
-                                : log.status === 'ALERTA'
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-emerald-100 text-emerald-800'
-                            }`}
-                          >
-                            {log.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
+                  {filteredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-6 text-center text-slate-400 font-sans">
-                        Nenhum registro de auditoria arquivado no momento.
+                      <td colSpan={6} className="py-12 text-center text-slate-400">
+                        <Users className="h-10 w-10 mx-auto text-slate-300 mb-2" />
+                        <p className="font-semibold text-slate-600">Nenhum usuário localizado</p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Tente ajustar a busca ou o filtro de setor.
+                        </p>
                       </td>
                     </tr>
+                  ) : (
+                    filteredUsers.map((user) => {
+                      const sectorInfo = SECTOR_LABELS[user.sector] || SECTOR_LABELS.SECRETARIA;
+                      const isCurrentlyLogged = currentUser.id === user.id;
+
+                      return (
+                        <tr
+                          key={user.id}
+                          className={`hover:bg-slate-50/80 transition-colors ${
+                            user.isMaster ? 'bg-rose-50/30' : ''
+                          }`}
+                        >
+                          {/* User info */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-3">
+                              {user.avatarUrl ? (
+                                <img
+                                  src={user.avatarUrl}
+                                  alt={user.name}
+                                  className="h-10 w-10 rounded-xl object-cover border border-indigo-200 shrink-0 shadow-xs"
+                                />
+                              ) : (
+                                <div
+                                  className={`h-10 w-10 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
+                                    user.isMaster
+                                      ? 'bg-rose-600 text-white shadow-sm'
+                                      : 'bg-indigo-100 text-indigo-700'
+                                  }`}
+                                >
+                                  {user.isMaster ? '👑' : user.name.charAt(0)}
+                                </div>
+                              )}
+                              <div>
+                                <div className="font-bold text-slate-900 flex items-center gap-2">
+                                  <span>{user.name}</span>
+                                  {user.isMaster && (
+                                    <span className="px-1.5 py-0.5 rounded-md bg-rose-100 border border-rose-300 text-rose-800 text-[10px] font-black">
+                                      MESTRE
+                                    </span>
+                                  )}
+                                  {isCurrentlyLogged && (
+                                    <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 border border-emerald-300 text-emerald-800 text-[10px] font-black">
+                                      VOCÊ
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-slate-400 text-xs flex items-center gap-2 mt-0.5">
+                                  <span className="font-mono text-slate-600">@{user.login}</span>
+                                  <span>•</span>
+                                  <span>{user.email || 'Sem e-mail cadastrado'}</span>
+                                  {user.phone && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{user.phone}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Seletor Rápido de Nível de Acesso */}
+                          <td className="py-3.5 px-4">
+                            <div className="space-y-1.5">
+                              <select
+                                value={user.sector}
+                                onChange={(e) =>
+                                  handleQuickChangeUserSector(user, e.target.value as UserSector)
+                                }
+                                className={`text-xs font-bold px-2.5 py-1.5 rounded-xl border cursor-pointer transition-all shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:outline-none ${sectorInfo.color}`}
+                                title="Selecione para alterar o nível de acesso deste usuário"
+                              >
+                                {(Object.keys(SECTOR_LABELS) as UserSector[]).map((sec) => (
+                                  <option key={sec} value={sec}>
+                                    {SECTOR_LABELS[sec].label}
+                                  </option>
+                                ))}
+                              </select>
+                              <div className="text-[11px] text-slate-500 max-w-xs line-clamp-1">
+                                {user.sectorTitle || sectorInfo.label}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* School Unit */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
+                              <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                              <span>{user.schoolUnitName || 'Rede Municipal Global'}</span>
+                            </div>
+                          </td>
+
+                          {/* Permissions summary */}
+                          <td className="py-3.5 px-4">
+                            {user.isMaster ? (
+                              <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 px-2 py-1 rounded-lg border border-rose-200">
+                                <Sparkles className="h-3.5 w-3.5 text-rose-500" />
+                                Acesso Total Irrestrito
+                              </span>
+                            ) : (
+                              <div className="text-xs space-y-0.5">
+                                <span className="font-semibold text-slate-800">
+                                  {
+                                    Object.values(user.permissions || {}).filter(
+                                      (p: any) => p.canCreate || p.canEdit || p.canApprove
+                                    ).length
+                                  }{' '}
+                                  módulos ativos
+                                </span>
+                                <div className="text-[11px] text-slate-400">
+                                  {user.permissions?.provas?.canApprove ? 'Homologa Provas • ' : ''}
+                                  {user.permissions?.secretaria?.canEdit ? 'Secretaria • ' : ''}
+                                  {user.permissions?.gestaoMunicipal?.canRead ? 'Censo SME' : ''}
+                                </div>
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Status */}
+                          <td className="py-3.5 px-4">
+                            <button
+                              onClick={() => handleToggleUserActive(user)}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold cursor-pointer transition-colors ${
+                                user.active
+                                  ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                              }`}
+                              title={user.active ? 'Clique para desativar conta' : 'Clique para ativar conta'}
+                            >
+                              <span
+                                className={`h-2 w-2 rounded-full ${
+                                  user.active ? 'bg-emerald-500' : 'bg-slate-400'
+                                }`}
+                              />
+                              {user.active ? 'Ativo' : 'Inativo'}
+                            </button>
+                          </td>
+
+                          {/* Actions: Editar, Excluir, Simular */}
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => onSwitchCurrentUser(user)}
+                                title="Alternar sessão para este usuário"
+                                className="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 transition-colors cursor-pointer text-xs font-bold inline-flex items-center gap-1 shadow-2xs"
+                              >
+                                <RefreshCw className="h-3.5 w-3.5" />
+                                <span className="hidden xl:inline">Simular</span>
+                              </button>
+
+                              <button
+                                onClick={() => handleOpenEditModal(user)}
+                                title="Editar dados e permissões do usuário"
+                                className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 border border-slate-200 font-semibold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                              >
+                                <Edit2 className="h-3.5 w-3.5 text-indigo-600" />
+                                <span>Editar</span>
+                              </button>
+
+                              {!user.isMaster && (
+                                <button
+                                  onClick={() => setDeleteCandidateUser(user)}
+                                  title="Excluir usuário permanentemente"
+                                  className="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 text-rose-600" />
+                                  <span>Excluir</span>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
             </div>
           </div>
+        </>
+      )}
+
+      {/* VIEW 2: MATRIZ DE NÍVEIS DE ACESSO */}
+      {activeMainTab === 'MATRIX' && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Shield className="h-5 w-5 text-indigo-600" />
+                Matriz Comparativa de Níveis de Acesso por Setor
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Consulte o escopo institucional de cada perfil na plataforma educacional.
+              </p>
+            </div>
+            <button
+              onClick={handleOpenCreateModal}
+              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-2 shadow-xs cursor-pointer"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Adicionar Usuário com Perfil</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {(Object.keys(SECTOR_LABELS) as UserSector[]).map((sec) => {
+              const info = SECTOR_LABELS[sec];
+              const sectorUsers = users.filter((u) => u.sector === sec);
+              return (
+                <div
+                  key={sec}
+                  className="rounded-2xl border border-slate-200 p-4 space-y-3 bg-slate-50/50 hover:bg-white hover:border-indigo-300 transition-all shadow-2xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`px-2.5 py-1 rounded-full text-xs font-bold border ${info.color}`}
+                    >
+                      {info.shortLabel}
+                    </span>
+                    <span className="text-xs font-bold text-slate-400">
+                      {sectorUsers.length} cadastrado(s)
+                    </span>
+                  </div>
+
+                  <h4 className="font-bold text-slate-900 text-sm">{info.label}</h4>
+                  <p className="text-xs text-slate-600 leading-relaxed min-h-[48px]">
+                    {info.desc}
+                  </p>
+
+                  <div className="pt-2 border-t border-slate-200 text-xs text-slate-500">
+                    <span className="font-semibold text-slate-700">Papel do Sistema: </span>
+                    <span className="font-mono text-indigo-600 font-bold">{info.defaultRole}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* MODAL: Criar / Editar Usuário com Matriz de Permissões */}
+      {/* VIEW 3: AUDITORIA & LOGS */}
+      {activeMainTab === 'AUDIT' && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Activity className="h-4 w-4 text-emerald-600" />
+                Trilha de Auditoria & Registro de Ações dos Operadores
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Auditoria em tempo real de autenticações, alterações cadastrais, emissão de documentos e comandos administrativos.
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-2xl border border-slate-200">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-600 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
+                <tr>
+                  <th className="py-3 px-4">Data / Hora</th>
+                  <th className="py-3 px-4">Operador</th>
+                  <th className="py-3 px-4">Ação Executada</th>
+                  <th className="py-3 px-4">Módulo</th>
+                  <th className="py-3 px-4">Endereço IP</th>
+                  <th className="py-3 px-4">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-mono text-[11px] text-slate-700">
+                {auditLogs && auditLogs.length > 0 ? (
+                  auditLogs.map((log) => (
+                    <tr key={log.id} className="hover:bg-slate-50">
+                      <td className="py-3 px-4 text-slate-500 font-sans">
+                        {new Date(log.timestamp).toLocaleString('pt-BR')}
+                      </td>
+                      <td className="py-3 px-4 font-bold text-slate-900 font-sans">
+                        {log.userName} ({log.userRole})
+                      </td>
+                      <td className="py-3 px-4 font-sans text-slate-800">
+                        {log.details || log.actionType}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 uppercase font-bold text-[9px]">
+                          {log.module}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-500">{log.ipAddress || '192.168.1.100'}</td>
+                      <td className="py-3 px-4 font-sans">
+                        <span
+                          className={`px-2 py-0.5 rounded-full font-bold text-[9px] ${
+                            log.status === 'BLOQUEADO'
+                              ? 'bg-rose-100 text-rose-800'
+                              : log.status === 'ALERTA'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}
+                        >
+                          {log.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-400 font-sans">
+                      Nenhum registro de auditoria arquivado no momento.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EXCLUIR USUÁRIO COM CONFIRMAÇÃO */}
+      {deleteCandidateUser && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in-50 duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-md p-6 space-y-4">
+            <div className="h-12 w-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="h-6 w-6" />
+            </div>
+
+            <div className="text-center space-y-1">
+              <h3 className="font-bold text-slate-900 text-base">Excluir Conta de Usuário?</h3>
+              <p className="text-xs text-slate-500">
+                Tem certeza que deseja remover permanentemente o acesso de{' '}
+                <strong className="text-slate-800">{deleteCandidateUser.name}</strong> (@
+                {deleteCandidateUser.login})?
+              </p>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-3 border border-slate-200 text-xs text-slate-600 space-y-1">
+              <div>
+                <strong>Setor:</strong> {deleteCandidateUser.sectorTitle}
+              </div>
+              <div>
+                <strong>E-mail:</strong> {deleteCandidateUser.email || 'Não informado'}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteCandidateUser(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteUser}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 transition-colors cursor-pointer shadow-xs"
+              >
+                Sim, Excluir Usuário
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ADICIONAR / EDITAR USUÁRIO */}
       {isEditingModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-scale-up">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
-            <div className="p-6 bg-slate-900 text-white flex items-center justify-between shrink-0">
+            <div className="p-5 bg-slate-900 text-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl bg-indigo-600 flex items-center justify-center font-bold">
                   {formData.isMaster ? '👑' : <Shield className="h-5 w-5" />}
                 </div>
                 <div>
-                  <h3 className="font-black text-lg">
-                    {editingUser ? 'Editar Conta de Usuário & Permissões' : 'Cadastrar Novo Operador'}
+                  <h3 className="font-black text-base sm:text-lg">
+                    {editingUser ? 'Editar Usuário & Nível de Acesso' : 'Adicionar Novo Usuário'}
                   </h3>
                   <p className="text-xs text-slate-300">
-                    Defina o setor, unidade de lotação e matriz de permissões por módulo
+                    Preencha os dados cadastrais, credenciais e selecione o nível de acesso do operador
                   </p>
                 </div>
               </div>
@@ -825,10 +1112,10 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
 
                 <div className="space-y-1.5 flex-1 text-center sm:text-left">
                   <h4 className="text-xs font-bold text-slate-800">
-                    Fotografia do Profissional / Usuário
+                    Foto de Perfil / Crachá Digital
                   </h4>
                   <p className="text-xs text-slate-500">
-                    Adicione uma foto de identificação para crachá digital, pauta e registro de auditoria.
+                    Adicione uma fotografia de identificação institucional para crachá digital e registro de auditoria.
                   </p>
                   <div className="flex items-center gap-2 pt-1 justify-center sm:justify-start">
                     <label className="py-1.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 cursor-pointer transition-all">
@@ -866,7 +1153,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Ex: Profa. Renata Vasconcelos"
+                    placeholder="Ex: Dra. Mariana Vasconcelos"
                     className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   />
                 </div>
@@ -880,9 +1167,42 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                     required
                     value={formData.login}
                     onChange={(e) => setFormData({ ...formData, login: e.target.value })}
-                    placeholder="Ex: renata.coord"
-                    className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    placeholder="Ex: mariana.direcao"
+                    className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Senha de Acesso
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={formData.password || ''}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      placeholder="Senha do usuário..."
+                      className="w-full pl-3 pr-16 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono"
+                    />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                        title={showPassword ? 'Ocultar Senha' : 'Ver Senha'}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={generateRandomPassword}
+                        className="px-1.5 py-0.5 text-[10px] font-bold bg-indigo-50 text-indigo-700 rounded border border-indigo-200 hover:bg-indigo-100"
+                        title="Gerar Senha Segura"
+                      >
+                        Gerar
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <div>
@@ -893,45 +1213,20 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="Ex: renata@escola.gov.br"
+                    placeholder="Ex: mariana@escola.gov.br"
                     className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                    Setor Institucional *
-                  </label>
-                  <select
-                    value={formData.sector}
-                    onChange={(e) => {
-                      const newSector = e.target.value as UserSector;
-                      setFormData({
-                        ...formData,
-                        sector: newSector,
-                        sectorTitle: SECTOR_LABELS[newSector].label,
-                        isMaster: newSector === 'MASTER',
-                      });
-                    }}
-                    className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-semibold"
-                  >
-                    {(Object.keys(SECTOR_LABELS) as UserSector[]).map((sec) => (
-                      <option key={sec} value={sec}>
-                        {SECTOR_LABELS[sec].label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                    Título / Cargo Personalizado
+                    Telefone / WhatsApp
                   </label>
                   <input
                     type="text"
-                    value={formData.sectorTitle}
-                    onChange={(e) => setFormData({ ...formData, sectorTitle: e.target.value })}
-                    placeholder="Ex: Secretário Escolar Adjunto"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="Ex: (11) 98765-4321"
                     className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                   />
                 </div>
@@ -955,75 +1250,111 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                 </div>
               </div>
 
-              {/* Master Account Special Banner */}
-              <div
-                className={`p-4 rounded-2xl border transition-all ${
-                  formData.isMaster
-                    ? 'bg-rose-50 border-rose-300 text-rose-900'
-                    : 'bg-slate-50 border-slate-200 text-slate-700'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`h-9 w-9 rounded-xl flex items-center justify-center font-black ${
-                        formData.isMaster ? 'bg-rose-600 text-white' : 'bg-slate-200 text-slate-600'
-                      }`}
-                    >
-                      👑
-                    </div>
-                    <div>
-                      <div className="font-bold text-sm">Privilégio de Cadastro Mestre</div>
-                      <div className="text-xs opacity-80">
-                        O usuário Mestre tem autorização irrestrita para modificar qualquer registro, criar outros administradores e desbloquear funções críticas.
+              {/* Seletor de Nível de Acesso (Setor/Perfil) */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-700 uppercase">
+                  Selecione o Nível de Acesso Institucional *
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {(Object.keys(SECTOR_LABELS) as UserSector[]).map((sec) => {
+                    const info = SECTOR_LABELS[sec];
+                    const isSelected = formData.sector === sec;
+                    return (
+                      <div
+                        key={sec}
+                        onClick={() => handleSectorChangeInForm(sec)}
+                        className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+                          isSelected
+                            ? 'bg-indigo-50/70 border-indigo-600 ring-2 ring-indigo-500/30 shadow-xs'
+                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold border ${info.color}`}>
+                            {info.shortLabel}
+                          </span>
+                          {isSelected && <Check className="h-4 w-4 text-indigo-600" />}
+                        </div>
+                        <div className="text-[11px] text-slate-600 mt-2 line-clamp-2">
+                          {info.desc}
+                        </div>
                       </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Título Personalizado & Ativo/Inativo */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Título / Cargo Personalizado
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.sectorTitle}
+                    onChange={(e) => setFormData({ ...formData, sectorTitle: e.target.value })}
+                    placeholder="Ex: Diretor Geral de Ensino"
+                    className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200 mt-auto">
+                  <div>
+                    <div className="text-xs font-bold text-slate-800">Status da Conta</div>
+                    <div className="text-[11px] text-slate-500">
+                      {formData.active ? 'Conta habilitada para login' : 'Acesso suspenso / inativo'}
                     </div>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={formData.isMaster}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          isMaster: e.target.checked,
-                          sector: e.target.checked ? 'MASTER' : formData.sector,
-                        })
-                      }
+                      checked={formData.active}
+                      onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600"></div>
+                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
                   </label>
                 </div>
               </div>
 
-              {/* Granular Permissions Matrix */}
+              {/* Matriz de Permissões Granulares */}
               {!formData.isMaster && (
-                <div className="space-y-3">
+                <div className="space-y-3 pt-2">
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                         <Key className="h-4 w-4 text-indigo-600" />
-                        Matriz de Permissões Granulares por Módulo
+                        Permissões Granulares por Módulo
                       </h4>
                       <p className="text-xs text-slate-500">
-                        Defina o que este usuário pode Ler, Criar, Editar, Excluir ou Homologar em cada módulo do sistema
+                        Você pode refinar o que este usuário pode Ler, Criar, Editar, Excluir ou Homologar
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setFormData({ ...formData, permissions: getMasterPermissions() })}
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            permissions: getDefaultSectorPermissions(formData.sector),
+                          })
+                        }
                         className="px-2.5 py-1 text-xs font-bold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors"
                       >
-                        Marcar Tudo
+                        Padrão do Perfil
                       </button>
                       <button
                         type="button"
-                        onClick={() => setFormData({ ...formData, permissions: getEmptyPermissions() })}
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            permissions: getDefaultSectorPermissions('MASTER'),
+                          })
+                        }
                         className="px-2.5 py-1 text-xs font-bold rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
                       >
-                        Limpar Tudo
+                        Marcar Tudo
                       </button>
                     </div>
                   </div>
@@ -1134,7 +1465,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                   className="px-6 py-2.5 text-xs sm:text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer"
                 >
                   <Save className="h-4 w-4" />
-                  Salvar Usuário & Permissões
+                  Salvar Conta & Nível de Acesso
                 </button>
               </div>
             </form>

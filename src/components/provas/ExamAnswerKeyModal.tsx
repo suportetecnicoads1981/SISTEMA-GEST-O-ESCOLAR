@@ -436,12 +436,12 @@ export const ExamAnswerKeyModal: React.FC<ExamAnswerKeyModalProps> = ({
                                 Palavras-Chave Ponderadas para Correção Automática:
                               </span>
                               <div className="flex flex-wrap gap-1.5">
-                                {rq.question.essayKeywords.map((kw, kIdx) => (
+                                {rq.question.essayKeywords.map((kw: any, kIdx: number) => (
                                   <span
                                     key={kIdx}
                                     className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[11px] font-bold border border-indigo-200 print:border-black print:text-black"
                                   >
-                                    "{kw.keyword}" ({kw.points} pts) {kw.required && '• Obrigatória'}
+                                    "{typeof kw === 'string' ? kw : kw.keyword}" {typeof kw === 'object' && kw.points ? `(${kw.points} pts)` : ''} {typeof kw === 'object' && kw.required ? '• Obrigatória' : ''}
                                   </span>
                                 ))}
                               </div>

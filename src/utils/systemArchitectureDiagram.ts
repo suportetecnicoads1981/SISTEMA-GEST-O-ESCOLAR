@@ -1637,6 +1637,14 @@ export function downloadArchitectureDiagramMarkdown(version?: string) {
   downloadFile('ARQUITETURA_MODULOS_SUCESSOEDU.md', md, 'text/markdown;charset=utf-8');
 }
 
+export {
+  generateArchitectureDiagramWordDoc,
+  downloadArchitectureDiagramWord,
+  copyArchitectureDiagramFormattedForWord,
+  MODULES_ROADMAP_AND_FIXES,
+} from './architectureWordGenerator';
+export type { ModuleRoadmapItem, ModuleFixChecklistItem } from './architectureWordGenerator';
+
 /**
  * Envia o Diagrama de Módulos gerado para a Nuvem / Google Drive Oficial (suportetecnicoads@gmail.com).
  */

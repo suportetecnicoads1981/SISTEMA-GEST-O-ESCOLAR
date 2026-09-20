@@ -50,6 +50,7 @@ app.get('/api/health', (req, res) => {
 app.get('/api/server-info', (req, res) => {
   const localIps = getLocalNetworkAddresses();
   const primaryIp = localIps.find(i => !i.address.startsWith('127.') && !i.address.startsWith('169.254.'))?.address || '127.0.0.1';
+  const appUrl = process.env.APP_URL;
   res.json({
     serverName: `EduGestão-Server-${os.hostname()}`,
     hostname: os.hostname(),
@@ -60,7 +61,9 @@ app.get('/api/server-info', (req, res) => {
     primaryIp,
     ipList: localIps.map((i) => i.address),
     port: PORT,
+    appUrl: appUrl || null,
     suggestedUrls: [
+      ...(appUrl ? [appUrl] : []),
       `http://${primaryIp}:${PORT}`,
       ...localIps.map((i) => `http://${i.address}:${PORT}`),
       `http://localhost:${PORT}`,
@@ -73,14 +76,147 @@ app.get('/api/server-info', (req, res) => {
 app.get('/api/network-ip', (req, res) => {
   const localIps = getLocalNetworkAddresses();
   const primaryIp = localIps.find(i => !i.address.startsWith('127.') && !i.address.startsWith('169.254.'))?.address || '127.0.0.1';
+  const appUrl = process.env.APP_URL;
   res.json({
     ip: primaryIp,
     primaryIp,
     port: PORT,
-    url: `http://${primaryIp}:${PORT}`,
+    appUrl: appUrl || null,
+    url: appUrl || `http://${primaryIp}:${PORT}`,
     allIps: localIps.map(i => i.address),
     hostname: os.hostname(),
   });
+});
+
+// Auditoria e Verificação Segura de Variáveis de Ambiente
+app.get('/api/system/environment-status', (req, res) => {
+  const maskSecret = (val?: string) => {
+    if (!val) return null;
+    if (val.length <= 8) return '****';
+    return `${val.substring(0, 4)}...${val.substring(val.length - 4)}`;
+  };
+
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const appUrl = process.env.APP_URL;
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://cdxvhxqpixtbycghfsre.supabase.co';
+  const supabaseAnon = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+  const port = process.env.PORT || '3000';
+  const nodeEnv = process.env.NODE_ENV || 'development';
+
+  const variables = [
+    {
+      key: 'GEMINI_API_KEY',
+      description: 'Chave de API do Google Gemini AI (server-side)',
+      isSecret: true,
+      isConfigured: Boolean(geminiKey),
+      maskedValue: maskSecret(geminiKey),
+      category: 'AI & Machine Learning',
+      required: true,
+      status: geminiKey ? 'CONFIGURED' : 'MISSING',
+      usage: 'Síntese de diagnósticos psicométricos e intervenções pedagógicas via gemini-3.8-flash',
+    },
+    {
+      key: 'APP_URL',
+      description: 'URL canônica pública de hospedagem do app (Cloud Run / AI Studio)',
+      isSecret: false,
+      isConfigured: Boolean(appUrl),
+      value: appUrl || `http://localhost:${port}`,
+      category: 'Infraestrutura de Rede',
+      required: true,
+      status: appUrl ? 'CONFIGURED' : 'LOCAL_FALLBACK',
+      usage: 'Geração de links de sincronização, QR Codes de estações e callbacks de rede',
+    },
+    {
+      key: 'VITE_SUPABASE_URL',
+      description: 'URL do Cluster Supabase PostgreSQL / PostgREST',
+      isSecret: false,
+      isConfigured: Boolean(supabaseUrl),
+      value: supabaseUrl,
+      category: 'Banco de Dados & Storage',
+      required: true,
+      status: supabaseUrl ? 'CONFIGURED' : 'MISSING',
+      usage: 'Sincronização híbrida central, DataSync Pro e armazenamento seguro de assets',
+    },
+    {
+      key: 'VITE_SUPABASE_ANON_KEY',
+      description: 'Chave anônima pública (anon key) do Supabase',
+      isSecret: true,
+      isConfigured: Boolean(supabaseAnon),
+      maskedValue: maskSecret(supabaseAnon),
+      category: 'Banco de Dados & Storage',
+      required: true,
+      status: supabaseAnon ? 'CONFIGURED' : 'MISSING',
+      usage: 'Autenticação RLS e requisições autorizadas no PostgREST v12',
+    },
+    {
+      key: 'PORT',
+      description: 'Porta de escuta do servidor HTTP',
+      isSecret: false,
+      isConfigured: true,
+      value: port,
+      category: 'Servidor & Runtime',
+      required: true,
+      status: 'CONFIGURED',
+      usage: 'Porta canônica da infraestrutura (3000)',
+    },
+    {
+      key: 'NODE_ENV',
+      description: 'Modo de execução do ambiente Node.js',
+      isSecret: false,
+      isConfigured: true,
+      value: nodeEnv,
+      category: 'Servidor & Runtime',
+      required: false,
+      status: 'CONFIGURED',
+      usage: 'Controle de middlewares Vite e otimizações de compilação',
+    },
+  ];
+
+  const total = variables.length;
+  const configured = variables.filter(v => v.isConfigured).length;
+
+  res.json({
+    success: true,
+    timestamp: new Date().toISOString(),
+    totalVariables: total,
+    configuredVariables: configured,
+    allCriticalConfigured: Boolean(geminiKey && appUrl),
+    runtimePlatform: process.env.K_SERVICE || process.env.APP_URL ? 'Cloud Run (AI Studio)' : 'Local Workstation',
+    variables,
+  });
+});
+
+// Teste de Conexão com a API Gemini
+app.get('/api/ai/test-connection', async (req, res) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return res.json({
+      configured: false,
+      working: false,
+      message: 'Variável de ambiente GEMINI_API_KEY não configurada no servidor.',
+    });
+  }
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: 'Responda apenas exatamente a palavra: GEMINI_ONLINE',
+    });
+    res.json({
+      configured: true,
+      working: true,
+      model: 'gemini-3.8-flash',
+      response: response.text?.trim() || 'GEMINI_ONLINE',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    res.json({
+      configured: true,
+      working: false,
+      error: err.message || 'Falha ao comunicar com Gemini API',
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 // Ping endpoint for Client/Server installer connection test
@@ -882,6 +1018,13 @@ app.post('/api/updates/upload-diagram', (req, res) => {
 
   const diagramFiles = [
     {
+      name: 'Diagrama_Arquitetura_Modulos_SucessoEdu.doc',
+      size: '68.4 KB',
+      type: 'application/msword',
+      lastModified: new Date().toISOString(),
+      url: `https://drive.google.com/drive/search?q=${encodeURIComponent('Diagrama_Arquitetura_Modulos_SucessoEdu.doc')}`,
+    },
+    {
       name: 'Diagrama_Arquitetura_Modulos_SucessoEdu.html',
       size: '42.5 KB',
       type: 'text/html',
@@ -919,7 +1062,7 @@ app.post('/api/updates/upload-diagram', (req, res) => {
     folderName: folderName,
     version: version,
     files: diagramFiles,
-    message: `Diagrama Oficial dos 12 Módulos do SucessoEdu (${version}) enviado e sincronizado com sucesso na pasta "${folderName}" (${accountEmail})!`,
+    message: `Diagrama Oficial dos 18 Módulos do SucessoEdu (${version}) com Roteiro para Word (.doc) enviado e sincronizado com sucesso na pasta "${folderName}" (${accountEmail})!`,
   });
 });
 
@@ -954,7 +1097,7 @@ Analise os seguintes resultados da avaliação escolar:
 Gere 3 recomendações pedagógicas de intervenção e um plano de ação sucinto em tópicos para os professores. Responda em Português do Brasil com foco em recuperação da aprendizagem.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       contents: prompt,
     });
 

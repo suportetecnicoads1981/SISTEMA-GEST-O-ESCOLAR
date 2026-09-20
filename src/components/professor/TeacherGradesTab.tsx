@@ -372,7 +372,16 @@ export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
           <tbody>
             ${classStudents
               .map((st, idx) => {
-                const g = localGrades[st.id] || { termAverage: 0, status: 'EM_ANDAMENTO' };
+                const g: any = localGrades[st.id] || {
+                  assessment1: null,
+                  assessment2: null,
+                  activitiesScore: null,
+                  examScore: null,
+                  recoveryScore: null,
+                  termAverage: 0,
+                  status: 'EM_ANDAMENTO',
+                  descriptiveFeedback: '',
+                };
                 let statusClass = 'aprovado';
                 let statusLabel = 'APROVADO';
                 if (g.status === 'RECUPERACAO') {

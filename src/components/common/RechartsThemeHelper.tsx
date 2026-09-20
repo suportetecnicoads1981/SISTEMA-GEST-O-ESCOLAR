@@ -3,7 +3,7 @@ import { Target, TrendingUp, TrendingDown, Eye, EyeOff, Info } from 'lucide-reac
 
 export interface InteractiveTooltipProps {
   active?: boolean;
-  payload?: any[];
+  payload?: readonly any[] | any[];
   label?: string;
   unit?: string;
   valueLabel?: string;
@@ -143,7 +143,7 @@ export const InteractiveChartTooltip: React.FC<InteractiveTooltipProps> = ({
 };
 
 export interface DynamicLegendProps {
-  payload?: any[];
+  payload?: readonly any[] | any[];
   hiddenKeys?: string[];
   onToggleKey?: (dataKey: string) => void;
   className?: string;

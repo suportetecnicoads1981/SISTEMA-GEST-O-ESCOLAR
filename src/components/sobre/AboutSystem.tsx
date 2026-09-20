@@ -33,6 +33,8 @@ import {
   Image as ImageIcon,
   Upload,
   Trash2,
+  School,
+  Building2,
 } from 'lucide-react';
 import { SchoolSettings, DeveloperContact } from '../../types';
 
@@ -58,22 +60,41 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<DeveloperContact>({ ...developerContact });
   const [savedSuccess, setSavedSuccess] = useState(false);
-  const [logoPreview, setLogoPreview] = useState<string>(settings.logoUrl || '');
+  const [schoolLogoPreview, setSchoolLogoPreview] = useState<string>(settings.logoUrl || '');
+  const [managementLogoPreview, setManagementLogoPreview] = useState<string>(settings.managementLogoUrl || '');
   const [logoSuccessMsg, setLogoSuccessMsg] = useState(false);
-  const logoInputRef = useRef<HTMLInputElement>(null);
+  const schoolLogoInputRef = useRef<HTMLInputElement>(null);
+  const managementLogoInputRef = useRef<HTMLInputElement>(null);
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: 'logoUrl' | 'managementLogoUrl'
+  ) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 3.5 * 1024 * 1024) {
+        alert('O arquivo selecionado é maior que 3.5MB. Por favor, utilize uma imagem mais leve.');
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (evt) => {
         const base64 = evt.target?.result as string;
-        setLogoPreview(base64);
-        if (onUpdateSettings) {
-          onUpdateSettings({
-            ...settings,
-            logoUrl: base64,
-          });
+        if (field === 'logoUrl') {
+          setSchoolLogoPreview(base64);
+          if (onUpdateSettings) {
+            onUpdateSettings({
+              ...settings,
+              logoUrl: base64,
+            });
+          }
+        } else {
+          setManagementLogoPreview(base64);
+          if (onUpdateSettings) {
+            onUpdateSettings({
+              ...settings,
+              managementLogoUrl: base64,
+            });
+          }
         }
         setLogoSuccessMsg(true);
         setTimeout(() => setLogoSuccessMsg(false), 3500);
@@ -82,13 +103,23 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
     }
   };
 
-  const handleRemoveLogo = () => {
-    setLogoPreview('');
-    if (onUpdateSettings) {
-      onUpdateSettings({
-        ...settings,
-        logoUrl: '',
-      });
+  const handleRemoveLogo = (field: 'logoUrl' | 'managementLogoUrl') => {
+    if (field === 'logoUrl') {
+      setSchoolLogoPreview('');
+      if (onUpdateSettings) {
+        onUpdateSettings({
+          ...settings,
+          logoUrl: '',
+        });
+      }
+    } else {
+      setManagementLogoPreview('');
+      if (onUpdateSettings) {
+        onUpdateSettings({
+          ...settings,
+          managementLogoUrl: '',
+        });
+      }
     }
   };
 
@@ -181,8 +212,8 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
         </div>
       )}
 
-      {/* Logomarca da Empresa / Rede de Ensino */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-5">
+      {/* Identidade Visual & Logomarcas Oficiais */}
+      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
@@ -190,61 +221,117 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
             </div>
             <div>
               <h2 className="text-lg sm:text-xl font-black text-slate-900">
-                Logomarca Oficial da Empresa / Secretaria de Educação
+                Identidade Visual & Logomarcas Oficiais
               </h2>
               <p className="text-xs text-slate-500">
-                Personalize a identidade visual exibida na tela de login, cabeçalho e documentos oficiais com fé pública.
+                Personalize os logotipos da escola e da gestão/mantenedora para aplicação no cabeçalho, tela de login e documentos oficiais com fé pública.
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center gap-6 p-4 rounded-2xl bg-slate-50 border border-slate-200">
-          <div className="h-24 w-24 rounded-2xl bg-white border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden shadow-inner shrink-0 p-2">
-            {logoPreview ? (
-              <img
-                src={logoPreview}
-                alt="Logomarca da Instituição"
-                className="h-full w-full object-contain"
-              />
-            ) : (
-              <div className="text-center text-slate-400 text-[10px]">
-                <ImageIcon className="h-6 w-6 mx-auto mb-1 opacity-50" />
-                Sem Logo
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Logo Oficial da Unidade Escolar */}
+          <div className="flex flex-col sm:flex-row items-center gap-4 p-5 rounded-2xl bg-slate-50 border border-slate-200">
+            <div className="h-24 w-24 rounded-2xl bg-white border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden shadow-inner shrink-0 p-2">
+              {schoolLogoPreview ? (
+                <img
+                  src={schoolLogoPreview}
+                  alt="Logo Escola"
+                  className="h-full w-full object-contain"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="text-center text-slate-400 text-[10px]">
+                  <School className="h-7 w-7 mx-auto mb-1 opacity-50 text-slate-400" />
+                  Sem Logo
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2 flex-1 text-center sm:text-left">
+              <div className="text-xs font-bold text-slate-900">
+                1. Logo / Brasão da Escola
               </div>
-            )}
+              <p className="text-[11px] text-slate-500">
+                Logotipo institucional próprio da unidade escolar.
+              </p>
+              <div className="flex items-center gap-2 pt-1 justify-center sm:justify-start flex-wrap">
+                <label className="py-1.5 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 cursor-pointer transition-all">
+                  <Upload className="h-3.5 w-3.5" />
+                  <span>{schoolLogoPreview ? 'Trocar Logo Escola' : 'Enviar Logo Escola'}</span>
+                  <input
+                    ref={schoolLogoInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileUpload(e, 'logoUrl')}
+                    className="hidden"
+                  />
+                </label>
+                {schoolLogoPreview && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveLogo('logoUrl')}
+                    className="py-1.5 px-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 flex items-center gap-1 transition-all cursor-pointer"
+                    title="Remover Logo da Escola"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Remover</span>
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-2 flex-1 text-center sm:text-left">
-            <div className="text-xs font-bold text-slate-800">
-              {logoPreview ? 'Logomarca Personalizada Carregada' : 'Nenhuma logomarca customizada enviada'}
-            </div>
-            <p className="text-xs text-slate-500 max-w-md">
-              Envie arquivos nos formatos <strong>PNG, JPG, SVG ou WEBP</strong> (fundo transparente recomendado, resolução mínima de 300x300px).
-            </p>
-            <div className="flex items-center gap-2 pt-1 justify-center sm:justify-start">
-              <label className="py-2 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 cursor-pointer transition-all">
-                <Upload className="h-3.5 w-3.5" />
-                <span>{logoPreview ? 'Substituir Logomarca' : 'Carregar Nova Logomarca'}</span>
-                <input
-                  ref={logoInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoUpload}
-                  className="hidden"
+          {/* Logo da Gestão / Mantenedora / SEMED */}
+          <div className="flex flex-col sm:flex-row items-center gap-4 p-5 rounded-2xl bg-slate-50 border border-slate-200">
+            <div className="h-24 w-24 rounded-2xl bg-white border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden shadow-inner shrink-0 p-2">
+              {managementLogoPreview ? (
+                <img
+                  src={managementLogoPreview}
+                  alt="Logo Gestão"
+                  className="h-full w-full object-contain"
+                  referrerPolicy="no-referrer"
                 />
-              </label>
-              {logoPreview && (
-                <button
-                  type="button"
-                  onClick={handleRemoveLogo}
-                  className="py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 flex items-center gap-1 transition-all cursor-pointer"
-                  title="Remover Logomarca"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span>Remover</span>
-                </button>
+              ) : (
+                <div className="text-center text-slate-400 text-[10px]">
+                  <Building2 className="h-7 w-7 mx-auto mb-1 opacity-50 text-slate-400" />
+                  Sem Logo
+                </div>
               )}
+            </div>
+
+            <div className="space-y-2 flex-1 text-center sm:text-left">
+              <div className="text-xs font-bold text-slate-900">
+                2. Logo da Gestão / Mantenedora / SEMED
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Brasão municipal, prefeitura ou mantenedora.
+              </p>
+              <div className="flex items-center gap-2 pt-1 justify-center sm:justify-start flex-wrap">
+                <label className="py-1.5 px-3.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 cursor-pointer transition-all">
+                  <Upload className="h-3.5 w-3.5" />
+                  <span>{managementLogoPreview ? 'Trocar Logo Gestão' : 'Enviar Logo Gestão'}</span>
+                  <input
+                    ref={managementLogoInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileUpload(e, 'managementLogoUrl')}
+                    className="hidden"
+                  />
+                </label>
+                {managementLogoPreview && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveLogo('managementLogoUrl')}
+                    className="py-1.5 px-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 flex items-center gap-1 transition-all cursor-pointer"
+                    title="Remover Logo da Gestão"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Remover</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

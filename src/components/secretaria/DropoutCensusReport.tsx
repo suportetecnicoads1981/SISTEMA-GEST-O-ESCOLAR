@@ -387,15 +387,15 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
         data: [
           {
             name: 'Masculino',
-            value: droppedOutStudents.filter((s) => s.gender === 'MASCULINO').length,
+            value: droppedOutStudents.filter((s) => s.gender === 'M' || (s.gender as any) === 'MASCULINO').length,
           },
           {
             name: 'Feminino',
-            value: droppedOutStudents.filter((s) => s.gender === 'FEMININO').length,
+            value: droppedOutStudents.filter((s) => s.gender === 'F' || (s.gender as any) === 'FEMININO').length,
           },
           {
             name: 'Outro / Não Declarado',
-            value: droppedOutStudents.filter((s) => s.gender === 'OUTRO').length,
+            value: droppedOutStudents.filter((s) => s.gender === 'OTHER' || (s.gender as any) === 'OUTRO').length,
           },
         ],
         valueLabel: 'Total Evadidos',
@@ -852,15 +852,15 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
                   data={[
                     {
                       name: 'Masculino',
-                      value: droppedOutStudents.filter((s) => s.gender === 'MASCULINO').length,
+                      value: droppedOutStudents.filter((s) => s.gender === 'M' || (s.gender as any) === 'MASCULINO').length,
                     },
                     {
                       name: 'Feminino',
-                      value: droppedOutStudents.filter((s) => s.gender === 'FEMININO').length,
+                      value: droppedOutStudents.filter((s) => s.gender === 'F' || (s.gender as any) === 'FEMININO').length,
                     },
                     {
                       name: 'Outro / Não Declarado',
-                      value: droppedOutStudents.filter((s) => s.gender === 'OUTRO').length,
+                      value: droppedOutStudents.filter((s) => s.gender === 'OTHER' || (s.gender as any) === 'OUTRO').length,
                     },
                   ]}
                   valueLabel="Total Evadidos"

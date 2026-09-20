@@ -39,6 +39,11 @@ import {
   ImportFilterOptions,
   FileImportResult,
   ParsedImportStudent,
+  loadSampleRuthPereiraBarbaresco,
+  loadSampleErminioBrito8Col,
+  downloadSpreadsheetTemplate,
+  downloadWordTemplate,
+  downloadWriterTemplate,
 } from '../../services/dataImportService';
 import { StudentQuickEditModal } from './StudentQuickEditModal';
 
@@ -84,6 +89,13 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
     incomplete: 0,
   });
   const [isDraggingOver, setIsDraggingOver] = useState<boolean>(false);
+
+  // Filtros Facilitadores da Pré-visualização (Quais alunos importar)
+  const [filterSpecial, setFilterSpecial] = useState<'ALL' | 'ONLY_PCD_TEA' | 'ONLY_TEA' | 'ONLY_REPORT' | 'REGULAR_ONLY'>('ALL');
+  const [filterGender, setFilterGender] = useState<'ALL' | 'F' | 'M'>('ALL');
+  const [filterRace, setFilterRace] = useState<string>('ALL');
+  const [filterCadastral, setFilterCadastral] = useState<'ALL' | 'OK' | 'INCOMPLETE'>('ALL');
+  const [filterSearch, setFilterSearch] = useState<string>('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -207,6 +219,58 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
     setFileResults([sampleResult]);
     setActiveFileIndex(0);
     setIsProcessing(false);
+  };
+
+  // Carregar dados oficiais de exemplo da EMEI Professora Ruth Pereira Barbaresco (Pré-Escola I A)
+  const handleLoadSampleRuthPereira = () => {
+    setIsProcessing(true);
+    setImportSuccess(false);
+    const sampleRuth = loadSampleRuthPereiraBarbaresco(filters, classes, schoolUnits);
+    setFileResults([sampleRuth]);
+    setActiveFileIndex(0);
+    setIsProcessing(false);
+  };
+
+  // Carregar dados de 8 colunas da EMIEIF Ermínio Brito (Pré II – 1º ao 5º - 6º ao 9º Anos)
+  const handleLoadSampleErminioBrito = () => {
+    setIsProcessing(true);
+    setImportSuccess(false);
+    const sampleErminio = loadSampleErminioBrito8Col(filters, classes, schoolUnits);
+    setFileResults([sampleErminio]);
+    setActiveFileIndex(0);
+    setIsProcessing(false);
+  };
+
+  // Alterna a seleção de um aluno específico para importação
+  const handleToggleStudentSelection = (tempId: string) => {
+    setFileResults((prev) =>
+      prev.map((file, fIdx) => {
+        if (fIdx !== activeFileIndex) return file;
+        return {
+          ...file,
+          students: file.students.map((s) =>
+            s.tempId === tempId ? { ...s, selectedForImport: s.selectedForImport === false ? true : false } : s
+          ),
+        };
+      })
+    );
+  };
+
+  // Seleciona ou desmarca todos os alunos atualmente visíveis pelo filtro
+  const handleSelectAllVisible = (select: boolean, visibleIds?: string[]) => {
+    const idSet = visibleIds ? new Set(visibleIds) : null;
+    setFileResults((prev) =>
+      prev.map((file, fIdx) => {
+        if (fIdx !== activeFileIndex) return file;
+        return {
+          ...file,
+          students: file.students.map((s) => {
+            if (idSet && !idSet.has(s.tempId)) return s;
+            return { ...s, selectedForImport: select };
+          }),
+        };
+      })
+    );
   };
 
   // Atualiza os filtros e sincroniza dinamicamente com os alunos e arquivos já carregados no preview
@@ -364,6 +428,55 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
   };
 
   const activeResult = fileResults[activeFileIndex];
+
+  // Filtro facilitador para a pré-visualização de alunos do arquivo ativo
+  const visibleActiveStudents = (activeResult?.students || []).filter((s) => {
+    // Busca por texto (Nome, Endereço ou Condição)
+    if (filterSearch.trim()) {
+      const q = filterSearch.toLowerCase();
+      const matchName = s.name.toLowerCase().includes(q);
+      const matchAddr = s.address?.toLowerCase().includes(q);
+      const matchPcd = s.medicalClassification?.toLowerCase().includes(q);
+      const matchReport = s.medicalReportText?.toLowerCase().includes(q);
+      if (!matchName && !matchAddr && !matchPcd && !matchReport) return false;
+    }
+
+    // Filtro de Inclusão / PCD / TEA / Laudo
+    if (filterSpecial === 'ONLY_PCD_TEA') {
+      const isPcdOrTea = s.isPcd || s.isTea || s.medicalClassification?.toLowerCase().includes('pcd') || s.name.toUpperCase().includes('PCD');
+      if (!isPcdOrTea) return false;
+    }
+    if (filterSpecial === 'ONLY_TEA') {
+      const isTea = s.isTea || s.medicalClassification?.toLowerCase().includes('tea') || s.specialConditions?.some(c => c.toLowerCase().includes('tea') || c.toLowerCase().includes('autis'));
+      if (!isTea) return false;
+    }
+    if (filterSpecial === 'ONLY_REPORT') {
+      if (!s.hasMedicalReport) return false;
+    }
+    if (filterSpecial === 'REGULAR_ONLY') {
+      const isPcdOrTea = s.isPcd || s.isTea || s.medicalClassification?.toLowerCase().includes('pcd') || s.name.toUpperCase().includes('PCD');
+      if (isPcdOrTea) return false;
+    }
+
+    // Filtro de Sexo
+    if (filterGender !== 'ALL' && s.gender !== filterGender) {
+      return false;
+    }
+
+    // Filtro de Raça/Cor
+    if (filterRace !== 'ALL' && s.raceColor !== filterRace) {
+      return false;
+    }
+
+    // Filtro de Regularidade Cadastral
+    if (filterCadastral === 'OK' && s.cadastralStatus !== 'OK') return false;
+    if (filterCadastral === 'INCOMPLETE' && s.cadastralStatus === 'OK') return false;
+
+    return true;
+  });
+
+  const selectedCountInActiveFile = (activeResult?.students || []).filter((s) => s.selectedForImport !== false).length;
+  const totalSelectedAcrossFiles = allParsedStudents.filter((s) => s.selectedForImport !== false).length;
 
   // Filtro de alunos na tela pós-importação
   const filteredImportedStudents = importedOfficialStudents.filter((s) => {
@@ -828,7 +941,7 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                     ref={fileInputRef}
                     type="file"
                     multiple
-                    accept=".xlsx,.xls,.csv,.txt,.tsv,.json,.xml,.ods,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/plain,application/json,text/xml"
+                    accept=".xlsx,.xls,.ods,.docx,.odt,.csv,.txt,.tsv,.json,.xml,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.oasis.opendocument.text,application/vnd.oasis.opendocument.spreadsheet,text/csv,text/plain,application/json,text/xml"
                     onChange={(e) => handleFilesSelect(e.target.files)}
                     onClick={(e) => {
                       (e.target as HTMLInputElement).value = '';
@@ -842,10 +955,10 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                     </div>
                     <div className="text-left">
                       <p className="text-sm font-bold text-slate-900">
-                        {isDraggingOver ? 'Solte os arquivos aqui para importar' : 'Importação Direta de Planilhas e Arquivos'}
+                        {isDraggingOver ? 'Solte os arquivos aqui para importar' : 'Importação de Planilhas & Documentos Oficiais'}
                       </p>
                       <p className="text-xs text-slate-500">
-                        Arraste para cá ou clique no botão abaixo para escolher do seu computador
+                        Arraste para cá ou selecione arquivos do Microsoft Office (.xlsx, .docx) ou LibreOffice (.ods, .odt)
                       </p>
                     </div>
                   </div>
@@ -862,23 +975,30 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                     </button>
                   </div>
 
-                  {/* Badges de Formatos Aceitos */}
+                  {/* Badges de Formatos Aceitos com Destaque para LibreOffice e Microsoft Office */}
                   <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
-                    <span className="text-[10px] text-slate-400 font-semibold mr-1">Formatos aceitos:</span>
-                    {['.XLSX', '.XLS', '.CSV', '.ODS', '.JSON', '.XML', '.TXT', '.TSV'].map((fmt) => (
-                      <span
-                        key={fmt}
-                        className="px-1.5 py-0.5 bg-white border border-indigo-100 text-indigo-700 font-mono text-[10px] font-bold rounded-md shadow-2xs"
-                      >
-                        {fmt}
-                      </span>
-                    ))}
+                    <span className="text-[10px] text-slate-500 font-bold mr-1">Compatível com:</span>
+                    <span className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-800 font-mono text-[10px] font-bold rounded-md">
+                      MS Excel (.xlsx)
+                    </span>
+                    <span className="px-2 py-0.5 bg-blue-50 border border-blue-200 text-blue-800 font-mono text-[10px] font-bold rounded-md">
+                      MS Word (.docx)
+                    </span>
+                    <span className="px-2 py-0.5 bg-teal-50 border border-teal-200 text-teal-800 font-mono text-[10px] font-bold rounded-md">
+                      LibreOffice Calc (.ods)
+                    </span>
+                    <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-800 font-mono text-[10px] font-bold rounded-md">
+                      LibreOffice Writer (.odt)
+                    </span>
+                    <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 font-mono text-[10px] font-bold rounded-md">
+                      CSV / TSV / XML
+                    </span>
                   </div>
 
                   {isProcessing && (
                     <div className="absolute inset-0 bg-white/80 backdrop-blur-xs rounded-2xl flex items-center justify-center gap-2 text-xs font-bold text-indigo-700">
                       <RefreshCw className="h-4 w-4 animate-spin text-indigo-600" />
-                      <span>Processando planilha e identificando alunos...</span>
+                      <span>Processando arquivo e identificando dados dos alunos...</span>
                     </div>
                   )}
                 </div>
@@ -888,29 +1008,87 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                   <div>
                     <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                       <Sparkles className="h-4 w-4 text-amber-500" />
-                      Planilha Modelo & Demonstração
+                      Exemplos Prontos & Modelos para Download
                     </span>
                     <p className="text-[11px] text-slate-500 mt-1">
-                      Layout oficial com cabeçalho de Escola, Turma e Perfil de Alunos por Turma.
+                      Carregue dados de teste com alunos PCD / TEA ou baixe os modelos padrão editáveis.
                     </p>
                   </div>
 
                   <div className="space-y-2">
                     <button
-                      onClick={handleLoadSampleMariaDaPraia}
-                      className="w-full py-2 px-3 bg-white hover:bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                      type="button"
+                      onClick={handleLoadSampleErminioBrito}
+                      className="w-full py-2 px-3 bg-gradient-to-r from-emerald-50 via-teal-50 to-indigo-50 hover:from-emerald-100 hover:to-indigo-100 border border-emerald-300 text-emerald-950 font-bold text-xs rounded-xl transition-all flex items-center justify-between gap-2 cursor-pointer shadow-2xs text-left"
+                      title="Exemplo com cabeçalho oficial de 8 colunas do município: Série, Nome, Nasc, Sexo, Raça, Endereço, PCD, Laudo"
                     >
-                      <Layers className="h-3.5 w-3.5 text-indigo-600" />
-                      <span>Carregar Exemplo Maria da Praia</span>
+                      <div className="flex items-center gap-2 truncate">
+                        <Sparkles className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                        <span className="truncate">Exemplo 8 Colunas: EMIEIF Ermínio Brito</span>
+                      </div>
+                      <span className="text-[10px] font-extrabold px-1.5 py-0.5 bg-emerald-200/80 text-emerald-900 rounded shrink-0">
+                        8 Colunas
+                      </span>
                     </button>
 
                     <button
-                      onClick={generateOfficialTemplateXlsx}
-                      className="w-full py-2 px-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      type="button"
+                      onClick={handleLoadSampleRuthPereira}
+                      className="w-full py-2 px-3 bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 border border-indigo-200 text-indigo-900 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs text-left"
+                      title="Exemplo com cabeçalho oficial do município, alunos PCD, TEA e laudo"
                     >
-                      <Download className="h-3.5 w-3.5" />
-                      <span>Baixar Modelo Oficial (.XLSX)</span>
+                      <Sparkles className="h-3.5 w-3.5 text-purple-600 shrink-0" />
+                      <span className="truncate">Exemplo Municipal: EMEI Ruth Pereira (Pré I A)</span>
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={handleLoadSampleMariaDaPraia}
+                      className="w-full py-1.5 px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Layers className="h-3.5 w-3.5 text-slate-500" />
+                      <span>Exemplo Escola Maria da Praia</span>
+                    </button>
+
+                    <div className="pt-1">
+                      <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Baixar Modelos Prontos:
+                      </span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          onClick={() => downloadSpreadsheetTemplate('xlsx')}
+                          className="py-1 px-2 bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-800 font-bold text-[10px] rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
+                          title="Modelo para Microsoft Excel"
+                        >
+                          <Download className="h-3 w-3" />
+                          <span>Excel (.xlsx)</span>
+                        </button>
+                        <button
+                          onClick={() => downloadSpreadsheetTemplate('ods')}
+                          className="py-1 px-2 bg-white hover:bg-teal-50 border border-teal-300 text-teal-800 font-bold text-[10px] rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
+                          title="Modelo para LibreOffice Calc"
+                        >
+                          <Download className="h-3 w-3" />
+                          <span>Calc (.ods)</span>
+                        </button>
+                        <button
+                          onClick={downloadWordTemplate}
+                          className="py-1 px-2 bg-white hover:bg-blue-50 border border-blue-300 text-blue-800 font-bold text-[10px] rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
+                          title="Modelo para Microsoft Word com tabela formatada"
+                        >
+                          <Download className="h-3 w-3" />
+                          <span>Word (.docx)</span>
+                        </button>
+                        <button
+                          onClick={downloadWriterTemplate}
+                          className="py-1 px-2 bg-white hover:bg-indigo-50 border border-indigo-300 text-indigo-800 font-bold text-[10px] rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
+                          title="Modelo para LibreOffice Writer com tabela formatada"
+                        >
+                          <Download className="h-3 w-3" />
+                          <span>Writer (.odt)</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1065,12 +1243,41 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                       Filtros de Campos: Selecione as informações que deseja importar
                     </span>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleUpdateFilters((f) => ({
+                            ...f,
+                            importSeries: true,
+                            extractSeriesFromFirstColumn: true,
+                            importName: true,
+                            cleanPcdSuffixFromName: true,
+                            importBirthDate: true,
+                            importGender: true,
+                            importRaceColor: true,
+                            importAddress: true,
+                            importPcd: true,
+                            importTea: true,
+                            importMedicalReport: true,
+                            importMedicalClassification: true,
+                            importSchoolUnit: true,
+                            importShift: true,
+                          }))
+                        }
+                        className="text-[11px] font-bold px-2 py-0.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-md transition-all cursor-pointer flex items-center gap-1"
+                        title="Configura os filtros para o formato de 8 colunas padrão do município"
+                      >
+                        <CheckSquare className="h-3 w-3 text-emerald-700" />
+                        <span>Padrão 8 Colunas Municipal</span>
+                      </button>
+                      <span className="text-slate-300">|</span>
                       <button
                         onClick={() =>
                           handleUpdateFilters((f) => ({
                             ...f,
                             importName: true,
+                            cleanPcdSuffixFromName: true,
                             importBirthDate: true,
                             importGender: true,
                             importRaceColor: true,
@@ -1078,13 +1285,15 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                             importShift: true,
                             importSeries: true,
                             importMedicalClassification: true,
+                            importPcd: true,
+                            importTea: true,
                             importMedicalReport: true,
                             importSchoolUnit: true,
                           }))
                         }
-                        className="text-[11px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                        className="text-[11px] font-bold px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-md transition-all cursor-pointer"
                       >
-                        Marcar Todos (Censo Completo)
+                        Marcar Todos (Censo & AEE)
                       </button>
                       <span className="text-slate-300">|</span>
                       <button
@@ -1092,20 +1301,47 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                           handleUpdateFilters((f) => ({
                             ...f,
                             importName: true,
-                            importBirthDate: false,
+                            cleanPcdSuffixFromName: true,
+                            importBirthDate: true,
                             importGender: false,
                             importRaceColor: false,
                             importAddress: false,
                             importShift: false,
                             importSeries: true,
+                            importMedicalClassification: true,
+                            importPcd: true,
+                            importTea: true,
+                            importMedicalReport: true,
+                            importSchoolUnit: false,
+                          }))
+                        }
+                        className="text-[11px] font-bold px-2 py-0.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-md transition-all cursor-pointer"
+                      >
+                        Foco Inclusão & AEE (PCD/TEA/Laudo)
+                      </button>
+                      <span className="text-slate-300">|</span>
+                      <button
+                        onClick={() =>
+                          handleUpdateFilters((f) => ({
+                            ...f,
+                            importName: true,
+                            cleanPcdSuffixFromName: true,
+                            importBirthDate: true,
+                            importGender: false,
+                            importRaceColor: false,
+                            importAddress: false,
+                            importShift: true,
+                            importSeries: true,
                             importMedicalClassification: false,
+                            importPcd: false,
+                            importTea: false,
                             importMedicalReport: false,
                             importSchoolUnit: false,
                           }))
                         }
-                        className="text-[11px] font-bold text-slate-600 hover:underline cursor-pointer"
+                        className="text-[11px] font-bold px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md transition-all cursor-pointer"
                       >
-                        Apenas Nome + Série
+                        Matrícula Básica
                       </button>
                       <span className="text-slate-300">|</span>
                       <button
@@ -1113,6 +1349,7 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                           handleUpdateFilters((f) => ({
                             ...f,
                             importName: false,
+                            cleanPcdSuffixFromName: false,
                             importBirthDate: false,
                             importGender: false,
                             importRaceColor: false,
@@ -1120,6 +1357,8 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                             importShift: false,
                             importSeries: false,
                             importMedicalClassification: false,
+                            importPcd: false,
+                            importTea: false,
                             importMedicalReport: false,
                             importSchoolUnit: false,
                           }))
@@ -1131,7 +1370,7 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
                     {/* Nome Completo */}
                     <label
                       className={`flex items-center gap-2 p-2.5 border rounded-xl cursor-pointer text-xs font-semibold transition-all ${
@@ -1149,6 +1388,28 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                         className="rounded text-indigo-600 focus:ring-indigo-500"
                       />
                       <span>Nome Completo</span>
+                    </label>
+
+                    {/* Limpar Sufixo - PCD do Nome */}
+                    <label
+                      className={`flex items-center gap-2 p-2.5 border rounded-xl cursor-pointer text-xs font-semibold transition-all ${
+                        filters.cleanPcdSuffixFromName
+                          ? 'bg-amber-50/70 border-amber-300 text-amber-950 shadow-2xs ring-1 ring-amber-200'
+                          : 'bg-slate-100/70 border-slate-200 text-slate-400'
+                      }`}
+                      title="Remove a anotação '– PCD' do final do nome, mantendo o nome limpo e registrando PCD no campo próprio"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filters.cleanPcdSuffixFromName}
+                        onChange={(e) =>
+                          handleUpdateFilters((f) => ({ ...f, cleanPcdSuffixFromName: e.target.checked }))
+                        }
+                        className="rounded text-amber-600 focus:ring-amber-500"
+                      />
+                      <span className="text-[11px]">
+                        Limpar "- PCD" do Nome
+                      </span>
                     </label>
 
                     {/* Série / Etapa Cursada */}
@@ -1191,7 +1452,7 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                         }
                         className="rounded text-indigo-600 focus:ring-indigo-500"
                       />
-                      <span>Data de Nascimento</span>
+                      <span>Data Nascimento</span>
                     </label>
 
                     {/* Sexo / Gênero */}
@@ -1270,7 +1531,64 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                       <span>Turno Escolar</span>
                     </label>
 
-                    {/* Classificação Médica / PCD */}
+                    {/* Coluna PCD (Deficiência) */}
+                    <label
+                      className={`flex items-center gap-2 p-2.5 border rounded-xl cursor-pointer text-xs font-semibold transition-all ${
+                        filters.importPcd
+                          ? 'bg-purple-50 border-purple-300 text-purple-950 shadow-2xs ring-1 ring-purple-200'
+                          : 'bg-slate-100/70 border-slate-200 text-slate-400'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filters.importPcd}
+                        onChange={(e) =>
+                          handleUpdateFilters((f) => ({ ...f, importPcd: e.target.checked }))
+                        }
+                        className="rounded text-purple-600 focus:ring-purple-500"
+                      />
+                      <span className="font-bold text-purple-950">Coluna PCD</span>
+                    </label>
+
+                    {/* Coluna TEA (Autismo) */}
+                    <label
+                      className={`flex items-center gap-2 p-2.5 border rounded-xl cursor-pointer text-xs font-semibold transition-all ${
+                        filters.importTea
+                          ? 'bg-blue-50 border-blue-300 text-blue-950 shadow-2xs ring-1 ring-blue-200'
+                          : 'bg-slate-100/70 border-slate-200 text-slate-400'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filters.importTea}
+                        onChange={(e) =>
+                          handleUpdateFilters((f) => ({ ...f, importTea: e.target.checked }))
+                        }
+                        className="rounded text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="font-bold text-blue-950">Coluna TEA</span>
+                    </label>
+
+                    {/* Laudo Médico */}
+                    <label
+                      className={`flex items-center gap-2 p-2.5 border rounded-xl cursor-pointer text-xs font-semibold transition-all ${
+                        filters.importMedicalReport
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-950 shadow-2xs ring-1 ring-emerald-200'
+                          : 'bg-slate-100/70 border-slate-200 text-slate-400'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filters.importMedicalReport}
+                        onChange={(e) =>
+                          handleUpdateFilters((f) => ({ ...f, importMedicalReport: e.target.checked }))
+                        }
+                        className="rounded text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span className="font-bold text-emerald-950">Laudo (SIM/NÃO)</span>
+                    </label>
+
+                    {/* Classificação Médica Geral */}
                     <label
                       className={`flex items-center gap-2 p-2.5 border rounded-xl cursor-pointer text-xs font-semibold transition-all ${
                         filters.importMedicalClassification
@@ -1289,26 +1607,7 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                         }
                         className="rounded text-indigo-600 focus:ring-indigo-500"
                       />
-                      <span>PCD / Condição Médica</span>
-                    </label>
-
-                    {/* Laudo Médico */}
-                    <label
-                      className={`flex items-center gap-2 p-2.5 border rounded-xl cursor-pointer text-xs font-semibold transition-all ${
-                        filters.importMedicalReport
-                          ? 'bg-white border-indigo-300 text-indigo-950 shadow-2xs'
-                          : 'bg-slate-100/70 border-slate-200 text-slate-400'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={filters.importMedicalReport}
-                        onChange={(e) =>
-                          handleUpdateFilters((f) => ({ ...f, importMedicalReport: e.target.checked }))
-                        }
-                        className="rounded text-indigo-600 focus:ring-indigo-500"
-                      />
-                      <span>Laudo (SIM/NÃO)</span>
+                      <span>Condição Médica</span>
                     </label>
 
                     {/* Nome da Escola / Polo */}
@@ -1327,7 +1626,7 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                         }
                         className="rounded text-indigo-600 focus:ring-indigo-500"
                       />
-                      <span>Escola / Polo Origem</span>
+                      <span>Escola Origem</span>
                     </label>
 
                     {/* Cadastrar Unidade Escolar & Séries Atendidas */}
@@ -1346,8 +1645,8 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                         }
                         className="rounded text-indigo-600 focus:ring-indigo-500"
                       />
-                      <Building2 className="h-3.5 w-3.5 text-indigo-700" />
-                      <span>Cadastrar Unidade & Séries (Pendente)</span>
+                      <Building2 className="h-3.5 w-3.5 text-indigo-700 shrink-0" />
+                      <span>Cadastrar Unidade</span>
                     </label>
                   </div>
 
@@ -1503,11 +1802,134 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                         </div>
                       )}
 
-                      {/* Tabela de Pré-visualização com Coluna da Série */}
-                      <div className="border border-slate-200 rounded-xl overflow-x-auto max-h-64">
+                      {/* Barra de Filtros Facilitadores de Alunos (Quais alunos importar) */}
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                            <Filter className="h-3.5 w-3.5 text-indigo-600" />
+                            Filtros Facilitadores da Lista: Selecione quais alunos importar deste arquivo
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold text-indigo-900 bg-indigo-50 px-2.5 py-0.5 rounded-md border border-indigo-200">
+                              {selectedCountInActiveFile} de {activeResult.totalRows} selecionados
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleSelectAllVisible(
+                                  true,
+                                  visibleActiveStudents.map((s) => s.tempId)
+                                )
+                              }
+                              className="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-bold transition-all cursor-pointer"
+                            >
+                              Marcar Visíveis
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleSelectAllVisible(
+                                  false,
+                                  visibleActiveStudents.map((s) => s.tempId)
+                                )
+                              }
+                              className="px-2 py-0.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-[10px] font-bold transition-all cursor-pointer"
+                            >
+                              Desmarcar Visíveis
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2 pt-1">
+                          {/* Campo de Busca Rápida */}
+                          <div className="relative md:col-span-2">
+                            <Search className="h-3.5 w-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                            <input
+                              type="text"
+                              value={filterSearch}
+                              onChange={(e) => setFilterSearch(e.target.value)}
+                              placeholder="Buscar por nome, endereço ou condição..."
+                              className="w-full text-xs pl-8 pr-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-800 placeholder-slate-400 focus:ring-1 focus:ring-indigo-500"
+                            />
+                            {filterSearch && (
+                              <button
+                                onClick={() => setFilterSearch('')}
+                                className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 text-xs"
+                              >
+                                ×
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Filtro PCD / TEA / Laudo */}
+                          <div>
+                            <select
+                              value={filterSpecial}
+                              onChange={(e) => setFilterSpecial(e.target.value as any)}
+                              className="w-full text-xs py-1.5 px-2 bg-white border border-slate-300 rounded-lg text-slate-800 font-semibold focus:ring-1 focus:ring-indigo-500"
+                            >
+                              <option value="ALL">Inclusão: Todos</option>
+                              <option value="ONLY_PCD_TEA">Apenas PCD / TEA</option>
+                              <option value="ONLY_TEA">Apenas TEA (Autismo)</option>
+                              <option value="ONLY_REPORT">Apenas com Laudo Médico</option>
+                              <option value="REGULAR_ONLY">Apenas Sem PCD (Regulares)</option>
+                            </select>
+                          </div>
+
+                          {/* Filtro Sexo */}
+                          <div>
+                            <select
+                              value={filterGender}
+                              onChange={(e) => setFilterGender(e.target.value as any)}
+                              className="w-full text-xs py-1.5 px-2 bg-white border border-slate-300 rounded-lg text-slate-800 font-semibold focus:ring-1 focus:ring-indigo-500"
+                            >
+                              <option value="ALL">Sexo: Todos</option>
+                              <option value="M">Apenas Masculino (M)</option>
+                              <option value="F">Apenas Feminino (F)</option>
+                            </select>
+                          </div>
+
+                          {/* Filtro Raça/Cor */}
+                          <div>
+                            <select
+                              value={filterRace}
+                              onChange={(e) => setFilterRace(e.target.value)}
+                              className="w-full text-xs py-1.5 px-2 bg-white border border-slate-300 rounded-lg text-slate-800 font-semibold focus:ring-1 focus:ring-indigo-500"
+                            >
+                              <option value="ALL">Raça/Cor: Todas</option>
+                              <option value="PARDA">Parda</option>
+                              <option value="BRANCA">Branca</option>
+                              <option value="PRETA">Preta</option>
+                              <option value="AMARELA">Amarela</option>
+                              <option value="INDÍGENA">Indígena</option>
+                              <option value="NÃO DECLARADA">Não Declarada</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tabela de Pré-visualização com Seleção Individual e Badges */}
+                      <div className="border border-slate-200 rounded-xl overflow-x-auto max-h-72">
                         <table className="w-full text-left text-xs border-collapse">
                           <thead className="bg-slate-100 sticky top-0 border-b border-slate-200 text-[11px] font-bold text-slate-600">
                             <tr>
+                              <th className="p-2 text-center w-10">
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    visibleActiveStudents.length > 0 &&
+                                    visibleActiveStudents.every((s) => s.selectedForImport !== false)
+                                  }
+                                  onChange={(e) =>
+                                    handleSelectAllVisible(
+                                      e.target.checked,
+                                      visibleActiveStudents.map((s) => s.tempId)
+                                    )
+                                  }
+                                  className="rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                  title="Marcar / Desmarcar todos os visíveis"
+                                />
+                              </th>
                               <th className="p-2.5">Nº</th>
                               <th className="p-2.5">Nome Completo do Aluno</th>
                               <th className="p-2.5">Série Cursada (1ª Col)</th>
@@ -1521,100 +1943,149 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {activeResult.students.slice(0, 30).map((std, idx) => (
-                              <tr key={idx} className="hover:bg-slate-50">
-                                <td className="p-2.5 font-mono text-slate-500">{std.sequenceNumber}</td>
-                                <td className="p-2.5 font-bold text-slate-900">
-                                  {filters.importName ? (
-                                    std.name
-                                  ) : (
-                                    <span className="text-slate-400 italic">Aluno Importado (Filtro)</span>
-                                  )}
-                                </td>
-                                <td className="p-2.5">
-                                  {filters.importSeries ? (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded font-bold text-[11px]">
-                                      <GraduationCap className="h-3 w-3 text-indigo-600" />
-                                      {std.series}
-                                      {std.seriesFromFirstCol && (
-                                        <span className="text-[9px] font-normal text-indigo-700">
-                                          (1ª col)
-                                        </span>
-                                      )}
-                                    </span>
-                                  ) : (
-                                    <span className="text-slate-400 italic text-[10px]">
-                                      (Não importar)
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="p-2.5 text-slate-600">
-                                  {filters.importBirthDate ? (
-                                    std.formattedBirthDate
-                                  ) : (
-                                    <span className="text-slate-400 italic text-[10px]">(Ignorado)</span>
-                                  )}
-                                </td>
-                                <td className="p-2.5 text-slate-600">
-                                  {filters.importGender ? (
-                                    std.gender
-                                  ) : (
-                                    <span className="text-slate-400 italic text-[10px]">(Ignorado)</span>
-                                  )}
-                                </td>
-                                <td className="p-2.5 text-slate-600">
-                                  {filters.importRaceColor ? (
-                                    std.raceColor
-                                  ) : (
-                                    <span className="text-slate-400 italic text-[10px]">(Ignorado)</span>
-                                  )}
-                                </td>
-                                <td className="p-2.5 text-slate-600 max-w-[150px] truncate">
-                                  {filters.importAddress ? (
-                                    std.address
-                                  ) : (
-                                    <span className="text-slate-400 italic text-[10px]">(Ignorado)</span>
-                                  )}
-                                </td>
-                                <td className="p-2.5 text-slate-600">
-                                  {filters.importMedicalClassification ? (
-                                    std.medicalClassification
-                                  ) : (
-                                    <span className="text-slate-400 italic text-[10px]">(Ignorado)</span>
-                                  )}
-                                </td>
-                                <td className="p-2.5">
-                                  {filters.importMedicalReport ? (
-                                    <span
-                                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                        std.hasMedicalReport
-                                          ? 'bg-emerald-100 text-emerald-800'
-                                          : 'bg-amber-100 text-amber-800'
-                                      }`}
-                                    >
-                                      {std.medicalReportText}
-                                    </span>
-                                  ) : (
-                                    <span className="text-slate-400 italic text-[10px]">(Ignorado)</span>
-                                  )}
-                                </td>
-                                <td className="p-2.5">
-                                  {std.cadastralStatus === 'OK' ? (
-                                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md text-[10px] font-bold">
-                                      Regular
-                                    </span>
-                                  ) : (
-                                    <span
-                                      className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md text-[10px] font-bold flex items-center gap-1 w-fit"
-                                      title={`Pendências: ${std.pendingFields.join(', ')}`}
-                                    >
-                                      <AlertTriangle className="h-3 w-3 text-amber-600" />
-                                      <span>Incompleto ({std.pendingFields.length})</span>
-                                    </span>
-                                  )}
+                            {visibleActiveStudents.length === 0 ? (
+                              <tr>
+                                <td colSpan={11} className="p-6 text-center text-slate-400 italic">
+                                  Nenhum aluno encontrado para os filtros selecionados.
                                 </td>
                               </tr>
-                            ))}
+                            ) : (
+                              visibleActiveStudents.map((std, idx) => {
+                                const isSelected = std.selectedForImport !== false;
+                                const isPcdStudent =
+                                  std.isPcd ||
+                                  std.medicalClassification?.toLowerCase().includes('pcd') ||
+                                  std.name.toUpperCase().includes('PCD');
+                                const isTeaStudent =
+                                  std.isTea ||
+                                  std.medicalClassification?.toLowerCase().includes('tea') ||
+                                  std.specialConditions?.some(
+                                    (c) => c.toLowerCase().includes('tea') || c.toLowerCase().includes('autis')
+                                  );
+
+                                return (
+                                  <tr
+                                    key={idx}
+                                    className={`transition-colors ${
+                                      isSelected ? 'hover:bg-indigo-50/40' : 'opacity-50 bg-slate-50/60'
+                                    }`}
+                                  >
+                                    <td className="p-2 text-center">
+                                      <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onChange={() => handleToggleStudentSelection(std.tempId)}
+                                        className="rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                      />
+                                    </td>
+                                    <td className="p-2.5 font-mono text-slate-500">{std.sequenceNumber}</td>
+                                    <td className="p-2.5 font-bold text-slate-900">
+                                      {filters.importName ? (
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                          <span>{std.name}</span>
+                                          {isPcdStudent && (
+                                            <span className="px-1.5 py-0.2 bg-purple-100 border border-purple-300 text-purple-800 rounded font-black text-[9px]">
+                                              PCD
+                                            </span>
+                                          )}
+                                          {isTeaStudent && (
+                                            <span className="px-1.5 py-0.2 bg-blue-100 border border-blue-300 text-blue-800 rounded font-black text-[9px]">
+                                              TEA
+                                            </span>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <span className="text-slate-400 italic">Aluno Importado (Filtro)</span>
+                                      )}
+                                    </td>
+                                    <td className="p-2.5">
+                                      {filters.importSeries ? (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded font-bold text-[11px]">
+                                          <GraduationCap className="h-3 w-3 text-indigo-600" />
+                                          {std.series}
+                                          {std.seriesFromFirstCol && (
+                                            <span className="text-[9px] font-normal text-indigo-700">
+                                              (1ª col)
+                                            </span>
+                                          )}
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-400 italic text-[10px]">
+                                          (Não importar)
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="p-2.5 text-slate-600">
+                                      {filters.importBirthDate ? (
+                                        std.formattedBirthDate
+                                      ) : (
+                                        <span className="text-slate-400 italic text-[10px]">(Ignorado)</span>
+                                      )}
+                                    </td>
+                                    <td className="p-2.5 text-slate-600">
+                                      {filters.importGender ? (
+                                        std.gender
+                                      ) : (
+                                        <span className="text-slate-400 italic text-[10px]">(Ignorado)</span>
+                                      )}
+                                    </td>
+                                    <td className="p-2.5 text-slate-600">
+                                      {filters.importRaceColor ? (
+                                        std.raceColor
+                                      ) : (
+                                        <span className="text-slate-400 italic text-[10px]">(Ignorado)</span>
+                                      )}
+                                    </td>
+                                    <td className="p-2.5 text-slate-600 max-w-[150px] truncate">
+                                      {filters.importAddress ? (
+                                        std.address
+                                      ) : (
+                                        <span className="text-slate-400 italic text-[10px]">(Ignorado)</span>
+                                      )}
+                                    </td>
+                                    <td className="p-2.5 text-slate-600">
+                                      {filters.importMedicalClassification || filters.importPcd || filters.importTea ? (
+                                        <span className="font-semibold text-purple-900">
+                                          {std.medicalClassification || (isPcdStudent ? 'PCD' : isTeaStudent ? 'TEA' : '—')}
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-400 italic text-[10px]">(Ignorado)</span>
+                                      )}
+                                    </td>
+                                    <td className="p-2.5">
+                                      {filters.importMedicalReport ? (
+                                        <span
+                                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                            std.hasMedicalReport
+                                              ? 'bg-emerald-100 text-emerald-800'
+                                              : 'bg-amber-100 text-amber-800'
+                                          }`}
+                                        >
+                                          {std.medicalReportText || (std.hasMedicalReport ? 'SIM' : 'NÃO')}
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-400 italic text-[10px]">(Ignorado)</span>
+                                      )}
+                                    </td>
+                                    <td className="p-2.5">
+                                      {std.cadastralStatus === 'OK' ? (
+                                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md text-[10px] font-bold">
+                                          Regular
+                                        </span>
+                                      ) : (
+                                        <span
+                                          className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md text-[10px] font-bold flex items-center gap-1 w-fit"
+                                          title={`Pendências: ${std.pendingFields.join(', ')}`}
+                                        >
+                                          <AlertTriangle className="h-3 w-3 text-amber-600" />
+                                          <span>Incompleto ({std.pendingFields.length})</span>
+                                        </span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
                           </tbody>
                         </table>
                       </div>
@@ -1647,13 +2118,13 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
               Cancelar
             </button>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <span className="text-xs text-slate-600 font-medium">
-                Total para Importar: <strong>{allParsedStudents.length} alunos</strong>
+                Alunos Selecionados: <strong className="text-indigo-700 font-bold">{totalSelectedAcrossFiles} de {allParsedStudents.length}</strong>
               </span>
 
               <button
-                disabled={allParsedStudents.length === 0 || isProcessing}
+                disabled={totalSelectedAcrossFiles === 0 || isProcessing}
                 onClick={handleConfirmImport}
                 className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer"
               >
@@ -1665,7 +2136,7 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                 ) : (
                   <>
                     <Check className="h-4 w-4" />
-                    <span>Confirmar e Importar {allParsedStudents.length} Alunos</span>
+                    <span>Confirmar e Importar {totalSelectedAcrossFiles} Alunos</span>
                   </>
                 )}
               </button>

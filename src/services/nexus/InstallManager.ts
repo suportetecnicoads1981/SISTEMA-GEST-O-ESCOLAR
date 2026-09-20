@@ -20,6 +20,7 @@ export interface InstallOptions {
   rootDir?: string;
   simulatePermissionFailure?: boolean;
   simulateCorruptedWrite?: boolean;
+  secretManagerEnv?: Record<string, string>;
   onProgress?: (progress: NexusFileTransferProgress) => void;
 }
 
@@ -32,6 +33,14 @@ export class InstallManager {
     this.currentRootDir = rootDir;
     this.tempBufferDir = `${rootDir}\\.nexus_tmp_staging`;
     this.fileService = new FileService(rootDir);
+  }
+
+  public getIndexJsSample(): string {
+    return this.fileService.generateIndexJsContent();
+  }
+
+  public getPackageJsonSample(): string {
+    return this.fileService.generatePackageJsonContent();
   }
 
   public getRootDir(): string {

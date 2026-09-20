@@ -32,6 +32,7 @@ import {
   Sliders,
   SlidersHorizontal,
   Building2,
+  School,
   Clock,
   RotateCcw,
   Sparkles,
@@ -58,6 +59,7 @@ import {
   ACTIVE_SEARCH_STATUS_INFO,
 } from '../../types';
 import { StudentModal } from './StudentModal';
+import { SchoolUnitModal } from '../municipal/SchoolUnitModal';
 import { ExcelStudentImportModal } from './ExcelStudentImportModal';
 import { UniversalDataImportModal } from './UniversalDataImportModal';
 import { StudentQuickEditModal } from './StudentQuickEditModal';
@@ -82,7 +84,11 @@ interface StudentListProps {
   onDeleteStudent: (id: string) => void;
   onIssueDocument?: (studentId: string, docType?: string) => void;
   onGenerateDocument?: (studentId: string, docType: string) => void;
-  onBatchImportStudents?: (students: Student[]) => void;
+  onBatchImportStudents?: (
+    students: Student[],
+    schoolUnits?: SchoolUnit[],
+    classes?: SchoolClass[]
+  ) => void;
   onBack?: () => void;
   onNavigate?: (tab: string, payload?: any) => void;
 }
@@ -130,6 +136,9 @@ export const StudentList: React.FC<StudentListProps> = ({
   const [importFeedback, setImportFeedback] = useState<string | null>(null);
   const [studentToEdit, setStudentToEdit] = useState<Student | null>(null);
   const [quickEditStudent, setQuickEditStudent] = useState<Student | null>(null);
+  const [isSchoolUnitModalOpen, setIsSchoolUnitModalOpen] = useState(false);
+  const [schoolUnitToEdit, setSchoolUnitToEdit] = useState<SchoolUnit | null>(null);
+  const [schoolUnitActionToast, setSchoolUnitActionToast] = useState<string | null>(null);
   const [isPredictiveAlertsModalOpen, setIsPredictiveAlertsModalOpen] = useState(false);
   const studentPrintRef = useRef<HTMLDivElement>(null);
 
@@ -234,6 +243,107 @@ export const StudentList: React.FC<StudentListProps> = ({
 
     return unitsList;
   }, [schoolUnits, students]);
+
+  // Unidade Escolar Ativa Selecionada no Filtro para visualização detalhada e edição
+  const activeSelectedSchoolUnit: SchoolUnit | null = useMemo(() => {
+    if (selectedUnitFilter === 'ALL') return null;
+
+    // 1. Busca direta nas unidades cadastradas por ID
+    const foundById = schoolUnits.find((u) => u.id === selectedUnitFilter);
+    if (foundById) return foundById;
+
+    // 2. Busca na lista disponível unificada
+    const availableItem = availableSchoolUnits.find((u) => u.id === selectedUnitFilter);
+    if (!availableItem) return null;
+
+    // Verifica se há unidade cadastrada com o mesmo nome
+    const cleanAvailableName = availableItem.name.replace(/^escola:\s*/i, '').trim().toLowerCase();
+    const foundByName = schoolUnits.find(
+      (u) =>
+        u.name.toLowerCase().trim() === availableItem.name.toLowerCase().trim() ||
+        u.name.toLowerCase().replace(/^escola:\s*/i, '').trim() === cleanAvailableName
+    );
+    if (foundByName) return foundByName;
+
+    // 3. Monta uma estrutura completa de SchoolUnit caso seja originária de importação ou polo recente
+    const studentsInSchool = students.filter(
+      (s) =>
+        s.schoolUnitId === availableItem.id ||
+        (s.schoolOriginName && s.schoolOriginName.toLowerCase().trim() === availableItem.name.toLowerCase().trim())
+    );
+
+    const gradesServedSet = new Set<string>();
+    studentsInSchool.forEach((s) => {
+      if (s.series) gradesServedSet.add(s.series);
+    });
+
+    const isRural =
+      availableItem.name.toLowerCase().includes('praia') ||
+      availableItem.name.toLowerCase().includes('brito') ||
+      availableItem.name.toLowerCase().includes('rural') ||
+      availableItem.type === 'POLO_REMOTO';
+
+    const synthUnit: SchoolUnit = {
+      id: availableItem.id.startsWith('unit-') ? availableItem.id : `unit-${availableItem.id}`,
+      name: availableItem.name,
+      tradeName: availableItem.name.replace(/^ESCOLA:\s*/i, '').trim(),
+      inepCode: 'Pendente de Regularização no Censo',
+      type: availableItem.type === 'POLO_REMOTO' ? 'ESCOLA_POLO' : availableItem.type === 'SEDE_CENTRAL' ? 'SEDE_CENTRAL' : 'ESCOLA_SATELITE',
+      locationZone: isRural ? 'ZONA_RURAL' : 'ZONA_URBANA',
+      cadastralStatus: 'INCOMPLETE',
+      totalStudents: studentsInSchool.length || availableItem.count,
+      totalTeachers: 0,
+      totalClasses: 0,
+      hasInternet: false,
+      syncStatus: 'PENDENTE',
+      district: isRural ? 'Comunidade / Zona Rural' : 'Sede Municipal',
+      address: 'Localidade da Escola (Aguardando Regularização Cadastral pela Secretaria)',
+      directorName: 'Diretoria / Coordenação (Pendente de Cadastro)',
+      phone: '(00) Pendente',
+      email: 'secretaria.escola@educacao.gov.br',
+      gradesServed: Array.from(gradesServedSet),
+      gradesServedText: Array.from(gradesServedSet).join(', ') || undefined,
+      pendingFields: [
+        'Código INEP da Escola',
+        'Ato / Decreto de Criação Escolar',
+        'Nome do(a) Diretor(a)',
+        'Telefone e Contato Oficial',
+        'Endereço Completo e CEP',
+      ],
+      createdViaImport: true,
+    };
+
+    return synthUnit;
+  }, [selectedUnitFilter, schoolUnits, availableSchoolUnits, students]);
+
+  // Alunos pertencentes à unidade escolar ativa selecionada
+  const studentsInSelectedUnit = useMemo(() => {
+    if (!activeSelectedSchoolUnit) return [];
+    const unitName = activeSelectedSchoolUnit.name.toLowerCase().trim();
+    return students.filter((s) => {
+      if (s.schoolUnitId === activeSelectedSchoolUnit.id) return true;
+      if (s.schoolOriginName && s.schoolOriginName.toLowerCase().trim() === unitName) return true;
+      if (activeSelectedSchoolUnit.type === 'SEDE_CENTRAL' && !s.schoolUnitId && !s.schoolOriginName) return true;
+      return false;
+    });
+  }, [activeSelectedSchoolUnit, students]);
+
+  // Abre modal para edição dos dados cadastrais da unidade escolar
+  const handleOpenEditSchoolUnit = () => {
+    if (!activeSelectedSchoolUnit) return;
+    setSchoolUnitToEdit(activeSelectedSchoolUnit);
+    setIsSchoolUnitModalOpen(true);
+  };
+
+  // Salva alterações da unidade escolar selecionada
+  const handleSaveSchoolUnitModal = (updatedUnit: SchoolUnit) => {
+    if (onSaveSchoolUnit) {
+      onSaveSchoolUnit(updatedUnit);
+    }
+    setSchoolUnitActionToast(`Dados da Unidade Escolar "${updatedUnit.name}" salvos com sucesso!`);
+    setTimeout(() => setSchoolUnitActionToast(null), 5000);
+    setIsSchoolUnitModalOpen(false);
+  };
 
   // Lista unificada e enriquecida de Séries / Etapas com contagem de alunos
   const availableSeries = useMemo(() => {
@@ -633,8 +743,22 @@ export const StudentList: React.FC<StudentListProps> = ({
     }
   };
 
-  const handleOpenAddModal = () => {
-    setStudentToEdit(null);
+  const handleOpenAddModal = (presetUnit?: SchoolUnit) => {
+    const targetUnit = presetUnit || activeSelectedSchoolUnit;
+    if (targetUnit) {
+      setStudentToEdit({
+        id: `std-new-${Date.now()}`,
+        name: '',
+        enrollmentNumber: `RA-${Math.floor(100000 + Math.random() * 900000)}`,
+        status: 'ACTIVE',
+        schoolUnitId: targetUnit.id,
+        schoolOriginName: targetUnit.name,
+        locationZone: targetUnit.locationZone,
+        cadastralStatus: 'OK',
+      } as any);
+    } else {
+      setStudentToEdit(null);
+    }
     setIsModalOpen(true);
   };
 
@@ -907,7 +1031,7 @@ export const StudentList: React.FC<StudentListProps> = ({
           </button>
           <button
             id="btn-students-add-student"
-            onClick={handleOpenAddModal}
+            onClick={() => handleOpenAddModal()}
             className="px-3.5 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm shadow-indigo-200 transition-all flex items-center gap-1.5 cursor-pointer"
           >
             <UserPlus className="h-3.5 w-3.5" />
@@ -1034,28 +1158,42 @@ export const StudentList: React.FC<StudentListProps> = ({
 
           {/* Grupo de Filtros Centrais: Unidade Escolar + Série + Turma */}
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            {/* 1. Filtro de Unidade Escolar / Polo */}
-            <div className="relative w-full sm:w-auto">
-              <div className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-indigo-600">
-                <Building2 className="h-3.5 w-3.5" />
+            {/* 1. Filtro de Unidade Escolar / Polo com Ação Rápida de Edição */}
+            <div className="flex items-center gap-1.5 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-auto">
+                <div className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-indigo-600">
+                  <Building2 className="h-3.5 w-3.5" />
+                </div>
+                <select
+                  value={selectedUnitFilter}
+                  onChange={(e) => setSelectedUnitFilter(e.target.value)}
+                  className={`w-full sm:w-auto pl-8 pr-7 py-2 text-xs rounded-xl border font-semibold transition-all cursor-pointer ${
+                    selectedUnitFilter !== 'ALL'
+                      ? 'border-indigo-400 bg-indigo-50/70 text-indigo-900 ring-2 ring-indigo-500/20'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                  }`}
+                  title="Filtrar por Unidade Escolar ou Polo"
+                >
+                  <option value="ALL">🏫 Todas as Unidades ({students.length})</option>
+                  {availableSchoolUnits.map((unit) => (
+                    <option key={unit.id} value={unit.id}>
+                      {unit.name} ({unit.count})
+                    </option>
+                  ))}
+                </select>
               </div>
-              <select
-                value={selectedUnitFilter}
-                onChange={(e) => setSelectedUnitFilter(e.target.value)}
-                className={`w-full sm:w-auto pl-8 pr-7 py-2 text-xs rounded-xl border font-semibold transition-all cursor-pointer ${
-                  selectedUnitFilter !== 'ALL'
-                    ? 'border-indigo-400 bg-indigo-50/70 text-indigo-900 ring-2 ring-indigo-500/20'
-                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
-                }`}
-                title="Filtrar por Unidade Escolar ou Polo"
-              >
-                <option value="ALL">🏫 Todas as Unidades ({students.length})</option>
-                {availableSchoolUnits.map((unit) => (
-                  <option key={unit.id} value={unit.id}>
-                    {unit.name} ({unit.count})
-                  </option>
-                ))}
-              </select>
+
+              {selectedUnitFilter !== 'ALL' && activeSelectedSchoolUnit && (
+                <button
+                  type="button"
+                  onClick={handleOpenEditSchoolUnit}
+                  className="px-2.5 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-900 border border-indigo-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0 shadow-2xs"
+                  title="Editar dados cadastrais desta unidade escolar (INEP, Direção, Endereço, Contato)"
+                >
+                  <Edit2 className="h-3.5 w-3.5 text-indigo-700" />
+                  <span className="hidden xl:inline">Editar Escola</span>
+                </button>
+              )}
             </div>
 
             {/* 2. Filtro de Série / Etapa */}
@@ -1481,6 +1619,268 @@ export const StudentList: React.FC<StudentListProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Feedback Toast de Atualização de Unidade Escolar */}
+      {schoolUnitActionToast && (
+        <div className="bg-emerald-50 border border-emerald-300 text-emerald-950 px-4 py-3 rounded-2xl text-xs font-bold shadow-xs flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+            <span>{schoolUnitActionToast}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSchoolUnitActionToast(null)}
+            className="text-emerald-700 hover:text-emerald-900 p-1"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Painel Aperfeiçoado de Gestão & Dados da Unidade Escolar Selecionada */}
+      {selectedUnitFilter !== 'ALL' && activeSelectedSchoolUnit && (
+        <div className="bg-gradient-to-br from-indigo-50/70 via-white to-slate-50 border border-indigo-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
+          {/* Cabeçalho da Escola com Identificação, Tipo, INEP e Ações */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-indigo-100">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-xs shrink-0 mt-0.5 sm:mt-0">
+                <School className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-base font-extrabold text-slate-900 leading-tight">
+                    {activeSelectedSchoolUnit.name}
+                  </h3>
+                  {activeSelectedSchoolUnit.tradeName && activeSelectedSchoolUnit.tradeName !== activeSelectedSchoolUnit.name && (
+                    <span className="text-xs text-slate-500 font-medium">
+                      ({activeSelectedSchoolUnit.tradeName})
+                    </span>
+                  )}
+                  {/* Badge de Tipo */}
+                  <span className="px-2 py-0.5 bg-indigo-100 text-indigo-800 text-[11px] font-bold rounded-lg border border-indigo-200">
+                    {activeSelectedSchoolUnit.type === 'SEDE_CENTRAL'
+                      ? 'Sede Central'
+                      : activeSelectedSchoolUnit.type === 'ESCOLA_POLO'
+                      ? 'Escola Polo'
+                      : activeSelectedSchoolUnit.type === 'ESCOLA_RURAL'
+                      ? 'Escola Rural'
+                      : activeSelectedSchoolUnit.type === 'CRECHE_INFANTIL'
+                      ? 'Creche Infantil'
+                      : 'Escola Satélite / Anexa'}
+                  </span>
+                  {/* Badge de Zona */}
+                  <span className={`px-2 py-0.5 text-[11px] font-bold rounded-lg border ${
+                    activeSelectedSchoolUnit.locationZone === 'ZONA_RURAL'
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      : 'bg-slate-100 text-slate-700 border-slate-200'
+                  }`}>
+                    {activeSelectedSchoolUnit.locationZone === 'ZONA_RURAL' ? 'Zona Rural' : 'Zona Urbana'}
+                  </span>
+                  {/* Badge de Situação Cadastral da Escola */}
+                  {activeSelectedSchoolUnit.cadastralStatus === 'INCOMPLETE' ||
+                  !activeSelectedSchoolUnit.inepCode ||
+                  activeSelectedSchoolUnit.inepCode.toLowerCase().includes('pendente') ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 border border-amber-300 text-amber-900 text-[11px] font-extrabold rounded-lg">
+                      <AlertTriangle className="h-3 w-3 text-amber-600" />
+                      Pendente de Regularização no Censo
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 border border-emerald-300 text-emerald-900 text-[11px] font-extrabold rounded-lg">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                      Regularizada
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 mt-1">
+                  <span className="font-semibold text-indigo-950 flex items-center gap-1">
+                    <Tag className="h-3.5 w-3.5 text-indigo-500" />
+                    INEP: <strong className="font-mono text-slate-800">{activeSelectedSchoolUnit.inepCode || 'Não cadastrado'}</strong>
+                  </span>
+                  {activeSelectedSchoolUnit.cnpjOrDecree && (
+                    <span className="text-slate-500">
+                      • Ato/Decreto: {activeSelectedSchoolUnit.cnpjOrDecree}
+                    </span>
+                  )}
+                  {activeSelectedSchoolUnit.district && (
+                    <span className="text-slate-500 flex items-center gap-1">
+                      <MapPin className="h-3 w-3 text-slate-400" />
+                      {activeSelectedSchoolUnit.district}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Grupo de Botões de Ação Direta na Escola */}
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
+              <button
+                type="button"
+                onClick={handleOpenEditSchoolUnit}
+                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                title="Editar dados cadastrais, endereço, direção e infraestrutura desta escola"
+              >
+                <Edit2 className="h-3.5 w-3.5" />
+                <span>Editar Dados da Escola</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenAddModal(activeSelectedSchoolUnit)}
+                className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                title="Matricular novo estudante diretamente nesta unidade escolar"
+              >
+                <UserPlus className="h-3.5 w-3.5 text-indigo-600" />
+                <span>Nova Matrícula</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsPrintModalOpen(true)}
+                className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                title="Imprimir listagem oficial de alunos desta unidade escolar"
+              >
+                <Printer className="h-3.5 w-3.5 text-slate-500" />
+                <span>Imprimir</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedUnitFilter('ALL')}
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+                title="Fechar visão por escola e voltar para todas as unidades"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Grade de Informações Cadastrais & Contatos da Escola */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+            {/* Endereço */}
+            <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+                <MapPin className="h-3 w-3 text-indigo-500" />
+                Localização & Endereço
+              </span>
+              <p className="font-semibold text-slate-800 leading-snug line-clamp-2">
+                {activeSelectedSchoolUnit.address || 'Endereço aguardando preenchimento'}
+              </p>
+              <span className="text-[11px] text-slate-500 mt-0.5 block">
+                {activeSelectedSchoolUnit.city || 'São Paulo'} - {activeSelectedSchoolUnit.state || 'SP'}
+                {activeSelectedSchoolUnit.zipCode ? ` • CEP: ${activeSelectedSchoolUnit.zipCode}` : ''}
+              </span>
+            </div>
+
+            {/* Diretoria e Gestão */}
+            <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+                <Users className="h-3 w-3 text-indigo-500" />
+                Diretoria & Coordenação
+              </span>
+              <p className="font-semibold text-slate-800 leading-snug truncate">
+                {activeSelectedSchoolUnit.directorName || 'Diretor(a) não informado'}
+              </p>
+              <span className="text-[11px] text-slate-500 mt-0.5 block truncate">
+                Coord.: {activeSelectedSchoolUnit.coordinatorName || 'Não atribuída'}
+              </span>
+            </div>
+
+            {/* Contato Institucional */}
+            <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+                <Phone className="h-3 w-3 text-indigo-500" />
+                Contato Oficial
+              </span>
+              <p className="font-semibold text-slate-800 leading-snug flex items-center gap-1 truncate">
+                <Phone className="h-3 w-3 text-slate-400 shrink-0" />
+                {activeSelectedSchoolUnit.phone || '(00) Pendente'}
+              </p>
+              <span className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1 truncate">
+                <Mail className="h-3 w-3 text-slate-400 shrink-0" />
+                {activeSelectedSchoolUnit.email || 'Não informado'}
+              </span>
+            </div>
+
+            {/* Séries & Etapas Atendidas */}
+            <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+                <GraduationCap className="h-3 w-3 text-indigo-500" />
+                Séries / Etapas Atendidas
+              </span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {activeSelectedSchoolUnit.gradesServed && activeSelectedSchoolUnit.gradesServed.length > 0 ? (
+                  activeSelectedSchoolUnit.gradesServed.map((g, idx) => (
+                    <span
+                      key={idx}
+                      className="px-1.5 py-0.5 bg-indigo-50 text-indigo-800 font-bold text-[10px] rounded-md border border-indigo-100"
+                    >
+                      {g}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-slate-400 text-[11px] italic">
+                    {activeSelectedSchoolUnit.gradesServedText || 'Séries conforme matrículas'}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Cards de Métricas Rápidas desta Escola + Botão de Filtro de Pendências */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+            <div className="bg-white/80 p-2.5 rounded-xl border border-indigo-100 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase block">Total Alunos</span>
+                <span className="text-base font-extrabold text-slate-900">{studentsInSelectedUnit.length}</span>
+              </div>
+              <Users className="h-5 w-5 text-indigo-400" />
+            </div>
+
+            <div className="bg-white/80 p-2.5 rounded-xl border border-indigo-100 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase block">Ativos / Regular</span>
+                <span className="text-base font-extrabold text-emerald-600">
+                  {studentsInSelectedUnit.filter((s) => s.status === 'ACTIVE').length}
+                </span>
+              </div>
+              <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+            </div>
+
+            {/* Alunos com Pendências Cadastrais nesta Escola (com Ação de 1 Clique) */}
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCadastralFilter(selectedCadastralFilter === 'INCOMPLETE' ? 'ALL' : 'INCOMPLETE');
+              }}
+              className={`p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                selectedCadastralFilter === 'INCOMPLETE'
+                  ? 'bg-amber-100 border-amber-300 ring-2 ring-amber-400'
+                  : 'bg-white/80 hover:bg-amber-50/60 border-amber-200'
+              }`}
+              title="Clique para filtrar apenas os alunos desta escola com pendências cadastrais"
+            >
+              <div>
+                <span className="text-[10px] font-bold text-amber-800 uppercase block">Pendências Cadastrais</span>
+                <span className="text-base font-extrabold text-amber-700">
+                  {studentsInSelectedUnit.filter((s) => s.cadastralStatus && s.cadastralStatus !== 'OK').length} alunos
+                </span>
+              </div>
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+            </button>
+
+            <div className="bg-white/80 p-2.5 rounded-xl border border-indigo-100 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase block">PCD / Laudo Médico</span>
+                <span className="text-base font-extrabold text-purple-600">
+                  {studentsInSelectedUnit.filter((s) => s.hasMedicalReport || s.specialNeeds).length}
+                </span>
+              </div>
+              <Stethoscope className="h-5 w-5 text-purple-400" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Student Records Table in Bento Card */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
@@ -1942,9 +2342,9 @@ export const StudentList: React.FC<StudentListProps> = ({
         classes={classes}
         schoolUnits={schoolUnits}
         studentsCount={students.length}
-        onImportStudents={(imported) => {
+        onImportStudents={(imported, explicitUnits, explicitClasses) => {
           if (onBatchImportStudents) {
-            onBatchImportStudents(imported);
+            onBatchImportStudents(imported, explicitUnits, explicitClasses);
           } else {
             imported.forEach((s) => onSaveStudent(s));
           }
@@ -1954,6 +2354,14 @@ export const StudentList: React.FC<StudentListProps> = ({
           setShowPendingCensusDashbox(true);
           setSelectedCadastralFilter('INCOMPLETE');
         }}
+      />
+
+      {/* Modal Dedicado de Gestão e Edição da Unidade Escolar Selecionada */}
+      <SchoolUnitModal
+        isOpen={isSchoolUnitModalOpen}
+        onClose={() => setIsSchoolUnitModalOpen(false)}
+        onSave={handleSaveSchoolUnitModal}
+        unitToEdit={schoolUnitToEdit}
       />
 
       {/* Modal Dedicado de Edição Rápida de Cadastros e Pendências */}

@@ -105,6 +105,7 @@ interface CustomizableChartModalProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
+  reportTitle?: string;
   subtitle?: string;
   datasets?: ChartDatasetOption[];
   availableDatasets?: ChartDatasetOption[];
@@ -217,7 +218,8 @@ const COLOR_PALETTES: Record<ColorPaletteKey, { name: string; colors: string[]; 
 export const CustomizableChartModal: React.FC<CustomizableChartModalProps> = ({
   isOpen,
   onClose,
-  title = 'Gerador e Personalizador de Gráficos',
+  title,
+  reportTitle,
   subtitle = 'Escolha o tipo de gráfico, temas de cores, métricas e gere impressões oficiais e exportações',
   datasets = [],
   availableDatasets = [],
@@ -226,6 +228,7 @@ export const CustomizableChartModal: React.FC<CustomizableChartModalProps> = ({
   settings,
   documentCategory = 'RELATÓRIO ESTATÍSTICO PEDAGÓGICO',
 }) => {
+  const finalTitle = reportTitle || title || 'Gerador e Personalizador de Gráficos';
   // Combina datasets fornecidos ou usa conjunto padrão completo
   const activeDatasets = useMemo(() => {
     if (datasets && datasets.length > 0) return datasets;
@@ -345,7 +348,7 @@ export const CustomizableChartModal: React.FC<CustomizableChartModalProps> = ({
 
   if (!isOpen) return null;
 
-  const displayTitle = customChartTitle || currentDataset?.title || title;
+  const displayTitle = customChartTitle || currentDataset?.title || finalTitle;
 
   const handlePrint = () => {
     if (printAreaRef.current) {

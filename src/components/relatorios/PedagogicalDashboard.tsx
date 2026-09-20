@@ -64,6 +64,7 @@ import {
   AcademicHistory,
 } from '../../types';
 import { generatePedagogicalReport } from '../../data/storage';
+import { EnvironmentService } from '../../services/environmentService';
 import { AssessmentResultsReport } from './AssessmentResultsReport';
 import { PedagogicalEvolution } from './PedagogicalEvolution';
 import { BimonthlyAcademicEvolutionCard } from './BimonthlyAcademicEvolutionCard';
@@ -194,6 +195,7 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
         tileApproval: true,
         tileServer: true,
         tileEvolution: true,
+        tileBimonthlyEvolution: true,
         tileDistribution: true,
         tileAccuracy: false,
         tileAiDiagnosis: true,
@@ -208,6 +210,7 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
         tileApproval: true,
         tileServer: false,
         tileEvolution: true,
+        tileBimonthlyEvolution: true,
         tileDistribution: true,
         tileAccuracy: true,
         tileAiDiagnosis: true,
@@ -220,11 +223,44 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
 
   const selectedExam = exams.find((e) => e.id === selectedExamId) || exams[0];
 
+  const [isGeneratingAiInsight, setIsGeneratingAiInsight] = useState(false);
+  const [aiInsightData, setAiInsightData] = useState<{
+    source: string;
+    text?: string;
+    recommendations?: string[];
+  } | null>(null);
+
   // Generate pedagogical report for selected exam
   const report: PedagogicalReport | null = useMemo(() => {
     if (!selectedExam) return null;
     return generatePedagogicalReport(selectedExam, questions, students, submissions);
   }, [selectedExam, questions, students, submissions]);
+
+  const handleGenerateAiInsight = async () => {
+    if (!selectedExam) return;
+    setIsGeneratingAiInsight(true);
+    try {
+      const className = classes.find((c) => c.id === selectedExam.classId)?.name || 'Turma Geral';
+      const topicMastery: Record<string, number> = {};
+      report?.questionStats?.forEach((qs) => {
+        topicMastery[qs.topic] = qs.correctPercentage;
+      });
+
+      const res = await EnvironmentService.requestPedagogicalInsights({
+        examTitle: selectedExam.title,
+        subject: selectedExam.subject,
+        className,
+        averageScore: report ? Number(report.averageScore.toFixed(1)) : 7.0,
+        commonErrors: report?.commonErrors?.map((e) => ({ topic: e.topic, errorRate: e.errorPercentage })) || [],
+        topicMastery,
+      });
+      setAiInsightData(res);
+    } catch {
+      // handled
+    } finally {
+      setIsGeneratingAiInsight(false);
+    }
+  };
 
   // Overall student performance progress evolution
   const evolutionData = useMemo(() => {
@@ -924,10 +960,16 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
             className="col-span-12 lg:col-span-4 bg-linear-to-br from-indigo-600 to-indigo-900 rounded-2xl p-5 shadow-lg text-white flex flex-col justify-between"
           >
             <div>
-              <h3 className="font-bold mb-4 text-sm flex items-center gap-2">
-                <BrainCircuit className="h-4 w-4 text-indigo-200" />
-                Central de Provas Automática
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-sm flex items-center gap-2">
+                  <BrainCircuit className="h-4 w-4 text-indigo-200" />
+                  Diagnóstico IA (Gemini)
+                </h3>
+                <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-mono font-bold text-indigo-100">
+                  gemini-3.8-flash
+                </span>
+              </div>
+
               <div className="space-y-2.5">
                 <div className="bg-white/10 p-3 rounded-xl border border-white/10">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-200">
@@ -935,17 +977,50 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
                   </p>
                   <p className="text-lg font-bold text-white">{questions.length} Questões Ativas</p>
                 </div>
-                <div className="bg-white/10 p-3 rounded-xl border border-white/10">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-200">
-                    FILA DE CORREÇÃO
-                  </p>
-                  <p className="text-lg font-bold text-white">Correção Instantânea</p>
-                </div>
+
+                {/* Exibição do Diagnóstico IA gerado */}
+                {aiInsightData ? (
+                  <div className="bg-white/15 p-3 rounded-xl border border-white/20 text-xs space-y-2 max-h-48 overflow-y-auto">
+                    <div className="flex items-center justify-between text-[10px] font-bold text-emerald-300">
+                      <span>INTERVENÇÃO PEDAGÓGICA</span>
+                      <span className="bg-emerald-500/30 px-1.5 py-0.5 rounded text-white">{aiInsightData.source}</span>
+                    </div>
+                    {aiInsightData.text ? (
+                      <p className="text-[11px] text-indigo-50 leading-relaxed whitespace-pre-line">
+                        {aiInsightData.text}
+                      </p>
+                    ) : (
+                      <ul className="list-disc list-inside text-[11px] text-indigo-50 space-y-1">
+                        {aiInsightData.recommendations?.map((r, idx) => (
+                          <li key={idx}>{r}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-white/10 p-3 rounded-xl border border-white/10">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-200">
+                      SÍNTESE PSICOMÉTRICA
+                    </p>
+                    <p className="text-xs text-indigo-100 mt-1">
+                      Gera recomendações pedagógicas de intervenção baseadas no desempenho da turma.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="mt-4">
-              <div className="text-[11px] text-indigo-100 bg-white/10 px-3 py-2 rounded-xl border border-white/10 flex items-center justify-between">
+            <div className="mt-4 space-y-2">
+              <button
+                onClick={handleGenerateAiInsight}
+                disabled={isGeneratingAiInsight}
+                className="w-full py-2 px-3 rounded-xl bg-white text-indigo-900 hover:bg-indigo-50 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-xs"
+              >
+                <Sparkles className={`w-3.5 h-3.5 ${isGeneratingAiInsight ? 'animate-spin' : 'text-indigo-600'}`} />
+                <span>{isGeneratingAiInsight ? 'Sintetizando com Gemini AI...' : 'Gerar Diagnóstico IA da Turma'}</span>
+              </button>
+
+              <div className="text-[11px] text-indigo-100 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 flex items-center justify-between">
                 <span>Mapeamento BNCC</span>
                 <span className="font-bold text-emerald-300">100% Coberto</span>
               </div>

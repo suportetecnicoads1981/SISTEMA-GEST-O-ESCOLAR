@@ -50,6 +50,8 @@ interface HeaderProps {
   onOpenVersionControl?: () => void;
   currentVersion?: string;
   onLogout?: () => void;
+  onToggleStartMenu?: () => void;
+  isStartMenuOpen?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -73,6 +75,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenVersionControl,
   currentVersion,
   onLogout,
+  onToggleStartMenu,
+  isStartMenuOpen = false,
 }) => {
   const [currentDateTime, setCurrentDateTime] = useState('');
   const [serverPingOk, setServerPingOk] = useState(true);
@@ -242,10 +246,10 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header
       id="app-header"
-      className="no-print h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs"
+      className="no-print h-14 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs"
     >
-      {/* LADO ESQUERDO: Marca Oficial SucessoEdu + Pílula Breadcrumb (Fiel à Imagem 1) */}
-      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+      {/* LADO ESQUERDO: Marca Oficial SucessoEdu + Pílula de Módulo Ativo */}
+      <div className="flex items-center gap-3 min-w-0">
         {/* Marca SucessoEdu com Ícone de Capelo */}
         <div
           id="header-brand-logo"
@@ -253,64 +257,45 @@ export const Header: React.FC<HeaderProps> = ({
           className="flex items-center gap-2.5 cursor-pointer select-none shrink-0 group"
           title="Ir para a Visão Geral do Sistema"
         >
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform shrink-0">
-            <GraduationCap className="h-6 w-6" />
+          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform shrink-0">
+            <GraduationCap className="h-5 w-5" />
           </div>
-          <div className="hidden sm:block text-left leading-tight">
-            <div className="text-sm md:text-base font-black text-slate-900 tracking-tight">
-              SucessoEdu Gestão Educacional
+          <div className="text-left leading-tight">
+            <div className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-2">
+              <span>SucessoEdu</span>
+              <span className="hidden md:inline text-xs font-semibold text-slate-400 font-normal">| Gestão Educacional</span>
             </div>
-            <div className="text-[11px] md:text-xs font-bold text-blue-600 truncate max-w-[240px] md:max-w-[320px]">
+            <div className="text-[11px] font-bold text-blue-600 truncate max-w-[200px] sm:max-w-[320px]">
               {schoolName || 'Colégio Horizonte do Saber & Inovação'}
             </div>
           </div>
         </div>
 
-        {/* Pílula Central de Breadcrumb / Navegação (Visão Geral > Nome da Aba) */}
-        <div
-          id="header-breadcrumb-pill"
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white border border-slate-200 shadow-2xs text-xs font-semibold text-slate-700 max-w-[220px] sm:max-w-none truncate"
-        >
-          {isNotDashboard && onGoBack && (
-            <button
-              onClick={onGoBack}
-              title="Voltar para tela anterior (Atalho: Alt + ←)"
-              className="text-slate-400 hover:text-blue-600 transition-colors p-0.5 mr-0.5 cursor-pointer shrink-0"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-            </button>
-          )}
-          <button
-            onClick={() => onSelectTab('MAIN_DASHBOARD')}
-            className="text-slate-500 hover:text-blue-600 transition-colors cursor-pointer font-medium shrink-0"
+        {/* Indicador de Módulo Ativo */}
+        {isNotDashboard && (
+          <div
+            id="header-active-module-badge"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 max-w-[240px] truncate"
           >
-            Visão Geral
-          </button>
-          <span className="text-slate-300 font-normal shrink-0">&gt;</span>
-          <span className="text-slate-900 font-bold truncate">
-            {getShortTabLabel(activeTab)}
-          </span>
-        </div>
+            {onGoBack && (
+              <button
+                onClick={onGoBack}
+                title="Voltar para tela anterior (Alt + ←)"
+                className="text-slate-400 hover:text-blue-600 transition-colors cursor-pointer shrink-0 mr-0.5"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+              </button>
+            )}
+            <span className="text-slate-500 font-medium">Módulo:</span>
+            <span className="text-slate-900 font-bold truncate">
+              {getShortTabLabel(activeTab)}
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* LADO DIREITO: Busca Rápida + Relógio + Status Servidor + Usuário + Notificações + Imprimir (Fiel à Imagem 1) */}
+      {/* LADO DIREITO: Ações Contextuais + Perfil do Operador + Notificações */}
       <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-        {/* Botão de Busca Rápida de Módulos (Ctrl+K) */}
-        {onOpenQuickSearch && (
-          <button
-            id="btn-header-quick-search"
-            onClick={onOpenQuickSearch}
-            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 text-xs text-slate-600 hover:text-indigo-600 shadow-2xs transition-all cursor-pointer group"
-            title="Abrir Busca Rápida de Módulos (Ctrl+K)"
-          >
-            <Search className="h-3.5 w-3.5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
-            <span className="font-semibold text-[11px]">Navegar</span>
-            <kbd className="text-[9px] font-mono px-1.5 py-0.2 bg-white rounded text-slate-400 group-hover:text-indigo-700 border border-slate-200 shadow-2xs">
-              Ctrl+K
-            </kbd>
-          </button>
-        )}
-
         {/* Botão de Diagrama de Módulos & Central de Solicitações IA */}
         {onOpenArchitectureDiagram && (
           <button
@@ -337,27 +322,6 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden xl:inline text-[9px] bg-purple-200/80 text-purple-900 px-1.5 py-0.5 rounded-md font-sans uppercase">Novidades</span>
           </button>
         )}
-
-        {/* Relógio em Tempo Real */}
-        <div
-          id="header-live-clock"
-          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-xs font-medium text-slate-700 shadow-2xs"
-          title="Data e hora do sistema"
-        >
-          <Clock className="h-3.5 w-3.5 text-slate-400" />
-          <span>{currentDateTime || 'Carregando...'}</span>
-        </div>
-
-        {/* Pílula de Status Servidor Offline Ativo */}
-        <div
-          id="header-server-status"
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800 shadow-2xs"
-          title="Servidor local autônomo ativo e operacional"
-        >
-          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-          <span className="hidden sm:inline">Servidor Offline Ativo</span>
-          <span className="sm:hidden">Online</span>
-        </div>
 
         {/* Card do Usuário Ativo (AD Admin Master ADS / ADMIN - TI) */}
         <div className="relative">
@@ -499,17 +463,6 @@ export const Header: React.FC<HeaderProps> = ({
             />
           )}
         </div>
-
-        {/* Botão Oficial Imprimir */}
-        <button
-          id="btn-header-print-official"
-          onClick={() => window.print()}
-          title="Imprimir relatório da tela atual (Ctrl+P)"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 shadow-2xs transition-all cursor-pointer shrink-0"
-        >
-          <Printer className="h-3.5 w-3.5 text-slate-600" />
-          <span>Imprimir</span>
-        </button>
       </div>
     </header>
   );

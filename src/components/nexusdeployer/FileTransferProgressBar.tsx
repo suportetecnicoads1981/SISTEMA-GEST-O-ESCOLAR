@@ -5,6 +5,7 @@ import { NexusFileTransferProgress } from '../../types';
 interface FileTransferProgressBarProps {
   progress: NexusFileTransferProgress;
   onCancel?: () => void;
+  onDismiss?: () => void;
 }
 
 export const FileTransferProgressBar: React.FC<FileTransferProgressBarProps> = ({

@@ -4,6 +4,8 @@ import { generateFullStandaloneAppHtml } from './standaloneAppHtml';
 import { generateUpdateManualHtml } from './updatePackageHelper';
 import { generateArchitectureDiagramHtml, syncSystemArchitectureDiagrams } from './systemArchitectureDiagram';
 import { generateDirectoryVerificationBat } from './installationStructureVerifier';
+import { DatabaseAutomatorService } from '../services/databaseAutomatorService';
+import { RelationalIntegrityService } from '../services/relationalIntegrityService';
 
 export { generateDirectoryVerificationBat };
 
@@ -5864,6 +5866,9 @@ export async function generateZipBundle(
     serverFolder.file('configurar_tarefa_backup_diario.bat', configBackupTaskBat);
     serverFolder.file('sincronizar_secretaria_municipio.ps1', municipalSyncPs1);
     serverFolder.file('sincronizar_secretaria_municipio.bat', municipalSyncBat);
+    serverFolder.file('automacao_atualizacao_banco.ps1', DatabaseAutomatorService.generatePowerShellAutomationScript());
+    serverFolder.file('automacao_atualizacao_banco.bat', DatabaseAutomatorService.generateBatchAutomationScript());
+    serverFolder.file('atualizar_banco_sucessoedu_v5.5.sql', RelationalIntegrityService.generateDatabaseUpdateScript(initialData));
     serverFolder.file('ATUALIZAR_SISTEMA_LOCAL.bat', generateUpdateSystemBat(config.serverPort, config.schoolName));
     serverFolder.file('SUBSTITUICAO_TOTAL_SERVIDOR.bat', generateTotalServerReplacementBat(config.serverPort, config.schoolName));
     serverFolder.file('DESINSTALAR_OU_LIMPAR_SUCESSOEDU.bat', generateUninstallBat(config.serverPort, config.schoolName));

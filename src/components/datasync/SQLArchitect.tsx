@@ -20,6 +20,8 @@ import {
 import { SchemaManager } from '../../services/datasync/SchemaManager';
 import { BackupZipRecord, SQLCommandAnalysis } from '../../types/datasync';
 import { AuthAutomator } from '../../services/datasync/AuthAutomator';
+import { RelationalIntegrityService } from '../../services/relationalIntegrityService';
+import { getStoredData } from '../../data/storage';
 
 interface SQLArchitectProps {
   onBackupGenerated?: (backup: BackupZipRecord) => void;
@@ -150,51 +152,80 @@ export const SQLArchitect: React.FC<SQLArchitectProps> = ({ onBackupGenerated })
       </div>
 
       {/* Templates Rápidos de Operação */}
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="text-slate-400 font-medium">Templates DDL/DML:</span>
-        <button
-          onClick={() =>
-            handleApplyTemplate(
-              `ALTER TABLE public.students \n  ADD COLUMN IF NOT EXISTS alergias_medicas JSONB DEFAULT '[]'::jsonb;`
-            )
-          }
-          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-[11px] transition-colors"
-        >
-          ALTER TABLE (+ Coluna)
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-slate-400 font-medium">Templates DDL/DML:</span>
+          <button
+            onClick={() =>
+              handleApplyTemplate(
+                `ALTER TABLE public.students \n  ADD COLUMN IF NOT EXISTS alergias_medicas JSONB DEFAULT '[]'::jsonb;`
+              )
+            }
+            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-[11px] transition-colors cursor-pointer"
+          >
+            ALTER TABLE (+ Coluna)
+          </button>
 
-        <button
-          onClick={() =>
-            handleApplyTemplate(
-              `DROP TABLE IF EXISTS public.relatorios_temporarios_antigos CASCADE;`
-            )
-          }
-          className="px-2.5 py-1 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 text-rose-300 border border-rose-500/40 font-mono text-[11px] transition-colors"
-        >
-          DROP TABLE (Crítico)
-        </button>
+          <button
+            onClick={() =>
+              handleApplyTemplate(
+                `DROP TABLE IF EXISTS public.relatorios_temporarios_antigos CASCADE;`
+              )
+            }
+            className="px-2.5 py-1 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 text-rose-300 border border-rose-500/40 font-mono text-[11px] transition-colors cursor-pointer"
+          >
+            DROP TABLE (Crítico)
+          </button>
 
-        <button
-          onClick={() =>
-            handleApplyTemplate(
-              `TRUNCATE TABLE public.sync_audit_logs RESTART IDENTITY;`
-            )
-          }
-          className="px-2.5 py-1 rounded-lg bg-amber-950/60 hover:bg-amber-900/60 text-amber-300 border border-amber-500/40 font-mono text-[11px] transition-colors"
-        >
-          TRUNCATE TABLE (Crítico)
-        </button>
+          <button
+            onClick={() =>
+              handleApplyTemplate(
+                `TRUNCATE TABLE public.sync_audit_logs RESTART IDENTITY;`
+              )
+            }
+            className="px-2.5 py-1 rounded-lg bg-amber-950/60 hover:bg-amber-900/60 text-amber-300 border border-amber-500/40 font-mono text-[11px] transition-colors cursor-pointer"
+          >
+            TRUNCATE TABLE (Crítico)
+          </button>
 
-        <button
-          onClick={() =>
-            handleApplyTemplate(
-              `SELECT id, name, registration_number, status, updated_at \nFROM public.students \nORDER BY updated_at DESC \nLIMIT 10;`
-            )
-          }
-          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-[11px] transition-colors"
-        >
-          SELECT (Consulta)
-        </button>
+          <button
+            onClick={() =>
+              handleApplyTemplate(
+                `SELECT id, name, registration_number, status, updated_at \nFROM public.students \nORDER BY updated_at DESC \nLIMIT 10;`
+              )
+            }
+            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-[11px] transition-colors cursor-pointer"
+          >
+            SELECT (Consulta)
+          </button>
+        </div>
+
+        {/* Botão Oficial de Geração do Script SQL Completo */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              const fullScript = RelationalIntegrityService.generateDatabaseUpdateScript(getStoredData());
+              handleApplyTemplate(fullScript);
+            }}
+            className="px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Carregar Script SQL Oficial de Engenharia com todas as tabelas, índices e integridade"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Carregar Script SQL v5.5</span>
+          </button>
+
+          <button
+            onClick={() => {
+              const fullScript = RelationalIntegrityService.generateDatabaseUpdateScript(getStoredData());
+              RelationalIntegrityService.downloadSqlScript(fullScript, 'atualizar_banco_sucessoedu_v5.5.sql');
+            }}
+            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-600/20"
+            title="Baixar arquivo .sql para rodar no PostgreSQL, Supabase ou SQLite"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Baixar .SQL Oficial</span>
+          </button>
+        </div>
       </div>
 
       {/* BANNER DE PROTOCOLO ZIP OBRIGATÓRIO (QUANDO CRÍTICO) */}

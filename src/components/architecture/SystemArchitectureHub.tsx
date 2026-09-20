@@ -17,6 +17,9 @@ import {
   downloadArchitectureDiagramHtml,
   downloadArchitectureDiagramJson,
   downloadArchitectureDiagramMarkdown,
+  downloadArchitectureDiagramWord,
+  copyArchitectureDiagramFormattedForWord,
+  MODULES_ROADMAP_AND_FIXES,
   sendArchitectureDiagramToCloud,
 } from '../../utils/systemArchitectureDiagram';
 import {
@@ -61,9 +64,28 @@ export const SystemArchitectureHub: React.FC<SystemArchitectureHubProps> = ({
   onClose,
 }) => {
   // Navigation / View Modes
-  const [activeView, setActiveView] = useState<'GRAPH' | 'CATALOG' | 'NEW_REQUEST' | 'BACKLOG'>(
+  const [activeView, setActiveView] = useState<'GRAPH' | 'CATALOG' | 'NEW_REQUEST' | 'BACKLOG' | 'WORD_ROADMAP'>(
     initialModuleId ? 'NEW_REQUEST' : 'GRAPH'
   );
+
+  // Copied for Word feedback
+  const [copiedForWord, setCopiedForWord] = useState(false);
+  const [wordCheckedFixes, setWordCheckedFixes] = useState<Record<string, boolean>>({});
+
+  const handleCopyForWord = async () => {
+    const success = await copyArchitectureDiagramFormattedForWord();
+    if (success) {
+      setCopiedForWord(true);
+      setTimeout(() => setCopiedForWord(false), 3000);
+    }
+  };
+
+  const toggleFixCheck = (fixId: string) => {
+    setWordCheckedFixes((prev) => ({
+      ...prev,
+      [fixId]: !prev[fixId],
+    }));
+  };
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -284,6 +306,32 @@ export const SystemArchitectureHub: React.FC<SystemArchitectureHubProps> = ({
               <span className="hidden sm:inline">Nuvem Oficial</span>
             </button>
 
+            {/* Salvar no Word (.doc) Button */}
+            <button
+              id="btn-diagram-download-word"
+              onClick={() => downloadArchitectureDiagramWord()}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+              title="Salvar documento oficial formatado para o Microsoft Word (.doc) com tabelas, roadmap e checklist"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              <span>Salvar no Word (.doc)</span>
+            </button>
+
+            {/* Copiar para o Word */}
+            <button
+              id="btn-diagram-copy-word"
+              onClick={handleCopyForWord}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                copiedForWord
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                  : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200'
+              }`}
+              title="Copiar com tabelas e estilos para colar direto no Word (Ctrl+V)"
+            >
+              {copiedForWord ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+              <span>{copiedForWord ? 'Copiado para o Word!' : 'Copiar p/ Word'}</span>
+            </button>
+
             {/* Export HTML Button */}
             <button
               id="btn-diagram-download-html"
@@ -302,7 +350,7 @@ export const SystemArchitectureHub: React.FC<SystemArchitectureHubProps> = ({
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-200 transition-all cursor-pointer"
               title="Salvar especificação técnica completa em Markdown (.md)"
             >
-              <FileText className="h-3.5 w-3.5 text-slate-600" />
+              <FileCode className="h-3.5 w-3.5 text-slate-600" />
               <span>Baixar MD</span>
             </button>
 
@@ -339,6 +387,18 @@ export const SystemArchitectureHub: React.FC<SystemArchitectureHubProps> = ({
         {/* View Switcher Tabs */}
         <div className="flex items-center gap-2 mt-4 overflow-x-auto pb-1">
           <button
+            onClick={() => setActiveView('WORD_ROADMAP')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+              activeView === 'WORD_ROADMAP'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200'
+            }`}
+          >
+            <FileText className="h-4 w-4" />
+            <span>📄 Análise para Word, Melhorias & Correções</span>
+          </button>
+
+          <button
             onClick={() => setActiveView('GRAPH')}
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
               activeView === 'GRAPH'
@@ -359,7 +419,7 @@ export const SystemArchitectureHub: React.FC<SystemArchitectureHubProps> = ({
             }`}
           >
             <Layers className="h-4 w-4" />
-            <span>2. Catálogo Detalhado dos 17 Módulos</span>
+            <span>2. Catálogo Geral ({SYSTEM_MODULES_CATALOG.length} Módulos)</span>
           </button>
 
           <button
@@ -984,6 +1044,338 @@ export const SystemArchitectureHub: React.FC<SystemArchitectureHubProps> = ({
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* VIEW 5: WORD ROADMAP, FUTURE IMPROVEMENTS & FIXES CHECKLIST */}
+        {activeView === 'WORD_ROADMAP' && (
+          <div className="space-y-6 max-w-7xl mx-auto">
+            {/* Executive Hero Banner */}
+            <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-blue-800/50 relative overflow-hidden">
+              <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                <div className="max-w-3xl">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 text-xs font-black tracking-wider uppercase">
+                      Exportação Word & Governança de TI
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold">
+                      18 Módulos Mapeados
+                    </span>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight">
+                    Diagrama de Módulos & Roteiro de Melhorias e Correções
+                  </h2>
+                  <p className="text-sm text-blue-100/80 mt-2 leading-relaxed">
+                    Documentação canônica completa dos 18 módulos do <strong>SucessoEdu</strong> estruturada com tabelas nativas, fichas técnicas, dependências, melhorias futuras de alta alavancagem e checklist de testes preventivos para análise e edição direta no <strong>Microsoft Word</strong>.
+                  </p>
+                </div>
+
+                {/* Primary Export Actions */}
+                <div className="flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0">
+                  <button
+                    id="btn-hero-download-word"
+                    onClick={() => downloadArchitectureDiagramWord()}
+                    className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-blue-500 hover:bg-blue-400 text-white font-black text-sm shadow-lg shadow-blue-500/30 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    <FileText className="h-4 w-4" />
+                    <span>Salvar no Word (.doc)</span>
+                  </button>
+
+                  <button
+                    id="btn-hero-copy-word"
+                    onClick={handleCopyForWord}
+                    className={`flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-sm font-black border transition-all cursor-pointer ${
+                      copiedForWord
+                        ? 'bg-emerald-500 text-white border-emerald-400 shadow-lg shadow-emerald-500/30'
+                        : 'bg-white/10 hover:bg-white/20 text-white border-white/20 backdrop-blur-xs'
+                    }`}
+                  >
+                    {copiedForWord ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    <span>{copiedForWord ? 'Copiado para o Word!' : 'Copiar p/ Word (Ctrl+V)'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Metrics Bar */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-6 border-t border-white/10">
+                <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
+                  <span className="text-xs text-blue-200 block font-medium">Módulos Auditados</span>
+                  <span className="text-xl font-black text-white">{SYSTEM_MODULES_CATALOG.length}</span>
+                </div>
+                <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
+                  <span className="text-xs text-blue-200 block font-medium">Melhorias Mapeadas</span>
+                  <span className="text-xl font-black text-emerald-400">36 Propostas</span>
+                </div>
+                <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
+                  <span className="text-xs text-blue-200 block font-medium">Checklist Preventivo</span>
+                  <span className="text-xl font-black text-amber-300">36 Verificações</span>
+                </div>
+                <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
+                  <span className="text-xs text-blue-200 block font-medium">Status Homologado</span>
+                  <span className="text-xl font-black text-blue-300">Produção 100%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter and Search Controls */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row gap-3 items-center justify-between">
+              <div className="relative w-full sm:w-80">
+                <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Filtrar módulos, melhorias ou correções..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                >
+                  <option value="TODAS">Todas as Categorias</option>
+                  <option value="GESTÃO_CORE">Gestão Core</option>
+                  <option value="ENSINO_PEDAGÓGICO">Ensino Pedagógico</option>
+                  <option value="CONTROLE_LEGAL">Controle Legal / LDB</option>
+                  <option value="INFRAESTRUTURA">Infraestrutura & TI</option>
+                  <option value="DEVOPS_NUVEM">DevOps & Nuvem</option>
+                </select>
+
+                <button
+                  onClick={() => downloadArchitectureDiagramMarkdown()}
+                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold border border-slate-200 cursor-pointer flex items-center gap-1.5 shrink-0"
+                  title="Baixar versão Markdown (.md)"
+                >
+                  <FileCode className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Baixar .MD</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Modules Roadmap & Fixes Cards List */}
+            <div className="space-y-6">
+              {SYSTEM_MODULES_CATALOG.filter((m) => {
+                const term = searchTerm.toLowerCase();
+                const matchSearch =
+                  m.name.toLowerCase().includes(term) ||
+                  m.tagline.toLowerCase().includes(term) ||
+                  m.id.toLowerCase().includes(term) ||
+                  m.sourceFiles.some((f) => f.toLowerCase().includes(term));
+                const matchCategory = selectedCategory === 'TODAS' || m.category === selectedCategory;
+                return matchSearch && matchCategory;
+              }).map((mod) => {
+                const roadmap = MODULES_ROADMAP_AND_FIXES[mod.id]?.futureImprovements || [];
+                const fixes = MODULES_ROADMAP_AND_FIXES[mod.id]?.fixesChecklist || [];
+
+                return (
+                  <div
+                    key={mod.id}
+                    className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs hover:shadow-md transition-all duration-200"
+                  >
+                    {/* Header Row */}
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-4 mb-4 border-b border-slate-100 gap-4">
+                      <div className="flex items-start gap-3">
+                        <span className="h-10 w-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-mono font-black text-sm shrink-0 shadow-xs">
+                          {mod.number}
+                        </span>
+                        <div>
+                          <div className="flex items-center flex-wrap gap-2">
+                            <h3 className="text-base sm:text-lg font-black text-slate-900">{mod.name}</h3>
+                            <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-bold border border-slate-200">
+                              {mod.id}
+                            </span>
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100">
+                              {mod.tierName}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1">{mod.tagline}</p>
+                        </div>
+                      </div>
+
+                      {/* Top Action Buttons for this Module */}
+                      <div className="flex items-center flex-wrap gap-2 shrink-0">
+                        {onNavigateToTab && (
+                          <button
+                            onClick={() => onNavigateToTab(mod.tabId)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer"
+                            title={`Abrir módulo na aba ${mod.tabId}`}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5 text-slate-500" />
+                            <span>Abrir Módulo</span>
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => handleOpenRequestForModule(mod)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200 transition-all cursor-pointer"
+                          title="Gerar solicitação de engenharia para a IA"
+                        >
+                          <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                          <span>Solicitar para IA</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quick Metadata: Files & Database */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5 text-xs">
+                      <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                        <span className="font-bold text-slate-700 flex items-center gap-1.5 mb-1.5">
+                          <FileCode className="h-3.5 w-3.5 text-blue-600" />
+                          Arquivos-Fonte Principais:
+                        </span>
+                        <div className="space-y-1 font-mono text-[11px] text-slate-600">
+                          {mod.sourceFiles.slice(0, 3).map((f, i) => (
+                            <div key={i} className="truncate">• {f}</div>
+                          ))}
+                          {mod.sourceFiles.length > 3 && (
+                            <span className="text-[10px] text-slate-400 font-sans font-bold">
+                              + {mod.sourceFiles.length - 3} outros arquivos
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                        <span className="font-bold text-slate-700 flex items-center gap-1.5 mb-1.5">
+                          <Database className="h-3.5 w-3.5 text-indigo-600" />
+                          Entidades de Banco de Dados:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {mod.databaseEntities.map((ent, i) => (
+                            <span
+                              key={i}
+                              className="px-2 py-0.5 rounded-lg bg-white border border-slate-200 text-[11px] font-mono font-bold text-slate-700 shadow-2xs"
+                            >
+                              {ent}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 1: Future Improvements (Roadmap) */}
+                    <div className="mb-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                          <Sparkles className="h-4 w-4 text-emerald-600" />
+                          Roteiro de Melhorias Futuras Planejadas ({roadmap.length})
+                        </span>
+                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                          Roadmap de Evolução
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {roadmap.map((item) => (
+                          <div
+                            key={item.id}
+                            className="bg-emerald-50/50 hover:bg-emerald-50 border border-emerald-200/80 rounded-2xl p-4 transition-all"
+                          >
+                            <div className="flex items-start justify-between gap-2 mb-1.5">
+                              <span className="text-xs font-black text-slate-900">{item.title}</span>
+                              <span
+                                className={`text-[10px] font-black px-2 py-0.5 rounded-md shrink-0 ${
+                                  item.priority === 'ALTA'
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                    : item.priority === 'ESTRATEGICA'
+                                    ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                                    : 'bg-blue-100 text-blue-800 border border-blue-200'
+                                }`}
+                              >
+                                {item.priority}
+                              </span>
+                            </div>
+
+                            <p className="text-xs text-emerald-950/80 font-medium mb-2">{item.impact}</p>
+                            <p className="text-[11px] text-slate-600 leading-relaxed">{item.description}</p>
+
+                            <div className="mt-3 pt-2 border-t border-emerald-200/50 flex items-center justify-between text-[11px]">
+                              <span className="text-slate-500 font-medium">Esforço: <strong>{item.technicalEffort}</strong></span>
+                              <button
+                                onClick={() => {
+                                  setRequestModuleId(mod.id);
+                                  setRequestType('IMPLEMENTATION');
+                                  setRequestPriority(item.priority === 'ALTA' ? 'ALTA' : 'MEDIA');
+                                  setRequestTitle(item.title);
+                                  setRequestDescription(`${item.impact}\n\nDetalhes: ${item.description}`);
+                                  setRequestExpectedBehavior(`A melhoria "${item.title}" deve estar integrada e homologada no módulo ${mod.name}.`);
+                                  setActiveView('NEW_REQUEST');
+                                }}
+                                className="text-xs font-bold text-emerald-700 hover:text-emerald-900 hover:underline cursor-pointer flex items-center gap-1"
+                              >
+                                <span>Criar Solicitação</span>
+                                <ChevronRight className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Section 2: Preventative Fixes Checklist */}
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-black text-red-800 uppercase tracking-wider flex items-center gap-1.5">
+                          <AlertCircle className="h-4 w-4 text-red-600" />
+                          Checklist de Pontos de Atenção & Correções Preventivas ({fixes.length})
+                        </span>
+                        <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                          Auditoria de Qualidade (QA)
+                        </span>
+                      </div>
+
+                      <div className="space-y-2">
+                        {fixes.map((fix) => {
+                          const isChecked = !!wordCheckedFixes[fix.id];
+                          return (
+                            <div
+                              key={fix.id}
+                              onClick={() => toggleFixCheck(fix.id)}
+                              className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${
+                                isChecked
+                                  ? 'bg-slate-50 border-slate-200 opacity-60'
+                                  : 'bg-red-50/40 hover:bg-red-50 border-red-200/80'
+                              }`}
+                            >
+                              <div className="mt-0.5 shrink-0">
+                                <div
+                                  className={`h-4 w-4 rounded border flex items-center justify-center transition-all ${
+                                    isChecked
+                                      ? 'bg-emerald-600 border-emerald-600 text-white'
+                                      : 'border-slate-300 bg-white'
+                                  }`}
+                                >
+                                  {isChecked && <CheckCircle2 className="h-3 w-3" />}
+                                </div>
+                              </div>
+
+                              <div className="flex-1 text-xs">
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                  <span
+                                    className={`font-black ${
+                                      isChecked ? 'line-through text-slate-500' : 'text-slate-900'
+                                    }`}
+                                  >
+                                    {fix.item}
+                                  </span>
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-100 text-red-800 border border-red-200 shrink-0">
+                                    {fix.category}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-600">{fix.description}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

@@ -1503,22 +1503,87 @@ pause
     reader.readAsText(file);
   };
 
-  // Handle publishing a new package to Google Drive
-  const handlePublishNewPackage = () => {
+  // Função para baixar qualquer módulo de instalação separado em formato ZIP
+  const handleDownloadSeparatedModuleZip = async (
+    moduleType: 'FULL' | 'SERVER' | 'CLIENT' | 'SATELLITE' | 'CLOUD'
+  ) => {
+    try {
+      const labels: Record<string, string> = {
+        FULL: 'Sistema Completo Unificado',
+        SERVER: 'Módulo 01 - Servidor Local Offline',
+        CLIENT: 'Módulo 02 - Estação de Trabalho / Aluno / Laboratório',
+        SATELLITE: 'Módulo 03 - Polo Remoto / Escola Satélite',
+        CLOUD: 'Módulo 04 - Servidor Nuvem / Docker Compose',
+      };
+
+      const fileNames: Record<string, string> = {
+        FULL: 'SucessoEdu_Sistema_Completo_v5.4.1.zip',
+        SERVER: 'SucessoEdu_Modulo_01_Servidor_Local.zip',
+        CLIENT: 'SucessoEdu_Modulo_02_Estacao_Trabalho.zip',
+        SATELLITE: 'SucessoEdu_Modulo_03_Polo_Remoto.zip',
+        CLOUD: 'SucessoEdu_Modulo_04_Hospedagem_Nuvem.zip',
+      };
+
+      setStatusMessage({
+        type: 'INFO',
+        text: `Gerando pacote ZIP do ${labels[moduleType]}...`,
+      });
+
+      const allCurrentData = getStoredData();
+      const zipBlob = await generateZipBundle(moduleType, {
+        schoolName: allCurrentData?.settings?.name || 'Colégio Horizonte',
+        serverIp: '127.0.0.1',
+        serverPort: 3000,
+        stationName: 'ESTACAO-TRABALHO',
+        stationType: 'ADMIN',
+        autoStart: true,
+        kioskMode: false,
+        enableFirewallRule: true,
+      }, allCurrentData);
+
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileNames[moduleType];
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setStatusMessage({
+        type: 'SUCCESS',
+        text: `Pacote ZIP (${labels[moduleType]}) gerado e baixado com sucesso!`,
+      });
+    } catch (err) {
+      console.error(err);
+      setStatusMessage({
+        type: 'ERROR',
+        text: 'Erro ao compilar o pacote ZIP do módulo selecionado.',
+      });
+    }
+  };
+
+  // Handle publishing a new package to Google Drive (Com Pacote ZIP do Sistema Completo e Módulos Separados)
+  const handlePublishNewPackage = async () => {
     if (!newVersionTitle.trim() || !newVersionNumber.trim()) {
       alert('Por favor, informe a versão e o título do pacote.');
       return;
     }
+
+    setStatusMessage({
+      type: 'INFO',
+      text: `Empacotando versão ${newVersionNumber} em ZIP e gerando arquivos criptográficos para a nuvem...`,
+    });
 
     const newPkg: SystemUpdatePackage = {
       id: `pkg-${newVersionNumber.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`,
       version: newVersionNumber,
       releaseDate: new Date().toISOString().split('T')[0],
       title: newVersionTitle,
-      summary: newVersionSummary || 'Pacote de atualização oficial hospedado no Google Drive.',
-      description: `Pacote oficial de atualização publicado na pasta "${OFFICIAL_DRIVE_UPDATES_FOLDER_NAME}" vinculado à conta ${TARGET_GOOGLE_DRIVE_ACCOUNT}.`,
+      summary: newVersionSummary || 'Pacote de atualização oficial hospedado no Google Drive com pacote ZIP completo do sistema.',
+      description: `Pacote oficial de atualização publicado na pasta "${OFFICIAL_DRIVE_UPDATES_FOLDER_NAME}" com sistema completo empacotado em ZIP e módulos de instalação separados.`,
       severity: newVersionSeverity,
-      sizeFormatted: '54.2 MB',
+      sizeFormatted: '58.4 MB',
       sha256Checksum: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
       author: `SEDUC / Engenharia SucessoEdu (${TARGET_GOOGLE_DRIVE_ACCOUNT})`,
       minCompatibleVersion: 'v4.0.0',
@@ -1531,8 +1596,43 @@ pause
     setCloudPackages([newPkg, ...cloudPackages]);
     downloadUpdatePackageFile(newPkg);
 
-    // Add to drive files list
-    setDriveFiles((prev) => [
+    // Gerar e disponibilizar o pacote ZIP do Sistema Completo automaticamente
+    try {
+      const allCurrentData = getStoredData();
+      const zipBlob = await generateZipBundle('FULL', {
+        schoolName: allCurrentData?.settings?.name || 'Colégio Horizonte',
+        serverIp: '127.0.0.1',
+        serverPort: 3000,
+        stationName: 'ESTACAO-TI',
+        stationType: 'ADMIN',
+        autoStart: true,
+        kioskMode: false,
+        enableFirewallRule: true,
+      }, allCurrentData);
+
+      const zipUrl = URL.createObjectURL(zipBlob);
+      const zipLink = document.createElement('a');
+      zipLink.href = zipUrl;
+      zipLink.download = `SucessoEdu_Sistema_Completo_${newVersionNumber}.zip`;
+      document.body.appendChild(zipLink);
+      zipLink.click();
+      document.body.removeChild(zipLink);
+      URL.revokeObjectURL(zipUrl);
+    } catch (e) {
+      console.warn('Download do ZIP automático ignorado pelo navegador:', e);
+    }
+
+    // Registrar no catálogo do Google Drive: Pacote ZIP completo e os módulos separados
+    const newDriveEntries = [
+      {
+        id: `gdrive-zip-full-${Date.now()}`,
+        name: `SucessoEdu_Sistema_Completo_${newVersionNumber}.zip`,
+        mimeType: 'application/zip',
+        size: '61245000',
+        modifiedTime: new Date().toISOString(),
+        webViewLink: getSafeDriveFileUrl(null, `SucessoEdu_Sistema_Completo_${newVersionNumber}.zip`),
+        description: `📦 Pacote ZIP do Sistema Completo Atualizado (${newVersionNumber}) contendo todos os módulos, scripts e instaladores.`,
+      },
       {
         id: `gdrive-file-${Date.now()}`,
         name: `SucessoEdu_Update_${newVersionNumber}.edupkg`,
@@ -1542,13 +1642,41 @@ pause
         webViewLink: getSafeDriveFileUrl(null, `SucessoEdu_Update_${newVersionNumber}.edupkg`),
         description: newPkg.title,
       },
-      ...prev,
-    ]);
+      {
+        id: `gdrive-zip-server-${Date.now()}`,
+        name: `SucessoEdu_Modulo_01_Servidor_Local_${newVersionNumber}.zip`,
+        mimeType: 'application/zip',
+        size: '22140000',
+        modifiedTime: new Date().toISOString(),
+        webViewLink: getSafeDriveFileUrl(null, `SucessoEdu_Modulo_01_Servidor_Local_${newVersionNumber}.zip`),
+        description: `🖥️ Módulo Servidor Central Offline (${newVersionNumber}) com micro-servidor HTTP e banco local.`,
+      },
+      {
+        id: `gdrive-zip-client-${Date.now()}`,
+        name: `SucessoEdu_Modulo_02_Estacao_Trabalho_${newVersionNumber}.zip`,
+        mimeType: 'application/zip',
+        size: '18450000',
+        modifiedTime: new Date().toISOString(),
+        webViewLink: getSafeDriveFileUrl(null, `SucessoEdu_Modulo_02_Estacao_Trabalho_${newVersionNumber}.zip`),
+        description: `👥 Módulo Estação de Trabalho / Aluno / Laboratório (${newVersionNumber}) com autodescoberta de IP na rede.`,
+      },
+      {
+        id: `gdrive-zip-sat-${Date.now()}`,
+        name: `SucessoEdu_Modulo_03_Polo_Remoto_${newVersionNumber}.zip`,
+        mimeType: 'application/zip',
+        size: '21500000',
+        modifiedTime: new Date().toISOString(),
+        webViewLink: getSafeDriveFileUrl(null, `SucessoEdu_Modulo_03_Polo_Remoto_${newVersionNumber}.zip`),
+        description: `🌐 Módulo Polo Remoto / Escola Satélite (${newVersionNumber}) para escolas sem internet contínua.`,
+      },
+    ];
+
+    setDriveFiles((prev) => [...newDriveEntries, ...prev]);
 
     setActiveTab('GOOGLE_DRIVE_SYNC');
     setStatusMessage({
       type: 'SUCCESS',
-      text: `🎉 Pacote ${newVersionNumber} publicado com sucesso na pasta "${OFFICIAL_DRIVE_UPDATES_FOLDER_NAME}" no Google Drive e arquivo .edupkg gerado!`,
+      text: `🎉 Atualização ${newVersionNumber} enviada para a nuvem! O pacote ZIP completo do sistema foi gerado e os módulos de instalação foram separados com sucesso.`,
     });
   };
 
@@ -2532,6 +2660,7 @@ pause
             <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden">
               {driveFiles.map((file) => {
                 const isTestFile = file.name === 'TESTE_ACESSO_SUCESSOEDU.txt' || file.name.startsWith('teste_');
+                const isZip = file.name.endsWith('.zip');
                 const isScript = file.name.endsWith('.bat');
                 const isDiagram = file.name.includes('Diagrama') || file.name.includes('ARQUITETURA');
                 const isManual = file.name.includes('Manual');
@@ -2617,6 +2746,27 @@ pause
                             <span>Baixar TXT</span>
                           </a>
                         </>
+                      ) : isZip ? (
+                        <button
+                          onClick={() => {
+                            if (file.name.includes('Modulo_01') || file.name.includes('Servidor')) {
+                              handleDownloadSeparatedModuleZip('SERVER');
+                            } else if (file.name.includes('Modulo_02') || file.name.includes('Estacao')) {
+                              handleDownloadSeparatedModuleZip('CLIENT');
+                            } else if (file.name.includes('Modulo_03') || file.name.includes('Polo')) {
+                              handleDownloadSeparatedModuleZip('SATELLITE');
+                            } else if (file.name.includes('Modulo_04') || file.name.includes('Nuvem')) {
+                              handleDownloadSeparatedModuleZip('CLOUD');
+                            } else {
+                              handleDownloadSeparatedModuleZip('FULL');
+                            }
+                          }}
+                          className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                          title="Baixar pacote ZIP oficial diretamente"
+                        >
+                          <Download className="h-3.5 w-3.5 text-white" />
+                          <span>Baixar Arquivo ZIP</span>
+                        </button>
                       ) : isDiagram ? (
                         <button
                           onClick={() => setShowDiagramModal(true)}
@@ -3978,14 +4128,137 @@ pause
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+            <div className="flex flex-wrap justify-between items-center gap-3 pt-4 border-t border-slate-100">
+              <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span>Ao publicar, o pacote ZIP do sistema completo e os módulos separados serão gerados para a nuvem.</span>
+              </div>
+
               <button
                 onClick={handlePublishNewPackage}
-                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 flex items-center gap-2 cursor-pointer transition-all"
+                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 flex items-center gap-2 cursor-pointer transition-all active:scale-95"
               >
                 <Cloud className="h-4 w-4" />
-                <span>Publicar no Google Drive &amp; Gerar .edupkg</span>
+                <span>Publicar Atualização na Nuvem (ZIP + .edupkg)</span>
               </button>
+            </div>
+          </div>
+
+          {/* PAINEL DE DOWNLOADS: SISTEMA COMPLETO EM ZIP E MÓDULOS SEPARADOS */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <h4 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Layers className="h-5 w-5 text-indigo-600" />
+                  Central de Módulos Separados &amp; Sistema Completo (.ZIP)
+                </h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Baixe o sistema integral compilado em arquivo ZIP ou selecione apenas o módulo de instalação necessário para sua infraestrutura.
+                </p>
+              </div>
+
+              <button
+                onClick={() => handleDownloadSeparatedModuleZip('FULL')}
+                className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 flex items-center gap-2 cursor-pointer transition-all active:scale-95"
+                title="Baixar pacote ZIP contendo todos os módulos de uma vez só"
+              >
+                <Download className="h-4 w-4" />
+                <span>Baixar Sistema Completo (.zip)</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Módulo 01: Servidor Local */}
+              <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 flex flex-col justify-between space-y-3 hover:border-indigo-300 transition-colors">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-blue-100 text-blue-800">
+                      Módulo 01
+                    </span>
+                    <Server className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <h5 className="text-xs font-bold text-slate-900">Servidor Local Offline</h5>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Micro-servidor HTTP, banco de dados local, backup automático e atalho oficial.
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDownloadSeparatedModuleZip('SERVER')}
+                  className="w-full py-2 px-3 rounded-xl bg-white border border-slate-300 hover:bg-indigo-50 hover:border-indigo-300 text-slate-700 hover:text-indigo-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-all"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Baixar Servidor (.zip)</span>
+                </button>
+              </div>
+
+              {/* Módulo 02: Estação de Trabalho */}
+              <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 flex flex-col justify-between space-y-3 hover:border-indigo-300 transition-colors">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
+                      Módulo 02
+                    </span>
+                    <Laptop className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <h5 className="text-xs font-bold text-slate-900">Estação de Trabalho / Aluno</h5>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Descoberta automática de IP do servidor na rede local e sincronização centralizada.
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDownloadSeparatedModuleZip('CLIENT')}
+                  className="w-full py-2 px-3 rounded-xl bg-white border border-slate-300 hover:bg-emerald-50 hover:border-emerald-300 text-slate-700 hover:text-emerald-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-all"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Baixar Estação (.zip)</span>
+                </button>
+              </div>
+
+              {/* Módulo 03: Polo Remoto */}
+              <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 flex flex-col justify-between space-y-3 hover:border-indigo-300 transition-colors">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-amber-100 text-amber-800">
+                      Módulo 03
+                    </span>
+                    <HardDrive className="h-4 w-4 text-amber-600" />
+                  </div>
+                  <h5 className="text-xs font-bold text-slate-900">Polo Remoto / Escola Satélite</h5>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Operação 100% offline com banco desacoplado e sincronização periódica por pen drive ou lote.
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDownloadSeparatedModuleZip('SATELLITE')}
+                  className="w-full py-2 px-3 rounded-xl bg-white border border-slate-300 hover:bg-amber-50 hover:border-amber-300 text-slate-700 hover:text-amber-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-all"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Baixar Polo Remoto (.zip)</span>
+                </button>
+              </div>
+
+              {/* Módulo 04: Servidor Nuvem / Docker */}
+              <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 flex flex-col justify-between space-y-3 hover:border-indigo-300 transition-colors">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-sky-100 text-sky-800">
+                      Módulo 04
+                    </span>
+                    <Cloud className="h-4 w-4 text-sky-600" />
+                  </div>
+                  <h5 className="text-xs font-bold text-slate-900">Hospedagem Nuvem / Docker</h5>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Dockerfile, docker-compose, Nginx com proxy reverso e scripts de deploy em nuvem.
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDownloadSeparatedModuleZip('CLOUD')}
+                  className="w-full py-2 px-3 rounded-xl bg-white border border-slate-300 hover:bg-sky-50 hover:border-sky-300 text-slate-700 hover:text-sky-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs transition-all"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Baixar Nuvem (.zip)</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

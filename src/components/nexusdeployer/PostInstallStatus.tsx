@@ -13,23 +13,39 @@ import {
   Clock,
   ExternalLink,
 } from 'lucide-react';
-import { NexusInstallationRecord } from '../../types';
+import { NexusInstallationRecord, NexusFileSystemValidation } from '../../types';
 
 interface PostInstallStatusProps {
   installation: NexusInstallationRecord | null;
-  onRunInstall: () => void;
-  onTestRollback: () => void;
-  onTestPermissionError: () => void;
-  isInstalling: boolean;
+  fsValidation?: NexusFileSystemValidation | null;
+  onRunInstall?: () => void;
+  onReinstall?: () => void;
+  onTestRollback?: () => void;
+  onSimulateRollback?: () => void;
+  onTestPermissionError?: () => void;
+  onTestW_OK?: () => void;
+  onValidateFs?: () => void;
+  isInstalling?: boolean;
+  isLoading?: boolean;
 }
 
 export const PostInstallStatus: React.FC<PostInstallStatusProps> = ({
   installation,
+  fsValidation,
   onRunInstall,
+  onReinstall,
   onTestRollback,
+  onSimulateRollback,
   onTestPermissionError,
-  isInstalling,
+  onTestW_OK,
+  onValidateFs,
+  isInstalling = false,
+  isLoading = false,
 }) => {
+  const handleInstall = onReinstall || onRunInstall || (() => {});
+  const handleRollback = onSimulateRollback || onTestRollback || (() => {});
+  const handlePermission = onTestW_OK || onTestPermissionError || (() => {});
+  const loading = isLoading || isInstalling;
   const formatBytes = (bytes: number): string => {
     if (!bytes || bytes === 0) return '0 B';
     const k = 1024;
@@ -54,8 +70,8 @@ export const PostInstallStatus: React.FC<PostInstallStatusProps> = ({
           </p>
         </div>
         <button
-          onClick={onRunInstall}
-          disabled={isInstalling}
+          onClick={handleInstall}
+          disabled={loading}
           className="px-5 py-2.5 rounded-md bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center gap-2"
         >
           <HardDrive className="h-4 w-4" />
@@ -109,24 +125,24 @@ export const PostInstallStatus: React.FC<PostInstallStatusProps> = ({
 
         <div className="flex items-center gap-2">
           <button
-            onClick={onRunInstall}
-            disabled={isInstalling}
+            onClick={handleInstall}
+            disabled={loading}
             className="px-3 py-1.5 rounded-md bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             <span>Reinstalar</span>
           </button>
           <button
-            onClick={onTestRollback}
-            disabled={isInstalling}
+            onClick={handleRollback}
+            disabled={loading}
             className="px-3 py-1.5 rounded-md bg-slate-900 hover:bg-rose-950/40 border border-rose-800/60 text-rose-300 transition-colors cursor-pointer disabled:opacity-50"
             title="Simula erro de gravação para validar que o buffer temporário é mantido intacto"
           >
             Testar Rollback
           </button>
           <button
-            onClick={onTestPermissionError}
-            disabled={isInstalling}
+            onClick={handlePermission}
+            disabled={loading}
             className="px-3 py-1.5 rounded-md bg-slate-900 hover:bg-amber-950/40 border border-amber-800/60 text-amber-300 transition-colors cursor-pointer disabled:opacity-50"
             title="Simula falha de permissão fs.constants.W_OK no destino"
           >

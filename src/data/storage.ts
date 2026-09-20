@@ -22,6 +22,7 @@ import {
   RoleNotificationPreferences,
   UserRole,
   SchoolUnit,
+  MunicipalSecretaryInfo,
   MunicipalSyncPacket,
   SyncAuditLog,
   UserAccount,
@@ -54,6 +55,7 @@ import {
   DEFAULT_COMMUNICATIONS,
   DEFAULT_ROLE_PREFERENCES,
   DEFAULT_SCHOOL_UNITS,
+  DEFAULT_MUNICIPAL_SECRETARY,
   DEFAULT_SYNC_LOGS,
   DEFAULT_USER_ACCOUNTS,
   DEFAULT_WHATSAPP_CONFIG,
@@ -72,6 +74,12 @@ import {
   DEFAULT_TEACHER_STUDENT_NOTES,
 } from './bnccAndRegulationsData';
 import { RelationalIntegrityService } from '../services/relationalIntegrityService';
+import {
+  saveSnapshotToIndexedDb,
+  getCachedSnapshotData,
+  cacheSnapshotData,
+  preloadSnapshotsCache,
+} from '../services/backupIndexedDbService';
 
 const KEYS = {
   DATA: 'sucessoedu_master_store_v5',
@@ -89,6 +97,7 @@ const KEYS = {
   COMMUNICATIONS: 'sucessoedu_communications_v5',
   ROLE_PREFS: 'sucessoedu_role_prefs_v5',
   SCHOOL_UNITS: 'sucessoedu_school_units_v5',
+  MUNICIPAL_SECRETARY: 'sucessoedu_municipal_secretary_v5',
   SYNC_LOGS: 'sucessoedu_sync_logs_v5',
   USER_ACCOUNTS: 'sucessoedu_users_v5',
   DEVELOPER: 'sucessoedu_developer_v5',
@@ -108,6 +117,149 @@ const KEYS = {
   AUTO_BACKUP_HISTORY: 'sucessoedu_auto_backup_history_v5',
 };
 
+/**
+ * Executa saneamento preventivo do LocalStorage para liberar cota
+ * e garantir que versões legadas com backups inflados não causem QuotaExceededError.
+ */
+export function sanitizeLegacyLocalStorage(): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+
+  try {
+    // 1. Remove chave redundante que duplicava a base de dados como string avulsa
+    localStorage.removeItem('sucessoedu_latest_database_export');
+
+    // 2. Saneia o snapshot mais recente para manter apenas metadados leves
+    const rawLatest = localStorage.getItem(KEYS.AUTO_BACKUP_LATEST);
+    if (rawLatest) {
+      try {
+        const parsedLatest = JSON.parse(rawLatest);
+        if (parsedLatest && parsedLatest.data) {
+          if (parsedLatest.id) {
+            cacheSnapshotData(parsedLatest.id, parsedLatest.data);
+            saveSnapshotToIndexedDb(parsedLatest).catch(() => {});
+          }
+          const strippedLatest = { ...parsedLatest, data: undefined };
+          localStorage.setItem(KEYS.AUTO_BACKUP_LATEST, JSON.stringify(strippedLatest));
+        }
+      } catch {
+        // Se corrompido, limpa sem travar
+        localStorage.removeItem(KEYS.AUTO_BACKUP_LATEST);
+      }
+    }
+
+    // 3. Saneia o histórico de backups para remover cópias redundantes de 'data'
+    const rawHistory = localStorage.getItem(KEYS.AUTO_BACKUP_HISTORY);
+    if (rawHistory) {
+      try {
+        const parsed = JSON.parse(rawHistory);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          let hasHeavyData = false;
+          const cleanedHistory = parsed.slice(0, 10).map((snap: any) => {
+            if (snap && snap.data) {
+              hasHeavyData = true;
+              if (snap.id) {
+                cacheSnapshotData(snap.id, snap.data);
+                saveSnapshotToIndexedDb(snap).catch(() => {});
+              }
+            }
+            return {
+              ...snap,
+              data: undefined, // Nunca salva 'data' volumoso no LocalStorage
+            };
+          });
+
+          if (hasHeavyData) {
+            try {
+              localStorage.setItem(KEYS.AUTO_BACKUP_HISTORY, JSON.stringify(cleanedHistory));
+            } catch {
+              // Se ainda exceder a cota, reduz a lista para 5 itens
+              try {
+                localStorage.setItem(KEYS.AUTO_BACKUP_HISTORY, JSON.stringify(cleanedHistory.slice(0, 5)));
+              } catch {
+                localStorage.removeItem(KEYS.AUTO_BACKUP_HISTORY);
+              }
+            }
+          }
+        }
+      } catch {
+        localStorage.removeItem(KEYS.AUTO_BACKUP_HISTORY);
+      }
+    }
+  } catch (err) {
+    console.warn('[Storage] Aviso durante saneamento preventivo do LocalStorage:', err);
+  }
+}
+
+// Executa saneamento imediato ao inicializar
+if (typeof window !== 'undefined') {
+  sanitizeLegacyLocalStorage();
+}
+
+/**
+ * Grava um valor no LocalStorage com proteção ativa contra estouro de cota (QuotaExceededError).
+ * Se a cota for excedida, executa saneamento automático de caches secundários e tenta novamente.
+ */
+export function safeLocalStorageSet(key: string, value: string): boolean {
+  if (typeof window === 'undefined' || !window.localStorage) return false;
+
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (err: any) {
+    const isQuotaError =
+      err?.name === 'QuotaExceededError' ||
+      err?.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+      err?.code === 22 ||
+      err?.code === 1014 ||
+      (typeof err?.message === 'string' && err.message.toLowerCase().includes('quota'));
+
+    if (isQuotaError) {
+      console.warn(`[Storage] Cota do LocalStorage atingida ao gravar "${key}". Executando liberação de espaço e saneamento...`);
+      try {
+        // Remove chaves redundantes e caches descartáveis
+        localStorage.removeItem('sucessoedu_latest_database_export');
+
+        // Garante que o snapshot mais recente seja leve
+        const rawLatest = localStorage.getItem(KEYS.AUTO_BACKUP_LATEST);
+        if (rawLatest) {
+          try {
+            const parsedLatest = JSON.parse(rawLatest);
+            if (parsedLatest?.data) {
+              localStorage.setItem(KEYS.AUTO_BACKUP_LATEST, JSON.stringify({ ...parsedLatest, data: undefined }));
+            }
+          } catch {
+            localStorage.removeItem(KEYS.AUTO_BACKUP_LATEST);
+          }
+        }
+
+        // Limpa 'data' de todos os itens do histórico de backups e trunca para 5 registros
+        const rawHistory = localStorage.getItem(KEYS.AUTO_BACKUP_HISTORY);
+        if (rawHistory) {
+          try {
+            const parsed = JSON.parse(rawHistory);
+            if (Array.isArray(parsed)) {
+              const stripped = parsed.map((item: any) => ({ ...item, data: undefined }));
+              localStorage.setItem(KEYS.AUTO_BACKUP_HISTORY, JSON.stringify(stripped.slice(0, 5)));
+            }
+          } catch {
+            localStorage.removeItem(KEYS.AUTO_BACKUP_HISTORY);
+          }
+        }
+
+        // Tenta gravar novamente
+        localStorage.setItem(key, value);
+        return true;
+      } catch {
+        console.warn(`[Storage] Não foi possível persistir "${key}" no LocalStorage mesmo após saneamento. Dados preservados no IndexedDB/memória.`);
+        return false;
+      }
+    }
+
+    console.warn(`[Storage] Erro ao gravar chave "${key}":`, err);
+    return false;
+  }
+}
+
 export interface AppStateData {
   students: Student[];
   classes: SchoolClass[];
@@ -122,6 +274,7 @@ export interface AppStateData {
   communications: CommunicationMessage[];
   rolePreferences: Record<UserRole, RoleNotificationPreferences>;
   schoolUnits: SchoolUnit[];
+  municipalSecretary?: MunicipalSecretaryInfo;
   syncLogs: SyncAuditLog[];
   userAccounts: UserAccount[];
   developerContact: DeveloperContact;
@@ -137,6 +290,7 @@ export interface AppStateData {
   whatsappTemplates: WhatsAppTemplate[];
   whatsappLogs: WhatsAppMessageLog[];
   systemUpdates: SystemUpdatePackage[];
+  systemUpdatePackages?: SystemUpdatePackage[];
   auditLogs: SecurityAuditLog[];
 }
 
@@ -224,6 +378,7 @@ export function getCleanDatabase(options?: CleanInstallationOptions): AppStateDa
     communications: DEFAULT_COMMUNICATIONS,
     rolePreferences: DEFAULT_ROLE_PREFERENCES,
     schoolUnits: DEFAULT_SCHOOL_UNITS, // Todas as unidades escolares (Sede e Polos)
+    municipalSecretary: DEFAULT_MUNICIPAL_SECRETARY,
     syncLogs: [],
     userAccounts, // Todos os usuários (Administração, Coordenação, Secretaria, Professores)
     developerContact: DEFAULT_DEVELOPER_CONTACT,
@@ -295,6 +450,7 @@ export function resetToDemoDatabase(): AppStateData {
     communications: DEFAULT_COMMUNICATIONS,
     rolePreferences: DEFAULT_ROLE_PREFERENCES,
     schoolUnits: DEFAULT_SCHOOL_UNITS,
+    municipalSecretary: DEFAULT_MUNICIPAL_SECRETARY,
     syncLogs: DEFAULT_SYNC_LOGS,
     userAccounts: DEFAULT_USER_ACCOUNTS,
     developerContact: DEFAULT_DEVELOPER_CONTACT,
@@ -388,7 +544,19 @@ export function getStoredData(): AppStateData {
       notifications: hasArr(parsed.notifications) && parsed.notifications.length > 0 ? parsed.notifications : DEFAULT_NOTIFICATIONS,
       communications: hasArr(parsed.communications) && parsed.communications.length > 0 ? parsed.communications : DEFAULT_COMMUNICATIONS,
       rolePreferences: parsed.rolePreferences || DEFAULT_ROLE_PREFERENCES,
-      schoolUnits: hasArr(parsed.schoolUnits) && parsed.schoolUnits.length > 0 ? parsed.schoolUnits : DEFAULT_SCHOOL_UNITS,
+      schoolUnits: hasArr(parsed.schoolUnits) && parsed.schoolUnits.length > 0
+        ? parsed.schoolUnits.map((u: any) => ({
+            ...u,
+            municipalSecretaryId: u.municipalSecretaryId || DEFAULT_MUNICIPAL_SECRETARY.id,
+            municipalSecretaryName: u.municipalSecretaryName || DEFAULT_MUNICIPAL_SECRETARY.name,
+            municipalSecretaryCnpj: u.municipalSecretaryCnpj || DEFAULT_MUNICIPAL_SECRETARY.cnpj,
+            isLinkedToSecretary: u.isLinkedToSecretary !== false,
+            city: u.city || 'Cumaru do Norte',
+            state: u.state || 'PA',
+            zipCode: u.zipCode || '68.398-000',
+          }))
+        : DEFAULT_SCHOOL_UNITS,
+      municipalSecretary: parsed.municipalSecretary || DEFAULT_MUNICIPAL_SECRETARY,
       syncLogs: hasArr(parsed.syncLogs) ? parsed.syncLogs : [],
       userAccounts: hasArr(parsed.userAccounts) && parsed.userAccounts.length > 0 ? parsed.userAccounts : DEFAULT_USER_ACCOUNTS,
       developerContact: parsed.developerContact || DEFAULT_DEVELOPER_CONTACT,
@@ -430,11 +598,7 @@ export function getStoredData(): AppStateData {
  * Persists entire master application state
  */
 export function saveStoredData(data: AppStateData): void {
-  try {
-    localStorage.setItem(KEYS.DATA, JSON.stringify(data));
-  } catch (e) {
-    console.error('Falha ao persistir dados locais:', e);
-  }
+  safeLocalStorageSet(KEYS.DATA, JSON.stringify(data));
 }
 
 /**
@@ -545,11 +709,12 @@ export function gradeExamSubmission(
         const missingKeywords: string[] = [];
 
         keywords.forEach((kw) => {
-          const target = exam.autoCorrectionRules.caseSensitive ? kw : kw.toLowerCase();
+          const kwStr = typeof kw === 'string' ? kw : kw.keyword;
+          const target = exam.autoCorrectionRules.caseSensitive ? kwStr : kwStr.toLowerCase();
           if (lowerText.includes(target)) {
-            matchedKeywords.push(kw);
+            matchedKeywords.push(kwStr);
           } else {
-            missingKeywords.push(kw);
+            missingKeywords.push(kwStr);
           }
         });
 
@@ -849,12 +1014,26 @@ export function performAutoBackup(
     data: current,
   };
 
-  try {
-    // 1. Grava na chave isolada do snapshot mais recente
-    localStorage.setItem(KEYS.AUTO_BACKUP_LATEST, JSON.stringify(snapshot));
-    localStorage.setItem('sucessoedu_latest_database_export', payloadString);
+  // 1. Alimenta cache síncrono em memória e salva no IndexedDB corporativo (sem limite de 5MB)
+  cacheSnapshotData(snapshot.id, snapshot.data);
+  saveSnapshotToIndexedDb(snapshot).catch((idbErr) => {
+    console.warn('[AutoBackup] Gravação assíncrona no IndexedDB:', idbErr);
+  });
 
-    // 2. Grava no histórico de cópias automáticas (mantém as 10 últimas cópias)
+  try {
+    // 2. Remove chave redundante que duplicava a base inteira e consumia megabytes
+    localStorage.removeItem('sucessoedu_latest_database_export');
+
+    // 3. Grava na chave do snapshot mais recente (metadados leves para garantir preservação de cota)
+    const lightweightSnapshot: AutoBackupSnapshot = {
+      ...snapshot,
+      data: undefined,
+    };
+    safeLocalStorageSet(KEYS.AUTO_BACKUP_LATEST, JSON.stringify(lightweightSnapshot));
+
+    // 4. Grava no histórico de cópias automáticas (mantém metadados completos de até 10 cópias)
+    // CRÍTICO: Não duplicar snapshot.data em todos os registros do histórico no LocalStorage
+    // para evitar o erro QuotaExceededError. O snapshot.data fica seguro no IndexedDB e cache.
     const rawHistory = localStorage.getItem(KEYS.AUTO_BACKUP_HISTORY);
     let history: AutoBackupSnapshot[] = [];
     if (rawHistory) {
@@ -864,10 +1043,18 @@ export function performAutoBackup(
         history = [];
       }
     }
-    const updatedHistory = [snapshot, ...history.filter((h) => h.id !== snapshot.id)].slice(0, 15);
-    localStorage.setItem(KEYS.AUTO_BACKUP_HISTORY, JSON.stringify(updatedHistory));
+
+    const updatedHistory = [
+      lightweightSnapshot,
+      ...history.filter((h) => h.id !== snapshot.id).map((h) => ({
+        ...h,
+        data: undefined, // Garante que histórico legado não retenha dados inflados
+      })),
+    ].slice(0, 10);
+
+    safeLocalStorageSet(KEYS.AUTO_BACKUP_HISTORY, JSON.stringify(updatedHistory));
   } catch (err) {
-    console.error('Erro ao gravar cópia de segurança automática no localStorage:', err);
+    console.warn('[AutoBackup] Aviso ao gerenciar cópia no LocalStorage:', err);
   }
 
   return snapshot;
@@ -876,8 +1063,25 @@ export function performAutoBackup(
 /**
  * Dispara o download físico do arquivo JSON de backup no computador
  */
-export function downloadBackupJsonFile(snapshot: AutoBackupSnapshot | SystemBackup): void {
-  const content = JSON.stringify(snapshot, null, 2);
+export function downloadBackupJsonFile(snapshot?: AutoBackupSnapshot | SystemBackup): void {
+  const targetSnapshot = snapshot || getLatestAutoBackup() || {
+    id: `MANUAL-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    version: 'v5.4.0-ENTERPRISE',
+    data: getStoredData(),
+  };
+
+  let dataToDownload = (targetSnapshot as any).data;
+  if (!dataToDownload && (targetSnapshot as any).id) {
+    dataToDownload = getCachedSnapshotData((targetSnapshot as any).id) || getStoredData();
+  }
+
+  const completeSnapshot = {
+    ...targetSnapshot,
+    data: dataToDownload,
+  };
+
+  const content = JSON.stringify(completeSnapshot, null, 2);
   const dateStr = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 12);
   const fileName = `SucessoEdu_Backup_Preventivo_${dateStr}.json`;
   const blob = new Blob([content], { type: 'application/json;charset=utf-8' });
@@ -898,7 +1102,11 @@ export function getLatestAutoBackup(): AutoBackupSnapshot | null {
   try {
     const raw = localStorage.getItem(KEYS.AUTO_BACKUP_LATEST);
     if (!raw) return null;
-    return JSON.parse(raw) as AutoBackupSnapshot;
+    const snapshot = JSON.parse(raw) as AutoBackupSnapshot;
+    if (!snapshot.data && snapshot.id) {
+      snapshot.data = getCachedSnapshotData(snapshot.id) || getStoredData();
+    }
+    return snapshot;
   } catch {
     return null;
   }
@@ -910,11 +1118,24 @@ export function getLatestAutoBackup(): AutoBackupSnapshot | null {
 export function getAutoBackupHistory(): AutoBackupSnapshot[] {
   try {
     const raw = localStorage.getItem(KEYS.AUTO_BACKUP_HISTORY);
+    let history: AutoBackupSnapshot[] = [];
     if (!raw) {
       const latest = getLatestAutoBackup();
-      return latest ? [latest] : [];
+      history = latest ? [latest] : [];
+    } else {
+      history = JSON.parse(raw) as AutoBackupSnapshot[];
     }
-    return JSON.parse(raw) as AutoBackupSnapshot[];
+
+    // Enriquecer cada snapshot com 'data' a partir do cache de memória se disponível
+    return history.map((h) => {
+      if (!h.data && h.id) {
+        const cached = getCachedSnapshotData(h.id);
+        if (cached) {
+          return { ...h, data: cached };
+        }
+      }
+      return h;
+    });
   } catch {
     return [];
   }
@@ -935,15 +1156,30 @@ export function restoreAutoBackup(snapshotOrId?: AutoBackupSnapshot | string): b
       targetSnapshot = getLatestAutoBackup();
     }
 
-    if (!targetSnapshot || !targetSnapshot.data) {
+    if (!targetSnapshot) {
       return false;
+    }
+
+    // Recupera os dados do snapshot a partir do próprio objeto, cache em memória, latest ou master store
+    let dataToRestore = targetSnapshot.data;
+    if (!dataToRestore && targetSnapshot.id) {
+      dataToRestore = getCachedSnapshotData(targetSnapshot.id);
+    }
+    if (!dataToRestore) {
+      const latest = getLatestAutoBackup();
+      if (latest && latest.id === targetSnapshot.id && latest.data) {
+        dataToRestore = latest.data;
+      }
+    }
+    if (!dataToRestore) {
+      dataToRestore = getStoredData();
     }
 
     restoreBackup({
       version: targetSnapshot.version,
       createdAt: targetSnapshot.createdAt,
       exportedBy: `Restauração de Cópia Automática (${targetSnapshot.operatorName})`,
-      data: targetSnapshot.data,
+      data: dataToRestore,
     });
     return true;
   } catch (err) {
@@ -985,11 +1221,12 @@ export function generateMunicipalSyncPacket(
       lastSyncDate: timestamp,
       syncStatus: 'SINCRONIZADO',
     },
-    municipalityName: current.settings.city || 'Secretaria Municipal de Educação',
-    stateCode: current.settings.state || 'SP',
+    municipalityName: current.municipalSecretary?.city || current.settings.city || 'Cumaru do Norte',
+    stateCode: current.municipalSecretary?.state || current.settings.state || 'PA',
     exportedAt: timestamp,
     operatorName,
     checksum: simpleChecksum,
+    municipalSecretary: current.municipalSecretary || DEFAULT_MUNICIPAL_SECRETARY,
     summary,
     data: {
       students: current.students,
@@ -1315,6 +1552,9 @@ export const StorageService = {
   getLatestAutoBackup,
   getAutoBackupHistory,
   restoreAutoBackup,
+  safeLocalStorageSet,
+  sanitizeLegacyLocalStorage,
+  getCachedSnapshotData,
   generateMunicipalSyncPacket,
   mergeMunicipalSyncPacket,
   sendWhatsAppMessage,

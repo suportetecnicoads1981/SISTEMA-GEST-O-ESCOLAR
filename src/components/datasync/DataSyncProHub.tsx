@@ -30,6 +30,7 @@ import { SchemaManager } from '../../services/datasync/SchemaManager';
 import { StorageController } from '../../services/datasync/StorageController';
 import { BackupZipRecord, StoredAsset } from '../../types/datasync';
 import { RelationalIntegrityDashboard } from '../admin/RelationalIntegrityDashboard';
+import { DatabaseAutomationDashbox } from './DatabaseAutomationDashbox';
 import { getStoredData, AppStateData } from '../../data/storage';
 
 type DataSyncTab =
@@ -270,6 +271,9 @@ export const DataSyncProHub: React.FC = () => {
 
       {/* Conteúdo da Aba Selecionada */}
       <div className="space-y-6">
+        {/* Dashbox Global de Automação do Banco de Dados */}
+        <DatabaseAutomationDashbox />
+
         {activeTab === 'DATABASE_SYNC' && (
           <SupabaseLiveDatabaseView />
         )}

@@ -392,7 +392,42 @@ export function generateFullStandaloneAppHtml(
       gap: 3px;
       flex-shrink: 0;
       max-height: calc(100vh - 63px);
-      overflow-y: auto;
+      height: calc(100vh - 63px);
+      overflow-y: scroll;
+      scrollbar-width: thin;
+      scrollbar-color: #6366f1 #090d16;
+      scrollbar-gutter: stable;
+      direction: rtl;
+    }
+
+    aside.sidebar > * {
+      direction: ltr;
+    }
+
+    aside.sidebar::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    aside.sidebar::-webkit-scrollbar-track {
+      background: #090d16;
+      border-radius: 9999px;
+      margin: 4px 0;
+    }
+
+    aside.sidebar::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 9999px;
+      border: 2px solid #090d16;
+      min-height: 48px;
+      transition: background-color 0.2s ease;
+    }
+
+    aside.sidebar::-webkit-scrollbar-thumb:hover {
+      background: #6366f1;
+    }
+
+    aside.sidebar::-webkit-scrollbar-thumb:active {
+      background: #818cf8;
     }
     
     .sidebar-section-title {
@@ -452,11 +487,97 @@ export function generateFullStandaloneAppHtml(
     /* Content Area */
     main.content-area {
       flex: 1;
-      padding: 22px 28px;
+      padding: 0 28px 28px 28px;
       max-width: 1400px;
       margin: 0 auto;
       width: 100%;
       overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Workspace Tabs Bar */
+    .workspace-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px 0;
+      background: #ffffff;
+      border-bottom: 1px solid var(--border-color);
+      border-radius: 0 0 10px 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      overflow-x: auto;
+      white-space: nowrap;
+      margin-bottom: 18px;
+    }
+    .workspace-back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      border: 1px solid var(--border-color);
+      background: #f8fafc;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .workspace-back-btn:hover:not(:disabled) {
+      background: #f1f5f9;
+      color: #0f172a;
+    }
+    .workspace-back-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+    .workspace-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 8px 8px 0 0;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      border: 1px solid transparent;
+      border-bottom: none;
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.15s;
+      position: relative;
+    }
+    .workspace-tab:hover {
+      background: #f8fafc;
+      color: #0f172a;
+    }
+    .workspace-tab.active {
+      background: #f8fafc;
+      color: var(--primary);
+      font-weight: 700;
+      border-color: var(--border-color);
+      border-top: 2px solid var(--primary);
+      box-shadow: 0 -2px 6px rgba(79, 70, 229, 0.08);
+    }
+    .workspace-tab-close {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      font-size: 10px;
+      color: #94a3b8;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-left: 4px;
+    }
+    .workspace-tab-close:hover {
+      background: #fee2e2;
+      color: #ef4444;
     }
 
     /* Standard Cards & Surfaces */
@@ -888,10 +1009,402 @@ export function generateFullStandaloneAppHtml(
     }
     .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--primary); }
 
+    /* Windows Desktop Layout Elements */
+    .win-titlebar {
+      height: 32px;
+      background: #030712;
+      color: #94a3b8;
+      border-bottom: 1px solid #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4px 0 10px;
+      font-size: 11px;
+      user-select: none;
+      z-index: 70;
+      position: sticky;
+      top: 0;
+    }
+    .win-titlebar-left { display: flex; align-items: center; gap: 8px; }
+    .win-app-brand { display: flex; align-items: center; gap: 6px; font-weight: 800; color: #f8fafc; cursor: pointer; }
+    .win-menu-bar { display: flex; align-items: center; gap: 2px; }
+    .win-menu-item {
+      position: relative;
+    }
+    .win-menu-btn {
+      background: transparent;
+      border: none;
+      color: #cbd5e1;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .win-menu-btn:hover, .win-menu-btn.active {
+      background: #1e293b;
+      color: #ffffff;
+    }
+    .win-dropdown-panel {
+      display: none;
+      position: absolute;
+      top: 26px;
+      left: 0;
+      min-width: 220px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.5);
+      padding: 4px;
+      z-index: 1000;
+    }
+    .win-dropdown-panel.show { display: block; }
+    .win-dropdown-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: #e2e8f0;
+      font-size: 11.5px;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .win-dropdown-item:hover { background: #1e293b; color: #60a5fa; }
+    .win-dropdown-divider { height: 1px; background: #334155; margin: 4px 0; }
+    
+    .win-titlebar-center {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #cbd5e1;
+      font-weight: 600;
+      pointer-events: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 40vw;
+    }
+    .win-titlebar-right { display: flex; align-items: center; }
+    .win-ctl-btn {
+      width: 36px;
+      height: 32px;
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .win-ctl-btn:hover { background: #1e293b; color: #fff; }
+    .win-ctl-btn.close:hover { background: #dc2626; color: #fff; }
+
+    /* Windows Taskbar at Bottom */
+    .win-taskbar {
+      height: 40px;
+      background: #090d16;
+      border-top: 1px solid #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 8px;
+      position: sticky;
+      bottom: 0;
+      z-index: 70;
+      user-select: none;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+    }
+    .win-taskbar-left { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; overflow-x: auto; }
+    .win-btn-start {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #ffffff;
+      padding: 5px 12px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .win-btn-start:hover, .win-btn-start.active {
+      background: #2563eb;
+      border-color: #3b82f6;
+      box-shadow: 0 0 12px rgba(37, 99, 235, 0.5);
+    }
+    .win-start-quad {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5px;
+      width: 13px;
+      height: 13px;
+    }
+    .win-start-quad div { border-radius: 1px; }
+    .win-start-quad .q1 { background: #38bdf8; }
+    .win-start-quad .q2 { background: #3b82f6; }
+    .win-start-quad .q3 { background: #6366f1; }
+    .win-start-quad .q4 { background: #1d4ed8; }
+
+    .win-btn-search {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid #334155;
+      color: #94a3b8;
+      padding: 5px 10px;
+      border-radius: 7px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .win-btn-search:hover { background: #1e293b; color: #e2e8f0; }
+
+    .win-taskbar-apps { display: flex; align-items: center; gap: 4px; min-width: 0; }
+    .win-task-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      position: relative;
+      white-space: nowrap;
+      max-width: 150px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .win-task-item:hover { background: #1e293b; color: #f8fafc; }
+    .win-task-item.active {
+      background: #1e293b;
+      color: #ffffff;
+      font-weight: 700;
+    }
+    .win-task-item.active::after {
+      content: '';
+      position: absolute;
+      bottom: 1px;
+      left: 6px;
+      right: 6px;
+      height: 2.5px;
+      background: #3b82f6;
+      border-radius: 2px;
+    }
+
+    .win-taskbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .win-system-status-tag {
+      font-size: 10px;
+      color: #10b981;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 700;
+    }
+    .win-system-tray {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #cbd5e1;
+      font-size: 12px;
+    }
+    .win-tray-icon { padding: 4px; border-radius: 5px; cursor: pointer; }
+    .win-tray-icon:hover { background: #1e293b; }
+    .win-clock-tray {
+      text-align: right;
+      padding: 2px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      line-height: 1.15;
+    }
+    .win-clock-tray:hover { background: #1e293b; }
+    .win-clock-time { font-size: 11px; font-weight: 700; color: #f8fafc; }
+    .win-clock-date { font-size: 9.5px; color: #94a3b8; }
+    .win-show-desktop {
+      width: 6px;
+      height: 28px;
+      border-left: 1px solid #334155;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .win-show-desktop:hover { background: #3b82f6; }
+
+    /* Windows 11 Start Menu Pop-out */
+    #win-start-menu {
+      display: none;
+      position: fixed;
+      bottom: 48px;
+      left: 12px;
+      width: 620px;
+      max-width: 95vw;
+      max-height: 80vh;
+      background: rgba(15, 23, 42, 0.96);
+      border: 1px solid #334155;
+      border-radius: 16px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06);
+      backdrop-filter: blur(20px);
+      z-index: 9999;
+      flex-direction: column;
+      overflow: hidden;
+      animation: winStartPop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    #win-start-menu.open { display: flex; }
+    @keyframes winStartPop {
+      from { opacity: 0; transform: translateY(12px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .win-start-search-box {
+      padding: 14px 16px;
+      border-bottom: 1px solid #1e293b;
+    }
+    .win-start-search-box input {
+      width: 100%;
+      background: #020617;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 9px 14px 9px 34px;
+      color: #fff;
+      font-size: 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .win-start-search-box input:focus { border-color: #3b82f6; }
+    .win-start-search-wrap { position: relative; }
+    .win-start-search-wrap::before {
+      content: '🔍';
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 12px;
+      pointer-events: none;
+    }
+    .win-start-body {
+      padding: 14px;
+      overflow-y: auto;
+      flex: 1;
+      max-height: calc(80vh - 120px);
+    }
+    .win-start-section-title {
+      font-size: 11px;
+      font-weight: 800;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .win-start-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 540px) {
+      .win-start-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    .win-start-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid #1e293b;
+      padding: 8px 10px;
+      border-radius: 10px;
+      color: #e2e8f0;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
+    }
+    .win-start-card:hover {
+      background: #1e293b;
+      border-color: #3b82f6;
+      color: #fff;
+      transform: translateY(-1px);
+    }
+    .win-card-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .win-card-title { font-size: 11.5px; font-weight: 700; color: #f8fafc; line-height: 1.1; }
+    .win-card-sub { font-size: 9.5px; color: #94a3b8; margin-top: 2px; }
+
+    .win-start-footer {
+      padding: 10px 16px;
+      background: #020617;
+      border-top: 1px solid #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .win-start-user {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .win-start-user-avatar {
+      width: 30px;
+      height: 30px;
+      background: linear-gradient(135deg, #2563eb, #6366f1);
+      border-radius: 8px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 900;
+    }
+    .win-start-user-name { font-size: 11.5px; font-weight: 800; color: #fff; }
+    .win-start-user-role { font-size: 9.5px; color: #60a5fa; font-weight: 600; }
+    .win-start-power-btn {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #f8fafc;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s;
+    }
+    .win-start-power-btn:hover { background: #dc2626; border-color: #ef4444; }
+
     /* Printable Area */
     @media print {
       body { background: #fff !important; color: #000 !important; }
-      header, aside.sidebar, .btn, .toolbar-filter, .no-print { display: none !important; }
+      .win-titlebar, .win-taskbar, #win-start-menu, header, aside.sidebar, .btn, .toolbar-filter, .no-print { display: none !important; }
       main.content-area { padding: 0 !important; max-width: 100% !important; margin: 0 !important; }
       .card { background: #fff !important; border: 1px solid #ddd !important; box-shadow: none !important; padding: 20px !important; color: #000 !important; }
       .card-title-clean, h1, h2, h3, h4, p, span, td, th { color: #000 !important; }
@@ -902,9 +1415,81 @@ export function generateFullStandaloneAppHtml(
 </head>
 <body>
 
+  <!-- Windows Title Bar -->
+  <div class="win-titlebar no-print">
+    <div class="win-titlebar-left">
+      <div class="win-app-brand" onclick="toggleWindowsStartMenu()" title="Clique para abrir o Menu Iniciar">
+        <div class="win-start-quad">
+          <div class="q1"></div><div class="q2"></div>
+          <div class="q3"></div><div class="q4"></div>
+        </div>
+        <span>SucessoEdu</span>
+      </div>
+      <nav class="win-menu-bar">
+        <div class="win-menu-item">
+          <button class="win-menu-btn" onclick="toggleWinMenu(event, 'win-menu-arquivo')">Arquivo</button>
+          <div class="win-dropdown-panel" id="win-menu-arquivo">
+            <button class="win-dropdown-item" onclick="navigateToTab('MAIN_DASHBOARD')"><span>📊 Visão Geral</span><kbd>Alt+D</kbd></button>
+            <button class="win-dropdown-item" onclick="navigateToTab('STUDENTS')"><span>👥 Alunos & Matrículas</span><kbd>Alt+S</kbd></button>
+            <button class="win-dropdown-item" onclick="navigateToTab('DIARY_GRADES')"><span>📝 Diário & Notas</span><kbd>Alt+N</kbd></button>
+            <div class="win-dropdown-divider"></div>
+            <button class="win-dropdown-item" onclick="window.print()"><span>🖨️ Imprimir Página</span><kbd>Ctrl+P</kbd></button>
+            <button class="win-dropdown-item" onclick="downloadBackupJsonDirect()"><span>💾 Exportar Backup</span></button>
+            <div class="win-dropdown-divider"></div>
+            <button class="win-dropdown-item" onclick="confirmExitWindowsApp()"><span>🚪 Sair do Sistema</span><kbd>Alt+F4</kbd></button>
+          </div>
+        </div>
+        <div class="win-menu-item">
+          <button class="win-menu-btn" onclick="toggleWinMenu(event, 'win-menu-exibir')">Exibir</button>
+          <div class="win-dropdown-panel" id="win-menu-exibir">
+            <button class="win-dropdown-item" onclick="toggleSidebarCollapse()"><span>🗂️ Alternar Barra Lateral</span><kbd>Alt+B</kbd></button>
+            <button class="win-dropdown-item" onclick="toggleWindowsFullscreen()"><span>🗖 Tela Cheia (Fullscreen)</span><kbd>F11</kbd></button>
+            <button class="win-dropdown-item" onclick="toggleWindowsStartMenu()"><span>🪟 Menu Iniciar</span><kbd>Ctrl+Esc</kbd></button>
+            <div class="win-dropdown-divider"></div>
+            <button class="win-dropdown-item" onclick="toggleSidebarScrollbarPosition()"><span>↔️ Mudar Lado da Rolagem</span></button>
+          </div>
+        </div>
+        <div class="win-menu-item">
+          <button class="win-menu-btn" onclick="toggleWinMenu(event, 'win-menu-ferramentas')">Ferramentas</button>
+          <div class="win-dropdown-panel" id="win-menu-ferramentas">
+            <button class="win-dropdown-item" onclick="navigateToTab('CENSUS_INEP')"><span>🏛️ Censo Escolar INEP</span><kbd>Alt+C</kbd></button>
+            <button class="win-dropdown-item" onclick="navigateToTab('NETWORK_INSTALLER')"><span>🌐 Instaladores de Rede</span><kbd>Alt+I</kbd></button>
+            <button class="win-dropdown-item" onclick="navigateToTab('INSTALAFLOW')"><span>📦 InstalaFlow Offline</span></button>
+            <button class="win-dropdown-item" onclick="openGlobalSearchModal()"><span>🔍 Busca Rápida</span><kbd>Ctrl+K</kbd></button>
+          </div>
+        </div>
+        <div class="win-menu-item">
+          <button class="win-menu-btn" onclick="toggleWinMenu(event, 'win-menu-ajuda')">Ajuda</button>
+          <div class="win-dropdown-panel" id="win-menu-ajuda">
+            <button class="win-dropdown-item" onclick="openVersionControlModal()"><span>✨ Controle de Versões v5.4.1</span></button>
+            <button class="win-dropdown-item" onclick="navigateToTab('ABOUT')"><span>ℹ️ Sobre o SucessoEdu</span><kbd>Alt+A</kbd></button>
+            <button class="win-dropdown-item" onclick="openShortcutsGuideModal()"><span>⌨️ Guia de Teclas de Atalho</span></button>
+          </div>
+        </div>
+      </nav>
+    </div>
+
+    <div class="win-titlebar-center">
+      SucessoEdu Gestão Educacional — <span id="win-titlebar-tab-name">Visão Geral</span>
+    </div>
+
+    <div class="win-titlebar-right">
+      <button class="win-ctl-btn" onclick="toggleSidebarCollapse()" title="Recolher / Expandir Menu Lateral (Alt+B)">—</button>
+      <button class="win-ctl-btn" onclick="toggleWindowsFullscreen()" title="Maximizar / Tela Cheia (F11)">🗖</button>
+      <button class="win-ctl-btn close" onclick="confirmExitWindowsApp()" title="Fechar / Encerrar Sessão (Alt+F4)">✕</button>
+    </div>
+  </div>
+
   <!-- Top Header -->
   <header>
     <div class="header-left">
+      <button class="win-btn-start no-print" onclick="toggleWindowsStartMenu()" title="Abrir Menu Iniciar do SucessoEdu (Ctrl+Esc)">
+        <div class="win-start-quad">
+          <div class="q1"></div><div class="q2"></div>
+          <div class="q3"></div><div class="q4"></div>
+        </div>
+        <span>Iniciar</span>
+      </button>
       <div class="brand-box" onclick="navigateToTab('MAIN_DASHBOARD')">
         <div class="brand-icon">🎓</div>
         <div class="brand-text">
@@ -1081,8 +1666,12 @@ export function generateFullStandaloneAppHtml(
     </aside>
 
     <!-- Main Content Area -->
-    <main class="content-area" id="main-content-view">
-      <!-- Dynamic Views rendered via JavaScript -->
+    <main class="content-area">
+      <!-- Workspace Navigation Tabs Bar -->
+      <div id="workspace-tabs-container" class="no-print"></div>
+      <div id="main-content-view" style="flex: 1;">
+        <!-- Dynamic Views rendered via JavaScript -->
+      </div>
     </main>
   </div>
 
@@ -1777,6 +2366,192 @@ Bruno Oliveira; 2026-102; 234.567.890-11; (13) 99777-2233; Denise Oliveira"></te
     </div>
   </div>
 
+  <!-- BARRA DE TAREFAS DO WINDOWS NO RODAPÉ (TASKBAR) -->
+  <div class="win-taskbar no-print" id="win-taskbar">
+    <div class="win-taskbar-left">
+      <button class="win-btn-start" id="win-taskbar-start-btn" onclick="toggleWindowsStartMenu()" title="Iniciar (Ctrl+Esc)">
+        <div class="win-start-quad">
+          <div class="q1"></div><div class="q2"></div>
+          <div class="q3"></div><div class="q4"></div>
+        </div>
+        <span>Iniciar</span>
+      </button>
+
+      <button class="win-btn-search" onclick="openGlobalSearchModal()" title="Pesquisar módulos, alunos ou turmas (Ctrl+K)">
+        <span>🔍</span>
+        <span>Pesquisar...</span>
+      </button>
+
+      <!-- Apps ativos na barra de tarefas -->
+      <div class="win-taskbar-apps" id="win-taskbar-apps-container"></div>
+    </div>
+
+    <div class="win-taskbar-right">
+      <div class="win-system-status-tag" title="Servidor Autônomo e Banco de Dados 100% Funcionais">
+        <span>🟢</span>
+        <span id="win-taskbar-status-text">Pronto</span>
+      </div>
+
+      <div class="win-system-tray">
+        <span class="win-tray-icon" onclick="openNotificationsModal()" title="Notificações do Sistema">🔔</span>
+        <span class="win-tray-icon" title="Servidor de Rede Local Ativo">📶</span>
+        <span class="win-tray-icon" title="Áudio e Sons do Sistema">🔊</span>
+      </div>
+
+      <div class="win-clock-tray" onclick="openVersionControlModal()" title="Data, Hora e Versão do SucessoEdu">
+        <div class="win-clock-time" id="win-taskbar-clock-time">--:--</div>
+        <div class="win-clock-date" id="win-taskbar-clock-date">--/--/----</div>
+      </div>
+
+      <div class="win-show-desktop" onclick="toggleSidebarCollapse()" title="Alternar Barra Lateral / Foco Total (Alt+B)"></div>
+    </div>
+  </div>
+
+  <!-- MENU INICIAR DO WINDOWS 11 FLUTUANTE -->
+  <div id="win-start-menu" class="no-print">
+    <div class="win-start-search-box">
+      <div class="win-start-search-wrap">
+        <input type="text" id="win-start-search-input" placeholder="Digite para pesquisar módulos, ferramentas ou configurações..." oninput="filterWindowsStartApps(this.value)">
+      </div>
+    </div>
+
+    <div class="win-start-body">
+      <div class="win-start-section-title">
+        <span>Aplicativos Fixados</span>
+        <span style="font-size: 10px; color: #60a5fa; cursor: pointer;" onclick="filterWindowsStartApps('')">Todos</span>
+      </div>
+
+      <div class="win-start-grid" id="win-start-apps-grid">
+        <div class="win-start-card" onclick="winStartNavigate('MAIN_DASHBOARD')">
+          <div class="win-card-icon" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa;">📊</div>
+          <div>
+            <div class="win-card-title">Visão Geral</div>
+            <div class="win-card-sub">Painel &amp; Indicadores</div>
+          </div>
+        </div>
+
+        <div class="win-start-card" onclick="winStartNavigate('STUDENTS')">
+          <div class="win-card-icon" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">👥</div>
+          <div>
+            <div class="win-card-title">Secretaria &amp; Alunos</div>
+            <div class="win-card-sub">Matrículas &amp; Cadastros</div>
+          </div>
+        </div>
+
+        <div class="win-start-card" onclick="winStartNavigate('TEACHER_PORTAL')">
+          <div class="win-card-icon" style="background: rgba(99, 102, 241, 0.2); color: #818cf8;">🎓</div>
+          <div>
+            <div class="win-card-title">Portal do Docente</div>
+            <div class="win-card-sub">Diários &amp; Frequência</div>
+          </div>
+        </div>
+
+        <div class="win-start-card" onclick="winStartNavigate('GRADES')">
+          <div class="win-card-icon" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24;">📝</div>
+          <div>
+            <div class="win-card-title">Notas &amp; Médias</div>
+            <div class="win-card-sub">Boletim Escolar</div>
+          </div>
+        </div>
+
+        <div class="win-start-card" onclick="winStartNavigate('CLASSES')">
+          <div class="win-card-icon" style="background: rgba(168, 85, 247, 0.2); color: #c084fc;">📑</div>
+          <div>
+            <div class="win-card-title">Turmas &amp; Matrizes</div>
+            <div class="win-card-sub">Enturmação</div>
+          </div>
+        </div>
+
+        <div class="win-start-card" onclick="winStartNavigate('EXAMS')">
+          <div class="win-card-icon" style="background: rgba(236, 72, 153, 0.2); color: #f472b6;">📋</div>
+          <div>
+            <div class="win-card-title">Gerador de Provas</div>
+            <div class="win-card-sub">Gabaritos &amp; BNCC</div>
+          </div>
+        </div>
+
+        <div class="win-start-card" onclick="winStartNavigate('QUESTION_BANK')">
+          <div class="win-card-icon" style="background: rgba(14, 165, 233, 0.2); color: #38bdf8;">❓</div>
+          <div>
+            <div class="win-card-title">Banco BNCC</div>
+            <div class="win-card-sub">Itens Avaliativos</div>
+          </div>
+        </div>
+
+        <div class="win-start-card" onclick="winStartNavigate('CENSUS_INEP')">
+          <div class="win-card-icon" style="background: rgba(20, 184, 166, 0.2); color: #2dd4bf;">🏛️</div>
+          <div>
+            <div class="win-card-title">Censo Escolar INEP</div>
+            <div class="win-card-sub">Exportação .txt Educacenso</div>
+          </div>
+        </div>
+
+        <div class="win-start-card" onclick="winStartNavigate('DROPOUT_CENSUS')">
+          <div class="win-card-icon" style="background: rgba(239, 68, 68, 0.2); color: #f87171;">🚨</div>
+          <div>
+            <div class="win-card-title">Busca Ativa Escolar</div>
+            <div class="win-card-sub">Combate à Evasão</div>
+          </div>
+        </div>
+
+        <div class="win-start-card" onclick="winStartNavigate('NETWORK_INSTALLER')">
+          <div class="win-card-icon" style="background: rgba(217, 70, 239, 0.2); color: #e879f9;">🖥️</div>
+          <div>
+            <div class="win-card-title">Rede &amp; Servidor</div>
+            <div class="win-card-sub">Instaladores .BAT &amp; .PS1</div>
+          </div>
+        </div>
+
+        <div class="win-start-card" onclick="winStartNavigate('INSTALAFLOW')">
+          <div class="win-card-icon" style="background: rgba(132, 204, 22, 0.2); color: #a3e635;">📥</div>
+          <div>
+            <div class="win-card-title">InstalaFlow Híbrido</div>
+            <div class="win-card-sub">Pacotes ZIP &amp; Standalone</div>
+          </div>
+        </div>
+
+        <div class="win-start-card" onclick="winStartNavigate('ABOUT')">
+          <div class="win-card-icon" style="background: rgba(100, 116, 139, 0.2); color: #94a3b8;">ℹ️</div>
+          <div>
+            <div class="win-card-title">Sobre o Sistema</div>
+            <div class="win-card-sub">Suporte ADS &amp; Versão</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="win-start-section-title">
+        <span>Ações Rápidas do Windows</span>
+      </div>
+
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="btn btn-outline btn-sm" onclick="openVersionControlModal(); closeWindowsStartMenu();" style="border-color: #334155; color: #cbd5e1; font-size: 11px;">
+          ✨ Notas da Versão v5.4.1
+        </button>
+        <button class="btn btn-outline btn-sm" onclick="window.print(); closeWindowsStartMenu();" style="border-color: #334155; color: #cbd5e1; font-size: 11px;">
+          🖨️ Imprimir Tela (Ctrl+P)
+        </button>
+        <button class="btn btn-outline btn-sm" onclick="downloadBackupJsonDirect(); closeWindowsStartMenu();" style="border-color: #334155; color: #cbd5e1; font-size: 11px;">
+          💾 Fazer Backup Local
+        </button>
+      </div>
+    </div>
+
+    <div class="win-start-footer">
+      <div class="win-start-user" onclick="openUserSwitchModal(); closeWindowsStartMenu();" style="cursor: pointer;">
+        <div class="win-start-user-avatar" id="win-start-avatar">AD</div>
+        <div>
+          <div class="win-start-user-name" id="win-start-name">Admin Master ADS</div>
+          <div class="win-start-user-role" id="win-start-role">ADMIN • TI</div>
+        </div>
+      </div>
+
+      <button class="win-start-power-btn" onclick="confirmExitWindowsApp()" title="Encerrar a sessão de trabalho com segurança">
+        <span>⏻</span>
+        <span>Encerrar</span>
+      </button>
+    </div>
+  </div>
+
   <script>
     // =========================================================================
     // SUCESSOEDU - MOTOR CLIENT-SIDE STANDALONE 100% OFFLINE
@@ -1792,6 +2567,174 @@ Bruno Oliveira; 2026-102; 234.567.890-11; (13) 99777-2233; Denise Oliveira"></te
       sector: 'TI & Gestão',
       email: 'suportetecnicoads@gmail.com'
     };
+
+    // =========================================================================
+    // RECURSOS E INTERFACE DESKTOP ESTILO WINDOWS (TASKBAR, START MENU, TITLEBAR)
+    // =========================================================================
+    var isWindowsStartMenuOpen = false;
+    var isSidebarCollapsed = false;
+
+    function toggleWindowsStartMenu() {
+      var menu = document.getElementById('win-start-menu');
+      var btn = document.getElementById('win-taskbar-start-btn');
+      if (!menu) return;
+      isWindowsStartMenuOpen = !isWindowsStartMenuOpen;
+      if (isWindowsStartMenuOpen) {
+        menu.classList.add('open');
+        if (btn) btn.classList.add('active');
+        closeAllWinMenus();
+        var searchInput = document.getElementById('win-start-search-input');
+        if (searchInput) {
+          searchInput.value = '';
+          filterWindowsStartApps('');
+          setTimeout(function() { searchInput.focus(); }, 50);
+        }
+      } else {
+        closeWindowsStartMenu();
+      }
+    }
+
+    function closeWindowsStartMenu() {
+      var menu = document.getElementById('win-start-menu');
+      var btn = document.getElementById('win-taskbar-start-btn');
+      if (menu) menu.classList.remove('open');
+      if (btn) btn.classList.remove('active');
+      isWindowsStartMenuOpen = false;
+    }
+
+    function winStartNavigate(tabId) {
+      closeWindowsStartMenu();
+      navigateToTab(tabId);
+    }
+
+    function filterWindowsStartApps(query) {
+      var q = (query || '').toLowerCase().trim();
+      var grid = document.getElementById('win-start-apps-grid');
+      if (!grid) return;
+      var cards = grid.querySelectorAll('.win-start-card');
+      cards.forEach(function(card) {
+        var text = (card.innerText || '').toLowerCase();
+        if (!q || text.indexOf(q) !== -1) {
+          card.style.display = 'flex';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    }
+
+    function toggleWinMenu(event, menuId) {
+      if (event) event.stopPropagation();
+      var target = document.getElementById(menuId);
+      var isAlreadyShown = target && target.classList.contains('show');
+      closeAllWinMenus();
+      if (target && !isAlreadyShown) {
+        target.classList.add('show');
+      }
+    }
+
+    function closeAllWinMenus() {
+      var dropdowns = document.querySelectorAll('.win-dropdown-panel');
+      dropdowns.forEach(function(d) { d.classList.remove('show'); });
+    }
+
+    function toggleSidebarCollapse() {
+      var sidebar = document.querySelector('aside.sidebar');
+      if (!sidebar) return;
+      isSidebarCollapsed = !isSidebarCollapsed;
+      if (isSidebarCollapsed) {
+        sidebar.style.display = 'none';
+      } else {
+        sidebar.style.display = 'flex';
+      }
+    }
+
+    function toggleWindowsFullscreen() {
+      if (!document.fullscreenElement) {
+        if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(function(err) {
+            console.warn('Fullscreen não suportado ou bloqueado:', err);
+          });
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+
+    function confirmExitWindowsApp() {
+      if (confirm('Deseja realmente sair da aplicação e encerrar o seu turno de trabalho no SucessoEdu?')) {
+        alert('Sessão encerrada com segurança. Obrigado por utilizar o SucessoEdu Gestão Educacional!');
+        try { window.close(); } catch (e) {}
+      }
+    }
+
+    function renderWindowsTaskbarApps() {
+      var container = document.getElementById('win-taskbar-apps-container');
+      if (!container) return;
+      var html = '';
+      openWorkspaceTabs.forEach(function(tId) {
+        var info = TAB_METADATA[tId] || { title: tId, icon: '📄' };
+        var isActive = tId === currentActiveTab;
+        html += '<button type="button" class="win-task-item ' + (isActive ? 'active' : '') + '" onclick="navigateToTab(\\'' + tId + '\\')" title="' + info.title + '">' +
+          '<span>' + info.icon + '</span> ' +
+          '<span>' + info.title + '</span>' +
+        '</button>';
+      });
+      container.innerHTML = html;
+
+      // Atualiza também o título na Titlebar do Windows
+      var titleTabName = document.getElementById('win-titlebar-tab-name');
+      if (titleTabName) {
+        var curInfo = TAB_METADATA[currentActiveTab] || { title: 'Visão Geral' };
+        titleTabName.innerText = curInfo.title;
+      }
+    }
+
+    function updateWindowsTaskbarClock() {
+      var now = new Date();
+      var timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      var dateStr = now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      var timeEl = document.getElementById('win-taskbar-clock-time');
+      var dateEl = document.getElementById('win-taskbar-clock-date');
+      if (timeEl) timeEl.innerText = timeStr;
+      if (dateEl) dateEl.innerText = dateStr;
+    }
+
+    setInterval(updateWindowsTaskbarClock, 1000);
+    setTimeout(updateWindowsTaskbarClock, 50);
+
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('#win-start-menu') && !e.target.closest('.win-btn-start')) {
+        closeWindowsStartMenu();
+      }
+      if (!e.target.closest('.win-menu-item')) {
+        closeAllWinMenus();
+      }
+    });
+
+    document.addEventListener('keydown', function(e) {
+      // Ctrl+Esc: Alternar Menu Iniciar
+      if (e.ctrlKey && e.key === 'Escape') {
+        e.preventDefault();
+        toggleWindowsStartMenu();
+      }
+      // Alt+B: Alternar barra lateral
+      if (e.altKey && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault();
+        toggleSidebarCollapse();
+      }
+      // Alt+F4: Sair do sistema
+      if (e.altKey && e.key === 'F4') {
+        e.preventDefault();
+        confirmExitWindowsApp();
+      }
+      // Escape: Fechar menus abertos
+      if (e.key === 'Escape') {
+        closeWindowsStartMenu();
+        closeAllWinMenus();
+      }
+    });
 
     function getDefaultDb() {
       try {
@@ -1937,10 +2880,109 @@ Bruno Oliveira; 2026-102; 234.567.890-11; (13) 99777-2233; Denise Oliveira"></te
       if (hNotif) hNotif.innerText = notifCount;
     }
 
+    // Workspace Tabs State & Navigation
+    var openWorkspaceTabs = ['MAIN_DASHBOARD'];
+    var workspaceNavHistory = [];
+
+    var TAB_METADATA = {
+      MAIN_DASHBOARD: { title: 'Dashbox Principal', icon: '📊' },
+      TEACHER_PORTAL: { title: 'Portal do Professor', icon: '🎓' },
+      STUDENTS: { title: 'Secretaria & Alunos', icon: '👥' },
+      CLASSES: { title: 'Turmas & Matrizes', icon: '📑' },
+      DROPOUT_CENSUS: { title: 'Busca Ativa & Evasão', icon: '🚨' },
+      DOCUMENTS: { title: 'Documentos & Boletins', icon: '📜' },
+      GRADES: { title: 'Notas & Médias', icon: '📊' },
+      CLASS_DIARY: { title: 'Diário & Frequência', icon: '📖' },
+      PEDAGOGICAL_DASHBOARD: { title: 'Evolução Pedagógica', icon: '📈' },
+      ASSESSMENT_REPORT: { title: 'Resultados & Desempenho', icon: '📊' },
+      QUESTION_BANK: { title: 'Banco Questões BNCC', icon: '❓' },
+      EXAMS: { title: 'Gerador de Provas', icon: '📋' },
+      STUDENT_ROOM: { title: 'Sala do Aluno', icon: '✅' },
+      MUNICIPAL_SYNC: { title: 'Polos & Censo .edusync', icon: '🏛️' },
+      COMMUNICATION: { title: 'Mural de Avisos SME', icon: '📢' },
+      WHATSAPP: { title: 'WhatsApp Notificações', icon: '💬' },
+      ADMIN_TI: { title: 'Central TI & Admin', icon: '🛡️' },
+      OMNI_DEPLOY: { title: 'OmniDeploy Híbrido', icon: '⚡' },
+      OMNIDEPLOY: { title: 'OmniDeploy Híbrido', icon: '⚡' },
+      NEXUS_DEPLOYER: { title: 'NexusCore ERP', icon: '🚀' },
+      NEXUS_INSTALL: { title: 'NexusInstall Manager', icon: '📦' },
+      INSTALLER: { title: 'NexusInstall Manager', icon: '📦' },
+      NEXUS_BUILD: { title: 'NexusBuild Total .EXE', icon: '⚙️' },
+      CLEANSLATE_HUB: { title: 'CleanSlate Enterprise', icon: '🧹' },
+      CLEAN_SLATE: { title: 'CleanSlate Enterprise', icon: '🧹' },
+      INSTALAFLOW: { title: 'InstalaFlow Híbrido', icon: '📥' },
+      DATASYNC_PRO: { title: 'DataSync Pro', icon: '🔄' },
+      DATA_SYNC_PRO: { title: 'DataSync Pro', icon: '🔄' },
+      USER_CONTROL: { title: 'Controle de Usuários', icon: '🔐' },
+      USERS: { title: 'Controle de Usuários', icon: '🔐' },
+      SYSTEM_UPDATES: { title: 'Atualizações & Nuvem', icon: '⚙️' },
+      SYSTEM_UPDATE: { title: 'Atualizações & Nuvem', icon: '⚙️' },
+      NETWORK_INSTALLER: { title: 'Rede Local & Servidor', icon: '🖥️' },
+      ARCHITECTURE_DIAGRAM: { title: 'Diagrama de Módulos', icon: '📐' },
+      RELATIONAL_INTEGRITY: { title: 'Integridade Relacional', icon: '🛡️' },
+      NOTIFICATIONS: { title: 'Central de Notificações', icon: '🔔' },
+      ABOUT: { title: 'Sobre o Sistema', icon: 'ℹ️' }
+    };
+
+    function renderWorkspaceTabs() {
+      var bar = document.getElementById('workspace-tabs-container');
+      if (!bar) return;
+
+      var canGoBack = workspaceNavHistory.length > 0;
+      var html = '<div class="workspace-bar">' +
+        '<button class="workspace-back-btn" ' + (!canGoBack ? 'disabled' : '') + ' onclick="goBackWorkspace()" title="Voltar para a tela anterior">' +
+          '<span>⬅</span> <span>Voltar</span>' +
+        '</button>' +
+        '<div style="display:flex; align-items:center; gap:6px; overflow-x:auto; flex:1;">';
+
+      openWorkspaceTabs.forEach(function(tId) {
+        var info = TAB_METADATA[tId] || { title: tId, icon: '📄' };
+        var isActive = tId === currentActiveTab;
+        html += '<div class="workspace-tab ' + (isActive ? 'active' : '') + '" onclick="navigateToTab(\\'' + tId + '\\')">' +
+          '<span>' + info.icon + '</span>' +
+          '<span>' + info.title + '</span>';
+        if (openWorkspaceTabs.length > 1) {
+          html += '<button type="button" class="workspace-tab-close" onclick="event.stopPropagation(); closeWorkspaceTab(\\'' + tId + '\\')" title="Fechar aba">✕</button>';
+        }
+        html += '</div>';
+      });
+
+      html += '</div></div>';
+      bar.innerHTML = html;
+      renderWindowsTaskbarApps();
+    }
+
+    function goBackWorkspace() {
+      if (workspaceNavHistory.length > 0) {
+        var prev = workspaceNavHistory.pop();
+        navigateToTab(prev, true);
+      }
+    }
+
+    function closeWorkspaceTab(tabId) {
+      if (openWorkspaceTabs.length <= 1) return;
+      openWorkspaceTabs = openWorkspaceTabs.filter(function(t) { return t !== tabId; });
+      if (currentActiveTab === tabId) {
+        var nextTab = openWorkspaceTabs[openWorkspaceTabs.length - 1] || 'MAIN_DASHBOARD';
+        navigateToTab(nextTab, true);
+      } else {
+        renderWorkspaceTabs();
+      }
+    }
+
     // Tab Navigation
-    function navigateToTab(tabId) {
+    function navigateToTab(tabId, isBack) {
       try {
-        currentActiveTab = tabId || 'MAIN_DASHBOARD';
+        var target = tabId || 'MAIN_DASHBOARD';
+        if (!isBack && currentActiveTab && currentActiveTab !== target) {
+          workspaceNavHistory.push(currentActiveTab);
+        }
+        currentActiveTab = target;
+        if (openWorkspaceTabs.indexOf(target) === -1) {
+          openWorkspaceTabs.push(target);
+        }
+        renderWorkspaceTabs();
+
         var navButtons = document.querySelectorAll('.nav-item');
         navButtons.forEach(function(btn) {
           btn.classList.remove('active');
@@ -2089,6 +3131,7 @@ Bruno Oliveira; 2026-102; 234.567.890-11; (13) 99777-2233; Denise Oliveira"></te
             renderDashboardView(viewContainer);
         }
         updateCounters();
+        renderWorkspaceTabs();
         window.scrollTo(0, 0);
       } catch (err) {
         console.error('Erro ao renderizar módulo ' + tabId + ':', err);
@@ -3854,40 +4897,395 @@ Bruno Oliveira; 2026-102; 234.567.890-11; (13) 99777-2233; Denise Oliveira"></te
         '</div>';
     }
 
-    // VIEW: USERS
-    function renderUsersView(container) {
-      var users = appDb.users || [
-        { id: 'usr-1', name: 'Administrador Master ADS', email: 'suportetecnicoads@gmail.com', role: 'ADMIN', sector: 'TI & Gestão', status: 'ACTIVE' },
-        { id: 'usr-2', name: 'Prof. Rodrigo Peixoto', email: 'rodrigo.peixoto@colegiohorizonte.edu.br', role: 'TEACHER', sector: 'Corpo Docente', status: 'ACTIVE' },
-        { id: 'usr-3', name: 'Profa. Mariana Albuquerque', email: 'mariana.albuquerque@colegiohorizonte.edu.br', role: 'COORDINATOR', sector: 'Coordenação Pedagógica', status: 'ACTIVE' },
-        { id: 'usr-4', name: 'Carlos Eduardo Nogueira Lima', email: 'secretaria@colegiohorizonte.edu.br', role: 'SECRETARY', sector: 'Secretaria Escolar', status: 'ACTIVE' }
+    // VIEW: USERS (CONTROLE DE USUÁRIOS & PERFIS DE ACESSO COMPLETO)
+    var userSearchQuery = '';
+    var userRoleFilter = 'ALL';
+
+    function getUserAccountsList() {
+      if (appDb.userAccounts && appDb.userAccounts.length > 0) {
+        return appDb.userAccounts;
+      }
+      if (appDb.users && appDb.users.length > 0) {
+        return appDb.users;
+      }
+      var defaultUsers = [
+        { id: 'usr-1', name: 'Administrador Master ADS', login: 'master', email: 'suportetecnicoads@gmail.com', role: 'ADMIN', sector: 'TI & Gestão de Infraestrutura', isMaster: true, active: true },
+        { id: 'usr-2', name: 'Prof. Rodrigo Peixoto', login: 'rodrigo.peixoto', email: 'rodrigo.peixoto@colegiohorizonte.edu.br', role: 'TEACHER', sector: 'Corpo Docente', isMaster: false, active: true },
+        { id: 'usr-3', name: 'Profa. Mariana Albuquerque', login: 'mariana.albuquerque', email: 'mariana.albuquerque@colegiohorizonte.edu.br', role: 'COORDINATOR', sector: 'Coordenação Pedagógica', isMaster: false, active: true },
+        { id: 'usr-4', name: 'Carlos Eduardo Nogueira Lima', login: 'carlos.secretaria', email: 'secretaria@colegiohorizonte.edu.br', role: 'SECRETARY', sector: 'Secretaria Escolar', isMaster: false, active: true }
       ];
+      appDb.userAccounts = defaultUsers;
+      saveDb(appDb);
+      return defaultUsers;
+    }
+
+    function renderUsersView(container) {
+      var allUsers = getUserAccountsList();
+      var totalCount = allUsers.length;
+      var adminCount = allUsers.filter(function(u) { return u.role === 'ADMIN'; }).length;
+      var teacherCount = allUsers.filter(function(u) { return u.role === 'TEACHER'; }).length;
+      var secCoordCount = allUsers.filter(function(u) { return u.role === 'SECRETARY' || u.role === 'COORDINATOR'; }).length;
+
+      var filtered = allUsers.filter(function(u) {
+        var matchesRole = userRoleFilter === 'ALL' || u.role === userRoleFilter;
+        var q = userSearchQuery.toLowerCase();
+        var matchesSearch = !q || (u.name && u.name.toLowerCase().indexOf(q) !== -1) ||
+                                  (u.email && u.email.toLowerCase().indexOf(q) !== -1) ||
+                                  (u.login && u.login.toLowerCase().indexOf(q) !== -1) ||
+                                  (u.sector && u.sector.toLowerCase().indexOf(q) !== -1);
+        return matchesRole && matchesSearch;
+      });
 
       var html = '' +
         '<div class="view-header">' +
           '<div class="view-title-group">' +
-            '<h2>Controle de Usuários &amp; Perfis de Acesso</h2>' +
-            '<p>Gestão de operadores da secretaria, coordenação pedagógica e corpo docente cadastrados na base de testes.</p>' +
+            '<h2>Controle de Usuários &amp; Níveis de Acesso</h2>' +
+            '<p>Gestão completa de operadores: cadastre, edite, exclua e configure permissões e setores de acesso.</p>' +
+          '</div>' +
+          '<div style="display: flex; gap: 8px;">' +
+            '<button class="btn btn-outline" onclick="exportUsersCsv()">📥 Exportar Usuários</button>' +
+            '<button class="btn btn-primary" onclick="openUserAccountModal()">+ Novo Usuário do Sistema</button>' +
           '</div>' +
         '</div>' +
+
+        '<div class="kpi-grid" style="margin-bottom: 20px;">' +
+          '<div class="kpi-card">' +
+            '<div class="kpi-icon">👥</div>' +
+            '<div class="kpi-value">' + totalCount + '</div>' +
+            '<div class="kpi-label">Usuários Cadastrados</div>' +
+          '</div>' +
+          '<div class="kpi-card">' +
+            '<div class="kpi-icon">🛡️</div>' +
+            '<div class="kpi-value" style="color: #4f46e5;">' + adminCount + '</div>' +
+            '<div class="kpi-label">Administradores TI</div>' +
+          '</div>' +
+          '<div class="kpi-card">' +
+            '<div class="kpi-icon">📚</div>' +
+            '<div class="kpi-value" style="color: #059669;">' + teacherCount + '</div>' +
+            '<div class="kpi-label">Docentes Ativos</div>' +
+          '</div>' +
+          '<div class="kpi-card">' +
+            '<div class="kpi-icon">🏛️</div>' +
+            '<div class="kpi-value" style="color: #7c3aed;">' + secCoordCount + '</div>' +
+            '<div class="kpi-label">Secretaria &amp; Coordenação</div>' +
+          '</div>' +
+        '</div>' +
+
         '<div class="card">' +
+          '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">' +
+            '<div style="display: flex; gap: 10px; flex-wrap: wrap; flex: 1;">' +
+              '<input type="text" class="input-control" id="user-search-input" value="' + userSearchQuery + '" oninput="handleUserSearch(this.value)" placeholder="Buscar por nome, login, e-mail ou setor..." style="max-width: 320px;">' +
+              '<select class="select-control" id="user-role-filter-select" onchange="handleUserRoleFilter(this.value)" style="max-width: 220px;">' +
+                '<option value="ALL" ' + (userRoleFilter === 'ALL' ? 'selected' : '') + '>Todos os Níveis de Acesso</option>' +
+                '<option value="ADMIN" ' + (userRoleFilter === 'ADMIN' ? 'selected' : '') + '>🛡️ Administrador TI</option>' +
+                '<option value="COORDINATOR" ' + (userRoleFilter === 'COORDINATOR' ? 'selected' : '') + '>🎓 Coordenação Pedagógica</option>' +
+                '<option value="TEACHER" ' + (userRoleFilter === 'TEACHER' ? 'selected' : '') + '>📚 Professor / Docente</option>' +
+                '<option value="SECRETARY" ' + (userRoleFilter === 'SECRETARY' ? 'selected' : '') + '>📝 Secretaria Escolar</option>' +
+                '<option value="PARENT" ' + (userRoleFilter === 'PARENT' ? 'selected' : '') + '>👨‍👩‍👧 Responsável / Família</option>' +
+                '<option value="STUDENT" ' + (userRoleFilter === 'STUDENT' ? 'selected' : '') + '>🎒 Aluno / Estudante</option>' +
+              '</select>' +
+            '</div>' +
+            '<span style="font-size: 12.5px; color: var(--text-muted);">' + filtered.length + ' de ' + totalCount + ' usuários exibidos</span>' +
+          '</div>' +
+
           '<div class="table-responsive"><table class="data-table">' +
-            '<thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Setor</th><th>Status</th></tr></thead>' +
+            '<thead><tr><th>Operador / Usuário</th><th>Login / Usuário</th><th>Nível de Acesso</th><th>Setor de Atuação</th><th>Status</th><th style="text-align: right;">Ações</th></tr></thead>' +
             '<tbody>';
 
-      users.forEach(function(u) {
-        var badgeColor = u.role === 'ADMIN' ? 'blue' : u.role === 'TEACHER' ? 'amber' : u.role === 'COORDINATOR' ? 'purple' : 'green';
-        html += '<tr>' +
-          '<td><strong>' + u.name + '</strong></td>' +
-          '<td>' + (u.email || '-') + '</td>' +
-          '<td><span class="badge ' + badgeColor + '">' + u.role + '</span></td>' +
-          '<td>' + (u.sector || 'Geral') + '</td>' +
-          '<td><span class="badge green">' + (u.status === 'ACTIVE' ? 'Ativo' : 'Ativo') + '</span></td>' +
-        '</tr>';
-      });
+      if (filtered.length === 0) {
+        html += '<tr><td colspan="6" style="text-align: center; padding: 32px; color: var(--text-muted);">Nenhum usuário encontrado com os filtros selecionados.</td></tr>';
+      } else {
+        filtered.forEach(function(u) {
+          var roleName = 'Administrador';
+          var badgeClass = 'blue';
+          if (u.role === 'ADMIN') { roleName = '🛡️ Administrador'; badgeClass = 'blue'; }
+          else if (u.role === 'COORDINATOR') { roleName = '🎓 Coordenação'; badgeClass = 'purple'; }
+          else if (u.role === 'TEACHER') { roleName = '📚 Professor'; badgeClass = 'green'; }
+          else if (u.role === 'SECRETARY') { roleName = '📝 Secretaria'; badgeClass = 'amber'; }
+          else if (u.role === 'PARENT') { roleName = '👨‍👩‍👧 Responsável'; badgeClass = 'purple'; }
+          else if (u.role === 'STUDENT') { roleName = '🎒 Aluno'; badgeClass = 'blue'; }
+
+          var initials = (u.name || 'U').split(' ').map(function(n) { return n[0]; }).slice(0, 2).join('').toUpperCase();
+          var isActive = u.active !== false && u.status !== 'INACTIVE';
+
+          html += '<tr>' +
+            '<td>' +
+              '<div style="display: flex; align-items: center; gap: 10px;">' +
+                '<div style="width: 34px; height: 34px; border-radius: 50%; background: #e0e7ff; color: #4338ca; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; flex-shrink: 0;">' + initials + '</div>' +
+                '<div>' +
+                  '<div style="font-weight: 700; color: #0f172a; font-size: 13.5px;">' + u.name + (u.isMaster ? ' <span class="badge blue" style="font-size: 9.5px; padding: 2px 6px;">Master</span>' : '') + '</div>' +
+                  '<div style="font-size: 11.5px; color: var(--text-muted);">' + (u.email || 'Sem e-mail') + '</div>' +
+                '</div>' +
+              '</div>' +
+            '</td>' +
+            '<td><code>@' + (u.login || u.username || 'usuario') + '</code></td>' +
+            '<td><span class="badge ' + badgeClass + '">' + roleName + '</span></td>' +
+            '<td><span style="font-size: 12.5px; color: #334155;">' + (u.sectorTitle || u.sector || 'Geral') + '</span></td>' +
+            '<td>' +
+              '<button type="button" onclick="toggleUserAccountStatus(\\'' + u.id + '\\')" class="badge ' + (isActive ? 'green' : 'amber') + '" style="cursor: pointer; border: none;" title="Clique para alternar">' +
+                (isActive ? '● Ativo' : '○ Inativo') +
+              '</button>' +
+            '</td>' +
+            '<td style="text-align: right; white-space: nowrap;">' +
+              '<button class="btn btn-outline btn-sm" onclick="openUserAccountModal(\\'' + u.id + '\\')" style="margin-right: 6px;" title="Editar usuário">✏️ Editar</button>' +
+              '<button class="btn btn-outline btn-sm" onclick="deleteUserAccount(\\'' + u.id + '\\')" style="color: #ef4444; border-color: #fca5a5;" title="Excluir usuário" ' + (u.isMaster ? 'disabled style="opacity:0.3; cursor:not-allowed;"' : '') + '>🗑️</button>' +
+            '</td>' +
+          '</tr>';
+        });
+      }
 
       html += '</tbody></table></div></div>';
+
+      // Injeta Modal de Cadastro / Edição de Usuário
+      html += '' +
+        '<div class="modal-backdrop" id="modal-user-account-standalone">' +
+          '<div class="modal-container" style="max-width: 580px;">' +
+            '<div class="modal-header">' +
+              '<div>' +
+                '<h3 id="user-modal-title">Cadastrar Novo Usuário</h3>' +
+                '<p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Defina as credenciais, nível de acesso e setor no SucessoEdu</p>' +
+              '</div>' +
+              '<button class="modal-close-btn" onclick="closeModal(&quot;modal-user-account-standalone&quot;)">✕</button>' +
+            '</div>' +
+            '<form id="form-user-account-standalone" onsubmit="saveUserAccountForm(event)">' +
+              '<input type="hidden" id="user-form-id">' +
+              '<div class="form-group">' +
+                '<label>Nome Completo *</label>' +
+                '<input type="text" id="user-form-name" required placeholder="Ex: Maria das Graças Silva">' +
+              '</div>' +
+              '<div class="form-row-2">' +
+                '<div class="form-group">' +
+                  '<label>Login / Usuário de Acesso *</label>' +
+                  '<input type="text" id="user-form-login" required placeholder="Ex: maria.silva">' +
+                '</div>' +
+                '<div class="form-group">' +
+                  '<label>E-mail *</label>' +
+                  '<input type="email" id="user-form-email" required placeholder="Ex: maria.silva@escola.gov.br">' +
+                '</div>' +
+              '</div>' +
+              '<div class="form-row-2">' +
+                '<div class="form-group">' +
+                  '<label>Nível de Acesso (Perfil) *</label>' +
+                  '<select id="user-form-role" required onchange="handleUserRoleChange(this.value)">' +
+                    '<option value="ADMIN">🛡️ Administrador (TI &amp; Gestão Plena)</option>' +
+                    '<option value="COORDINATOR">🎓 Coordenação Pedagógica</option>' +
+                    '<option value="TEACHER">📚 Professor / Corpo Docente</option>' +
+                    '<option value="SECRETARY">📝 Secretaria Escolar</option>' +
+                    '<option value="PARENT">👨‍👩‍👧 Responsável / Família</option>' +
+                    '<option value="STUDENT">🎒 Aluno / Estudante</option>' +
+                  '</select>' +
+                '</div>' +
+                '<div class="form-group">' +
+                  '<label>Setor / Lotação</label>' +
+                  '<input type="text" id="user-form-sector" placeholder="Ex: Coordenação Anos Iniciais">' +
+                '</div>' +
+              '</div>' +
+              '<div class="form-row-2">' +
+                '<div class="form-group">' +
+                  '<label>Senha de Acesso</label>' +
+                  '<input type="password" id="user-form-password" placeholder="Digite uma senha ou deixe em branco">' +
+                '</div>' +
+                '<div class="form-group">' +
+                  '<label>Status da Conta</label>' +
+                  '<select id="user-form-active">' +
+                    '<option value="true">Ativo (Acesso Liberado)</option>' +
+                    '<option value="false">Inativo (Acesso Bloqueado)</option>' +
+                  '</select>' +
+                '</div>' +
+              '</div>' +
+              '<div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border-color);">' +
+                '<button type="button" class="btn btn-outline" onclick="closeModal(&quot;modal-user-account-standalone&quot;)">Cancelar</button>' +
+                '<button type="submit" class="btn btn-primary">Salvar Usuário</button>' +
+              '</div>' +
+            '</form>' +
+          '</div>' +
+        '</div>';
+
       container.innerHTML = html;
+    }
+
+    function handleUserSearch(val) {
+      userSearchQuery = val;
+      renderUsersView(document.getElementById('main-content-view'));
+      var input = document.getElementById('user-search-input');
+      if (input) {
+        input.focus();
+        input.setSelectionRange(val.length, val.length);
+      }
+    }
+
+    function handleUserRoleFilter(val) {
+      userRoleFilter = val;
+      renderUsersView(document.getElementById('main-content-view'));
+    }
+
+    function handleUserRoleChange(role) {
+      var sectorEl = document.getElementById('user-form-sector');
+      if (!sectorEl) return;
+      if (role === 'ADMIN') sectorEl.value = 'TI & Gestão de Infraestrutura';
+      else if (role === 'COORDINATOR') sectorEl.value = 'Coordenação Pedagógica';
+      else if (role === 'TEACHER') sectorEl.value = 'Corpo Docente';
+      else if (role === 'SECRETARY') sectorEl.value = 'Secretaria Escolar';
+      else if (role === 'PARENT') sectorEl.value = 'Comunidade Escolar / Responsáveis';
+      else if (role === 'STUDENT') sectorEl.value = 'Alunos / Ensino Regular';
+    }
+
+    function openUserAccountModal(userId) {
+      var allUsers = getUserAccountsList();
+      var modal = document.getElementById('modal-user-account-standalone');
+      if (!modal) return;
+
+      var titleEl = document.getElementById('user-modal-title');
+      var idEl = document.getElementById('user-form-id');
+      var nameEl = document.getElementById('user-form-name');
+      var loginEl = document.getElementById('user-form-login');
+      var emailEl = document.getElementById('user-form-email');
+      var roleEl = document.getElementById('user-form-role');
+      var sectorEl = document.getElementById('user-form-sector');
+      var pwdEl = document.getElementById('user-form-password');
+      var activeEl = document.getElementById('user-form-active');
+
+      if (userId) {
+        var user = allUsers.find(function(u) { return u.id === userId; });
+        if (user) {
+          if (titleEl) titleEl.innerText = 'Editar Usuário: ' + user.name;
+          if (idEl) idEl.value = user.id;
+          if (nameEl) nameEl.value = user.name || '';
+          if (loginEl) loginEl.value = user.login || user.username || '';
+          if (emailEl) emailEl.value = user.email || '';
+          if (roleEl) roleEl.value = user.role || 'TEACHER';
+          if (sectorEl) sectorEl.value = user.sectorTitle || user.sector || '';
+          if (pwdEl) pwdEl.value = user.password || '';
+          if (activeEl) activeEl.value = (user.active !== false && user.status !== 'INACTIVE') ? 'true' : 'false';
+        }
+      } else {
+        if (titleEl) titleEl.innerText = 'Cadastrar Novo Usuário';
+        if (idEl) idEl.value = '';
+        if (nameEl) nameEl.value = '';
+        if (loginEl) loginEl.value = '';
+        if (emailEl) emailEl.value = '';
+        if (roleEl) roleEl.value = 'TEACHER';
+        if (sectorEl) sectorEl.value = 'Corpo Docente';
+        if (pwdEl) pwdEl.value = 'Edu@2026';
+        if (activeEl) activeEl.value = 'true';
+      }
+
+      modal.classList.add('active');
+    }
+
+    function saveUserAccountForm(event) {
+      event.preventDefault();
+      var id = document.getElementById('user-form-id').value;
+      var name = document.getElementById('user-form-name').value.trim();
+      var login = document.getElementById('user-form-login').value.trim().toLowerCase();
+      var email = document.getElementById('user-form-email').value.trim();
+      var role = document.getElementById('user-form-role').value;
+      var sector = document.getElementById('user-form-sector').value.trim();
+      var password = document.getElementById('user-form-password').value;
+      var active = document.getElementById('user-form-active').value === 'true';
+
+      var allUsers = getUserAccountsList();
+
+      if (id) {
+        // Atualização
+        allUsers = allUsers.map(function(u) {
+          if (u.id === id) {
+            return Object.assign({}, u, {
+              name: name,
+              login: login,
+              email: email,
+              role: role,
+              sector: sector,
+              sectorTitle: sector,
+              password: password || u.password,
+              active: active,
+              status: active ? 'ACTIVE' : 'INACTIVE'
+            });
+          }
+          return u;
+        });
+      } else {
+        // Novo Usuário
+        var newUser = {
+          id: 'usr-' + Date.now(),
+          name: name,
+          login: login,
+          email: email,
+          role: role,
+          sector: sector || 'Geral',
+          sectorTitle: sector || 'Geral',
+          password: password || 'Edu@2026',
+          isMaster: false,
+          active: active,
+          status: active ? 'ACTIVE' : 'INACTIVE',
+          createdAt: new Date().toISOString()
+        };
+        allUsers.unshift(newUser);
+      }
+
+      appDb.userAccounts = allUsers;
+      appDb.users = allUsers;
+      saveDb(appDb);
+      closeModal('modal-user-account-standalone');
+      renderUsersView(document.getElementById('main-content-view'));
+      alert('Usuário ' + name + ' salvo com sucesso!');
+    }
+
+    function deleteUserAccount(userId) {
+      var allUsers = getUserAccountsList();
+      var user = allUsers.find(function(u) { return u.id === userId; });
+      if (!user) return;
+      if (user.isMaster) {
+        alert('O usuário Administrador Master ADS não pode ser excluído por razões de segurança do sistema.');
+        return;
+      }
+      if (confirm('Tem certeza de que deseja excluir o usuário "' + user.name + '" (@' + (user.login || user.username) + ')? Esta ação não pode ser desfeita.')) {
+        allUsers = allUsers.filter(function(u) { return u.id !== userId; });
+        appDb.userAccounts = allUsers;
+        appDb.users = allUsers;
+        saveDb(appDb);
+        renderUsersView(document.getElementById('main-content-view'));
+        alert('Usuário removido com sucesso.');
+      }
+    }
+
+    function toggleUserAccountStatus(userId) {
+      var allUsers = getUserAccountsList();
+      allUsers = allUsers.map(function(u) {
+        if (u.id === userId) {
+          var nextActive = !(u.active !== false && u.status !== 'INACTIVE');
+          return Object.assign({}, u, {
+            active: nextActive,
+            status: nextActive ? 'ACTIVE' : 'INACTIVE'
+          });
+        }
+        return u;
+      });
+      appDb.userAccounts = allUsers;
+      appDb.users = allUsers;
+      saveDb(appDb);
+      renderUsersView(document.getElementById('main-content-view'));
+    }
+
+    function exportUsersCsv() {
+      var allUsers = getUserAccountsList();
+      var csv = 'ID;Nome;Login;Email;NivelAcesso;Setor;Status\\n';
+      allUsers.forEach(function(u) {
+        csv += (u.id || '') + ';' +
+               (u.name || '') + ';' +
+               (u.login || u.username || '') + ';' +
+               (u.email || '') + ';' +
+               (u.role || '') + ';' +
+               (u.sectorTitle || u.sector || '') + ';' +
+               (u.active !== false ? 'Ativo' : 'Inativo') + '\\n';
+      });
+      var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      var link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'SucessoEdu_Usuarios_' + new Date().toISOString().slice(0, 10) + '.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
 
     // VIEW: GRADES (Lançamento de Notas e Médias Bimestrais)
@@ -4719,6 +6117,16 @@ Bruno Oliveira; 2026-102; 234.567.890-11; (13) 99777-2233; Denise Oliveira"></te
     window.openNotificationsModal = openNotificationsModal;
     window.openVersionControlModal = openVersionControlModal;
     window.openUserSwitchModal = openUserSwitchModal;
+    window.toggleWindowsStartMenu = toggleWindowsStartMenu;
+    window.closeWindowsStartMenu = closeWindowsStartMenu;
+    window.winStartNavigate = winStartNavigate;
+    window.filterWindowsStartApps = filterWindowsStartApps;
+    window.toggleWinMenu = toggleWinMenu;
+    window.closeAllWinMenus = closeAllWinMenus;
+    window.toggleSidebarCollapse = toggleSidebarCollapse;
+    window.toggleWindowsFullscreen = toggleWindowsFullscreen;
+    window.confirmExitWindowsApp = confirmExitWindowsApp;
+    window.renderWindowsTaskbarApps = renderWindowsTaskbarApps;
     window.appDb = appDb;
     window.saveDb = saveDb;
     window.loadDb = loadDb;
@@ -4727,6 +6135,8 @@ Bruno Oliveira; 2026-102; 234.567.890-11; (13) 99777-2233; Denise Oliveira"></te
     function initSucessoEduStandalone() {
       try {
         navigateToTab('MAIN_DASHBOARD');
+        renderWindowsTaskbarApps();
+        updateWindowsTaskbarClock();
       } catch (err) {
         console.error('Erro na inicialização do SucessoEdu:', err);
       }

@@ -26,6 +26,7 @@ export interface DirectoryAuditStatus {
   isCritical: boolean;
   status: 'PRESERVED' | 'VERIFIED' | 'CREATED';
   details: string;
+  preservationPolicy?: string;
 }
 
 export interface LayoutProtectionStatus {
@@ -48,6 +49,7 @@ export interface InstallationStructureAuditReport {
   allDirectoriesPreserved: boolean;
   directories: DirectoryAuditStatus[];
   layoutProtection: LayoutProtectionStatus;
+  layoutProtectionEnforced?: boolean;
   timestamp: string;
 }
 

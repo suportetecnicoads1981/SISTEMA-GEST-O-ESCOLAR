@@ -302,7 +302,9 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
               targetClassId: msg.targetClassId,
               targetStudentId: msg.targetStudentId,
               attachments: msg.attachments,
+              sendPushNotification: msg.sendPushNotification ?? true,
               requireReadConfirmation: msg.requireReadConfirmation,
+              status: msg.status || 'ENVIADO',
             });
           });
         }

@@ -68,6 +68,7 @@ export type DropoutReasonKey =
   | 'TRABALHO_INFANTIL_RENDA'     // Inserção no Mercado de Trabalho / Ajuda na Renda Familiar
   | 'TRANSPORTE_DISTANCIA'        // Dificuldades de Acesso / Falta de Transporte Escolar Rural
   | 'DESINTERESSE_DESEMPENHO'     // Desinteresse / Dificuldades de Aprendizagem Acumuladas
+  | 'DESINTERESSE'                // Alias de desinteresse
   | 'GRAVIDEZ_CUIDADO_FAMILIAR'   // Gravidez Precoce / Cuidados com Irmãos ou Parentes
   | 'SAUDE_DOENCA_CRONICA'        // Problemas de Saúde / Doença Crônica do Aluno ou Familiar
   | 'VIOLENCIA_VULNERABILIDADE'   // Vulnerabilidade Social Extrema / Violência Comunitária
@@ -128,6 +129,7 @@ export interface Student {
   locationZone?: LocationZone; // Zona Urbana ou Rural de residência
   courseId: string;
   classId: string;
+  gradeLevel?: string;
   schoolUnitId?: string; // Unidade Escolar onde está matriculado
   inepCode?: string; // Código INEP do Aluno (Censo Escolar)
   status: StudentStatus;
@@ -161,6 +163,7 @@ export interface Student {
   dropoutDate?: string;
   dropoutObservation?: string;
   dropoutIntervention?: DropoutIntervention;
+  enrollmentYear?: number;
 }
 
 export interface SchoolClass {
@@ -171,6 +174,8 @@ export interface SchoolClass {
   shift: ClassShift;
   schoolYear: number;
   maxCapacity: number;
+  capacity?: number;
+  code?: string;
   roomNumber: string;
   classTeacher?: string;
   schoolUnitId?: string; // Unidade Escolar
@@ -187,6 +192,7 @@ export interface BnccSkill {
   segment: EducationSegment | string;
   subject: string; // "Língua Portuguesa", "Matemática", "Ciências", "História", "Geografia", "Arte", "Educação Física", "Campos de Experiências"
   fieldOfExperience?: string; // Para Educação Infantil (ex: "Traços, sons, cores e formas")
+  knowledgeObject?: string; // Objeto de conhecimento
   description: string;
   tags?: string[];
 }
@@ -290,6 +296,7 @@ export interface Subject {
   segment: string;
   teacherName: string;
   workloadHours: number;
+  classId?: string;
 }
 
 export interface AcademicRecordItem {
@@ -348,7 +355,7 @@ export interface Question {
   type: QuestionType;
   stem: string; // Enunciado
   options?: QuestionOption[];
-  essayKeywords?: string[]; // Palavras-chave obrigatórias para correção automática de discursivas
+  essayKeywords?: (string | { keyword: string; points: number; required?: boolean })[]; // Palavras-chave para correção de discursivas
   modelAnswer?: string;
   explanation: string;
   authorTeacher: string;
@@ -383,12 +390,14 @@ export interface Exam {
   schoolYear: number;
   term: '1º Bimestre' | '2º Bimestre' | '3º Bimestre' | '4º Bimestre' | 'Recuperação' | 'Simulado Geral';
   totalPoints: number;
+  totalScore?: number;
   passingScore: number;
   timeLimitMinutes: number; // Tempo total da prova em minutos (0 = sem limite)
   timePerQuestionSeconds?: number; // Tempo individual configurado
   randomizeQuestions: boolean;
   randomizeOptions: boolean;
   questions: ExamQuestionConfig[];
+  questionIds?: string[];
   status: 'DRAFT' | 'PUBLISHED' | 'IN_PROGRESS' | 'FINISHED' | 'ARCHIVED';
   autoCorrectionRules: AutoCorrectionRules;
   scheduledDate: string;
@@ -481,6 +490,7 @@ export interface PedagogicalReport {
 
 export interface SchoolSettings {
   name: string;
+  schoolName?: string;
   tradeName: string;
   inepCode: string;
   cnpj: string;
@@ -494,10 +504,13 @@ export interface SchoolSettings {
   email: string;
   website: string;
   principalName: string;
+  directorName?: string;
+  coordinatorName?: string;
   principalTitle: string;
   secretaryName: string;
   secretaryRegistration: string;
   logoUrl?: string;
+  managementLogoUrl?: string;
   stampUrl?: string;
   systemVersion?: string;
 }
@@ -555,22 +568,23 @@ export interface NetworkConfig {
 export interface DeveloperContact {
   name: string;
   developerName?: string;
-  role: string;
-  company: string;
+  role?: string;
+  roleTitle?: string;
+  company?: string;
   cnpj?: string;
   email: string;
   phone: string;
   whatsapp?: string;
-  website: string;
+  website?: string;
   github?: string;
   linkedin?: string;
-  location: string;
-  supportAvailability: string;
-  license: string;
-  systemVersion: string;
+  location?: string;
+  supportAvailability?: string;
+  license?: string;
+  systemVersion?: string;
   companyLogoUrl?: string;
   customNotes?: string;
-  changelog: {
+  changelog?: {
     version: string;
     date: string;
     highlights: string[];
@@ -618,11 +632,15 @@ export interface UserAccount {
   id: string;
   name: string;
   login: string;
+  username?: string;
+  password?: string;
   email: string;
   phone?: string;
   role: UserRole;
   sector: UserSector;
   sectorTitle: string;
+  department?: string;
+  roleTitle?: string;
   schoolUnitId?: string;
   schoolUnitName?: string;
   isMaster: boolean;
@@ -758,6 +776,7 @@ export interface SchoolUnit {
   cnpjOrDecree?: string;
   type: SchoolUnitType;
   locationZone: LocationZone; // ZONA URBANA ou ZONA RURAL
+  zone?: LocationZone | string;
   district: string; // Bairro / Distrito
   address: string;
   zipCode?: string;
@@ -783,6 +802,137 @@ export interface SchoolUnit {
   pendingFields?: string[]; // Lista de pendências para complementação cadastral
   createdViaImport?: boolean; // Se foi cadastrada automaticamente via importação de planilha
   importSourceFileName?: string;
+
+  // Identidade Visual & Logotipos da Unidade Escolar
+  logoUrl?: string; // Logotipo oficial da Unidade Escolar (brasão/marca da escola)
+  managementLogoUrl?: string; // Logotipo da Gestão / Mantenedora / SEMED associada
+
+  // Etapas de Ensino, Séries, Turmas e Turnos Atendidos
+  offeredStages?: EducationSegment[]; // ex: ['EDUCACAO_INFANTIL', 'ENSINO_FUNDAMENTAL_I', 'ENSINO_FUNDAMENTAL_II']
+  offeredGrades?: string[]; // ex: ['Berçário', 'Maternal I', '1º Ano', '2º Ano', '6º Ano', '9º Ano']
+  offeredShifts?: ClassShift[]; // ex: ['MATUTINO', 'VESPERTINO', 'INTEGRAL']
+  operatingHours?: string; // Horário de funcionamento (ex: '07:00 às 17:30')
+  maxCapacityStudents?: number; // Capacidade máxima de alunos
+  maxCapacityClasses?: number; // Capacidade máxima de turmas autorizadas
+
+  // Vínculo Central Oficial com a Secretaria Municipal de Educação
+  municipalSecretaryId?: string; // ex: 'semed-cumaru-do-norte'
+  municipalSecretaryName?: string; // ex: 'Secretaria Municipal de Educação – SEMED'
+  municipalSecretaryCnpj?: string; // ex: '30.676.114/0001-17'
+  isLinkedToSecretary?: boolean; // true se homologada e vinculada à SEMED
+  linkageCode?: string; // Código de registro na SEMED (ex: 'VINC-SEMED-PA-001')
+  linkageDate?: string; // Data da homologação do vínculo
+  linkageDecree?: string; // Portaria / Decreto municipal de vinculação
+}
+
+// ==========================================
+// CONFIGURAÇÃO DO GOOGLE DRIVE PARA ATUALIZAÇÕES (OTA)
+// ==========================================
+export interface GoogleDriveOTAConfig {
+  googleAccountEmail: string;
+  driveFolderId: string;
+  driveFolderName: string;
+  publicShareUrl?: string;
+  isConfirmed: boolean;
+  isDefaultSource: boolean;
+  lastSyncCheck?: string;
+  autoCheckUpdates: boolean;
+  serviceAccountEmail?: string;
+}
+
+// ==========================================
+// RELATÓRIOS PERSONALIZADOS UNIVERSAIS
+// ==========================================
+export type ReportModuleKey =
+  | 'STUDENTS'
+  | 'CLASSES'
+  | 'CLASS_DIARY'
+  | 'TEACHER_PORTAL'
+  | 'EXAMS'
+  | 'QUESTIONS'
+  | 'DROPOUT_CENSUS'
+  | 'MUNICIPAL_SYNC'
+  | 'USER_CONTROL'
+  | 'PEDAGOGICAL_DASHBOARD'
+  | 'FINANCIAL';
+
+export interface CustomReportColumnDef {
+  key: string;
+  label: string;
+  type: 'string' | 'number' | 'date' | 'badge' | 'boolean';
+  defaultVisible: boolean;
+  category?: string;
+  width?: string;
+}
+
+export interface CustomReportFilterState {
+  classId?: string;
+  stage?: string;
+  grade?: string;
+  shift?: string;
+  status?: string;
+  locationZone?: string;
+  specialCondition?: string;
+  raceColor?: string;
+  schoolUnitId?: string;
+  searchTerm?: string;
+  startDate?: string;
+  endDate?: string;
+  minAverage?: number;
+  maxAbsences?: number;
+  [key: string]: any;
+}
+
+export interface CustomReportConfig {
+  id?: string;
+  title: string;
+  subtitle?: string;
+  module: ReportModuleKey;
+  columns: string[];
+  filters: CustomReportFilterState;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  groupBy?: string;
+  showSummary: boolean;
+  showOfficialHeader: boolean;
+  showSignatureLines: boolean;
+  includeSchoolLogo: boolean;
+  includeManagementLogo: boolean;
+  paperOrientation: 'portrait' | 'landscape';
+  signatureTitles?: string[];
+}
+
+export interface CustomReportTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  module: ReportModuleKey;
+  config: CustomReportConfig;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface MunicipalSecretaryInfo {
+  id: string;
+  name: string; // 'Secretaria Municipal de Educação – SEMED'
+  shortName: string; // 'SEMED'
+  cnpj: string; // '30.676.114/0001-17'
+  email: string; // 'augustasec@pmcn.pa.gov.br'
+  phone: string; // '(94) 98435-8694'
+  address: string; // 'Rua Um, s/nº, Centro – Cumaru do Norte/PA'
+  neighborhood: string; // 'Centro'
+  city: string; // 'Cumaru do Norte'
+  state: string; // 'PA'
+  zipCode: string; // '68.398-000'
+  secretaryDirector: string; // 'Augusta (Secretária Municipal de Educação)'
+  secretaryDirectorRole?: string; // 'Secretária Titular de Educação'
+  jurisdiction: string; // 'Rede Municipal de Ensino de Cumaru do Norte / PA'
+  systemCode: string; // 'SEMED-PMCN-PA'
+  officialDecree?: string; // 'Lei Orgânica Municipal / Decreto PMCN nº 104/1993'
+  logoUrl?: string; // Logotipo da Secretaria Municipal de Educação (SEMED)
+  managementLogoUrl?: string; // Logotipo da Gestão Municipal / Brasão Oficial da Prefeitura
+  lastUpdateDate?: string;
+  notes?: string;
 }
 
 export const RACE_COLOR_OPTIONS: { value: RaceColorType; label: string; description: string }[] = [
@@ -932,6 +1082,7 @@ export interface MunicipalSyncPacket {
   exportedAt: string;
   operatorName: string;
   checksum: string;
+  municipalSecretary?: MunicipalSecretaryInfo;
   summary: {
     studentsCount: number;
     classesCount: number;
@@ -1060,6 +1211,16 @@ export const DROPOUT_REASON_INFO: Record<
     border: 'border-purple-200',
     mecCode: 'MEC-04',
     description: 'Desmotivação escolar decorrente de histórico de reprovações sucessivas ou distorção idade-série.',
+  },
+  DESINTERESSE: {
+    label: 'Desinteresse / Desmotivação Escolar',
+    shortLabel: 'Desinteresse Escolar',
+    category: 'PEDAGOGICO',
+    color: 'text-purple-700',
+    bg: 'bg-purple-50',
+    border: 'border-purple-200',
+    mecCode: 'MEC-04',
+    description: 'Desmotivação escolar ou falta de interesse nos estudos.',
   },
   GRAVIDEZ_CUIDADO_FAMILIAR: {
     label: 'Gravidez Precoce / Cuidados com Filhos ou Familiares',
@@ -1242,19 +1403,25 @@ export interface TeacherStudentPedagogicalNote {
    ========================================================================== */
 
 export interface WhatsAppConfig {
-  enabled: boolean;
+  enabled?: boolean;
   instanceName: string;
   serverEndpoint: string;
-  apiKeyOrToken: string;
+  apiKeyOrToken?: string;
+  apiKey?: string;
+  phoneNumber?: string;
+  webhookUrl?: string;
   status: 'CONNECTED' | 'DISCONNECTED' | 'QR_READY' | 'CONNECTING';
   qrCodeBase64?: string;
   connectedPhone?: string;
   batteryLevel?: number;
-  autoSendAbsenceAlerts: boolean;
-  autoSendGradeAlerts: boolean;
-  autoSendAnnouncements: boolean;
-  autoSendActiveSearchSummons: boolean;
-  defaultCountryCode: string;
+  autoSendAbsenceAlerts?: boolean;
+  autoSendGradeAlerts?: boolean;
+  autoSendAnnouncements?: boolean;
+  autoSendActiveSearchSummons?: boolean;
+  autoNotifyGrades?: boolean;
+  autoNotifyAttendance?: boolean;
+  autoNotifyAnnouncements?: boolean;
+  defaultCountryCode?: string;
 }
 
 export type WhatsAppRecipientRole = 'RESPONSAVEL' | 'PROFESSOR' | 'SECRETARIA' | 'DIRETORIA' | 'COORDENACAO' | 'ALUNO';
@@ -1483,6 +1650,7 @@ export interface PredictiveAlert {
   interventionNotes?: string;
   interventionResponsible?: string;
   interventionDate?: string;
+  recommendedAction?: string;
   
   detectedAt: string;
 }

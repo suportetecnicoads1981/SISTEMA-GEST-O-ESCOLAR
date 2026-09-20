@@ -33,6 +33,7 @@ import {
 import { UserAccount, SchoolSettings, NexusAuditEntry } from '../../types';
 import { AuditService } from '../../services/nexus/AuditService';
 import { RelationalIntegrityDashboard } from './RelationalIntegrityDashboard';
+import { EnvironmentVariablesView } from './EnvironmentVariablesView';
 import { getStoredData, AppStateData } from '../../data/storage';
 
 interface AdminTIHubProps {
@@ -45,7 +46,7 @@ interface AdminTIHubProps {
 }
 
 type AdminCategory = 'ALL' | 'DEPLOY' | 'DATABASE' | 'SECURITY' | 'INFRA';
-type ViewMode = 'DASHBOARD' | 'CATALOG' | 'RELATIONAL_INTEGRITY';
+type ViewMode = 'DASHBOARD' | 'CATALOG' | 'RELATIONAL_INTEGRITY' | 'ENV_VARS';
 
 export const AdminTIHub: React.FC<AdminTIHubProps> = ({
   onNavigate,
@@ -398,6 +399,18 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
               >
                 Catálogo Geral ({modules.length})
               </button>
+              <button
+                onClick={() => setViewMode('ENV_VARS')}
+                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  viewMode === 'ENV_VARS'
+                    ? 'bg-purple-600 text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Auditoria e teste em tempo real das Variáveis de Ambiente e Secrets"
+              >
+                <Key className="w-3.5 h-3.5 text-purple-300" />
+                <span>Variáveis de Ambiente (.env)</span>
+              </button>
             </div>
           </div>
         </div>
@@ -471,13 +484,20 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
                     </div>
                   </div>
 
-                  <div className="p-2 bg-white rounded-xl border border-slate-200 flex flex-col justify-between">
-                    <span className="text-[10px] text-slate-500 font-bold">SECRET MANAGER</span>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="font-bold text-slate-900">GCP IAM</span>
-                      <span className="text-[10px] text-indigo-600 font-bold">{serviceStatus.secretManager.keys} Chaves</span>
+                  <button
+                    onClick={() => setViewMode('ENV_VARS')}
+                    className="p-2 bg-indigo-50/60 hover:bg-indigo-100/80 rounded-xl border border-indigo-200 flex flex-col justify-between text-left transition-all cursor-pointer group"
+                    title="Clique para auditar e testar variáveis de ambiente (.env) e Secrets em tempo real"
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-[10px] text-indigo-700 font-bold">ENV & SECRETS</span>
+                      <Key className="w-3 h-3 text-indigo-500 group-hover:rotate-12 transition-transform" />
                     </div>
-                  </div>
+                    <div className="flex items-center justify-between mt-1 w-full">
+                      <span className="font-bold text-slate-900 text-xs">.env Ativo</span>
+                      <span className="text-[10px] text-indigo-600 font-bold">Auditar →</span>
+                    </div>
+                  </button>
                 </div>
               </div>
 
@@ -1049,6 +1069,13 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
             onRefresh={runHealthCheck}
           />
         </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODO 4: AUDITORIA E TESTE DE VARIÁVEIS DE AMBIENTE & SECRETS */}
+      {/* ======================================================== */}
+      {viewMode === 'ENV_VARS' && (
+        <EnvironmentVariablesView onBack={() => setViewMode('DASHBOARD')} />
       )}
 
       {/* Painel de Recomendações de TI & Boas Práticas */}

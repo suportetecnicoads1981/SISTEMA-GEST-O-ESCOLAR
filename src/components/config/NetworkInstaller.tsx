@@ -347,7 +347,7 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
       exportedBy: `Cópia de Segurança (${snapshot.operatorName}) - ${snapshot.reason}`,
       checksum: snapshot.checksum,
       stats: snapshot.stats,
-      data: snapshot.data,
+      data: snapshot.data || getStoredData(),
     };
     const blob = new Blob([JSON.stringify(backupObj, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -978,9 +978,40 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
             </button>
           </div>
 
-          {/* 2 Big Action Cards: Server vs Client */}
+          {/* BANNER DE DOWNLOAD DO SISTEMA COMPLETO EM ZIP */}
+          <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 rounded-2xl p-5 border border-indigo-500/40 text-white shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="h-12 w-12 rounded-2xl bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center text-indigo-300 shrink-0">
+                <Layers className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="text-sm sm:text-base font-black text-white">
+                    Pacote ZIP do Sistema Completo Unificado
+                  </h4>
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-black border border-emerald-500/30">
+                    v5.4.1
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  Contém todos os módulos de instalação (Servidor, Estação, Satélite e Nuvem), scripts de inicialização silenciosa e documentação offline em um único arquivo compactado.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => handleDownloadZip('FULL')}
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md shadow-emerald-950/40 transition-all flex items-center gap-2 cursor-pointer shrink-0 active:scale-95"
+              title="Baixar pacote ZIP completo do SucessoEdu"
+            >
+              <Download className="h-4 w-4 text-white" />
+              <span>Baixar Sistema Completo (.ZIP)</span>
+            </button>
+          </div>
+
+          {/* 4 Módulos de Instalação Separados */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* SERVER CARD */}
+            {/* MÓDULO 01: SERVIDOR CENTRAL */}
             <div className="bg-white rounded-2xl border-2 border-indigo-200 p-6 shadow-sm flex flex-col justify-between space-y-5 hover:border-indigo-400 transition-all">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -988,7 +1019,7 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
                     <Server className="h-5 w-5" />
                   </span>
                   <span className="text-[10px] font-black uppercase px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-200">
-                    Instalar 1 por Escola
+                    Módulo 01 • 1 por Escola
                   </span>
                 </div>
 
@@ -1037,12 +1068,12 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
                   className="w-full py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-950 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer border border-indigo-200"
                 >
                   <PackageCheck className="h-4 w-4 text-indigo-600" />
-                  <span>Baixar Pacote Completo do Servidor (.ZIP)</span>
+                  <span>Baixar Pacote do Servidor (.ZIP)</span>
                 </button>
               </div>
             </div>
 
-            {/* CLIENT CARD */}
+            {/* MÓDULO 02: ESTAÇÃO DE TRABALHO */}
             <div className="bg-white rounded-2xl border-2 border-emerald-200 p-6 shadow-sm flex flex-col justify-between space-y-5 hover:border-emerald-400 transition-all">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -1050,7 +1081,7 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
                     <Laptop className="h-5 w-5" />
                   </span>
                   <span className="text-[10px] font-black uppercase px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-200">
-                    Instalar nos Computadores dos Alunos
+                    Módulo 02 • Alunos / Labs
                   </span>
                 </div>
 
@@ -1091,7 +1122,61 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
                   className="w-full py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer border border-emerald-200"
                 >
                   <PackageCheck className="h-4 w-4 text-emerald-600" />
-                  <span>Baixar Pacote Completo de Estações (.ZIP)</span>
+                  <span>Baixar Pacote de Estações (.ZIP)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* MÓDULO 03: POLO REMOTO / ESCOLA SATÉLITE */}
+            <div className="bg-white rounded-2xl border-2 border-amber-200 p-6 shadow-sm flex flex-col justify-between space-y-5 hover:border-amber-400 transition-all">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="h-10 w-10 rounded-2xl bg-amber-600 text-white flex items-center justify-center font-bold">
+                    <HardDrive className="h-5 w-5" />
+                  </span>
+                  <span className="text-[10px] font-black uppercase px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full border border-amber-200">
+                    Módulo 03 • Sem Internet
+                  </span>
+                </div>
+
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Módulo Polo Remoto / Escola Satélite</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Ideal para polos rurais, aldeias indígenas ou escolas sem internet contínua. Opera de forma 100% autônoma.
+                  </p>
+                </div>
+
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1.5 text-[11px] text-slate-600">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>Banco de dados local isolado para lançamentos diários</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>Sincronização em lote via Pen Drive ou conexão esporádica</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>Compatível com qualquer notebook ou computador simples</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <button
+                  onClick={() => downloadFile(generateRemoteSatelliteSchoolBat(currentConfig), 'Instalar_Polo_Remoto_Satélite.bat')}
+                  className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Baixar Instalador Polo Satélite (.BAT)</span>
+                </button>
+
+                <button
+                  onClick={() => handleDownloadZip('SATELLITE')}
+                  className="w-full py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer border border-amber-200"
+                >
+                  <PackageCheck className="h-4 w-4 text-amber-600" />
+                  <span>Baixar Pacote Polo Remoto (.ZIP)</span>
                 </button>
               </div>
             </div>

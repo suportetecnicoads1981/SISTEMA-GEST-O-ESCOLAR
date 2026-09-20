@@ -294,3 +294,55 @@
   animation: progress-shimmer 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
+/* ==========================================================================
+   Barra de Rolagem Visível e Estilizada para os Módulos da Barra Lateral
+   ========================================================================== */
+.sidebar-scrollbar {
+  overflow-y: scroll;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #6366f1 #090d16;
+  scrollbar-gutter: stable;
+}
+
+/* WebKit (Chrome, Edge, Safari, Opera) */
+.sidebar-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-track {
+  background: #090d16;
+  border-radius: 9999px;
+  margin: 4px 0;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 9999px;
+  border: 2px solid #090d16;
+  min-height: 48px;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #6366f1;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb:active {
+  background: #818cf8;
+}
+
+/* Scrollbar posicionada na borda esquerda do menu de módulos */
+.sidebar-scrollbar-left {
+  direction: rtl;
+}
+
+.sidebar-scrollbar-left > * {
+  direction: ltr;
+}
+
+.sidebar-scrollbar-right {
+  direction: ltr;
+}
+
+

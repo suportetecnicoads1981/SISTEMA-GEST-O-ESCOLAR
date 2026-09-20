@@ -7,18 +7,32 @@ import {
   RaceColorType,
   LocationZone,
   ClassShift,
+  SpecialConditionType,
 } from '../types';
+import {
+  parseDocxFile,
+  parseOdtFile,
+  OFFICIAL_MUNICIPAL_SAMPLE_DATA,
+  OFFICIAL_ERMINIO_BRITO_8COL_DATA,
+  downloadSpreadsheetTemplate,
+  downloadWordTemplate,
+  downloadWriterTemplate,
+} from './officeDocumentParser';
 
 export interface ImportFilterOptions {
+  // Filtros de Informações a Importar (Campos)
   importName: boolean;
+  cleanPcdSuffixFromName: boolean; // Remove sufixo " - PCD" do nome
   importBirthDate: boolean;
   importGender: boolean;
   importRaceColor: boolean;
   importAddress: boolean;
   importShift: boolean;
   importSeries: boolean;
-  importMedicalClassification: boolean;
-  importMedicalReport: boolean;
+  importPcd: boolean; // Importa classificação PCD / Condição Especial
+  importTea: boolean; // Importa indicação TEA (Sim/Não)
+  importMedicalReport: boolean; // Importa LAUDO comprobatório
+  importMedicalClassification?: boolean;
   importSchoolUnit: boolean;
   autoRegisterSchoolUnit: boolean; // Cadastra automaticamente a unidade escolar e séries atendidas
   extractSeriesFromFirstColumn: boolean; // Extrai a série a partir da 1ª coluna (ex: "PRÉ II Nº")
@@ -26,12 +40,20 @@ export interface ImportFilterOptions {
   selectedSchoolUnitId?: string;
   defaultShift?: ClassShift;
   defaultSeries?: string;
+
+  // Filtros Facilitadores de Registros (quais alunos importar)
+  recordFilterSpecial?: 'ALL' | 'ONLY_PCD_TEA' | 'ONLY_TEA' | 'ONLY_REPORT' | 'REGULAR_ONLY';
+  recordFilterGender?: 'ALL' | 'F' | 'M';
+  recordFilterRace?: 'ALL' | 'PARDA' | 'BRANCA' | 'PRETA' | 'INDIGENA' | 'AMARELA';
+  recordFilterCadastralStatus?: 'ALL' | 'OK' | 'INCOMPLETE';
+  searchFilter?: string;
 }
 
 export interface ParsedImportStudent {
   tempId: string;
   sequenceNumber?: string;
   name: string;
+  cleanName?: string; // Nome limpo sem sufixo " - PCD"
   birthDate: string;
   formattedBirthDate?: string;
   gender: 'M' | 'F' | 'OTHER';
@@ -43,6 +65,9 @@ export interface ParsedImportStudent {
   series: string;
   seriesFromFirstCol?: string; // Informação da série extraída da 1ª coluna
   medicalClassification: string;
+  specialConditions?: string[];
+  isPcd?: boolean;
+  isTea?: boolean;
   hasMedicalReport: boolean;
   medicalReportText: string;
   schoolName: string;
@@ -53,6 +78,7 @@ export interface ParsedImportStudent {
   pendingFields: string[];
   sourceFileName: string;
   rawRow: Record<string, any>;
+  selectedForImport?: boolean; // Controle de seleção individual pelo usuário
 }
 
 export interface FileImportResult {
@@ -72,31 +98,40 @@ export interface FileImportResult {
   completeCount: number;
   incompleteCount: number;
   errors: string[];
+  documentType?: 'EXCEL' | 'CALC' | 'WORD' | 'WRITER' | 'CSV' | 'GENERIC';
 }
 
 export const DEFAULT_IMPORT_FILTERS: ImportFilterOptions = {
   importName: true,
+  cleanPcdSuffixFromName: true,
   importBirthDate: true,
   importGender: true,
   importRaceColor: true,
   importAddress: true,
   importShift: true,
   importSeries: true,
-  importMedicalClassification: true,
+  importPcd: true,
+  importTea: true,
   importMedicalReport: true,
+  importMedicalClassification: true,
   importSchoolUnit: true,
   autoRegisterSchoolUnit: true, // Habilitado por padrão
   extractSeriesFromFirstColumn: true, // Ativo por padrão conforme solicitado
   overrideSeriesWithDefault: false,
   defaultShift: 'MANHÃ',
-  defaultSeries: 'PRÉ II',
+  defaultSeries: 'PRÉ-ESCOLA I',
+  recordFilterSpecial: 'ALL',
+  recordFilterGender: 'ALL',
+  recordFilterRace: 'ALL',
+  recordFilterCadastralStatus: 'ALL',
+  searchFilter: '',
 };
 
 // Extrai a série a partir do cabeçalho da 1ª coluna (ex: "PRÉ II Nº", "PRÉ II\nNº", "1º ANO Nº")
 export function extractSeriesFromFirstColumnHeader(
   cellText: any,
   adjacentCells?: any[]
-): { series: string | null; cleanHeader: string } {
+): { series: string | null; cleanHeader: string; studentNumber?: string } {
   if (!cellText && (!adjacentCells || adjacentCells.length === 0)) {
     return { series: null, cleanHeader: '' };
   }
@@ -105,6 +140,13 @@ export function extractSeriesFromFirstColumnHeader(
   const fullText = [raw, ...(adjacentCells || []).map((c) => String(c || '').trim())]
     .filter(Boolean)
     .join(' ');
+
+  // Extrai número do estudante se houver no final (ex: "PRÉ II - 1" -> studentNumber = "1")
+  let studentNumber: string | undefined = undefined;
+  const numEndMatch = raw.match(/[\-\_\s]+(\d{1,4})$/);
+  if (numEndMatch) {
+    studentNumber = numEndMatch[1];
+  }
 
   // 1. Padrões específicos de séries e etapas escolares brasileiras
   const knownPatterns: Array<{ regex: RegExp; format: (m: RegExpMatchArray) => string }> = [
@@ -176,6 +218,7 @@ export function extractSeriesFromFirstColumnHeader(
       return {
         series: format(match),
         cleanHeader: raw,
+        studentNumber,
       };
     }
   }
@@ -192,10 +235,11 @@ export function extractSeriesFromFirstColumnHeader(
     return {
       series: stripped.toUpperCase(),
       cleanHeader: raw,
+      studentNumber,
     };
   }
 
-  return { series: null, cleanHeader: raw };
+  return { series: null, cleanHeader: raw, studentNumber };
 }
 
 /**
@@ -516,7 +560,7 @@ function parseMedicalReport(val: any): { hasReport: boolean; text: string } {
   return { hasReport: false, text: str };
 }
 
-// Processa arquivo individual (qualquer formato suportado)
+// Processa arquivo individual (qualquer formato suportado do LibreOffice e Microsoft Office)
 export async function parseSingleFile(
   file: File,
   filters: ImportFilterOptions,
@@ -528,6 +572,41 @@ export async function parseSingleFile(
   const ext = fileName.split('.').pop()?.toLowerCase() || '';
 
   try {
+    // 1. Microsoft Office Word (.docx)
+    if (ext === 'docx') {
+      const extracted = await parseDocxFile(file);
+      const res = processSheetWithHeaders(extracted.matrix, fileName, fileSize, filters, classes, schoolUnits);
+      res.documentType = 'WORD';
+      if (extracted.schoolNameDetected && !res.schoolNameDetected) {
+        res.schoolNameDetected = extracted.schoolNameDetected;
+      }
+      if (extracted.classOrSeriesDetected && !res.seriesDetected) {
+        res.seriesDetected = extracted.classOrSeriesDetected;
+      }
+      if (extracted.dateDetected && !res.dateDetected) {
+        res.dateDetected = extracted.dateDetected;
+      }
+      return res;
+    }
+
+    // 2. LibreOffice Writer (.odt - OpenDocument Text)
+    if (ext === 'odt') {
+      const extracted = await parseOdtFile(file);
+      const res = processSheetWithHeaders(extracted.matrix, fileName, fileSize, filters, classes, schoolUnits);
+      res.documentType = 'WRITER';
+      if (extracted.schoolNameDetected && !res.schoolNameDetected) {
+        res.schoolNameDetected = extracted.schoolNameDetected;
+      }
+      if (extracted.classOrSeriesDetected && !res.seriesDetected) {
+        res.seriesDetected = extracted.classOrSeriesDetected;
+      }
+      if (extracted.dateDetected && !res.dateDetected) {
+        res.dateDetected = extracted.dateDetected;
+      }
+      return res;
+    }
+
+    // 3. JSON
     if (ext === 'json') {
       const text = await file.text();
       const jsonData = JSON.parse(text);
@@ -541,23 +620,27 @@ export async function parseSingleFile(
       );
     }
 
+    // 4. CSV, TSV, TXT
     if (ext === 'csv' || ext === 'tsv' || ext === 'txt') {
       const text = await file.text();
-      // Lê delimitado com fallback inteligente
       const wb = XLSX.read(text, { type: 'string' });
       const wsname = wb.SheetNames[0];
       const ws = wb.Sheets[wsname];
       const rawRows = XLSX.utils.sheet_to_json<any>(ws, { header: 1, defval: '' });
-      return processSheetWithHeaders(rawRows, fileName, fileSize, filters, classes, schoolUnits);
+      const res = processSheetWithHeaders(rawRows, fileName, fileSize, filters, classes, schoolUnits);
+      res.documentType = 'CSV';
+      return res;
     }
 
-    // XLSX, XLS, ODS, XML
+    // 5. Microsoft Office Excel (.xlsx, .xls) e LibreOffice Calc (.ods)
     const buffer = await file.arrayBuffer();
     const wb = XLSX.read(buffer, { type: 'array' });
     const wsname = wb.SheetNames[0];
     const ws = wb.Sheets[wsname];
     const rawRows = XLSX.utils.sheet_to_json<any>(ws, { header: 1, defval: '' });
-    return processSheetWithHeaders(rawRows, fileName, fileSize, filters, classes, schoolUnits);
+    const res = processSheetWithHeaders(rawRows, fileName, fileSize, filters, classes, schoolUnits);
+    res.documentType = ext === 'ods' ? 'CALC' : ext === 'xls' || ext === 'xlsx' ? 'EXCEL' : 'GENERIC';
+    return res;
   } catch (error: any) {
     return {
       fileName,
@@ -567,12 +650,13 @@ export async function parseSingleFile(
       completeCount: 0,
       incompleteCount: 0,
       errors: [`Falha ao ler o arquivo: ${error?.message || 'Formato não reconhecido'}`],
+      documentType: 'GENERIC',
     };
   }
 }
 
 // Processa planilha crua linha por linha com detecção de metadados do cabeçalho
-function processSheetWithHeaders(
+export function processSheetWithHeaders(
   matrix: any[][],
   fileName: string,
   fileSize: number,
@@ -591,26 +675,26 @@ function processSheetWithHeaders(
     const row = matrix[r] || [];
     const rowText = row.map((c) => String(c).trim()).join(' ');
 
-    // Detecção: ESCOLA: MARIA DA PRAIA
-    const schoolMatch = rowText.match(/ESCOLA:\s*([^\n\r]+?)(?=\s+TURMAS:|\s+DATA:|$)/i);
+    // Detecção: ESCOLA: EMEI RUTH PEREIRA BARBARESCO ou ESCOLA: MARIA DA PRAIA
+    const schoolMatch = rowText.match(/ESCOLA:\s*([^\n\r\|\t]+?)(?=\s+TURMAS?:|\s+DATA:|\s*\||$)/i);
     if (schoolMatch && !schoolNameDetected) {
       schoolNameDetected = schoolMatch[1].trim();
     }
 
-    // Detecção: TURMAS: PRÉ II – 1º AO 5º - 6º AO 9º
-    const turmasMatch = rowText.match(/TURMAS?:\s*([^\n\r]+?)(?=\s+DATA:|$)/i);
+    // Detecção: TURMA: PRÉ-ESCOLA I A ou TURMAS: PRÉ II – 1º AO 5º - 6º AO 9º
+    const turmasMatch = rowText.match(/TURMAS?:\s*([^\n\r\|\t]+?)(?=\s+DATA:|\s*\||$)/i);
     if (turmasMatch && !seriesDetected) {
       seriesDetected = turmasMatch[1].trim();
     }
 
-    // Detecção: DATA: 01/09/2026
+    // Detecção: DATA: 15/09/2026 ou 01/09/2026
     const dataMatch = rowText.match(/DATA:\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i);
     if (dataMatch && !dateDetected) {
       dateDetected = dataMatch[1].trim();
     }
 
     // Procurar a linha que contém as colunas da tabela
-    // Ex: "NOME COMPLETO DO ALUNO" ou "DATA DE NASCIMENTO"
+    // Ex: "NOME COMPLETO DO ALUNO" ou "DE NASCIM" ou "DATA DE NASCIMENTO"
     const hasStudentNameCol = row.some((cell) => {
       const c = String(cell).toUpperCase();
       return (
@@ -639,47 +723,135 @@ function processSheetWithHeaders(
     const norm = h
       .toUpperCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
 
-    if (norm.includes('Nº') || norm.includes('NO') || norm.includes('NUMERO') || norm.includes('ORDEM')) {
+    // 1. SERIE DO ALUO / SERIE DO ALUNO / TURMA
+    if (
+      (norm.includes('SERIE') ||
+        norm.includes('TURMA') ||
+        norm.includes('ANO DE ENSINO') ||
+        norm.includes('ETAPA') ||
+        norm === 'SERIE DO ALUO' ||
+        norm === 'SERIE DO ALUNO') &&
+      !norm.includes('NASCIM')
+    ) {
+      if (colMap.series === undefined) colMap.series = idx;
+    }
+
+    // Nº de Ordem
+    if (
+      norm.includes('Nº') ||
+      norm.includes('N°') ||
+      norm.includes('NO.') ||
+      norm.includes('NUMERO') ||
+      norm.includes('ORDEM') ||
+      norm === 'N' ||
+      norm === 'ORD'
+    ) {
       if (colMap.seq === undefined) colMap.seq = idx;
     }
-    if (norm.includes('NOME') || norm.includes('ALUNO')) {
+
+    // 2. NOME COMPLETO DO ALUNO
+    // Não vincular colunas que contenham termos de outros campos (SERIE, SEXO, RACA, EDENRECO, PCD, LAUDO, NASCIM)
+    const isSpecialStudentField =
+      norm.includes('SERIE') ||
+      norm.includes('TURMA') ||
+      norm.includes('SEXO') ||
+      norm.includes('COR') ||
+      norm.includes('RACA') ||
+      norm.includes('ENDERECO') ||
+      norm.includes('EDENRECO') ||
+      norm.includes('PCD') ||
+      norm.includes('LAUDO') ||
+      norm.includes('NASCIM');
+
+    if (
+      !isSpecialStudentField &&
+      (norm.includes('NOME') || norm === 'ALUNO' || norm === 'ESTUDANTE' || norm === 'NOME COMPLETO DO ALUNO')
+    ) {
       if (colMap.name === undefined) colMap.name = idx;
     }
-    if (norm.includes('NASCIMENTO') || norm.includes('DT NASC') || norm.includes('NASC')) {
+
+    // 3. DATA DE NASCIMENTO
+    if (norm.includes('NASCIM') || norm.includes('NASC') || norm.includes('ANIVERSARIO') || norm.includes('DATA DE NASCIMENTO')) {
       if (colMap.birthDate === undefined) colMap.birthDate = idx;
     }
+
+    // 4. SEXO DO ALUNO
     if (norm.includes('SEXO') || norm.includes('GENERO')) {
       if (colMap.gender === undefined) colMap.gender = idx;
     }
+
+    // 5. COR/RAÇA DO ALUNO
     if (norm.includes('RACA') || norm.includes('COR') || norm.includes('ETNIA')) {
       if (colMap.race === undefined) colMap.race = idx;
     }
-    if (norm.includes('ENDERECO') || norm.includes('LOGRADOURO') || norm.includes('VILA') || norm.includes('RESIDENCIA')) {
+
+    // 6. EDENREÇO DO ALUNO / ENDEREÇO
+    if (
+      norm.includes('ENDERECO') ||
+      norm.includes('EDENRECO') ||
+      norm.includes('LOGRADOURO') ||
+      norm.includes('VILA') ||
+      norm.includes('RESIDENCIA') ||
+      norm.includes('BAIRRO') ||
+      norm.includes('VICINAL') ||
+      norm.includes('FAZENDA')
+    ) {
       if (colMap.address === undefined) colMap.address = idx;
     }
+
+    // TURNO / PERÍODO
     if (norm.includes('TURNO') || norm.includes('PERIODO')) {
       if (colMap.shift === undefined) colMap.shift = idx;
     }
-    if (norm.includes('SERIE') || norm.includes('TURMA') || norm.includes('ANO')) {
-      if (colMap.series === undefined) colMap.series = idx;
+
+    // Coluna TEA (Sim/Não)
+    if (norm.includes('TEA') || norm.includes('AUTISMO') || norm.includes('ESPECTRO')) {
+      if (colMap.tea === undefined) colMap.tea = idx;
     }
+
+    // 7. PCD DO ALUNO / Condição Especial
     if (
       norm.includes('PCD') ||
-      norm.includes('CLASSIFICACAO MEDICA') ||
       norm.includes('DEFICIENCIA') ||
-      norm.includes('CONDICAO')
+      norm.includes('CONDICAO') ||
+      norm.includes('CLASSIFICACAO MEDICA') ||
+      norm.includes('NECESSIDADES')
     ) {
-      if (colMap.medicalClass === undefined) colMap.medicalClass = idx;
+      if (colMap.pcd === undefined) colMap.pcd = idx;
     }
-    if (norm.includes('LAUDO')) {
+
+    // 8. SE O ALUNO TEM LAUDO / LAUDO
+    if (norm.includes('LAUDO') || norm.includes('COMPROVACAO') || norm.includes('TEM LAUDO')) {
       if (colMap.laudo === undefined) colMap.laudo = idx;
     }
   });
 
-  // 2. Extração especializada da Série na 1ª Coluna (como "PRÉ II \n Nº" ou "PRÉ II Nº")
-  const firstColIdx = colMap.seq !== undefined ? colMap.seq : 0;
+  // Fallback padrão municipal caso a planilha contenha a estrutura clássica de 8 colunas:
+  // 0: SERIE DO ALUO / Nº
+  // 1: NOME COMPLETO DO ALUNO
+  // 2: DATA DE NASCIMENTO
+  // 3: SEXO DO ALUNO
+  // 4: COR/RAÇA DO ALUNO
+  // 5: EDENREÇO DO ALUNO
+  // 6: PCD DO ALUNO
+  // 7: SE O ALUNO TEM LAUDO
+  if (colMap.name === undefined && headers.length >= 2) {
+    if (colMap.series === undefined) colMap.series = 0;
+    colMap.name = 1;
+    if (colMap.birthDate === undefined && headers.length >= 3) colMap.birthDate = 2;
+    if (colMap.gender === undefined && headers.length >= 4) colMap.gender = 3;
+    if (colMap.race === undefined && headers.length >= 5) colMap.race = 4;
+    if (colMap.address === undefined && headers.length >= 6) colMap.address = 5;
+    if (colMap.pcd === undefined && headers.length >= 7) colMap.pcd = 6;
+    if (colMap.laudo === undefined && headers.length >= 8) colMap.laudo = 7;
+  }
+
+  // 2. Extração especializada da Série na 1ª Coluna (como "PRÉ II \n Nº" ou "PRÉ II Nº" ou "SERIE DO ALUO")
+  const firstColIdx = colMap.series !== undefined ? colMap.series : colMap.seq !== undefined ? colMap.seq : 0;
   const firstColRawHeader = headers[firstColIdx] || '';
   const adjacentFirstColCells: any[] = [];
   if (headerRowIndex > 0) {
@@ -712,22 +884,65 @@ function processSheetWithHeaders(
       continue;
     }
 
-    const rawSeq = colMap.seq !== undefined ? row[colMap.seq] : row[0];
+    // Detecta se o nome contém sufixo PCD (ex: "Luan Sousa de Jesus – PCD", "Lucas Sousa de Jesus - PCD")
+    const pcdNameRegex = /[\s\-_–—]+PCD\b/i;
+    const hasPcdInName = pcdNameRegex.test(name);
+    const cleanName = name.replace(pcdNameRegex, '').trim();
+
+    let rawSeq = colMap.seq !== undefined ? row[colMap.seq] : row[0];
     const rawBirth = colMap.birthDate !== undefined ? row[colMap.birthDate] : '';
     const rawGender = colMap.gender !== undefined ? row[colMap.gender] : '';
     const rawRace = colMap.race !== undefined ? row[colMap.race] : '';
     const rawAddr = colMap.address !== undefined ? row[colMap.address] : '';
     const rawShift = colMap.shift !== undefined ? row[colMap.shift] : '';
     const rawSeries = colMap.series !== undefined ? row[colMap.series] : '';
-    const rawMedical = colMap.medicalClass !== undefined ? row[colMap.medicalClass] : '';
+    const rawPcd = colMap.pcd !== undefined ? row[colMap.pcd] : '';
+    const rawTea = colMap.tea !== undefined ? row[colMap.tea] : '';
     const rawLaudo = colMap.laudo !== undefined ? row[colMap.laudo] : '';
+
+    // Extrai série e número de chamada da 1ª coluna se contiver "PRÉ II - 1" ou similar
+    let rowSeriesParsed = '';
+    const seriesColVal = cleanPlaceholder(rawSeries);
+    if (seriesColVal) {
+      const parsedCol = extractSeriesFromFirstColumnHeader(seriesColVal);
+      if (parsedCol.series) {
+        rowSeriesParsed = parsedCol.series;
+      }
+      if (parsedCol.studentNumber && (!rawSeq || rawSeq === rawSeries)) {
+        rawSeq = parsedCol.studentNumber;
+      }
+    }
 
     const parsedDate = parseFlexibleDate(rawBirth);
     const gender = parseGender(rawGender);
     const race = parseRaceColor(rawRace);
     const address = cleanPlaceholder(rawAddr);
-    const medClass = cleanPlaceholder(rawMedical);
-    const laudoInfo = parseMedicalReport(rawLaudo);
+
+    // Avalia PCD
+    let pcdDesc = cleanPlaceholder(rawPcd);
+    if (!pcdDesc && hasPcdInName) {
+      pcdDesc = 'PCD Identificado no Levantamento';
+    }
+
+    // Avalia TEA
+    const teaStr = cleanPlaceholder(rawTea).toLowerCase();
+    const isTea =
+      teaStr === 'sim' ||
+      teaStr === 's' ||
+      /TEA|AUTISMO/i.test(pcdDesc) ||
+      /TEA|AUTISMO/i.test(name);
+
+    const isPcd = Boolean(pcdDesc || hasPcdInName || isTea);
+
+    // Avalia Laudo
+    let laudoInfo = parseMedicalReport(rawLaudo);
+    // Se PCD diz "Suspeita sem laudo", garante hasReport = false
+    if (/sem laudo|suspeita/i.test(pcdDesc)) {
+      laudoInfo = { hasReport: false, text: 'Suspeita sem laudo' };
+    } else if (/TEA\s*[–-]\s*Nível/i.test(pcdDesc) && !cleanPlaceholder(rawLaudo)) {
+      // Diagnóstico fechado com nível especificado
+      laudoInfo = { hasReport: true, text: 'SIM' };
+    }
 
     const shift =
       cleanPlaceholder(rawShift) ||
@@ -735,15 +950,17 @@ function processSheetWithHeaders(
       'MANHÃ';
 
     // Determinar a série aplicando as regras configuráveis pelo usuário:
-    let finalSeries = 'PRÉ II';
+    let finalSeries = 'PRÉ-ESCOLA I';
     if (filters.overrideSeriesWithDefault && filters.defaultSeries) {
       finalSeries = filters.defaultSeries;
+    } else if (rowSeriesParsed) {
+      finalSeries = rowSeriesParsed;
     } else if (cleanPlaceholder(rawSeries)) {
       finalSeries = cleanPlaceholder(rawSeries);
-    } else if (filters.extractSeriesFromFirstColumn !== false && seriesFromFirstColumn) {
-      finalSeries = seriesFromFirstColumn;
     } else if (seriesDetected) {
       finalSeries = seriesDetected;
+    } else if (filters.extractSeriesFromFirstColumn !== false && seriesFromFirstColumn) {
+      finalSeries = seriesFromFirstColumn;
     } else if (filters.defaultSeries) {
       finalSeries = filters.defaultSeries;
     }
@@ -764,7 +981,7 @@ function processSheetWithHeaders(
     if (race === 'NAO_DECLARADA') {
       pendingFields.push('Raça/Cor (Censo Escolar)');
     }
-    if (medClass && !laudoInfo.hasReport) {
+    if (isPcd && !laudoInfo.hasReport) {
       pendingFields.push('Comprovação de Laudo Médico (PCD)');
     }
     if (!cleanPlaceholder(rawLaudo) || rawLaudo.toString().includes('*')) {
@@ -786,6 +1003,7 @@ function processSheetWithHeaders(
       tempId: `imp-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
       sequenceNumber: cleanPlaceholder(rawSeq) || String(students.length + 1),
       name,
+      cleanName,
       birthDate: parsedDate.isoDate || '2020-01-01',
       formattedBirthDate: parsedDate.formatted || 'Não informada',
       gender,
@@ -794,7 +1012,9 @@ function processSheetWithHeaders(
       shift,
       series: finalSeries,
       seriesFromFirstCol: seriesFromFirstColumn,
-      medicalClassification: medClass || (medClass === '' ? 'Não declarada' : medClass),
+      medicalClassification: pcdDesc || (isPcd ? 'PCD' : 'Não declarada'),
+      isPcd,
+      isTea,
       hasMedicalReport: laudoInfo.hasReport,
       medicalReportText: laudoInfo.text,
       schoolName: finalSchoolName,
@@ -803,6 +1023,7 @@ function processSheetWithHeaders(
       cadastralStatus,
       pendingFields,
       sourceFileName: fileName,
+      selectedForImport: true, // Selecionado por padrão para importação
       rawRow: {
         rawSeq,
         rawName,
@@ -810,7 +1031,8 @@ function processSheetWithHeaders(
         rawGender,
         rawRace,
         rawAddr,
-        rawMedical,
+        rawPcd,
+        rawTea,
         rawLaudo,
       },
     });
@@ -820,8 +1042,8 @@ function processSheetWithHeaders(
   const incompleteCount = students.filter((s) => s.cadastralStatus !== 'OK').length;
 
   // Monta a unidade escolar e as turmas sugeridas para cadastro automático
-  const effectiveSchoolName = schoolNameDetected || 'ESCOLA MUNICIPAL POLO';
-  const effectiveGradesText = seriesDetected || seriesFromFirstColumn || 'PRÉ II – 1º AO 5º - 6º AO 9º';
+  const effectiveSchoolName = schoolNameDetected || 'EMEI RUTH PEREIRA BARBARESCO';
+  const effectiveGradesText = seriesDetected || seriesFromFirstColumn || 'PRÉ-ESCOLA I A';
 
   const schoolUnitInfo = buildSchoolUnitAndClassesFromImport(
     effectiveSchoolName,
@@ -936,13 +1158,16 @@ export function convertImportedStudentsToOfficial(
   const year = new Date().getFullYear();
   const allClasses = [...classes, ...additionalClasses];
 
-  return importedList.map((item, index) => {
+  // Apenas estudantes selecionados para importação
+  const studentsToImport = importedList.filter((item) => item.selectedForImport !== false);
+
+  return studentsToImport.map((item, index) => {
     const ra = `RA-${year}-${String(existingStudentsCount + index + 1).padStart(4, '0')}`;
 
     const effectiveSeries = filters.importSeries
       ? (filters.overrideSeriesWithDefault && filters.defaultSeries
           ? filters.defaultSeries
-          : item.series || item.seriesFromFirstCol || filters.defaultSeries || 'PRÉ II')
+          : item.series || item.seriesFromFirstCol || filters.defaultSeries || 'PRÉ-ESCOLA I')
       : undefined;
 
     // Prioriza turma da escola alvo com a série correspondente
@@ -959,9 +1184,32 @@ export function convertImportedStudentsToOfficial(
       ? (targetSchoolUnit?.name || item.schoolName)
       : '';
 
+    // Nome final considerando limpeza de " - PCD"
+    let finalName = item.name;
+    if (filters.cleanPcdSuffixFromName !== false && item.cleanName) {
+      finalName = item.cleanName;
+    }
+    if (!filters.importName) {
+      finalName = 'Aluno Importado';
+    }
+
+    // Condições especiais (TEA / AEE)
+    const specialConditions: SpecialConditionType[] = [];
+    if (filters.importTea && item.isTea) {
+      specialConditions.push('TEA');
+    }
+    if (filters.importPcd && item.isPcd && !item.isTea) {
+      specialConditions.push('OUTRA');
+    }
+
+    const specialNeeds: string[] = [];
+    if (filters.importPcd && item.medicalClassification && item.medicalClassification !== 'Não declarada') {
+      specialNeeds.push(item.medicalClassification);
+    }
+
     const officialStudent: Student = {
       id: `std-imp-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`,
-      name: filters.importName ? item.name : 'Aluno Importado',
+      name: finalName,
       enrollmentNumber: ra,
       cpf: '000.000.000-00',
       birthDate: filters.importBirthDate ? item.birthDate : '2020-01-01',
@@ -981,15 +1229,13 @@ export function convertImportedStudentsToOfficial(
       status: 'ACTIVE',
       cadastralStatus: item.cadastralStatus,
       entryDate: nowIso.split('T')[0],
-      observations: `Importado de planilha: ${item.sourceFileName}. Polo/Escola: ${finalSchoolName || item.schoolName}. Turno: ${item.shift || 'MANHÃ'}. Série: ${effectiveSeries || 'Não informada'}`,
-      medicalObservations: filters.importMedicalClassification
-        ? item.medicalClassification
-        : undefined,
-      medicalClassification: filters.importMedicalClassification
-        ? item.medicalClassification
-        : undefined,
+      observations: `Importado de documento: ${item.sourceFileName}. Polo/Escola: ${finalSchoolName || item.schoolName}. Turno: ${item.shift || 'MANHÃ'}. Série: ${effectiveSeries || 'Não informada'}${item.isPcd ? ` | PCD: ${item.medicalClassification}` : ''}${item.isTea ? ' | TEA: SIM' : ''}${item.hasMedicalReport ? ' | Laudo: SIM' : ''}`,
+      medicalObservations: filters.importPcd ? item.medicalClassification : undefined,
+      medicalClassification: filters.importPcd ? item.medicalClassification : undefined,
       hasMedicalReport: filters.importMedicalReport ? item.hasMedicalReport : false,
-      medicalReportText: item.medicalReportText,
+      medicalReportText: filters.importMedicalReport ? item.medicalReportText : 'NÃO INFORMADO',
+      specialConditions: specialConditions.length > 0 ? specialConditions : undefined,
+      specialNeeds: specialNeeds.length > 0 ? specialNeeds : undefined,
       schoolOriginName: finalSchoolName,
       pendingFields: item.pendingFields,
       shift: filters.importShift ? item.shift : undefined,
@@ -1001,51 +1247,49 @@ export function convertImportedStudentsToOfficial(
   });
 }
 
+// Carrega amostra oficial municipal: EMEI RUTH PEREIRA BARBARESCO (Pré-Escola I A)
+export function loadSampleRuthPereiraBarbaresco(
+  filters: ImportFilterOptions,
+  classes: SchoolClass[],
+  schoolUnits: SchoolUnit[]
+): FileImportResult {
+  const res = processSheetWithHeaders(
+    OFFICIAL_MUNICIPAL_SAMPLE_DATA,
+    'Levantamento_EMEI_Ruth_Pereira_Barbaresco.xlsx',
+    34816,
+    filters,
+    classes,
+    schoolUnits
+  );
+  res.documentType = 'EXCEL';
+  return res;
+}
+
+// Carrega amostra municipal de 8 colunas: EMIEIF ERMINIO BRITO (Pré II, 1º ao 5º, 6º ao 9º Anos)
+export function loadSampleErminioBrito8Col(
+  filters: ImportFilterOptions,
+  classes: SchoolClass[],
+  schoolUnits: SchoolUnit[]
+): FileImportResult {
+  const res = processSheetWithHeaders(
+    OFFICIAL_ERMINIO_BRITO_8COL_DATA,
+    'Levantamento_EMIEIF_Erminio_Brito_8Colunas.xlsx',
+    38912,
+    filters,
+    classes,
+    schoolUnits
+  );
+  res.documentType = 'EXCEL';
+  return res;
+}
+
 // Gera o modelo Excel fiel ao print anexo pelo usuário ("ESCOLA: MARIA DA PRAIA")
 export function generateOfficialTemplateXlsx(): void {
-  const data = [
-    ['ESCOLA: MARIA DA PRAIA', '', '', 'TURMAS: PRÉ II – 1º AO 5º - 6º AO 9º', '', '', 'DATA: 01/09/2026'],
-    ['LEVANTAMENTO DO QUANTITATIVO E PERFIL DOS ALUNOS POR TURMA'],
-    [
-      'PRÉ II\r\nNº',
-      'NOME COMPLETO DO ALUNO',
-      'DATA DE NASCIMENTO',
-      'SEXO',
-      'RAÇA/COR',
-      'ENDEREÇO',
-      'PCD',
-      'LAUDO (SIM/NÃO)',
-    ],
-    ['1', 'THAYLA VITORIA FERNANDES MARTINS', '25/08/2021', 'F', 'PARDO', 'VILA: BRILHANTE', '*****', '*****'],
-    ['2', 'KAUÊ DE AQUINO GUEDES', '01/06/2021', 'M', 'PARDO', 'VILA: BRILHANTE', '*****', '*****'],
-    ['3', 'REBECA SANTOS RODRIGUES', '15/04/2020', 'F', 'PARDO', 'VILA: BRILHANTE', '*****', '*****'],
-    ['4', 'SAMUEL SILVA SANTOS', '01/05/2021', 'M', 'PARDO', 'VILA: BRILHANTE', '*****', '*****'],
-    ['5', 'THAYLLA EMANUELLY ALMEDIA DE SOUSA', '23/03/2022', 'F', 'PARDO', 'VILA: BRILHANTE', '*****', '*****'],
-    ['6', 'LARISSA MANOELA SOUSA LOBATO', '10/11/2021', 'F', 'PARDO', 'VILA: BRILHANTE', '*****', '*****'],
-    ['7', 'YASMIM ALVES REIS', '03/01/2022', 'F', 'PARDO', 'VILA: BRILHANTE', '*****', '*****'],
-    ['8', 'MARIA CECILIA MARTINS MORAIS', '12/07/2021', 'F', 'PARDO', 'VILA: BRILHANTE', '*****', '*****'],
-    ['9', 'ANA LARA BARROS ARAÚJO', '26/02/2021', 'F', 'PARDO', 'VILA: BRILHANTE', '*****', '*****'],
-    ['10', 'VALENTINA SANTOS DA SILVA', '19/03/2021', 'F', 'PARDO', 'VILA: BRILHANTE', '*****', '*****'],
-    ['11', 'MARIA JULIA PESSOA LOPES', '03/08/2020', 'F', 'PARDO', 'VILA: BRILHANTE', '*****', '*****'],
-    ['12', 'THALISSON DE SOUSA SILVA', '16/12/2020', 'M', 'PARDO', 'VILA: BRILHANTE', '*****', '*****'],
-    ['13', 'ENZO SAMUEL BATISTA OLIVEIRA', '12/05/2022', 'M', 'PARDO', 'VILA: BRILHANTE', '*****', '*****'],
-    ['14', 'ÂNGELO MIGUEL ALVES LIMA', '22/04/2022', 'M', 'PARDO', 'VILA: BRILHANTE', '*****', '*****'],
-    ['15', 'HELOISA BARROS DA SILVA', '05/06/2020', 'F', 'BRANCO', 'VILA: BRILHNATE', '*****', '*****'],
-  ];
-
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [
-    { wch: 12 },
-    { wch: 38 },
-    { wch: 20 },
-    { wch: 8 },
-    { wch: 14 },
-    { wch: 28 },
-    { wch: 14 },
-    { wch: 16 },
-  ];
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Perfil_Alunos_Maria_da_Praia');
-  XLSX.writeFile(wb, 'SucessoEdu_Modelo_Levantamento_Alunos_Maria_da_Praia.xlsx');
+  downloadSpreadsheetTemplate('xlsx');
 }
+
+export {
+  downloadSpreadsheetTemplate,
+  downloadWordTemplate,
+  downloadWriterTemplate,
+};

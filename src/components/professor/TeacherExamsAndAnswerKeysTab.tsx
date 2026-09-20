@@ -19,6 +19,12 @@ import {
   Edit2,
   Trash2,
   Users,
+  Shuffle,
+  Copy,
+  Sliders,
+  FileSpreadsheet,
+  AlertCircle,
+  ChevronRight,
 } from 'lucide-react';
 import {
   Exam,
@@ -29,6 +35,13 @@ import {
   ExamSubmission,
   SchoolSettings,
 } from '../../types';
+import {
+  ExamModelVariant,
+  ExamBatchConfig,
+  generateExamVariants,
+  generateComparativeAnswerKey,
+  generateBatchPrintHtml,
+} from '../../utils/examBatchGenerator';
 
 interface TeacherExamsAndAnswerKeysTabProps {
   teacherName: string;
@@ -61,6 +74,7 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
   selectedTerm,
   onSaveExam,
   onDeleteExam,
+  onNavigateToExamBuilder,
 }) => {
   const activeClass = useMemo(
     () => classes.find((c) => c.id === activeClassId) || classes[0],
@@ -74,18 +88,38 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
 
   const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
+  const [showBatchModal, setShowBatchModal] = useState<boolean>(false);
 
-  // New Exam Form State
+  // Configurações de Modelos em Lote
+  const [batchModelCount, setBatchModelCount] = useState<number>(2); // 2, 3 ou 4 modelos
+  const [batchShuffleQuestions, setBatchShuffleQuestions] = useState<boolean>(true);
+  const [batchShuffleOptions, setBatchShuffleOptions] = useState<boolean>(true);
+  const [includeTeacherKeyInBatch, setIncludeTeacherKeyInBatch] = useState<boolean>(true);
+  const [activeModelTab, setActiveModelTab] = useState<'A' | 'B' | 'C' | 'D' | 'KEY'>('A');
+
+  // Estado do formulário de criação personalizada de prova
   const [newTitle, setNewTitle] = useState<string>('');
   const [newExamDate, setNewExamDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [newDuration, setNewDuration] = useState<number>(90);
   const [newPassingScore, setNewPassingScore] = useState<number>(7.0);
   const [newInstructions, setNewInstructions] = useState<string>(
-    'Leia atentamente cada questão. Preencha o cartão-resposta com caneta esferográfica preta ou azul.'
+    '1. Verifique se o caderno e o cartão-resposta possuem o mesmo modelo.\n2. Utilize caneta esferográfica preta ou azul.\n3. Não é permitida a comunicação entre estudantes ou consulta a materiais não autorizados.'
   );
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
 
-  // Filter exams for teacher / active class
+  // Questão Inédita Rápida (Criada na hora pelo professor)
+  const [showNewQuestionForm, setShowNewQuestionForm] = useState<boolean>(false);
+  const [customQuestionStem, setCustomQuestionStem] = useState<string>('');
+  const [customQuestionSkill, setCustomQuestionSkill] = useState<string>('EM13MAT101');
+  const [customOptions, setCustomOptions] = useState<Array<{ text: string; isCorrect: boolean }>>([
+    { text: '', isCorrect: true },
+    { text: '', isCorrect: false },
+    { text: '', isCorrect: false },
+    { text: '', isCorrect: false },
+  ]);
+  const [customQuestionExplanation, setCustomQuestionExplanation] = useState<string>('');
+
+  // Provas do docente / turma ativa
   const teacherExams = useMemo(() => {
     return exams.filter(
       (e) =>
@@ -102,14 +136,43 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
     return teacherExams[0];
   }, [exams, selectedExamId, teacherExams]);
 
-  const examQuestions = useMemo(() => {
-    if (!activeExam || !activeExam.questions) return [];
-    return activeExam.questions
-      .map((cfg) => questions.find((q) => q.id === cfg.questionId))
-      .filter(Boolean) as Question[];
-  }, [activeExam, questions]);
+  // Modelos e Variações em Lote Gerados para a Prova Ativa
+  const examVariants = useMemo(() => {
+    if (!activeExam) return [];
+    return generateExamVariants(activeExam, questions, {
+      modelCount: batchModelCount,
+      shuffleQuestions: batchShuffleQuestions,
+      shuffleOptions: batchShuffleOptions,
+      schoolName: settings.name,
+      className: activeClass?.name || 'Turma Regente',
+      subjectName: activeExam.subject,
+      teacherName: activeExam.teacherName,
+      scheduledDate: new Date(activeExam.scheduledDate + 'T00:00:00').toLocaleDateString('pt-BR'),
+      totalPoints: activeExam.totalPoints,
+      timeLimitMinutes: activeExam.timeLimitMinutes,
+    });
+  }, [
+    activeExam,
+    questions,
+    batchModelCount,
+    batchShuffleQuestions,
+    batchShuffleOptions,
+    settings.name,
+    activeClass?.name,
+  ]);
 
-  // Questions available for adding
+  // Modelo atualmente visualizado na tela
+  const currentPreviewVariant = useMemo(() => {
+    if (activeModelTab === 'KEY') return examVariants[0];
+    return examVariants.find((v) => v.modelLetter === activeModelTab) || examVariants[0];
+  }, [examVariants, activeModelTab]);
+
+  // Matriz comparativa de gabaritos em lote
+  const comparativeKeyRows = useMemo(() => {
+    return generateComparativeAnswerKey(examVariants);
+  }, [examVariants]);
+
+  // Questões disponíveis da disciplina para montagem
   const availableSubjectQuestions = useMemo(() => {
     return questions.filter((q) => {
       if (!activeSubject) return true;
@@ -125,23 +188,91 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
     });
   }, [questions, activeSubject]);
 
-  // Create Quick Exam Handler
+  // Impressão em Lote (Todos os Modelos + Gabarito Mestre)
+  const handlePrintBatch = (variantsToPrint: ExamModelVariant[]) => {
+    if (!activeExam) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Por favor, permita popups no navegador para emitir a impressão.');
+      return;
+    }
+
+    const html = generateBatchPrintHtml(variantsToPrint, {
+      modelCount: variantsToPrint.length,
+      shuffleQuestions: batchShuffleQuestions,
+      shuffleOptions: batchShuffleOptions,
+      includeTeacherKeyInBatch,
+      includeStudentBubbleSheets: true,
+      customHeaderTitle: activeExam.title,
+      customInstructions: newInstructions,
+      schoolName: settings.name,
+      className: classes.find((c) => c.id === activeExam.classId)?.name || 'Turma Regente',
+      subjectName: activeExam.subject,
+      teacherName: activeExam.teacherName,
+      scheduledDate: new Date(activeExam.scheduledDate + 'T00:00:00').toLocaleDateString('pt-BR'),
+      totalPoints: activeExam.totalPoints,
+      timeLimitMinutes: activeExam.timeLimitMinutes,
+    });
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
+  // Impressão Exclusiva do Modelo Ativo
+  const handlePrintSingleModel = (modelLetter: 'A' | 'B' | 'C' | 'D') => {
+    const v = examVariants.find((m) => m.modelLetter === modelLetter);
+    if (!v) return;
+    handlePrintBatch([v]);
+  };
+
+  // Criação de Nova Avaliação Personalizada
   const handleCreateExam = (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeClass || !activeSubject) return;
 
-    if (selectedQuestionIds.length === 0) {
-      alert('Por favor, selecione ao menos uma questão para compor a prova.');
+    let finalQuestionIds = [...selectedQuestionIds];
+
+    // Se o professor preencheu uma questão inédita no modal, cria e adiciona
+    if (showNewQuestionForm && customQuestionStem.trim()) {
+      const customQId = `q-custom-${Date.now()}`;
+      const newQuestionObj: Question = {
+        id: customQId,
+        code: `DOC-${Math.floor(100 + Math.random() * 900)}`,
+        stem: customQuestionStem.trim(),
+        subject: activeSubject.name,
+        subjectId: activeSubject.id,
+        topic: 'Conteúdo do Docente',
+        gradeLevel: activeClass.gradeLevel || '1º Ano',
+        bnccSkill: customQuestionSkill.trim() || 'EM13MAT101',
+        difficulty: 'MEDIO',
+        type: 'MULTIPLE_CHOICE',
+        options: customOptions.map((opt, idx) => ({
+          id: `opt-${idx + 1}`,
+          text: opt.text.trim() || 'Opção sem descrição',
+          isCorrect: opt.isCorrect,
+        })),
+        explanation: customQuestionExplanation.trim() || 'Critério estabelecido pelo docente regente.',
+        authorTeacher: teacherName || 'Docente Regente',
+        tags: ['Inédita', 'Docente'],
+        createdAt: new Date().toISOString(),
+      };
+
+      questions.unshift(newQuestionObj);
+      finalQuestionIds.push(customQId);
+    }
+
+    if (finalQuestionIds.length === 0) {
+      alert('Por favor, selecione ou crie ao menos 1 questão para a prova.');
       return;
     }
 
     const examId = `exam-${Date.now()}`;
-    const pointsPerQuestion = Number((10.0 / selectedQuestionIds.length).toFixed(2));
+    const pointsPerQuestion = Number((10.0 / finalQuestionIds.length).toFixed(2));
 
     const newExam: Exam = {
       id: examId,
-      title: newTitle || `Avaliação Bimestral de ${activeSubject.name}`,
-      description: `Prova referente ao ${selectedTerm} - Ano Letivo 2026`,
+      title: newTitle || `Avaliação Personalizada de ${activeSubject.name}`,
+      description: `Prova em Lote referente ao ${selectedTerm} - Modelos Multi-Cadernos Anti-Cola`,
       subject: activeSubject.name,
       subjectId: activeSubject.id,
       classId: activeClass.id,
@@ -151,9 +282,9 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
       totalPoints: 10.0,
       passingScore: newPassingScore,
       timeLimitMinutes: newDuration,
-      randomizeQuestions: false,
-      randomizeOptions: false,
-      questions: selectedQuestionIds.map((qid) => ({
+      randomizeQuestions: batchShuffleQuestions,
+      randomizeOptions: batchShuffleOptions,
+      questions: finalQuestionIds.map((qid) => ({
         questionId: qid,
         points: pointsPerQuestion,
       })),
@@ -174,216 +305,32 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
     onSaveExam(newExam);
     setSelectedExamId(examId);
     setShowCreateModal(false);
-    // Reset
+
+    // Reset Form
     setNewTitle('');
     setSelectedQuestionIds([]);
-  };
-
-  // Print Exam Paper
-  const handlePrintExamPaper = (exam: Exam) => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    const qList = exam.questions
-      .map((cfg) => questions.find((q) => q.id === cfg.questionId))
-      .filter(Boolean) as Question[];
-
-    const examClassName = classes.find((c) => c.id === exam.classId)?.name || 'Turma Regente';
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html lang="pt-BR">
-      <head>
-        <meta charset="utf-8">
-        <title>Avaliação Oficial - ${exam.title}</title>
-        <style>
-          @page { size: A4 portrait; margin: 15mm; }
-          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 10.5pt; color: #0f172a; margin: 0; padding: 20px; line-height: 1.5; }
-          .header-box { border: 2px solid #0f172a; border-radius: 6px; padding: 12px; margin-bottom: 20px; }
-          .school-title { font-size: 13pt; font-weight: bold; text-transform: uppercase; text-align: center; }
-          .exam-title { font-size: 11.5pt; font-weight: bold; text-align: center; margin-top: 4px; color: #1e293b; }
-          .student-fields { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; margin-top: 12px; font-size: 9.5pt; border-top: 1px solid #cbd5e1; padding-top: 8px; }
-          .instructions-box { background: #f8fafc; border: 1px dashed #94a3b8; border-radius: 6px; padding: 10px; font-size: 9pt; margin-bottom: 20px; }
-          .question-block { margin-bottom: 20px; page-break-inside: avoid; }
-          .q-header { font-weight: bold; font-size: 10.5pt; color: #0f172a; margin-bottom: 6px; display: flex; justify-content: space-between; }
-          .q-text { font-size: 10pt; color: #334155; margin-bottom: 10px; }
-          .options-grid { display: grid; grid-template-columns: 1fr; gap: 6px; font-size: 9.5pt; }
-          .opt-item { display: flex; align-items: flex-start; gap: 8px; }
-          .opt-letter { font-weight: bold; border: 1px solid #0f172a; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 8.5pt; shrink: 0; }
-        </style>
-      </head>
-      <body>
-        <div class="header-box">
-          <div class="school-title">${settings.name}</div>
-          <div class="exam-title">${exam.title}</div>
-          <div class="student-fields">
-            <div><strong>Estudante:</strong> ________________________________________________</div>
-            <div><strong>Nº / Turma:</strong> ___ / ${examClassName}</div>
-            <div><strong>Data:</strong> ${new Date(exam.scheduledDate + 'T00:00:00').toLocaleDateString('pt-BR')}</div>
-          </div>
-          <div style="display: flex; justify-content: space-between; font-size: 9pt; margin-top: 6px; color: #475569;">
-            <div><strong>Componente:</strong> ${exam.subject}</div>
-            <div><strong>Docente:</strong> ${exam.teacherName}</div>
-            <div><strong>Valor da Prova:</strong> ${exam.totalPoints.toFixed(1)} pts</div>
-          </div>
-        </div>
-
-        <div class="instructions-box">
-          <strong>Orientações para Realização da Avaliação:</strong>
-          <ul style="margin: 4px 0 0 0; padding-left: 18px;">
-            <li>Duração máxima: ${exam.timeLimitMinutes} minutos.</li>
-            <li>Utilize caneta esferográfica azul ou preta para preencher a folha de respostas oficial.</li>
-            <li>Não é permitida a comunicação entre estudantes ou consulta a materiais não autorizados.</li>
-          </ul>
-        </div>
-
-        ${qList
-          .map(
-            (q, idx) => `
-          <div class="question-block">
-            <div class="q-header">
-              <span>Questão ${idx + 1} ${q.bnccSkill ? `[BNCC: ${q.bnccSkill}]` : ''}</span>
-              <span style="font-size: 9pt; color: #64748b;">(Valor: ${(exam.totalPoints / (qList.length || 1)).toFixed(2)} pts)</span>
-            </div>
-            <div class="q-text">${q.stem}</div>
-            ${
-              q.options && q.options.length > 0
-                ? `
-              <div class="options-grid">
-                ${q.options
-                  .map(
-                    (opt, oIdx) => `
-                  <div class="opt-item">
-                    <div class="opt-letter">${String.fromCharCode(65 + oIdx)}</div>
-                    <div>${opt.text}</div>
-                  </div>
-                `
-                  )
-                  .join('')}
-              </div>
-            `
-                : `
-              <div style="border: 1px dashed #cbd5e1; height: 100px; border-radius: 4px; padding: 6px; font-size: 8.5pt; color: #94a3b8;">
-                [Espaço reservado para resolução e resposta do estudante]
-              </div>
-            `
-            }
-          </div>
-        `
-          )
-          .join('')}
-
-        <script>
-          window.onload = function() { window.print(); }
-        </script>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
-
-  // Print Answer Key (Gabarito Oficial e Cartão-Resposta)
-  const handlePrintAnswerCardAndKey = (exam: Exam) => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    const qList = exam.questions
-      .map((cfg) => questions.find((q) => q.id === cfg.questionId))
-      .filter(Boolean) as Question[];
-
-    const examClassName = classes.find((c) => c.id === exam.classId)?.name || 'Turma Regente';
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html lang="pt-BR">
-      <head>
-        <meta charset="utf-8">
-        <title>Gabarito Oficial & Cartão-Resposta - ${exam.title}</title>
-        <style>
-          @page { size: A4 portrait; margin: 15mm; }
-          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 9.5pt; color: #0f172a; margin: 0; padding: 20px; }
-          .header { border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 15px; }
-          .title { font-size: 13pt; font-weight: bold; text-transform: uppercase; }
-          .comment-box { background: #f8fafc; border-left: 3px solid #6366f1; padding: 6px 10px; margin-top: 4px; font-size: 8.5pt; color: #334155; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="title">${settings.name}</div>
-          <div style="font-size: 11pt; font-weight: bold; margin-top: 2px;">GABARITO OFICIAL & RESOLUÇÃO COMENTADA DO PROFESSOR</div>
-          <div style="font-size: 8.5pt; color: #64748b; margin-top: 4px;">
-            ${exam.title} • Turma: ${examClassName} • Componente: ${exam.subject} • Docente: ${exam.teacherName}
-          </div>
-        </div>
-
-        <div style="margin-bottom: 20px;">
-          <h3 style="font-size: 10.5pt; font-weight: bold; text-transform: uppercase; color: #1e293b; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px;">
-            1. Grade Resumida de Respostas Corretas
-          </h3>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;">
-            ${qList
-              .map((q, idx) => {
-                const correctIdx = q.options?.findIndex((o) => o.isCorrect) ?? -1;
-                const correctLetter = correctIdx >= 0 ? String.fromCharCode(65 + correctIdx) : 'DISC';
-                return `
-                <div style="background: #e0e7ff; border: 1px solid #c7d2fe; border-radius: 6px; padding: 6px 10px; text-align: center; min-width: 55px;">
-                  <div style="font-size: 7.5pt; font-weight: bold; color: #4338ca;">Q${idx + 1}</div>
-                  <div style="font-size: 13pt; font-weight: black; color: #1e1b4b;">${correctLetter}</div>
-                </div>
-              `;
-              })
-              .join('')}
-          </div>
-        </div>
-
-        <div>
-          <h3 style="font-size: 10.5pt; font-weight: bold; text-transform: uppercase; color: #1e293b; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px;">
-            2. Resoluções Pedagógicas e Habilidades BNCC
-          </h3>
-          <div style="margin-top: 10px;">
-            ${qList
-              .map((q, idx) => {
-                const correctIdx = q.options?.findIndex((o) => o.isCorrect) ?? -1;
-                const correctLetter = correctIdx >= 0 ? String.fromCharCode(65 + correctIdx) : 'Discursiva';
-                return `
-                <div style="margin-bottom: 15px; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">
-                  <div style="display: flex; justify-content: space-between; font-weight: bold;">
-                    <span>Questão ${idx + 1} • Alternativa Correta: <strong style="color: #4338ca; font-size: 11pt;">(${correctLetter})</strong></span>
-                    <span style="font-size: 8pt; color: #6366f1; background: #eef2ff; padding: 2px 6px; border-radius: 4px;">${q.bnccSkill || 'Habilidade Geral'}</span>
-                  </div>
-                  <div style="margin-top: 4px; font-size: 9pt; color: #334155;"><strong>Enunciado:</strong> ${q.stem}</div>
-                  <div class="comment-box">
-                    <strong>Justificativa Pedagógica do Gabarito:</strong><br>
-                    ${q.explanation || 'A alternativa indicada atende integralmente aos critérios conceituais avaliados.'}
-                  </div>
-                </div>
-              `;
-              })
-              .join('')}
-          </div>
-        </div>
-
-        <script>
-          window.onload = function() { window.print(); }
-        </script>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
+    setShowNewQuestionForm(false);
+    setCustomQuestionStem('');
   };
 
   return (
     <div className="space-y-6">
-      {/* Header and Actions */}
+      {/* Top Header Card */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <Award className="h-5 w-5 text-indigo-600" />
-            Provas, Simulados e Gabaritos Oficiais
-          </h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Gerenciamento de avaliações, visualização de gabaritos comentados e impressão oficial de cartões-resposta.
-          </p>
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-indigo-50 border border-indigo-200 rounded-xl text-indigo-600">
+              <Award className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-slate-900">
+                Gerador de Avaliações, Provas em Lote &amp; Gabaritos
+              </h3>
+              <p className="text-xs text-slate-500">
+                Elaboração de provas personalizadas com múltiplos cadernos (A, B, C, D), embaralhamento anti-cola e gabarito mestre.
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -392,25 +339,30 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <Plus className="h-4 w-4" />
-            Nova Avaliação do Docente
+            Criar Prova Personalizada
           </button>
         </div>
       </div>
 
-      {/* Main Grid: Exams List + Active Exam Details / Gabarito */}
+      {/* Grid Principal: Lista de Provas da Turma + Painel de Modelos */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: List of Exams (4 cols) */}
+        {/* Coluna Esquerda: Lista de Provas da Turma (4 cols) */}
         <div className="lg:col-span-4 space-y-3">
-          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1">
-            Avaliações da Turma ({teacherExams.length})
-          </h4>
+          <div className="flex items-center justify-between px-1">
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Avaliações da Turma ({teacherExams.length})
+            </h4>
+            <span className="text-[10px] bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded-full">
+              {activeClass?.name}
+            </span>
+          </div>
 
           {teacherExams.length === 0 ? (
             <div className="bg-white p-6 rounded-2xl border border-dashed border-slate-200 text-center">
               <Award className="h-8 w-8 text-slate-300 mx-auto mb-2" />
               <p className="text-xs font-bold text-slate-700">Nenhuma avaliação cadastrada</p>
               <p className="text-[11px] text-slate-400 mt-1">
-                Clique no botão acima para criar a primeira prova desta turma.
+                Clique no botão acima para criar a primeira prova com modelos em lote desta turma.
               </p>
             </div>
           ) : (
@@ -419,10 +371,13 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
               return (
                 <div
                   key={exam.id}
-                  onClick={() => setSelectedExamId(exam.id)}
+                  onClick={() => {
+                    setSelectedExamId(exam.id);
+                    setActiveModelTab('A');
+                  }}
                   className={`p-4 rounded-2xl border transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-indigo-50/70 border-indigo-300 shadow-xs ring-2 ring-indigo-500/20'
+                      ? 'bg-indigo-50/80 border-indigo-300 shadow-xs ring-2 ring-indigo-500/20'
                       : 'bg-white border-slate-200 hover:border-indigo-200'
                   }`}
                 >
@@ -446,8 +401,9 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
                       <Calendar className="h-3 w-3" />
                       {new Date(exam.scheduledDate + 'T00:00:00').toLocaleDateString('pt-BR')}
                     </span>
-                    <span className="font-bold text-indigo-600">
-                      {exam.totalPoints.toFixed(1)} pts
+                    <span className="flex items-center gap-1 text-emerald-600 font-bold">
+                      <Layers className="h-3 w-3" />
+                      {batchModelCount} Cadernos
                     </span>
                   </div>
                 </div>
@@ -456,11 +412,11 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
           )}
         </div>
 
-        {/* Right Column: Exam Details, Gabarito & Actions (8 cols) */}
+        {/* Coluna Direita: Gerenciador de Modelos em Lote & Pré-Visualização (8 cols) */}
         <div className="lg:col-span-8">
           {activeExam ? (
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-6">
-              {/* Header Box */}
+              {/* Top Details & Ações em Lote */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
@@ -477,180 +433,374 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
                   <h4 className="text-xl font-black text-slate-900 mt-2">
                     {activeExam.title}
                   </h4>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {activeExam.description || 'Avaliação oficial bimestral com alinhamento à BNCC'}
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {activeExam.description || 'Avaliação oficial bimestral com modelos múltiplos e alinhamento à BNCC'}
                   </p>
                 </div>
 
+                {/* Botões de Ação de Impressão */}
                 <div className="flex flex-wrap items-center gap-2">
                   <button
-                    onClick={() => handlePrintExamPaper(activeExam)}
-                    className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    onClick={() => setShowBatchModal(true)}
+                    className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    title="Configurar variações e número de cadernos"
                   >
-                    <Printer className="h-4 w-4" />
-                    Imprimir Prova
+                    <Sliders className="h-4 w-4 text-slate-500" />
+                    <span>Ajustar Lote</span>
                   </button>
 
                   <button
-                    onClick={() => handlePrintAnswerCardAndKey(activeExam)}
-                    className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                    onClick={() => handlePrintBatch(examVariants)}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                    title="Imprimir todos os modelos (A, B, C, D) e o gabarito mestre de uma só vez"
                   >
-                    <Award className="h-4 w-4" />
-                    Gabarito & Resolução
+                    <Printer className="h-4 w-4" />
+                    <span>Imprimir Lote Completo ({examVariants.length} Modelos)</span>
                   </button>
                 </div>
               </div>
 
-              {/* Quick Exam Metrics Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-xs">
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Questões</span>
-                  <span className="text-base font-black text-slate-900">{examQuestions.length}</span>
-                </div>
+              {/* SELETOR DE ABAS DE MODELOS (Caderno A, Caderno B, Caderno C, etc. + Gabarito Comparativo) */}
+              <div className="bg-slate-50 p-2 rounded-2xl border border-slate-200">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    {examVariants.map((v) => {
+                      const isActive = activeModelTab === v.modelLetter;
+                      return (
+                        <button
+                          key={v.modelLetter}
+                          onClick={() => setActiveModelTab(v.modelLetter as any)}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                            isActive
+                              ? 'bg-white text-indigo-700 shadow-xs border border-indigo-200 ring-2 ring-indigo-500/20'
+                              : 'text-slate-600 hover:bg-slate-200/70 border border-transparent'
+                          }`}
+                        >
+                          <span className={`h-2 w-2 rounded-full ${isActive ? 'bg-indigo-600' : 'bg-slate-400'}`} />
+                          <span>Modelo {v.modelLetter}</span>
+                          <span className="text-[10px] font-normal text-slate-400">({v.questions.length}Q)</span>
+                        </button>
+                      );
+                    })}
 
-                <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-900">
-                  <span className="text-[10px] text-indigo-600 font-bold uppercase block">Valor Total</span>
-                  <span className="text-base font-black text-indigo-700">{activeExam.totalPoints.toFixed(1)} pts</span>
-                </div>
-
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-900">
-                  <span className="text-[10px] text-emerald-600 font-bold uppercase block">Duração</span>
-                  <span className="text-base font-black text-emerald-700">{activeExam.timeLimitMinutes} min</span>
-                </div>
-
-                <div className="p-3 rounded-xl bg-amber-50 border border-amber-100 text-amber-900">
-                  <span className="text-[10px] text-amber-600 font-bold uppercase block">Média de Corte</span>
-                  <span className="text-base font-black text-amber-700">{activeExam.passingScore.toFixed(1)} pts</span>
-                </div>
-              </div>
-
-              {/* Gabarito Resumido Oficial Bar */}
-              <div className="bg-slate-900 text-white p-4 rounded-2xl border border-slate-800 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                    <span className="text-xs font-bold tracking-wider uppercase text-slate-300">
-                      Gabarito Oficial Rápido
-                    </span>
+                    <button
+                      onClick={() => setActiveModelTab('KEY')}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        activeModelTab === 'KEY'
+                          ? 'bg-slate-900 text-white shadow-xs'
+                          : 'text-slate-700 hover:bg-slate-200/70'
+                      }`}
+                    >
+                      <BarChart2 className="h-3.5 w-3.5 text-emerald-400" />
+                      <span>Gabarito Mestre Comparativo</span>
+                    </button>
                   </div>
-                  <span className="text-[11px] text-indigo-300">Grade de Respostas</span>
-                </div>
 
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {examQuestions.map((q, idx) => {
-                    const cIdx = q.options?.findIndex((o) => o.isCorrect) ?? -1;
-                    const letter = cIdx >= 0 ? String.fromCharCode(65 + cIdx) : 'DISC';
-                    return (
-                      <div
-                        key={q.id}
-                        className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-center min-w-[52px]"
+                  <div className="flex items-center gap-2">
+                    {activeModelTab !== 'KEY' && (
+                      <button
+                        onClick={() => handlePrintSingleModel(activeModelTab as any)}
+                        className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-bold transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
+                        title={`Imprimir apenas o Caderno ${activeModelTab}`}
                       >
-                        <span className="block text-[9px] font-bold text-slate-400">Q{idx + 1}</span>
-                        <span className="text-sm font-black text-emerald-400">
-                          {letter}
-                        </span>
-                      </div>
-                    );
-                  })}
+                        <Printer className="h-3 w-3 text-slate-500" />
+                        <span>Imprimir Caderno {activeModelTab}</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Questions Detailed List with Explanations */}
-              <div className="space-y-4">
-                <h5 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Itens da Avaliação & Justificativas do Docente
-                </h5>
-
+              {/* CONTEÚDO DA ABA SELECIONADA */}
+              {activeModelTab === 'KEY' ? (
+                /* TABELA COMPARATIVA DE GABARITOS */
                 <div className="space-y-4">
-                  {examQuestions.map((question, idx) => {
-                    const cIdx = question.options?.findIndex((o) => o.isCorrect) ?? -1;
-                    const letter = cIdx >= 0 ? String.fromCharCode(65 + cIdx) : 'Discursiva';
+                  <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-100 text-xs text-indigo-900 flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-indigo-600 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-bold">Gabarito Comparativo Entre Cadernos</div>
+                      <div className="text-[11px] text-indigo-700 mt-0.5">
+                        Esta tabela correlaciona a mesma questão pedagógica entre todos os cadernos gerados para correção rápida e sem confusão em sala de aula.
+                      </div>
+                    </div>
+                  </div>
 
-                    return (
-                      <div
-                        key={question.id}
-                        className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3 text-xs"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <span className="font-bold text-indigo-600 text-sm">
-                              Questão {idx + 1}
-                            </span>
-                            {question.bnccSkill && (
-                              <span className="ml-2 px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-bold">
-                                {question.bnccSkill}
-                              </span>
-                            )}
-                          </div>
-
-                          <span className="text-emerald-700 bg-emerald-100 font-extrabold px-2.5 py-0.5 rounded-full text-[11px]">
-                            Correta: ({letter})
-                          </span>
-                        </div>
-
-                        <p className="text-slate-800 font-medium leading-relaxed">
-                          {question.stem}
-                        </p>
-
-                        {question.options && question.options.length > 0 && (
-                          <div className="space-y-1.5 pl-2 border-l-2 border-slate-200">
-                            {question.options.map((opt, oIdx) => {
-                              const optLetter = String.fromCharCode(65 + oIdx);
-                              const isCorrect = opt.isCorrect;
+                  <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                          <th className="p-3 w-14 text-center">Orig.</th>
+                          <th className="p-3">Enunciado &amp; Habilidade BNCC</th>
+                          {examVariants.map((v) => (
+                            <th key={v.modelLetter} className="p-3 text-center bg-indigo-50/50 text-indigo-900 border-l border-indigo-100">
+                              Caderno {v.modelLetter}
+                            </th>
+                          ))}
+                          <th className="p-3 text-center w-20">Pontos</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {comparativeKeyRows.map((row) => (
+                          <tr key={row.originalIndex} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="p-3 text-center font-bold text-slate-400">
+                              #{row.originalIndex}
+                            </td>
+                            <td className="p-3">
+                              <div className="font-semibold text-slate-800 line-clamp-1">
+                                {row.questionStemPreview}
+                              </div>
+                              {row.bnccSkill && (
+                                <span className="inline-block mt-0.5 text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                  BNCC: {row.bnccSkill}
+                                </span>
+                              )}
+                            </td>
+                            {examVariants.map((v) => {
+                              const cell = row.models[v.modelLetter];
+                              if (!cell) return <td key={v.modelLetter} className="p-3 text-center text-slate-400">-</td>;
                               return (
-                                <div
-                                  key={opt.id || oIdx}
-                                  className={`flex items-start gap-2 p-1.5 rounded-lg ${
-                                    isCorrect ? 'bg-emerald-100/70 font-bold text-emerald-900' : 'text-slate-600'
-                                  }`}
-                                >
-                                  <span className="font-bold shrink-0">{optLetter})</span>
-                                  <span>{opt.text}</span>
-                                </div>
+                                <td key={v.modelLetter} className="p-3 text-center border-l border-indigo-50">
+                                  <div className="text-[10px] text-slate-500 font-medium">Q{cell.modelQuestionNumber}</div>
+                                  <div className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-600 text-white font-black text-xs mt-0.5">
+                                    {cell.correctLetter}
+                                  </div>
+                                </td>
                               );
                             })}
+                            <td className="p-3 text-center font-bold text-emerald-600">
+                              {row.points.toFixed(2)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                /* PRÉ-VISUALIZAÇÃO DA FOLHA DE PROVA DO CADERNO ATUAL */
+                <div className="space-y-4">
+                  {/* Resumo do Caderno */}
+                  <div className="flex items-center justify-between bg-slate-900 text-white p-4 rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-lg font-black">
+                        {currentPreviewVariant.modelLetter}
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold">Folha de Prova: {currentPreviewVariant.modelLabel}</div>
+                        <div className="text-xs text-slate-400">Código de Validação: {currentPreviewVariant.uniqueVariantCode}</div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-emerald-400 font-bold bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-800">
+                        {currentPreviewVariant.questions.length} Questões Formatadas
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Lista de Questões do Modelo */}
+                  <div className="space-y-3">
+                    {currentPreviewVariant.questions.map((q) => (
+                      <div
+                        key={q.modelQuestionNumber}
+                        className="p-4 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-colors space-y-2.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 text-xs font-bold">
+                              Questão {q.modelQuestionNumber}
+                            </span>
+                            {q.bnccSkill && (
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded border border-indigo-100">
+                                {q.bnccSkill}
+                              </span>
+                            )}
+                            <span className="text-[10px] text-slate-400">
+                              (Orig: #{q.originalIndex})
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-500">
+                              {q.points.toFixed(2)} pts
+                            </span>
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                              Gabarito: {q.correctLetter}
+                            </span>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-slate-800 leading-relaxed font-medium">
+                          {q.stem}
+                        </p>
+
+                        {q.options && q.options.length > 0 ? (
+                          <div className="grid grid-cols-1 gap-1.5 pt-1 pl-2">
+                            {q.options.map((opt) => (
+                              <div
+                                key={opt.newLetter}
+                                className={`flex items-start gap-2 text-xs p-1.5 rounded-lg transition-colors ${
+                                  opt.isCorrect
+                                    ? 'bg-emerald-50 text-emerald-900 font-semibold border border-emerald-200'
+                                    : 'text-slate-600'
+                                }`}
+                              >
+                                <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-bold shrink-0 ${
+                                  opt.isCorrect ? 'bg-emerald-600 text-white' : 'border border-slate-300 text-slate-700'
+                                }`}>
+                                  {opt.newLetter}
+                                </span>
+                                <span className="pt-0.5">{opt.text}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-[11px] text-slate-400 italic">
+                            Questão Discursiva - Espaço reservado para desenvolvimento e resposta manuscrita do estudante.
                           </div>
                         )}
-
-                        {/* Pedagogical Justification */}
-                        <div className="p-3 bg-white rounded-lg border border-slate-200 text-slate-700">
-                          <span className="font-bold text-indigo-600 block text-[11px] mb-0.5">
-                            Justificativa Pedagógica do Gabarito:
-                          </span>
-                          <p className="text-[11px] text-slate-600">
-                            {question.explanation ||
-                              'A alternativa selecionada atende integralmente à habilidade avaliada.'}
-                          </p>
-                        </div>
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           ) : (
             <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center">
-              <Award className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-              <h4 className="text-sm font-bold text-slate-800">Selecione uma avaliação</h4>
-              <p className="text-xs text-slate-500 mt-1">
-                Escolha uma prova na lista ao lado para visualizar os detalhes, gabaritos e emitir cartões-resposta.
+              <Award className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+              <h4 className="text-sm font-bold text-slate-700">Selecione uma avaliação</h4>
+              <p className="text-xs text-slate-400 mt-1">
+                Escolha uma avaliação na lista à esquerda para visualizar seus modelos e gabaritos.
               </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Modal: Create New Quick Exam */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto space-y-4">
+      {/* MODAL: CONFIGURAÇÃO DE MODELOS EM LOTE & EMBARALHAMENTO */}
+      {showBatchModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 className="text-base font-bold text-slate-900">
-                  Criar Nova Avaliação / Simulado
+                <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                  <Shuffle className="h-5 w-5 text-indigo-600" />
+                  Configuração de Modelos em Lote
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Turma: {activeClass?.name} • Disciplina: {activeSubject?.name}
+                  Defina as variações de impressão anti-cola e número de cadernos.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowBatchModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-lg cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {/* Quantidade de Modelos */}
+              <div>
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Quantidade de Cadernos / Modelos:
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[2, 3, 4].map((count) => (
+                    <button
+                      key={count}
+                      type="button"
+                      onClick={() => setBatchModelCount(count)}
+                      className={`py-2 px-3 rounded-xl font-bold border transition-all cursor-pointer text-center ${
+                        batchModelCount === count
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {count} Modelos ({['A, B', 'A, B, C', 'A, B, C, D'][count - 2]})
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Variações Anti-Cola */}
+              <div className="space-y-2.5 pt-2 border-t border-slate-100">
+                <label className="block font-bold text-slate-700 uppercase tracking-wider">
+                  Mecanismos Anti-Cola Ativos:
+                </label>
+
+                <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={batchShuffleQuestions}
+                    onChange={(e) => setBatchShuffleQuestions(e.target.checked)}
+                    className="rounded text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <div>
+                    <span className="font-bold text-slate-800 block">Embaralhar Ordem das Questões</span>
+                    <span className="text-[11px] text-slate-500">
+                      A questão 1 do Caderno A se torna outra posição no Caderno B, impedindo consultas simultâneas.
+                    </span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={batchShuffleOptions}
+                    onChange={(e) => setBatchShuffleOptions(e.target.checked)}
+                    className="rounded text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <div>
+                    <span className="font-bold text-slate-800 block">Embaralhar Alternativas (A, B, C, D)</span>
+                    <span className="text-[11px] text-slate-500">
+                      A alternativa correta varia de letra em cada caderno, com gabarito matematicamente mapeado.
+                    </span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={includeTeacherKeyInBatch}
+                    onChange={(e) => setIncludeTeacherKeyInBatch(e.target.checked)}
+                    className="rounded text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <div>
+                    <span className="font-bold text-slate-800 block">Incluir Gabarito Mestre no Final da Impressão</span>
+                    <span className="text-[11px] text-slate-500">
+                      Gera automaticamente a folha do professor com tabela comparativa de todos os cadernos.
+                    </span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowBatchModal(false)}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+              >
+                Concluir &amp; Aplicar ao Visualizador
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CRIAR NOVA AVALIAÇÃO PERSONALIZADA (Com Banco de Questões + Questão Inédita) */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 my-8 space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                  <Award className="h-5 w-5 text-indigo-600" />
+                  Criar Avaliação Personalizada
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Turma: {activeClass?.name} • Componente: {activeSubject?.name}
                 </p>
               </div>
               <button
@@ -670,7 +820,7 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
                 <input
                   type="text"
                   required
-                  placeholder="Ex: Prova Bimestral de Matemática - Sistemas & Matrizes"
+                  placeholder="Ex: 1ª Avaliação Bimestral - Matemática e Raciocínio Lógico"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   className="w-full text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:bg-white"
@@ -704,7 +854,7 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                    Nota de Corte:
+                    Nota de Corte (Aprovação):
                   </label>
                   <input
                     type="number"
@@ -716,11 +866,25 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
                 </div>
               </div>
 
-              {/* Questions Picker */}
+              {/* Instruções da Prova */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Orientações ao Estudante (Cabeçalho da Prova):
+                </label>
+                <textarea
+                  rows={2}
+                  value={newInstructions}
+                  onChange={(e) => setNewInstructions(e.target.value)}
+                  className="w-full text-xs text-slate-800 bg-slate-50 border border-slate-200 rounded-xl p-2.5"
+                  placeholder="Orientações de preenchimento, caneta azul/preta, duração e regras..."
+                />
+              </div>
+
+              {/* Seleção do Banco de Questões */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    Selecione as Questões do Banco ({selectedQuestionIds.length} selecionadas):
+                    Banco de Questões ({selectedQuestionIds.length} selecionadas de {availableSubjectQuestions.length}):
                   </label>
                   <button
                     type="button"
@@ -731,7 +895,7 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
                         setSelectedQuestionIds(availableSubjectQuestions.map((q) => q.id));
                       }
                     }}
-                    className="text-[11px] font-bold text-indigo-600 cursor-pointer"
+                    className="text-[11px] font-bold text-indigo-600 cursor-pointer hover:underline"
                   >
                     {selectedQuestionIds.length === availableSubjectQuestions.length
                       ? 'Desmarcar Todas'
@@ -739,7 +903,7 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
                   </button>
                 </div>
 
-                <div className="max-h-52 overflow-y-auto divide-y divide-slate-100 bg-slate-50 border border-slate-200 rounded-xl">
+                <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 bg-slate-50 border border-slate-200 rounded-xl">
                   {availableSubjectQuestions.map((q) => {
                     const isChecked = selectedQuestionIds.includes(q.id);
                     return (
@@ -779,6 +943,101 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
                 </div>
               </div>
 
+              {/* Botão de Questão Inédita */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNewQuestionForm(!showNewQuestionForm)}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>{showNewQuestionForm ? 'Ocultar Questão Inédita' : '+ Adicionar Questão Própria Inédita Nesta Prova'}</span>
+                </button>
+
+                {showNewQuestionForm && (
+                  <div className="mt-3 p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 animate-in fade-in duration-200">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Enunciado da Questão:
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={customQuestionStem}
+                        onChange={(e) => setCustomQuestionStem(e.target.value)}
+                        placeholder="Digite o enunciado completo da pergunta..."
+                        className="w-full text-xs text-slate-800 bg-white border border-slate-200 rounded-xl p-2.5"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Código BNCC / Descritor:
+                        </label>
+                        <input
+                          type="text"
+                          value={customQuestionSkill}
+                          onChange={(e) => setCustomQuestionSkill(e.target.value)}
+                          className="w-full text-xs text-slate-800 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          Justificativa do Gabarito:
+                        </label>
+                        <input
+                          type="text"
+                          value={customQuestionExplanation}
+                          onChange={(e) => setCustomQuestionExplanation(e.target.value)}
+                          placeholder="Explicação pedagógica da resposta correta"
+                          className="w-full text-xs text-slate-800 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Alternativas (Selecione a Correta):
+                      </label>
+                      <div className="space-y-1.5">
+                        {customOptions.map((opt, oIdx) => (
+                          <div key={oIdx} className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="correct_option_radio"
+                              checked={opt.isCorrect}
+                              onChange={() => {
+                                setCustomOptions(
+                                  customOptions.map((o, idx) => ({
+                                    ...o,
+                                    isCorrect: idx === oIdx,
+                                  }))
+                                );
+                              }}
+                              className="text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <span className="text-xs font-bold text-slate-500 w-4">
+                              {String.fromCharCode(65 + oIdx)})
+                            </span>
+                            <input
+                              type="text"
+                              value={opt.text}
+                              onChange={(e) => {
+                                const newOpts = [...customOptions];
+                                newOpts[oIdx].text = e.target.value;
+                                setCustomOptions(newOpts);
+                              }}
+                              placeholder={`Texto da alternativa ${String.fromCharCode(65 + oIdx)}...`}
+                              className="flex-1 text-xs text-slate-800 bg-white border border-slate-200 rounded-lg px-2.5 py-1"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
@@ -792,7 +1051,7 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
                   type="submit"
                   className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
                 >
-                  Gerar Avaliação & Gabarito
+                  Gerar Avaliação &amp; Montar Modelos em Lote
                 </button>
               </div>
             </form>

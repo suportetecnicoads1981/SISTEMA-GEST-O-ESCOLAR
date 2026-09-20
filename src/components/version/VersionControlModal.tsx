@@ -49,9 +49,11 @@ import {
 interface VersionControlModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onNavigate: (tabId: string, payload?: any) => void;
+  onNavigate?: (tabId: string, payload?: any) => void;
+  onNavigateToModule?: (tabId: string, payload?: any) => void;
   currentVersion?: string;
   updatePackages?: SystemUpdatePackage[];
+  packages?: SystemUpdatePackage[];
   schoolName?: string;
 }
 
@@ -61,10 +63,14 @@ export const VersionControlModal: React.FC<VersionControlModalProps> = ({
   isOpen,
   onClose,
   onNavigate,
+  onNavigateToModule,
   currentVersion,
   updatePackages,
+  packages,
   schoolName,
 }) => {
+  const navigateFn = onNavigate || onNavigateToModule || (() => {});
+  const effectivePackages = packages || updatePackages;
   const [activeTab, setActiveTab] = useState<ModalTab>('IMPROVEMENTS');
   const [selectedCategory, setSelectedCategory] = useState<string>('TODOS');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -73,8 +79,8 @@ export const VersionControlModal: React.FC<VersionControlModalProps> = ({
   const [compareToVersion, setCompareToVersion] = useState<string>('');
 
   const allPackages = useMemo(() => {
-    return getAllVersionPackages(updatePackages);
-  }, [updatePackages]);
+    return getAllVersionPackages(effectivePackages);
+  }, [effectivePackages]);
 
   const activeVer = useMemo(() => {
     return getCurrentSystemVersion(currentVersion);

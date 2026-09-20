@@ -69,6 +69,7 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
   const [printIncludeAnswers, setPrintIncludeAnswers] = useState(true);
   const [printIncludeDistractors, setPrintIncludeDistractors] = useState(true);
   const [questionToEdit, setQuestionToEdit] = useState<Question | null>(null);
+  const [isActionBarMinimized, setIsActionBarMinimized] = useState(false);
 
   const subjectNames = useMemo(
     () => Array.from(new Set(subjects.map((s) => s.name))),
@@ -601,61 +602,89 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
 
       {/* Floating Bottom Action Bar when items are selected */}
       {selectedQuestionIds.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-800 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-200">
-          <div className="flex items-center gap-2">
-            <span className="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-xs">
-              {selectedQuestionIds.length}
-            </span>
-            <span className="text-xs font-semibold text-slate-200">
-              {selectedQuestionIds.length === 1 ? 'questão selecionada' : 'questões selecionadas'}
-            </span>
-          </div>
-
-          <div className="h-4 w-[1px] bg-slate-700"></div>
-
-          <div className="flex items-center gap-2">
-            {onCreateExamWithQuestions && (
-              <button
-                onClick={handleCreateExamWithSelected}
-                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
-              >
-                <FileCheck className="h-4 w-4" />
-                <span>Elaborar Avaliação</span>
-              </button>
-            )}
-
+        <div className="fixed bottom-14 left-1/2 -translate-x-1/2 z-40 animate-in fade-in slide-in-from-bottom-4 duration-200">
+          {isActionBarMinimized ? (
             <button
-              onClick={() => setIsPrintModalOpen(true)}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-semibold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+              onClick={() => setIsActionBarMinimized(false)}
+              className="bg-slate-900/95 hover:bg-slate-800 text-white px-4 py-2 rounded-full shadow-2xl border border-slate-700/80 backdrop-blur-md flex items-center gap-2 text-xs font-bold transition-all cursor-pointer hover:scale-105"
             >
-              <Printer className="h-3.5 w-3.5" />
-              <span>Imprimir Selecionadas</span>
+              <span className="h-5 w-5 rounded-full bg-indigo-600 flex items-center justify-center text-[10px]">
+                {selectedQuestionIds.length}
+              </span>
+              <span>Ações ({selectedQuestionIds.length} selecionadas)</span>
+              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
             </button>
+          ) : (
+            <div className="bg-slate-900/95 text-white px-4 py-2.5 rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-md flex items-center gap-3 max-w-[95vw] flex-wrap sm:flex-nowrap">
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="h-6 w-6 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-xs">
+                  {selectedQuestionIds.length}
+                </span>
+                <span className="text-xs font-semibold text-slate-200 hidden sm:inline">
+                  {selectedQuestionIds.length === 1 ? 'questão selecionada' : 'questões selecionadas'}
+                </span>
+              </div>
 
-            <button
-              onClick={() => handleExportJSON(true)}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-semibold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
-            >
-              <Download className="h-3.5 w-3.5" />
-              <span>Exportar JSON</span>
-            </button>
+              <div className="h-4 w-[1px] bg-slate-700 hidden sm:block"></div>
 
-            <button
-              onClick={handleBatchDeleteSelected}
-              className="px-3 py-1.5 bg-rose-600/80 hover:bg-rose-600 text-white rounded-xl font-semibold text-xs flex items-center gap-1 cursor-pointer transition-colors"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              <span>Excluir</span>
-            </button>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {onCreateExamWithQuestions && (
+                  <button
+                    onClick={handleCreateExamWithSelected}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                  >
+                    <FileCheck className="h-3.5 w-3.5" />
+                    <span>Elaborar Avaliação</span>
+                  </button>
+                )}
 
-            <button
-              onClick={() => setSelectedQuestionIds([])}
-              className="p-1 text-slate-400 hover:text-white rounded-lg cursor-pointer"
-              title="Limpar Seleção"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+                <button
+                  onClick={() => setIsPrintModalOpen(true)}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-semibold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  <span className="hidden md:inline">Imprimir Selecionadas</span>
+                  <span className="md:hidden">Imprimir</span>
+                </button>
+
+                <button
+                  onClick={() => handleExportJSON(true)}
+                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-semibold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                  title="Exportar JSON"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span className="hidden lg:inline">JSON</span>
+                </button>
+
+                <button
+                  onClick={handleBatchDeleteSelected}
+                  className="px-2.5 py-1.5 bg-rose-600/80 hover:bg-rose-600 text-white rounded-xl font-semibold text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Excluir selecionadas"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span className="hidden lg:inline">Excluir</span>
+                </button>
+
+                <div className="flex items-center border-l border-slate-700/80 pl-1 ml-0.5 gap-0.5">
+                  <button
+                    onClick={() => setIsActionBarMinimized(true)}
+                    className="p-1 text-slate-400 hover:text-slate-200 rounded-lg cursor-pointer"
+                    title="Minimizar barra de ações para não atrapalhar a visualização"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedQuestionIds([])}
+                    className="p-1 text-slate-400 hover:text-white rounded-lg cursor-pointer"
+                    title="Desmarcar todas"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -669,4 +669,340 @@ export class RelationalIntegrityService {
       fixesApplied,
     };
   }
+
+  /**
+   * Gera o Script SQL DDL/DML Completo de Atualização, Correção e Otimização do Banco de Dados
+   */
+  public static generateDatabaseUpdateScript(data: AppStateData): string {
+    const healed = this.autoHeal(data).healedData;
+    const now = new Date().toISOString();
+
+    return `-- ============================================================================
+-- SUCESSOEDU GESTÃO EDUCACIONAL ENTERPRISE
+-- SCRIPT OFICIAL DE ENGENHARIA, MIGRAÇÃO E ATUALIZAÇÃO DO BANCO DE DADOS
+-- Versão do Schema: v5.5.1 Relational Enterprise
+-- Gerado em: ${now}
+-- Compatibilidade: PostgreSQL 14+, SQLite 3.35+, MySQL 8.0+
+-- ============================================================================
+
+BEGIN TRANSACTION;
+
+-- ----------------------------------------------------------------------------
+-- 1. TABELA DE SECRETARIAS MUNICIPAIS DE EDUCAÇÃO
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS municipal_secretaries (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    cnpj VARCHAR(32) NOT NULL,
+    city VARCHAR(128) NOT NULL,
+    state VARCHAR(2) NOT NULL,
+    secretary_name VARCHAR(150),
+    phone VARCHAR(32),
+    email VARCHAR(150),
+    official_decree VARCHAR(255),
+    total_schools INTEGER DEFAULT 0,
+    total_students INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ----------------------------------------------------------------------------
+-- 2. TABELA DE UNIDADES ESCOLARES & POLOS (Com Séries, Turmas e Turnos)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS school_units (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    trade_name VARCHAR(150),
+    inep_code VARCHAR(16) UNIQUE NOT NULL,
+    cnpj_or_decree VARCHAR(64),
+    type VARCHAR(32) DEFAULT 'ESCOLA_POLO',
+    location_zone VARCHAR(32) DEFAULT 'ZONA_URBANA',
+    district VARCHAR(100) DEFAULT 'Centro',
+    address VARCHAR(255) NOT NULL,
+    zip_code VARCHAR(16),
+    city VARCHAR(100) NOT NULL,
+    state VARCHAR(2) NOT NULL,
+    director_name VARCHAR(150) NOT NULL,
+    coordinator_name VARCHAR(150),
+    secretary_name VARCHAR(150),
+    phone VARCHAR(32),
+    email VARCHAR(150),
+    total_classrooms INTEGER DEFAULT 6,
+    total_students INTEGER DEFAULT 0,
+    total_teachers INTEGER DEFAULT 0,
+    total_classes INTEGER DEFAULT 0,
+    has_internet BOOLEAN DEFAULT TRUE,
+    sync_status VARCHAR(32) DEFAULT 'SINCRONIZADO',
+    last_sync_date TIMESTAMP,
+    is_linked_to_secretary BOOLEAN DEFAULT TRUE,
+    municipal_secretary_id VARCHAR(64) REFERENCES municipal_secretaries(id) ON DELETE SET NULL,
+    linkage_code VARCHAR(64),
+    offered_stages JSON,
+    offered_grades JSON,
+    offered_shifts JSON,
+    operating_hours VARCHAR(64),
+    max_capacity_students INTEGER DEFAULT 350,
+    max_capacity_classes INTEGER DEFAULT 12,
+    logo_url TEXT,
+    management_logo_url TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_school_units_inep ON school_units(inep_code);
+CREATE INDEX IF NOT EXISTS idx_school_units_zone ON school_units(location_zone);
+
+-- ----------------------------------------------------------------------------
+-- 3. TABELA DE CURSOS / SEGMENTOS DE ENSINO
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS courses (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    code VARCHAR(32),
+    description TEXT,
+    duration_years INTEGER DEFAULT 1,
+    stage VARCHAR(64) DEFAULT 'ENSINO_FUNDAMENTAL_II',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ----------------------------------------------------------------------------
+-- 4. TABELA DE DISCIPLINAS / COMPONENTES CURRICULARES
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS subjects (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    code VARCHAR(32) UNIQUE NOT NULL,
+    weekly_hours INTEGER DEFAULT 4,
+    color_badge VARCHAR(32) DEFAULT 'bg-blue-600',
+    bncc_area VARCHAR(64) DEFAULT 'Linguagens e suas Tecnologias',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_subjects_code ON subjects(code);
+
+-- ----------------------------------------------------------------------------
+-- 5. TABELA DE TURMAS & ENTURMAÇÃO
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS school_classes (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    school_unit_id VARCHAR(64) REFERENCES school_units(id) ON DELETE CASCADE,
+    course_id VARCHAR(64) REFERENCES courses(id) ON DELETE RESTRICT,
+    grade_level VARCHAR(64) NOT NULL,
+    shift VARCHAR(32) DEFAULT 'MATUTINO',
+    school_year INTEGER DEFAULT 2026,
+    max_capacity INTEGER DEFAULT 35,
+    room_number VARCHAR(32) DEFAULT 'Sala 01',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_classes_unit ON school_classes(school_unit_id);
+CREATE INDEX IF NOT EXISTS idx_classes_year ON school_classes(school_year);
+
+-- ----------------------------------------------------------------------------
+-- 6. TABELA DE ALUNOS & MATRÍCULAS (Com Integridade Censo / INEP)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS students (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    registration VARCHAR(64) UNIQUE NOT NULL,
+    cpf VARCHAR(16),
+    nis_pis VARCHAR(16),
+    birth_date DATE NOT NULL,
+    gender VARCHAR(1) DEFAULT 'M',
+    race_color VARCHAR(32) DEFAULT 'PARDA',
+    mother_name VARCHAR(150),
+    father_name VARCHAR(150),
+    guardian_name VARCHAR(150),
+    guardian_phone VARCHAR(32),
+    address VARCHAR(255),
+    neighborhood VARCHAR(100),
+    city VARCHAR(100) DEFAULT 'Cumaru do Norte',
+    state VARCHAR(2) DEFAULT 'PA',
+    zip_code VARCHAR(16),
+    class_id VARCHAR(64) REFERENCES school_classes(id) ON DELETE SET NULL,
+    school_unit_id VARCHAR(64) REFERENCES school_units(id) ON DELETE CASCADE,
+    course_id VARCHAR(64) REFERENCES courses(id) ON DELETE SET NULL,
+    status VARCHAR(32) DEFAULT 'ACTIVE',
+    cadastral_status VARCHAR(32) DEFAULT 'COMPLETE',
+    is_pcd BOOLEAN DEFAULT FALSE,
+    special_needs TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_students_class ON students(class_id);
+CREATE INDEX IF NOT EXISTS idx_students_unit ON students(school_unit_id);
+CREATE INDEX IF NOT EXISTS idx_students_status ON students(status);
+CREATE INDEX IF NOT EXISTS idx_students_cpf ON students(cpf);
+
+-- ----------------------------------------------------------------------------
+-- 7. TABELA DE HABILIDADES BNCC
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS bncc_skills (
+    id VARCHAR(64) PRIMARY KEY,
+    code VARCHAR(32) UNIQUE NOT NULL,
+    description TEXT NOT NULL,
+    stage VARCHAR(64) NOT NULL,
+    grade VARCHAR(64) NOT NULL,
+    subject_id VARCHAR(64) REFERENCES subjects(id) ON DELETE CASCADE,
+    area VARCHAR(64) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_bncc_code ON bncc_skills(code);
+
+-- ----------------------------------------------------------------------------
+-- 8. TABELA DE BANCO DE QUESTÕES
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS questions (
+    id VARCHAR(64) PRIMARY KEY,
+    code VARCHAR(32) UNIQUE NOT NULL,
+    subject_id VARCHAR(64) REFERENCES subjects(id) ON DELETE CASCADE,
+    subject_name VARCHAR(100) NOT NULL,
+    topic VARCHAR(150) NOT NULL,
+    difficulty VARCHAR(32) DEFAULT 'MEDIUM',
+    bncc_skill_code VARCHAR(32),
+    statement TEXT NOT NULL,
+    options JSON NOT NULL,
+    correct_option_index INTEGER NOT NULL,
+    explanation TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_questions_subject ON questions(subject_id);
+
+-- ----------------------------------------------------------------------------
+-- 9. TABELA DE PROVAS & AVALIAÇÕES
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS exams (
+    id VARCHAR(64) PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    subject_id VARCHAR(64) REFERENCES subjects(id) ON DELETE CASCADE,
+    class_id VARCHAR(64) REFERENCES school_classes(id) ON DELETE CASCADE,
+    academic_term VARCHAR(32) DEFAULT '1º Bimestre',
+    exam_date DATE NOT NULL,
+    total_questions INTEGER DEFAULT 10,
+    max_score DECIMAL(5,2) DEFAULT 10.0,
+    weight DECIMAL(3,1) DEFAULT 1.0,
+    status VARCHAR(32) DEFAULT 'PENDING',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_exams_class ON exams(class_id);
+CREATE INDEX IF NOT EXISTS idx_exams_subject ON exams(subject_id);
+
+-- ----------------------------------------------------------------------------
+-- 10. TABELA DE RESPOSTAS & SUBMISSÕES DE PROVAS
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS exam_submissions (
+    id VARCHAR(64) PRIMARY KEY,
+    exam_id VARCHAR(64) REFERENCES exams(id) ON DELETE CASCADE,
+    student_id VARCHAR(64) REFERENCES students(id) ON DELETE CASCADE,
+    score DECIMAL(5,2) DEFAULT 0.0,
+    answers JSON NOT NULL,
+    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(32) DEFAULT 'GRADED'
+);
+
+CREATE INDEX IF NOT EXISTS idx_submissions_exam ON exam_submissions(exam_id);
+CREATE INDEX IF NOT EXISTS idx_submissions_student ON exam_submissions(student_id);
+
+-- ----------------------------------------------------------------------------
+-- 11. TABELA DE FREQUÊNCIA ESCOLAR
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS attendance_sheets (
+    id VARCHAR(64) PRIMARY KEY,
+    class_id VARCHAR(64) REFERENCES school_classes(id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    records JSON NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_attendance_class_date ON attendance_sheets(class_id, date);
+
+-- ----------------------------------------------------------------------------
+-- 12. TABELA DE MODELOS DE RELATÓRIOS PERSONALIZADOS
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS custom_report_templates (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    description TEXT,
+    module VARCHAR(64) NOT NULL,
+    config JSON NOT NULL,
+    created_by VARCHAR(64),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_custom_reports_module ON custom_report_templates(module);
+
+-- ----------------------------------------------------------------------------
+-- 13. POPULAÇÃO & NORMALIZAÇÃO DOS REGISTROS COM AUTO-CURA
+-- ----------------------------------------------------------------------------
+
+-- Inserção / Atualização de Unidades Escolares
+${healed.schoolUnits
+  .map(
+    (u) =>
+      `INSERT INTO school_units (id, name, trade_name, inep_code, type, location_zone, district, address, city, state, director_name, phone, email, total_students, total_classes, has_internet, sync_status, is_linked_to_secretary, municipal_secretary_id) ` +
+      `VALUES ('${u.id}', '${u.name.replace(/'/g, "''")}', '${(u.tradeName || '').replace(/'/g, "''")}', '${u.inepCode}', '${u.type}', '${u.locationZone}', '${u.district}', '${u.address.replace(/'/g, "''")}', '${u.city}', '${u.state}', '${u.directorName.replace(/'/g, "''")}', '${u.phone}', '${u.email}', ${u.totalStudents}, ${u.totalClasses}, ${u.hasInternet ? 'TRUE' : 'FALSE'}, '${u.syncStatus}', TRUE, 'semed-cumaru-do-norte') ` +
+      `ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, inep_code = EXCLUDED.inep_code, total_students = EXCLUDED.total_students, updated_at = CURRENT_TIMESTAMP;`
+  )
+  .join('\n')}
+
+-- Inserção / Atualização de Turmas
+${healed.classes
+  .map(
+    (c) =>
+      `INSERT INTO school_classes (id, name, school_unit_id, grade_level, shift, school_year, max_capacity, room_number) ` +
+      `VALUES ('${c.id}', '${c.name.replace(/'/g, "''")}', '${c.schoolUnitId || healed.schoolUnits[0]?.id}', '${c.gradeLevel}', '${c.shift}', ${c.schoolYear || 2026}, ${c.maxCapacity || 35}, '${(c.roomNumber || 'Sala 01').replace(/'/g, "''")}') ` +
+      `ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, school_unit_id = EXCLUDED.school_unit_id, updated_at = CURRENT_TIMESTAMP;`
+  )
+  .join('\n')}
+
+-- Inserção / Atualização de Disciplinas
+${healed.subjects
+  .map(
+    (s) =>
+      `INSERT INTO subjects (id, name, code, weekly_hours, color_badge, bncc_area) ` +
+      `VALUES ('${s.id}', '${s.name.replace(/'/g, "''")}', '${s.code}', ${s.workloadHours || 80}, 'bg-blue-600', 'Base Nacional Comum Curricular') ` +
+      `ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, code = EXCLUDED.code;`
+  )
+  .join('\n')}
+
+-- Inserção / Atualização de Alunos
+${healed.students
+  .map(
+    (st) =>
+      `INSERT INTO students (id, name, registration, cpf, birth_date, class_id, school_unit_id, course_id, status, cadastral_status) ` +
+      `VALUES ('${st.id}', '${st.name.replace(/'/g, "''")}', '${st.enrollmentNumber || ''}', '${st.cpf || ''}', '${st.birthDate || '2010-01-01'}', '${st.classId || healed.classes[0]?.id}', '${st.schoolUnitId || healed.schoolUnits[0]?.id}', '${st.courseId || healed.courses[0]?.id}', '${st.status}', '${st.cadastralStatus || 'OK'}') ` +
+      `ON CONFLICT (id) DO UPDATE SET class_id = EXCLUDED.class_id, school_unit_id = EXCLUDED.school_unit_id, status = EXCLUDED.status, updated_at = CURRENT_TIMESTAMP;`
+  )
+  .join('\n')}
+
+COMMIT;
+
+-- ============================================================================
+-- FIM DO SCRIPT DE ATUALIZAÇÃO DO BANCO DE DADOS SUCESSOEDU
+-- ============================================================================
+`;
+  }
+
+  /**
+   * Dispara o download automático do script SQL no navegador
+   */
+  public static downloadSqlScript(sql: string, filename = 'atualizar_banco_sucessoedu_v5.5.sql'): void {
+    if (typeof window === 'undefined') return;
+    const blob = new Blob([sql], { type: 'application/sql;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
 }
+

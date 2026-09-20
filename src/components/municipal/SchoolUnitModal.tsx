@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Save,
@@ -14,6 +14,10 @@ import {
   FileText,
   School,
   Sparkles,
+  ShieldCheck,
+  Upload,
+  Image as ImageIcon,
+  Trash2,
 } from 'lucide-react';
 import { SchoolUnit, LocationZone, SchoolUnitType } from '../../types';
 
@@ -22,6 +26,7 @@ interface SchoolUnitModalProps {
   onClose: () => void;
   onSave: (unit: SchoolUnit) => void;
   unitToEdit?: SchoolUnit | null;
+  defaultManagementLogo?: string;
 }
 
 export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
@@ -29,7 +34,11 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
   onClose,
   onSave,
   unitToEdit,
+  defaultManagementLogo,
 }) => {
+  const schoolLogoInputRef = useRef<HTMLInputElement>(null);
+  const managementLogoInputRef = useRef<HTMLInputElement>(null);
+
   const [formData, setFormData] = useState<Partial<SchoolUnit>>({
     name: '',
     tradeName: '',
@@ -39,13 +48,13 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
     locationZone: 'ZONA_URBANA',
     district: '',
     address: '',
-    zipCode: '',
-    city: 'São Paulo',
-    state: 'SP',
+    zipCode: '68.398-000',
+    city: 'Cumaru do Norte',
+    state: 'PA',
     directorName: '',
     coordinatorName: '',
     secretaryName: '',
-    phone: '',
+    phone: '(94) 98435-8694',
     email: '',
     totalClassrooms: 8,
     totalStudents: 0,
@@ -53,15 +62,58 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
     totalClasses: 0,
     hasInternet: true,
     syncStatus: 'SINCRONIZADO',
+    isLinkedToSecretary: true,
+    municipalSecretaryId: 'semed-cumaru-do-norte',
+    municipalSecretaryName: 'Secretaria Municipal de Educação – SEMED',
+    municipalSecretaryCnpj: '30.676.114/0001-17',
+    linkageCode: 'VINC-SEMED-PA-001',
+    linkageDecree: 'Portaria de Homologação SEMED nº 01/2026',
+    logoUrl: '',
+    managementLogoUrl: defaultManagementLogo || '',
   });
 
   const [error, setError] = useState<string>('');
 
+  const handleFileUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: 'logoUrl' | 'managementLogoUrl'
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecione um arquivo de imagem válido (PNG, JPG, SVG ou WebP).');
+      return;
+    }
+
+    if (file.size > 3 * 1024 * 1024) {
+      alert('O tamanho da imagem não deve exceder 3MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setFormData((prev) => ({
+        ...prev,
+        [field]: base64,
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   useEffect(() => {
     if (unitToEdit) {
-      setFormData(unitToEdit);
+      setFormData({
+        ...unitToEdit,
+        isLinkedToSecretary: unitToEdit.isLinkedToSecretary !== false,
+        municipalSecretaryId: unitToEdit.municipalSecretaryId || 'semed-cumaru-do-norte',
+        municipalSecretaryName: unitToEdit.municipalSecretaryName || 'Secretaria Municipal de Educação – SEMED',
+        municipalSecretaryCnpj: unitToEdit.municipalSecretaryCnpj || '30.676.114/0001-17',
+      });
     } else {
       const codeNum = Math.floor(10000000 + Math.random() * 90000000);
+      const linkNum = Math.floor(100 + Math.random() * 900);
       setFormData({
         name: '',
         tradeName: '',
@@ -69,15 +121,15 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
         cnpjOrDecree: '',
         type: 'ESCOLA_POLO',
         locationZone: 'ZONA_URBANA',
-        district: '',
+        district: 'Centro',
         address: '',
-        zipCode: '',
-        city: 'São Paulo',
-        state: 'SP',
+        zipCode: '68.398-000',
+        city: 'Cumaru do Norte',
+        state: 'PA',
         directorName: '',
         coordinatorName: '',
         secretaryName: '',
-        phone: '',
+        phone: '(94) 98435-8694',
         email: '',
         totalClassrooms: 8,
         totalStudents: 0,
@@ -85,6 +137,12 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
         totalClasses: 0,
         hasInternet: true,
         syncStatus: 'SINCRONIZADO',
+        isLinkedToSecretary: true,
+        municipalSecretaryId: 'semed-cumaru-do-norte',
+        municipalSecretaryName: 'Secretaria Municipal de Educação – SEMED',
+        municipalSecretaryCnpj: '30.676.114/0001-17',
+        linkageCode: `VINC-SEMED-PA-${linkNum}`,
+        linkageDecree: 'Portaria SEMED/PMCN de Homologação da Unidade',
       });
     }
     setError('');
@@ -132,6 +190,21 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
       hasInternet: Boolean(formData.hasInternet),
       syncStatus: formData.syncStatus || 'SINCRONIZADO',
       lastSyncDate: unitToEdit?.lastSyncDate || new Date().toISOString(),
+      gradesServed: formData.gradesServed || [],
+      gradesServedText: formData.gradesServedText || (formData.gradesServed && formData.gradesServed.length > 0 ? formData.gradesServed.join(', ') : 'Educação Básica'),
+      offeredStages: formData.offeredStages || ['ENSINO_FUNDAMENTAL_I', 'ENSINO_FUNDAMENTAL_II'],
+      offeredGrades: formData.offeredGrades || [],
+      offeredShifts: formData.offeredShifts || ['MATUTINO', 'VESPERTINO'],
+      operatingHours: formData.operatingHours || '07:00 às 17:30',
+      maxCapacityStudents: formData.maxCapacityStudents || 350,
+      maxCapacityClasses: formData.maxCapacityClasses || 12,
+      isLinkedToSecretary: formData.isLinkedToSecretary !== false,
+      municipalSecretaryId: formData.municipalSecretaryId || 'semed-cumaru-do-norte',
+      municipalSecretaryName: formData.municipalSecretaryName || 'Secretaria Municipal de Educação – SEMED',
+      municipalSecretaryCnpj: formData.municipalSecretaryCnpj || '30.676.114/0001-17',
+      linkageCode: formData.linkageCode || 'VINC-SEMED-PA-001',
+      linkageDate: formData.linkageDate || new Date().toISOString(),
+      linkageDecree: formData.linkageDecree || 'Portaria SEMED/PMCN de Homologação da Unidade',
     };
 
     onSave(schoolUnit);
@@ -170,6 +243,170 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
               {error}
             </div>
           )}
+
+          {/* VÍNCULO OFICIAL COM A SECRETARIA MUNICIPAL DE EDUCAÇÃO */}
+          <div className="p-3.5 bg-emerald-50/80 rounded-xl border border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shrink-0">
+                <ShieldCheck className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-emerald-950 text-xs">
+                    Vínculo Central: Secretaria Municipal de Educação – SEMED
+                  </span>
+                  <span className="px-1.5 py-0.2 rounded-sm bg-emerald-600 text-white font-mono text-[9px] font-bold">
+                    HOMOLOGADA
+                  </span>
+                </div>
+                <p className="text-[11px] text-emerald-800">
+                  CNPJ: 30.676.114/0001-17 • Cumaru do Norte/PA • Rede Municipal de Ensino
+                </p>
+              </div>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-900 shrink-0 bg-white/70 px-2.5 py-1 rounded-lg border border-emerald-200">
+              <input
+                type="checkbox"
+                checked={formData.isLinkedToSecretary !== false}
+                onChange={(e) => setFormData({ ...formData, isLinkedToSecretary: e.target.checked })}
+                className="rounded text-emerald-600 focus:ring-emerald-500"
+              />
+              <span>Unidade Jurisdicionada à SEMED</span>
+            </label>
+          </div>
+
+          {/* IDENTIDADE VISUAL & LOGOTIPOS DA UNIDADE ESCOLAR E GESTÃO */}
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+            <h3 className="font-bold text-slate-900 text-xs flex items-center justify-between pb-1 border-b border-slate-200">
+              <span className="flex items-center gap-1.5">
+                <ImageIcon className="h-4 w-4 text-emerald-600" />
+                <span>Identidade Visual da Escola e da Gestão</span>
+              </span>
+              <span className="text-[10px] text-slate-500 font-normal">
+                Suporta PNG, JPG, SVG ou WebP (Máx 3MB)
+              </span>
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+              {/* Logo Oficial da Unidade Escolar (Brasão/Marca da Escola) */}
+              <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-800 text-xs flex items-center gap-1">
+                    <span>1. Logo / Brasão da Escola</span>
+                  </label>
+                  {formData.logoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, logoUrl: '' }))}
+                      className="text-[10px] text-rose-600 hover:text-rose-700 flex items-center gap-0.5 font-bold cursor-pointer"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      <span>Remover</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="h-16 w-16 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center shrink-0 overflow-hidden relative group">
+                    {formData.logoUrl ? (
+                      <img
+                        src={formData.logoUrl}
+                        alt="Logo Escola"
+                        className="h-full w-full object-contain p-1"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <School className="h-6 w-6 text-slate-400" />
+                    )}
+                  </div>
+
+                  <div className="flex-1 space-y-1.5">
+                    <input
+                      type="file"
+                      ref={schoolLogoInputRef}
+                      onChange={(e) => handleFileUpload(e, 'logoUrl')}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => schoolLogoInputRef.current?.click()}
+                      className="w-full px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                      <span>{formData.logoUrl ? 'Trocar Logo da Escola' : 'Enviar Logo da Escola'}</span>
+                    </button>
+                    <input
+                      type="text"
+                      placeholder="Ou cole a URL da imagem da escola..."
+                      value={formData.logoUrl?.startsWith('data:') ? 'Imagem carregada localmente' : (formData.logoUrl || '')}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, logoUrl: e.target.value }))}
+                      className="w-full px-2.5 py-1 text-[11px] rounded-lg border border-slate-200 text-slate-700 font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Logo da Gestão / Mantenedora Vinculada */}
+              <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-800 text-xs flex items-center gap-1">
+                    <span>2. Logo da Gestão / Mantenedora</span>
+                  </label>
+                  {formData.managementLogoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, managementLogoUrl: '' }))}
+                      className="text-[10px] text-rose-600 hover:text-rose-700 flex items-center gap-0.5 font-bold cursor-pointer"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      <span>Remover</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="h-16 w-16 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center shrink-0 overflow-hidden relative group">
+                    {formData.managementLogoUrl ? (
+                      <img
+                        src={formData.managementLogoUrl}
+                        alt="Logo Gestão"
+                        className="h-full w-full object-contain p-1"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <Building2 className="h-6 w-6 text-slate-400" />
+                    )}
+                  </div>
+
+                  <div className="flex-1 space-y-1.5">
+                    <input
+                      type="file"
+                      ref={managementLogoInputRef}
+                      onChange={(e) => handleFileUpload(e, 'managementLogoUrl')}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => managementLogoInputRef.current?.click()}
+                      className="w-full px-3 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                      <span>{formData.managementLogoUrl ? 'Trocar Logo Gestão' : 'Enviar Logo Gestão'}</span>
+                    </button>
+                    <input
+                      type="text"
+                      placeholder="Ou cole a URL do logo da gestão..."
+                      value={formData.managementLogoUrl?.startsWith('data:') ? 'Imagem carregada localmente' : (formData.managementLogoUrl || '')}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, managementLogoUrl: e.target.value }))}
+                      className="w-full px-2.5 py-1 text-[11px] rounded-lg border border-slate-200 text-slate-700 font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* DADOS BÁSICOS */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -472,6 +709,268 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
                   onChange={(e) => setFormData({ ...formData, totalTeachers: Number(e.target.value) })}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold text-center"
                 />
+              </div>
+            </div>
+          </div>
+
+          {/* ETAPAS DE ENSINO, SÉRIES E TURMAS ATENDIDAS */}
+          <div className="pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-bold text-slate-900 flex items-center gap-1.5">
+                <GraduationCap className="h-4 w-4 text-emerald-600" />
+                <span>Etapas de Ensino, Séries e Turmas Oferecidas</span>
+              </h3>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const allGrades = [
+                      'Berçário', 'Maternal I', 'Maternal II', 'Pré I', 'Pré II',
+                      '1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano',
+                      '6º Ano', '7º Ano', '8º Ano', '9º Ano',
+                      '1ª Série Médio', '2ª Série Médio', '3ª Série Médio',
+                      'EJA Fundamental', 'EJA Médio', 'AEE Especial'
+                    ];
+                    setFormData((prev) => ({
+                      ...prev,
+                      offeredGrades: allGrades,
+                      gradesServed: allGrades,
+                      gradesServedText: 'Educação Infantil, Fundamental I e II, Médio e EJA',
+                    }));
+                  }}
+                  className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded cursor-pointer"
+                >
+                  Marcar Todas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      offeredGrades: [],
+                      gradesServed: [],
+                      gradesServedText: '',
+                    }));
+                  }}
+                  className="text-[11px] font-semibold text-slate-500 hover:text-slate-700 bg-slate-100 px-2 py-0.5 rounded cursor-pointer"
+                >
+                  Limpar
+                </button>
+              </div>
+            </div>
+
+            {/* Agrupamento por Segmentos */}
+            <div className="space-y-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              {/* Educação Infantil */}
+              <div>
+                <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-pink-500"></span>
+                  <span>Educação Infantil (Creche & Pré-Escola)</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                  {['Berçário', 'Maternal I', 'Maternal II', 'Pré I', 'Pré II'].map((grade) => {
+                    const isSelected = formData.offeredGrades?.includes(grade);
+                    return (
+                      <label
+                        key={grade}
+                        className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-xs cursor-pointer transition-all ${
+                          isSelected
+                            ? 'bg-pink-50 border-pink-300 text-pink-900 font-bold'
+                            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!isSelected}
+                          onChange={(e) => {
+                            const current = formData.offeredGrades || [];
+                            const next = e.target.checked
+                              ? [...current, grade]
+                              : current.filter((g) => g !== grade);
+                            setFormData((prev) => ({
+                              ...prev,
+                              offeredGrades: next,
+                              gradesServed: next,
+                              gradesServedText: next.join(', '),
+                            }));
+                          }}
+                          className="rounded accent-pink-600"
+                        />
+                        <span className="truncate">{grade}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Ensino Fundamental I */}
+              <div>
+                <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                  <span>Ensino Fundamental I (Anos Iniciais – 1º ao 5º)</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                  {['1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano'].map((grade) => {
+                    const isSelected = formData.offeredGrades?.includes(grade);
+                    return (
+                      <label
+                        key={grade}
+                        className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-xs cursor-pointer transition-all ${
+                          isSelected
+                            ? 'bg-blue-50 border-blue-300 text-blue-900 font-bold'
+                            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!isSelected}
+                          onChange={(e) => {
+                            const current = formData.offeredGrades || [];
+                            const next = e.target.checked
+                              ? [...current, grade]
+                              : current.filter((g) => g !== grade);
+                            setFormData((prev) => ({
+                              ...prev,
+                              offeredGrades: next,
+                              gradesServed: next,
+                              gradesServedText: next.join(', '),
+                            }));
+                          }}
+                          className="rounded accent-blue-600"
+                        />
+                        <span className="truncate">{grade}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Ensino Fundamental II */}
+              <div>
+                <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                  <span>Ensino Fundamental II (Anos Finais – 6º ao 9º)</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                  {['6º Ano', '7º Ano', '8º Ano', '9º Ano'].map((grade) => {
+                    const isSelected = formData.offeredGrades?.includes(grade);
+                    return (
+                      <label
+                        key={grade}
+                        className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-xs cursor-pointer transition-all ${
+                          isSelected
+                            ? 'bg-indigo-50 border-indigo-300 text-indigo-900 font-bold'
+                            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!isSelected}
+                          onChange={(e) => {
+                            const current = formData.offeredGrades || [];
+                            const next = e.target.checked
+                              ? [...current, grade]
+                              : current.filter((g) => g !== grade);
+                            setFormData((prev) => ({
+                              ...prev,
+                              offeredGrades: next,
+                              gradesServed: next,
+                              gradesServedText: next.join(', '),
+                            }));
+                          }}
+                          className="rounded accent-indigo-600"
+                        />
+                        <span className="truncate">{grade}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Ensino Médio, EJA e Modalidades Especiais */}
+              <div>
+                <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                  <span>Ensino Médio, EJA & Modalidades Especiais</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                  {[
+                    '1ª Série Médio', '2ª Série Médio', '3ª Série Médio',
+                    'EJA Fundamental', 'EJA Médio', 'AEE Especial'
+                  ].map((grade) => {
+                    const isSelected = formData.offeredGrades?.includes(grade);
+                    return (
+                      <label
+                        key={grade}
+                        className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-xs cursor-pointer transition-all ${
+                          isSelected
+                            ? 'bg-purple-50 border-purple-300 text-purple-900 font-bold'
+                            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!isSelected}
+                          onChange={(e) => {
+                            const current = formData.offeredGrades || [];
+                            const next = e.target.checked
+                              ? [...current, grade]
+                              : current.filter((g) => g !== grade);
+                            setFormData((prev) => ({
+                              ...prev,
+                              offeredGrades: next,
+                              gradesServed: next,
+                              gradesServedText: next.join(', '),
+                            }));
+                          }}
+                          className="rounded accent-purple-600"
+                        />
+                        <span className="truncate">{grade}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Turnos de Funcionamento */}
+              <div className="pt-2 border-t border-slate-200/80">
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Turnos de Funcionamento Autorizados
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { key: 'MATUTINO', label: 'Matutino (Manhã)' },
+                    { key: 'VESPERTINO', label: 'Vespertino (Tarde)' },
+                    { key: 'NOTURNO', label: 'Noturno (Noite)' },
+                    { key: 'INTEGRAL', label: 'Tempo Integral' },
+                  ].map((shift) => {
+                    const isShiftSelected = formData.offeredShifts?.includes(shift.key as any);
+                    return (
+                      <label
+                        key={shift.key}
+                        className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-xs cursor-pointer transition-all ${
+                          isShiftSelected
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-bold'
+                            : 'bg-white border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!isShiftSelected}
+                          onChange={(e) => {
+                            const current = formData.offeredShifts || [];
+                            const next = e.target.checked
+                              ? [...current, shift.key as any]
+                              : current.filter((s) => s !== shift.key);
+                            setFormData((prev) => ({ ...prev, offeredShifts: next }));
+                          }}
+                          className="rounded accent-emerald-600"
+                        />
+                        <span>{shift.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>

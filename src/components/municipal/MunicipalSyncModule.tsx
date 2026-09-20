@@ -34,6 +34,12 @@ import {
   Plus,
   Edit2,
   Trash2,
+  Phone,
+  Mail,
+  Printer,
+  Landmark,
+  Link2,
+  ShieldAlert,
 } from 'lucide-react';
 import {
   SchoolUnit,
@@ -45,12 +51,16 @@ import {
   ExamSubmission,
   AcademicHistory,
   SchoolSettings,
+  MunicipalSecretaryInfo,
 } from '../../types';
 import {
   generateMunicipalSyncPacket,
   mergeMunicipalSyncPacket,
 } from '../../data/storage';
+import { DEFAULT_MUNICIPAL_SECRETARY } from '../../data/defaultData';
 import { SchoolUnitModal } from './SchoolUnitModal';
+import { MunicipalSecretaryModal } from './MunicipalSecretaryModal';
+import { MunicipalLinkageCertificateModal } from './MunicipalLinkageCertificateModal';
 
 interface MunicipalSyncModuleProps {
   schoolUnits: SchoolUnit[];
@@ -61,8 +71,10 @@ interface MunicipalSyncModuleProps {
   submissions: ExamSubmission[];
   academicHistories: AcademicHistory[];
   settings: SchoolSettings;
+  municipalSecretary?: MunicipalSecretaryInfo;
   onUpdateSchoolUnits?: (units: SchoolUnit[]) => void;
   onUpdateSyncLogs?: (logs: SyncAuditLog[]) => void;
+  onUpdateMunicipalSecretary?: (secretary: MunicipalSecretaryInfo) => void;
   onRefreshData?: () => void;
   onBack?: () => void;
   onNavigate?: (tab: string, payload?: any) => void;
@@ -77,15 +89,22 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = ({
   submissions,
   academicHistories,
   settings,
+  municipalSecretary,
   onUpdateSchoolUnits,
   onUpdateSyncLogs,
+  onUpdateMunicipalSecretary,
   onRefreshData,
   onBack,
   onNavigate,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<
-    'OVERVIEW' | 'REMOTE_EXPORT' | 'CENTRAL_IMPORT' | 'CENSUS_REPORT' | 'PERFORMANCE_RANKING'
+    'OVERVIEW' | 'SEMED_CENTRAL' | 'REMOTE_EXPORT' | 'CENTRAL_IMPORT' | 'CENSUS_REPORT' | 'PERFORMANCE_RANKING'
   >('OVERVIEW');
+
+  // Active SEMED Secretary Data
+  const activeSecretary = municipalSecretary || DEFAULT_MUNICIPAL_SECRETARY;
+  const [isSecretaryModalOpen, setIsSecretaryModalOpen] = useState(false);
+  const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
 
   // Selected school unit for remote export mode
   const [selectedUnitForExportId, setSelectedUnitForExportId] = useState<string>(
@@ -141,6 +160,68 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = ({
     }
   };
 
+  const handleSaveSecretary = (updatedSecretary: MunicipalSecretaryInfo) => {
+    if (onUpdateMunicipalSecretary) {
+      onUpdateMunicipalSecretary(updatedSecretary);
+    }
+    // Also update any school unit that holds the secretary metadata
+    if (onUpdateSchoolUnits) {
+      const updatedUnits = schoolUnits.map((u) => ({
+        ...u,
+        municipalSecretaryId: updatedSecretary.id,
+        municipalSecretaryName: updatedSecretary.name,
+        municipalSecretaryCnpj: updatedSecretary.cnpj,
+      }));
+      onUpdateSchoolUnits(updatedUnits);
+    }
+  };
+
+  const linkedUnitsCount = useMemo(() => {
+    return schoolUnits.filter((u) => u.isLinkedToSecretary !== false).length;
+  }, [schoolUnits]);
+
+  const handleLinkAllUnitsToSecretary = () => {
+    if (!onUpdateSchoolUnits) return;
+    const updated = schoolUnits.map((u) => ({
+      ...u,
+      isLinkedToSecretary: true,
+      municipalSecretaryId: activeSecretary.id,
+      municipalSecretaryName: activeSecretary.name,
+      municipalSecretaryCnpj: activeSecretary.cnpj,
+      city: activeSecretary.city || u.city || 'Cumaru do Norte',
+      state: activeSecretary.state || u.state || 'PA',
+      zipCode: activeSecretary.zipCode || u.zipCode || '68.398-000',
+      linkageCode: u.linkageCode || `VINC-SEMED-PA-${Math.floor(100 + Math.random() * 900)}`,
+      linkageDecree: u.linkageDecree || 'Portaria de Homologação SEMED/PMCN',
+      linkageDate: u.linkageDate || new Date().toISOString(),
+    }));
+    onUpdateSchoolUnits(updated);
+    alert(
+      `Sucesso! Todas as ${updated.length} unidades escolares foram formalmente vinculadas à ${activeSecretary.name} (CNPJ ${activeSecretary.cnpj} - ${activeSecretary.city}/${activeSecretary.state}).`
+    );
+  };
+
+  const handleToggleUnitLink = (unitId: string) => {
+    if (!onUpdateSchoolUnits) return;
+    const updated = schoolUnits.map((u) => {
+      if (u.id === unitId) {
+        const nextLinked = !u.isLinkedToSecretary;
+        return {
+          ...u,
+          isLinkedToSecretary: nextLinked,
+          municipalSecretaryId: nextLinked ? activeSecretary.id : undefined,
+          municipalSecretaryName: nextLinked ? activeSecretary.name : undefined,
+          municipalSecretaryCnpj: nextLinked ? activeSecretary.cnpj : undefined,
+          linkageCode: nextLinked
+            ? u.linkageCode || `VINC-SEMED-PA-${Math.floor(100 + Math.random() * 900)}`
+            : undefined,
+        };
+      }
+      return u;
+    });
+    onUpdateSchoolUnits(updated);
+  };
+
   const filteredUnits = useMemo(() => {
     return schoolUnits.filter((u) => {
       const matchZone = zoneFilter === 'ALL' || u.locationZone === zoneFilter;
@@ -164,7 +245,8 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = ({
         id: 'unit-sat-1',
         name: 'E.M. Paulo Freire (Unidade Satélite Norte)',
         inepCode: '35129921',
-        type: 'ESCOLA_SATELITE',
+        type: 'ESCOLA_SATELITE' as const,
+        locationZone: 'ZONA_URBANA' as const,
         district: 'Bairro Esperança',
         address: 'Rua das Flores, 420',
         directorName: 'Prof. Marcos Vinicius Alencar',
@@ -173,7 +255,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = ({
         totalStudents: 310,
         totalTeachers: 22,
         totalClasses: 10,
-        syncStatus: 'SINCRONIZADO',
+        syncStatus: 'SINCRONIZADO' as const,
         hasInternet: false,
       }
     );
@@ -306,6 +388,17 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = ({
         {/* Quick Sub-Tab Switcher */}
         <div className="flex items-center gap-1.5 overflow-x-auto">
           <button
+            onClick={() => setActiveSubTab('SEMED_CENTRAL')}
+            className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1 ${
+              activeSubTab === 'SEMED_CENTRAL'
+                ? 'bg-emerald-700 text-white shadow-xs'
+                : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+            }`}
+          >
+            <Building2 className="h-3 w-3" />
+            <span>SEMED Central</span>
+          </button>
+          <button
             onClick={() => setActiveSubTab('OVERVIEW')}
             className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
               activeSubTab === 'OVERVIEW'
@@ -351,33 +444,62 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = ({
       {/* Top Municipal Banner */}
       <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white rounded-2xl p-6 shadow-md space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-200 text-[11px] font-bold">
-              <Building2 className="h-3.5 w-3.5 text-emerald-400" />
-              Gestão Escolar Pública Municipal & Sincronização Descentralizada
+          <div className="flex items-start gap-4">
+            {(activeSecretary.managementLogoUrl || activeSecretary.logoUrl) && (
+              <div className="flex items-center gap-2 shrink-0 bg-white/10 p-2 rounded-2xl border border-white/20 backdrop-blur-xs">
+                {activeSecretary.managementLogoUrl && (
+                  <img
+                    src={activeSecretary.managementLogoUrl}
+                    alt="Logo Gestão"
+                    className="h-12 w-12 object-contain rounded-xl bg-white p-1 shadow-xs"
+                    referrerPolicy="no-referrer"
+                  />
+                )}
+                {activeSecretary.logoUrl && (
+                  <img
+                    src={activeSecretary.logoUrl}
+                    alt="Logo SEMED"
+                    className="h-12 w-12 object-contain rounded-xl bg-white p-1 shadow-xs"
+                    referrerPolicy="no-referrer"
+                  />
+                )}
+              </div>
+            )}
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-200 text-[11px] font-bold">
+                <Building2 className="h-3.5 w-3.5 text-emerald-400" />
+                Gestão Escolar Pública Municipal & Sincronização Descentralizada
+              </div>
+              <h2 className="text-xl font-black">
+                Central de Unificação Municipal, Polos Satélites & Censo Escolar
+              </h2>
+              <p className="text-xs text-emerald-100 max-w-2xl">
+                Órgão Gestor Central: <strong>{activeSecretary.name}</strong> • CNPJ: <strong>{activeSecretary.cnpj}</strong> • {activeSecretary.city}/{activeSecretary.state}. Todas as unidades escolares e polos remotos operam integradas a este registro central.
+              </p>
             </div>
-            <h2 className="text-xl font-black">
-              Central de Unificação Municipal, Polos Satélites & Censo Escolar
-            </h2>
-            <p className="text-xs text-emerald-100 max-w-2xl">
-              Permite que todas as escolas do município operem 100% de forma local e offline. Gere pacotes de sincronização em pendrive para unificação e relatórios consolidados do Censo e IDEB.
-            </p>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
             <button
+              onClick={() => setActiveSubTab('SEMED_CENTRAL')}
+              className="px-3.5 py-2 bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <Building2 className="h-4 w-4" />
+              <span>Cadastro Central SEMED</span>
+            </button>
+            <button
               onClick={() => setActiveSubTab('REMOTE_EXPORT')}
-              className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 bg-white/20 hover:bg-white/30 text-white font-bold text-xs rounded-xl border border-white/20 transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <Download className="h-4 w-4" />
-              <span>Exportar Polo Remoto (.edusync)</span>
+              <span>Exportar Polo (.edusync)</span>
             </button>
             <button
               onClick={() => setActiveSubTab('CENTRAL_IMPORT')}
               className="px-3.5 py-2 bg-white/20 hover:bg-white/30 text-white font-bold text-xs rounded-xl border border-white/20 transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <Upload className="h-4 w-4" />
-              <span>Importar na Sede Central</span>
+              <span>Importar na Sede</span>
             </button>
           </div>
         </div>
@@ -405,6 +527,21 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = ({
 
       {/* Sub-Navigation Buttons */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        <button
+          onClick={() => setActiveSubTab('SEMED_CENTRAL')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 ${
+            activeSubTab === 'SEMED_CENTRAL'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'bg-white text-emerald-900 hover:bg-emerald-50 border border-emerald-300 font-extrabold'
+          }`}
+        >
+          <Building2 className="h-4 w-4 text-emerald-600" />
+          <span>Secretaria SEMED</span>
+          <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black">
+            Central
+          </span>
+        </button>
+
         <button
           onClick={() => setActiveSubTab('OVERVIEW')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 ${
@@ -471,6 +608,122 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = ({
       {/* ========================================================= */}
       {activeSubTab === 'OVERVIEW' && (
         <div className="space-y-5">
+          {/* CARD EXECUTIVO DO CADASTRO CENTRAL DA SECRETARIA MUNICIPAL */}
+          <div className="bg-white rounded-2xl border-2 border-emerald-500/40 p-5 shadow-xs space-y-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                {activeSecretary.logoUrl || activeSecretary.managementLogoUrl ? (
+                  <div className="flex items-center gap-2 shrink-0">
+                    {activeSecretary.managementLogoUrl && (
+                      <div className="h-12 w-12 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center p-1 shadow-2xs shrink-0">
+                        <img
+                          src={activeSecretary.managementLogoUrl}
+                          alt="Logo Gestão"
+                          className="h-full w-full object-contain"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                    )}
+                    {activeSecretary.logoUrl && (
+                      <div className="h-12 w-12 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center p-1 shadow-2xs shrink-0">
+                        <img
+                          src={activeSecretary.logoUrl}
+                          alt="Logo SEMED"
+                          className="h-full w-full object-contain"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-800 text-white flex items-center justify-center shrink-0 shadow-md">
+                    <Building2 className="h-6 w-6" />
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-black text-[10px] uppercase tracking-wider">
+                      Órgão Gestor Central Municipal
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 font-mono text-[10px] font-bold">
+                      CNPJ: {activeSecretary.cnpj}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 font-bold text-[10px]">
+                      {activeSecretary.city} / {activeSecretary.state}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-600 text-white font-bold text-[10px]">
+                      {linkedUnitsCount} de {schoolUnits.length} Escolas Vinculadas
+                    </span>
+                  </div>
+                  <h3 className="text-base font-black text-slate-900 leading-tight">
+                    {activeSecretary.name}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {activeSecretary.jurisdiction} • Titular:{' '}
+                    <strong className="text-slate-800">{activeSecretary.secretaryDirector}</strong>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setIsSecretaryModalOpen(true)}
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Edit2 className="h-3.5 w-3.5" />
+                  <span>Editar SEMED</span>
+                </button>
+
+                <button
+                  onClick={handleLinkAllUnitsToSecretary}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  title="Garantir vínculo de todas as escolas cadastradas à SEMED"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>Vincular Toda a Rede ({linkedUnitsCount}/{schoolUnits.length})</span>
+                </button>
+
+                <button
+                  onClick={() => setIsCertificateModalOpen(true)}
+                  className="px-3.5 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Printer className="h-4 w-4" />
+                  <span>Certidão de Vínculo</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Contato e Endereço da SEMED */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-100 text-xs text-slate-600">
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-emerald-600 shrink-0" />
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-bold uppercase">E-mail Oficial</span>
+                  <a href={`mailto:${activeSecretary.email}`} className="font-mono font-bold text-emerald-800 hover:underline">
+                    {activeSecretary.email}
+                  </a>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-emerald-600 shrink-0" />
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-bold uppercase">Telefone / Gabinete</span>
+                  <span className="font-bold text-slate-900">{activeSecretary.phone}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-emerald-600 shrink-0" />
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-bold uppercase">Endereço da Sede</span>
+                  <span className="font-medium text-slate-800">
+                    {activeSecretary.address} • CEP: {activeSecretary.zipCode}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex flex-col sm:flex-row items-center gap-3 flex-1">
               <div className="relative flex-1 w-full sm:max-w-md">
@@ -572,13 +825,29 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = ({
                     </div>
                   </div>
 
-                  <div>
-                    <h4 className="font-bold text-slate-900 text-sm leading-snug">{unit.name}</h4>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[11px] text-slate-500 font-mono">INEP: {unit.inepCode}</span>
-                      {unit.tradeName && (
-                        <span className="text-[10px] text-slate-400 font-medium">({unit.tradeName})</span>
-                      )}
+                  <div className="flex items-start gap-3">
+                    {unit.logoUrl ? (
+                      <div className="h-11 w-11 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center p-1 shrink-0 shadow-2xs">
+                        <img
+                          src={unit.logoUrl}
+                          alt={unit.name}
+                          className="h-full w-full object-contain"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-11 w-11 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center shrink-0">
+                        <School className="h-5 w-5" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-bold text-slate-900 text-sm leading-snug">{unit.name}</h4>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[11px] text-slate-500 font-mono">INEP: {unit.inepCode}</span>
+                        {unit.tradeName && (
+                          <span className="text-[10px] text-slate-400 font-medium">({unit.tradeName})</span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -606,6 +875,31 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = ({
                       <span className="text-[10px] text-slate-400 block font-bold">Docentes</span>
                       <span className="font-black text-slate-800">{unit.totalTeachers}</span>
                     </div>
+                  </div>
+
+                  {/* Vínculo à Secretaria SEMED */}
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5">
+                      {unit.isLinkedToSecretary !== false ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                          <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                          <span>Vinculada à SEMED</span>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleToggleUnitLink(unit.id)}
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-300 hover:bg-amber-100 cursor-pointer"
+                          title="Clique para vincular esta escola à SEMED"
+                        >
+                          <ShieldAlert className="h-3.5 w-3.5 text-amber-600" />
+                          <span>Vincular à SEMED</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <span className="text-[10px] font-mono text-slate-400">
+                      {unit.linkageCode || 'VINC-SEMED'}
+                    </span>
                   </div>
                 </div>
 
@@ -667,6 +961,316 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = ({
                       </td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* SUBTAB: CADASTRO CENTRAL DA SECRETARIA MUNICIPAL (SEMED) */}
+      {/* ========================================================= */}
+      {activeSubTab === 'SEMED_CENTRAL' && (
+        <div className="space-y-6">
+          {/* Header Institucional da Secretaria */}
+          <div className="bg-white rounded-2xl border-2 border-emerald-500/50 p-6 shadow-sm space-y-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-100">
+              <div className="flex items-start gap-4">
+                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 text-white flex items-center justify-center shrink-0 shadow-lg ring-4 ring-emerald-50">
+                  <Landmark className="h-8 w-8 text-emerald-300" />
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-black text-xs uppercase tracking-wider">
+                      Órgão Gestor da Educação Municipal
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 font-mono text-xs font-bold">
+                      CNPJ: {activeSecretary.cnpj}
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-md bg-teal-100 text-teal-900 font-bold text-xs">
+                      {activeSecretary.city} - {activeSecretary.state}
+                    </span>
+                  </div>
+                  <h2 className="text-2xl font-black text-slate-900">
+                    {activeSecretary.name}
+                  </h2>
+                  <p className="text-xs text-slate-600 max-w-3xl">
+                    Registro central institucional responsável pela gestão de toda a rede de ensino público do município de {activeSecretary.city}/{activeSecretary.state}. Todas as unidades escolares, polos remotos e centros de educação infantil operam subordinados a esta autarquia.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  onClick={() => setIsSecretaryModalOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs"
+                >
+                  <Edit2 className="h-4 w-4 text-slate-600" />
+                  <span>Editar Dados SEMED</span>
+                </button>
+
+                <button
+                  onClick={handleLinkAllUnitsToSecretary}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-sm shadow-emerald-200"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>Homologar Vínculo da Rede ({linkedUnitsCount}/{schoolUnits.length})</span>
+                </button>
+
+                <button
+                  onClick={() => setIsCertificateModalOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-sm"
+                >
+                  <Printer className="h-4 w-4" />
+                  <span>Emitir Certidão de Vínculo</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Grid com Dados Oficiais de Contato e Localização */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block flex items-center gap-1">
+                  <Mail className="h-3 w-3 text-emerald-600" /> E-mail Institucional
+                </span>
+                <a
+                  href={`mailto:${activeSecretary.email}`}
+                  className="text-xs font-mono font-bold text-emerald-800 hover:underline block break-all"
+                >
+                  {activeSecretary.email}
+                </a>
+                <span className="text-[10px] text-slate-500">Canal oficial de comunicação e Censo</span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block flex items-center gap-1">
+                  <Phone className="h-3 w-3 text-emerald-600" /> Telefone / Gabinete
+                </span>
+                <span className="text-xs font-bold text-slate-900 block font-mono">
+                  {activeSecretary.phone}
+                </span>
+                <span className="text-[10px] text-slate-500">Horário: 08:00 às 14:00 (Seg a Sex)</span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block flex items-center gap-1">
+                  <MapPin className="h-3 w-3 text-emerald-600" /> Endereço Oficial da Sede
+                </span>
+                <span className="text-xs font-semibold text-slate-900 block">
+                  {activeSecretary.address}
+                </span>
+                <span className="text-[10px] font-mono text-slate-500">
+                  CEP: {activeSecretary.zipCode} • {activeSecretary.city} / {activeSecretary.state}
+                </span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block flex items-center gap-1">
+                  <GraduationCap className="h-3 w-3 text-emerald-600" /> Titular da Pasta
+                </span>
+                <span className="text-xs font-bold text-slate-900 block">
+                  {activeSecretary.secretaryDirector}
+                </span>
+                <span className="text-[10px] text-slate-500">Secretária Municipal de Educação</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Cards de Resumo da Rede Vinculada */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider block">
+                  Escolas na Rede
+                </span>
+                <span className="text-2xl font-black text-slate-900">{schoolUnits.length}</span>
+                <span className="text-xs text-emerald-700 font-semibold block mt-0.5">
+                  {linkedUnitsCount} 100% Vinculadas à SEMED
+                </span>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                <School className="h-6 w-6" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider block">
+                  Alunos Matriculados
+                </span>
+                <span className="text-2xl font-black text-slate-900">
+                  {censusStats.totalStudents.toLocaleString('pt-BR')}
+                </span>
+                <span className="text-xs text-slate-500 font-medium block mt-0.5">
+                  Sob jurisdição municipal
+                </span>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center">
+                <Users className="h-6 w-6" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider block">
+                  Docentes em Exercício
+                </span>
+                <span className="text-2xl font-black text-slate-900">
+                  {schoolUnits.reduce((acc, u) => acc + (u.totalTeachers || 0), 0)}
+                </span>
+                <span className="text-xs text-slate-500 font-medium block mt-0.5">
+                  Quadro lotado nas escolas
+                </span>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
+                <GraduationCap className="h-6 w-6" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider block">
+                  Distribuição Territorial
+                </span>
+                <span className="text-sm font-black text-slate-800 block">
+                  {schoolUnits.filter((u) => u.locationZone === 'ZONA_URBANA').length} Urbanas •{' '}
+                  {schoolUnits.filter((u) => u.locationZone === 'ZONA_RURAL').length} Rurais
+                </span>
+                <span className="text-xs text-emerald-700 font-semibold block mt-0.5">
+                  Sincronização Descentralizada
+                </span>
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
+                <MapPin className="h-6 w-6" />
+              </div>
+            </div>
+          </div>
+
+          {/* Tabela de Gestão e Homologação de Vínculo de Todas as Unidades */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-emerald-600" />
+                  Relação de Unidades Escolares Vinculadas à SEMED
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Confirme a vinculação jurídica e administrativa de cada escola com o CNPJ {activeSecretary.cnpj}.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleLinkAllUnitsToSecretary}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>Vincular Todas</span>
+                </button>
+
+                <button
+                  onClick={() => setIsCertificateModalOpen(true)}
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Printer className="h-4 w-4" />
+                  <span>Imprimir Certidão Geral</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
+                  <tr>
+                    <th className="p-3">Unidade Escolar</th>
+                    <th className="p-3">Código INEP</th>
+                    <th className="p-3">Tipologia / Zona</th>
+                    <th className="p-3">Diretor(a)</th>
+                    <th className="p-3">Código de Homologação</th>
+                    <th className="p-3 text-center">Status do Vínculo</th>
+                    <th className="p-3 text-right">Ação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {schoolUnits.map((u) => {
+                    const isLinked = u.isLinkedToSecretary !== false;
+                    return (
+                      <tr key={u.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="p-3 font-bold text-slate-900">
+                          <div className="flex items-center gap-2">
+                            <School className="h-4 w-4 text-emerald-700 shrink-0" />
+                            <div>
+                              <span>{u.name}</span>
+                              <span className="text-[10px] text-slate-400 block font-normal">
+                                {u.district || 'Centro'} - {u.city || activeSecretary.city}/{u.state || activeSecretary.state}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-3 font-mono font-semibold text-slate-700">
+                          {u.inepCode}
+                        </td>
+                        <td className="p-3">
+                          <div className="flex flex-wrap items-center gap-1">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-800">
+                              {u.type === 'SEDE_CENTRAL' ? 'Sede Central' : 'Polo Satélite'}
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                u.locationZone === 'ZONA_RURAL'
+                                  ? 'bg-amber-100 text-amber-900'
+                                  : 'bg-emerald-100 text-emerald-900'
+                              }`}
+                            >
+                              {u.locationZone === 'ZONA_RURAL' ? 'Rural' : 'Urbana'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-3 text-slate-800 font-medium">
+                          {u.directorName}
+                        </td>
+                        <td className="p-3 font-mono text-[11px] text-slate-600">
+                          {u.linkageCode || 'VINC-SEMED-PA-001'}
+                        </td>
+                        <td className="p-3 text-center">
+                          {isLinked ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                              <span>Vinculada à SEMED</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                              <ShieldAlert className="h-3.5 w-3.5 text-amber-600" />
+                              <span>Pendente de Vínculo</span>
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleToggleUnitLink(u.id)}
+                              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-colors cursor-pointer ${
+                                isLinked
+                                  ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                              }`}
+                              title={isLinked ? 'Desvincular da SEMED' : 'Vincular à SEMED'}
+                            >
+                              {isLinked ? 'Desvincular' : 'Vincular'}
+                            </button>
+                            <button
+                              onClick={() => handleOpenEditSchoolUnit(u)}
+                              className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-slate-100 rounded-lg cursor-pointer"
+                              title="Editar Unidade"
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1080,6 +1684,23 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = ({
         }}
         onSave={handleSaveSchoolUnit}
         unitToEdit={schoolUnitToEdit}
+        defaultManagementLogo={activeSecretary.managementLogoUrl || activeSecretary.logoUrl}
+      />
+
+      {/* MODAL DE CADASTRO CENTRAL DA SECRETARIA MUNICIPAL (SEMED) */}
+      <MunicipalSecretaryModal
+        isOpen={isSecretaryModalOpen}
+        onClose={() => setIsSecretaryModalOpen(false)}
+        secretary={activeSecretary}
+        onSave={handleSaveSecretary}
+      />
+
+      {/* MODAL DE CERTIDÃO OFICIAL DE VINCULAÇÃO */}
+      <MunicipalLinkageCertificateModal
+        isOpen={isCertificateModalOpen}
+        onClose={() => setIsCertificateModalOpen(false)}
+        secretary={activeSecretary}
+        schoolUnits={schoolUnits}
       />
     </div>
   );

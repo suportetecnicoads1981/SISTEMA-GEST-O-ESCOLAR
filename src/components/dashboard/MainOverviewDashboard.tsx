@@ -47,6 +47,7 @@ import {
   NotificationItem,
 } from '../../types';
 import { CadastralPendingCensusDashbox } from './CadastralPendingCensusDashbox';
+import { SystemUpdateStatusDashbox } from './SystemUpdateStatusDashbox';
 
 interface MainOverviewDashboardProps {
   students: Student[];
@@ -97,7 +98,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
   // School Units Metrics
   const totalUnits = schoolUnits.length;
   const synchronizedUnits = schoolUnits.filter((u) => u.syncStatus === 'SINCRONIZADO').length;
-  const pendingSyncUnits = schoolUnits.filter((u) => u.syncStatus === 'PENDENTE' || u.syncStatus === 'DESCONECTADO').length;
+  const pendingSyncUnits = schoolUnits.filter((u) => u.syncStatus === 'PENDENTE' || u.syncStatus === 'NUNCA_SINCRONIZADO').length;
   const offlineUnits = schoolUnits.filter((u) => !u.hasInternet).length;
 
   // Real-time Anomaly Detection & Actionable Alerts Engine
@@ -410,6 +411,13 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
         onEditStudent={onEditStudent}
         onOpenImportModal={onOpenImportModal}
         onNavigateToSecretaria={() => onNavigate('STUDENTS')}
+      />
+
+      {/* ========================================================= */}
+      {/* DASHBOX DE STATUS COM NOVAS ATUALIZAÇÕES DISPONÍVEIS & OTA */}
+      {/* ========================================================= */}
+      <SystemUpdateStatusDashbox
+        onNavigateToUpdates={() => onNavigate('INSTALAFLOW')}
       />
 
       {/* ========================================================= */}
