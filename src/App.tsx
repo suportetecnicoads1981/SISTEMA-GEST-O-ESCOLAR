@@ -37,6 +37,7 @@ import {
   performAutoBackup,
 } from './data/storage';
 import { getSupabaseClient } from './services/supabaseClient';
+import { supabaseBatchQueue } from './services/supabaseBatchQueue';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { MainOverviewDashboard } from './components/dashboard/MainOverviewDashboard';
@@ -196,24 +197,23 @@ export default function App() {
   // Question Bank to Exam Builder bridging state
   const [preselectedQuestionIdsForExam, setPreselectedQuestionIdsForExam] = useState<string[]>([]);
 
-  // Sync to storage on data change & Supabase Direct Upsert
+  // Sync to storage on data change & Supabase Batched Queue Upsert
   useEffect(() => {
     saveStoredData(data);
     
-    async function syncTablesToSupabase() {
+    function syncTablesToSupabase() {
       try {
-        const supabase = getSupabaseClient();
         if (data.students && data.students.length > 0) {
-          await supabase.from('students').upsert(data.students, { onConflict: 'id' });
+          supabaseBatchQueue.enqueue('students', data.students);
         }
         if (data.exams && data.exams.length > 0) {
-          await supabase.from('exams').upsert(data.exams, { onConflict: 'id' });
+          supabaseBatchQueue.enqueue('exams', data.exams);
         }
         if (data.notifications && data.notifications.length > 0) {
-          await supabase.from('notifications').upsert(data.notifications, { onConflict: 'id' });
+          supabaseBatchQueue.enqueue('notifications', data.notifications);
         }
       } catch (err) {
-        console.warn('Supabase upsert sync error:', err);
+        console.warn('Supabase batch queue enqueue error:', err);
       }
     }
     syncTablesToSupabase();
