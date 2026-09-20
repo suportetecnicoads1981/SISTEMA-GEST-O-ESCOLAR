@@ -235,7 +235,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
               Dashbox Principal de Comando & Central de Notificações
             </div>
             <h1 className="text-2xl sm:text-4xl font-black tracking-tight flex items-center gap-3">
-              <span>{settings.name || 'SucessoEdu Gestão Educacional'}</span>
+              <span>{settings?.name || 'SucessoEdu Gestão Educacional'}</span>
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
               Painel unificado de monitoramento de unidades escolares, auditoria em tempo real, acompanhamento de matrículas por situação e saúde operacional da rede.

@@ -62,7 +62,7 @@ export const QuickActionButtonsDashboard: React.FC<QuickActionButtonsDashboardPr
               Painel de Operações Rápidas & Gestão Educacional
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-              {settings.name || 'EduGestão Pro'}
+              {settings?.name || 'EduGestão Pro'}
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
               Ambiente unificado para controle acadêmico, banco de provas BNCC, acompanhamento de evolução pedagógica e sincronização de polos municipais.
