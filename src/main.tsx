@@ -7,6 +7,7 @@ import './index.css';
 
 // Saneamento preventivo síncrono antes do primeiro ciclo de renderização
 try {
+  // Se o storage tiver formato legado com rolePreferences inconsistente, higieniza imediatamente
   sanitizeLegacyLocalStorage();
 } catch (err) {
   console.warn('[SucessoEdu] Erro não impeditivo no saneamento inicial:', err);

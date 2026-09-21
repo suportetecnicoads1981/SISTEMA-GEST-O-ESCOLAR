@@ -69,16 +69,38 @@ const getBaseFallback = (role?: UserRole): RoleNotificationPreferences => {
     role && (role === 'ADMIN' || role === 'TEACHER' || role === 'STUDENT' || role === 'PARENT')
       ? role
       : 'ADMIN';
-  const item =
-    (typeof INLINE_DEFAULT_ROLE_PREFERENCES === 'object' && INLINE_DEFAULT_ROLE_PREFERENCES !== null
-      ? INLINE_DEFAULT_ROLE_PREFERENCES[safeRole] || INLINE_DEFAULT_ROLE_PREFERENCES['ADMIN']
-      : null) || HARD_FALLBACK_PREF;
+  
+  let item: RoleNotificationPreferences | undefined;
+  try {
+    if (typeof INLINE_DEFAULT_ROLE_PREFERENCES === 'object' && INLINE_DEFAULT_ROLE_PREFERENCES !== null) {
+      item = INLINE_DEFAULT_ROLE_PREFERENCES[safeRole] || INLINE_DEFAULT_ROLE_PREFERENCES.ADMIN;
+    }
+  } catch {}
+
+  const source = item || HARD_FALLBACK_PREF;
 
   return {
-    ...item,
-    channels: { ...(item?.channels || HARD_FALLBACK_PREF.channels) },
-    categories: { ...(item?.categories || HARD_FALLBACK_PREF.categories) },
-    quietHours: { ...(item?.quietHours || HARD_FALLBACK_PREF.quietHours) },
+    role: safeRole,
+    channels: {
+      inApp: source?.channels?.inApp ?? true,
+      browserPush: source?.channels?.browserPush ?? true,
+      email: source?.channels?.email ?? true,
+      smsWhatsapp: source?.channels?.smsWhatsapp ?? (safeRole === 'ADMIN' || safeRole === 'PARENT'),
+    },
+    categories: {
+      enrollmentStatus: source?.categories?.enrollmentStatus ?? (safeRole !== 'TEACHER'),
+      examAvailable: source?.categories?.examAvailable ?? true,
+      deadlines: source?.categories?.deadlines ?? true,
+      examResults: source?.categories?.examResults ?? true,
+      announcements: source?.categories?.announcements ?? true,
+      directMessages: source?.categories?.directMessages ?? true,
+    },
+    soundEnabled: source?.soundEnabled ?? true,
+    quietHours: {
+      enabled: source?.quietHours?.enabled ?? (safeRole !== 'ADMIN'),
+      start: source?.quietHours?.start ?? (safeRole === 'TEACHER' ? '21:00' : '22:00'),
+      end: source?.quietHours?.end ?? (safeRole === 'TEACHER' ? '07:30' : '07:00'),
+    },
   };
 };
 

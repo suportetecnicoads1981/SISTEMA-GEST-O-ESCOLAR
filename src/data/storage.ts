@@ -155,7 +155,7 @@ export function sanitizeLegacyLocalStorage(): void {
         const parsedData = JSON.parse(rawData);
         if (parsedData && (!parsedData.rolePreferences || !parsedData.rolePreferences?.ADMIN)) {
           parsedData.rolePreferences = {
-            ...DEFAULT_ROLE_PREFERENCES,
+            ...(typeof DEFAULT_ROLE_PREFERENCES === 'object' && DEFAULT_ROLE_PREFERENCES !== null ? DEFAULT_ROLE_PREFERENCES : {}),
             ...(parsedData.rolePreferences || {}),
           };
           localStorage.setItem(KEYS.DATA, JSON.stringify(parsedData));
