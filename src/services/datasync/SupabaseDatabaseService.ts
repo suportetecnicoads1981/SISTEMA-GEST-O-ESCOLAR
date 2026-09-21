@@ -1270,10 +1270,16 @@ CREATE TABLE IF NOT EXISTS public.communications (
     priority TEXT DEFAULT 'NORMAL',
     category TEXT DEFAULT 'GERAL',
     status TEXT DEFAULT 'ENVIADO',
+    target_roles JSONB DEFAULT '["ADMIN", "TEACHER", "STUDENT", "PARENT"]'::jsonb,
     read_confirmations JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public.communications ADD COLUMN IF NOT EXISTS sender_role TEXT DEFAULT 'ADMIN';
+ALTER TABLE public.communications ADD COLUMN IF NOT EXISTS "senderRole" TEXT DEFAULT 'ADMIN';
+ALTER TABLE public.communications ADD COLUMN IF NOT EXISTS target_roles JSONB DEFAULT '["ADMIN", "TEACHER", "STUDENT", "PARENT"]'::jsonb;
+ALTER TABLE public.communications ADD COLUMN IF NOT EXISTS "targetRoles" JSONB DEFAULT '["ADMIN", "TEACHER", "STUDENT", "PARENT"]'::jsonb;
 
 -- =========================================================================
 -- 15. TABELA DE NOTIFICAÇÕES (notifications)
@@ -1286,8 +1292,37 @@ CREATE TABLE IF NOT EXISTS public.notifications (
     priority TEXT DEFAULT 'NORMAL',
     read BOOLEAN DEFAULT FALSE,
     action_tab TEXT,
+    target_roles JSONB DEFAULT '["ADMIN", "TEACHER", "STUDENT", "PARENT"]'::jsonb,
+    action_payload JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS target_roles JSONB DEFAULT '["ADMIN", "TEACHER", "STUDENT", "PARENT"]'::jsonb;
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS "targetRoles" JSONB DEFAULT '["ADMIN", "TEACHER", "STUDENT", "PARENT"]'::jsonb;
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS action_payload JSONB;
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS "actionPayload" JSONB;
+UPDATE public.notifications SET target_roles = '["ADMIN", "TEACHER", "STUDENT", "PARENT"]'::jsonb WHERE target_roles IS NULL;
+UPDATE public.notifications SET "targetRoles" = '["ADMIN", "TEACHER", "STUDENT", "PARENT"]'::jsonb WHERE "targetRoles" IS NULL;
+
+-- =========================================================================
+-- 15.1. TABELA DE PREFERÊNCIAS DE NOTIFICAÇÃO POR PERFIL (role_preferences)
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS public.role_preferences (
+    role TEXT PRIMARY KEY,
+    channels JSONB NOT NULL DEFAULT '{"inApp": true, "browserPush": true, "email": true, "smsWhatsapp": true}'::jsonb,
+    categories JSONB NOT NULL DEFAULT '{"enrollmentStatus": true, "examAvailable": true, "deadlines": true, "examResults": true, "announcements": true, "directMessages": true}'::jsonb,
+    sound_enabled BOOLEAN DEFAULT TRUE,
+    quiet_hours JSONB DEFAULT '{"enabled": false, "start": "22:00", "end": "07:00"}'::jsonb,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+INSERT INTO public.role_preferences (role, channels, categories, sound_enabled, quiet_hours)
+VALUES 
+  ('ADMIN', '{"inApp": true, "browserPush": true, "email": true, "smsWhatsapp": true}'::jsonb, '{"enrollmentStatus": true, "examAvailable": true, "deadlines": true, "examResults": true, "announcements": true, "directMessages": true}'::jsonb, true, '{"enabled": false, "start": "22:00", "end": "07:00"}'::jsonb),
+  ('TEACHER', '{"inApp": true, "browserPush": true, "email": true, "smsWhatsapp": false}'::jsonb, '{"enrollmentStatus": false, "examAvailable": true, "deadlines": true, "examResults": true, "announcements": true, "directMessages": true}'::jsonb, true, '{"enabled": true, "start": "21:00", "end": "07:30"}'::jsonb),
+  ('STUDENT', '{"inApp": true, "browserPush": true, "email": true, "smsWhatsapp": false}'::jsonb, '{"enrollmentStatus": true, "examAvailable": true, "deadlines": true, "examResults": true, "announcements": true, "directMessages": true}'::jsonb, true, '{"enabled": true, "start": "22:00", "end": "07:00"}'::jsonb),
+  ('PARENT', '{"inApp": true, "browserPush": true, "email": true, "smsWhatsapp": true}'::jsonb, '{"enrollmentStatus": true, "examAvailable": true, "deadlines": true, "examResults": true, "announcements": true, "directMessages": true}'::jsonb, true, '{"enabled": true, "start": "22:00", "end": "07:00"}'::jsonb)
+ON CONFLICT (role) DO NOTHING;
 
 -- =========================================================================
 -- 16. TABELA DE CONFIGURAÇÕES DA ESCOLA (school_settings)

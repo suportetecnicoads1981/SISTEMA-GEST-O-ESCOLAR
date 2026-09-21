@@ -182,7 +182,9 @@ export default function App() {
     } catch {}
     return defaultMasterUser;
   });
-  const currentRole: UserRole = currentUser?.role || 'ADMIN';
+  const currentRole: UserRole = (currentUser?.role && ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'].includes(currentUser.role))
+    ? (currentUser.role as UserRole)
+    : 'ADMIN';
 
   // Sub-navigation state for document issuance and exam taking
   const [documentSelectedStudentId, setDocumentSelectedStudentId] = useState<string | undefined>();
@@ -235,7 +237,17 @@ export default function App() {
           ...prev,
           students: studentsRes.data && studentsRes.data.length > 0 ? studentsRes.data : prev.students,
           exams: examsRes.data && examsRes.data.length > 0 ? examsRes.data : prev.exams,
-          notifications: notifsRes.data && notifsRes.data.length > 0 ? notifsRes.data : prev.notifications,
+          notifications: notifsRes.data && notifsRes.data.length > 0
+            ? notifsRes.data.map((n: any) => ({
+                ...n,
+                targetRoles: Array.isArray(n.targetRoles)
+                  ? n.targetRoles
+                  : Array.isArray(n.target_roles)
+                  ? n.target_roles
+                  : ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'],
+                read: Boolean(n.read),
+              }))
+            : prev.notifications,
         }));
       } catch (err) {
         console.warn('Supabase initial select warning:', err);
@@ -248,7 +260,12 @@ export default function App() {
   useEffect(() => {
     const handleDbChange = (e: any) => {
       if (e.detail) {
-        setData(e.detail);
+        setData({
+          ...e.detail,
+          rolePreferences: (e.detail?.rolePreferences && e.detail?.rolePreferences?.ADMIN)
+            ? { ...DEFAULT_ROLE_PREFERENCES, ...e.detail.rolePreferences }
+            : DEFAULT_ROLE_PREFERENCES,
+        });
       } else {
         setData(getStoredData());
       }
@@ -757,8 +774,8 @@ export default function App() {
   const handleMarkAllNotificationsAsRead = () => {
     setData((prev) => ({
       ...prev,
-      notifications: prev.notifications.map((n) =>
-        n.targetRoles.includes(currentRole) || n.targetRoles.length === 0
+      notifications: (prev.notifications || []).map((n) =>
+        (n?.targetRoles?.includes(currentRole) || (Array.isArray(n?.targetRoles) && n.targetRoles.length === 0) || !n?.targetRoles)
           ? { ...n, read: true, readAt: new Date().toISOString() }
           : n
       ),
@@ -798,7 +815,8 @@ export default function App() {
     setData((prev) => ({
       ...prev,
       rolePreferences: {
-        ...(prev.rolePreferences || DEFAULT_ROLE_PREFERENCES),
+        ...DEFAULT_ROLE_PREFERENCES,
+        ...(prev.rolePreferences || {}),
         [role]: prefs,
       },
     }));
@@ -1277,7 +1295,11 @@ export default function App() {
     data.exams?.find((e) => e.id === activeExamIdForTaking) || data.exams?.[0];
 
   const unreadNotificationCount = (data.notifications || []).filter(
-    (n) => !n.read && (n.targetRoles.includes(currentRole) || n.targetRoles.length === 0)
+    (n) => !n?.read && (
+      n?.targetRoles?.includes(currentRole) ||
+      (Array.isArray(n?.targetRoles) && n.targetRoles.length === 0) ||
+      !n?.targetRoles
+    )
   ).length;
 
   if (!isAuthenticated) {
@@ -1881,38 +1903,40 @@ export default function App() {
       />
 
       {/* CENTRAL DE NOTIFICAÇÕES MODAL */}
-      <NotificationCenterModal
-        isOpen={isNotificationModalOpen}
-        onClose={() => setIsNotificationModalOpen(false)}
-        notifications={data.notifications || []}
-        currentRole={currentRole}
-        onChangeRole={(role) => {
-          const matchingAccount = data.userAccounts?.find((u) => u.role === role);
-          if (matchingAccount) {
-            setCurrentUser(matchingAccount);
-          }
-        }}
-        preferences={data.rolePreferences || DEFAULT_ROLE_PREFERENCES}
-        onSavePreferences={handleSaveNotificationPreferences}
-        onMarkAsRead={handleMarkNotificationAsRead}
-        onMarkAllAsRead={handleMarkAllNotificationsAsRead}
-        onDeleteNotification={handleDeleteNotification}
-        onNavigateTab={(tab, payload) => {
-          setActiveTab(tab);
-          if (tab === 'DOCUMENTS' && payload?.studentId) {
-            setDocumentSelectedStudentId(payload.studentId);
-          }
-          if (tab === 'STUDENT_ROOM' && payload?.examId) {
-            setActiveExamIdForTaking(payload.examId);
-          }
-        }}
-        onTriggerTestPush={() => {
-          triggerPushNotification(
-            '🔔 Teste de Notificação Push',
-            'O canal de notificações está 100% operacional no SucessoEdu.'
-          );
-        }}
-      />
+      {isNotificationModalOpen && (
+        <NotificationCenterModal
+          isOpen={isNotificationModalOpen}
+          onClose={() => setIsNotificationModalOpen(false)}
+          notifications={data?.notifications || []}
+          currentRole={currentRole}
+          onChangeRole={(role) => {
+            const matchingAccount = data?.userAccounts?.find((u) => u.role === role);
+            if (matchingAccount) {
+              setCurrentUser(matchingAccount);
+            }
+          }}
+          preferences={(data?.rolePreferences && data.rolePreferences?.ADMIN) ? data.rolePreferences : DEFAULT_ROLE_PREFERENCES}
+          onSavePreferences={handleSaveNotificationPreferences}
+          onMarkAsRead={handleMarkNotificationAsRead}
+          onMarkAllAsRead={handleMarkAllNotificationsAsRead}
+          onDeleteNotification={handleDeleteNotification}
+          onNavigateTab={(tab, payload) => {
+            setActiveTab(tab);
+            if (tab === 'DOCUMENTS' && payload?.studentId) {
+              setDocumentSelectedStudentId(payload.studentId);
+            }
+            if (tab === 'STUDENT_ROOM' && payload?.examId) {
+              setActiveExamIdForTaking(payload.examId);
+            }
+          }}
+          onTriggerTestPush={() => {
+            triggerPushNotification(
+              '🔔 Teste de Notificação Push',
+              'O canal de notificações está 100% operacional no SucessoEdu.'
+            );
+          }}
+        />
+      )}
 
       {/* CANAL DIRETO COM O DESENVOLVEDOR (FEEDBACK & SUGESTÕES WHATSAPP) */}
       <FeedbackSuggestionsModal

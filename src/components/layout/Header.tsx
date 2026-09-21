@@ -109,8 +109,12 @@ export const Header: React.FC<HeaderProps> = ({
   }, []);
 
   // Filter notifications for active persona
-  const unreadRoleNotifications = notifications.filter(
-    (n) => !n.read && (n.targetRoles.includes(currentRole) || n.targetRoles.length === 0)
+  const unreadRoleNotifications = (notifications || []).filter(
+    (n) => !n?.read && (
+      n?.targetRoles?.includes(currentRole) ||
+      (Array.isArray(n?.targetRoles) && n.targetRoles.length === 0) ||
+      !n?.targetRoles
+    )
   );
 
   const getTabTitle = (tab: string) => {

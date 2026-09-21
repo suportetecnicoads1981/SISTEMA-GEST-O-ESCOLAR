@@ -1,7 +1,7 @@
 import { getSupabaseClient } from './datasync/supabaseClient';
 import { SupabaseDatabaseService } from './datasync/SupabaseDatabaseService';
 import { AppStateData } from '../data/storage';
-import { DEFAULT_ROLE_PREFERENCES } from '../data/defaultData';
+import { DEFAULT_ROLE_PREFERENCES, DEFAULT_SCHOOL_SETTINGS, DEFAULT_USER_ACCOUNTS } from '../data/defaultData';
 
 export class SupabasePersistenceService {
   private static isSubscribed = false;
@@ -71,14 +71,42 @@ export class SupabasePersistenceService {
         exams: examsRes.data || [],
         submissions: submissionsRes.data || [],
         academicHistories: historiesRes.data || [],
-        settings: Object.keys(rawSettings).length > 0 ? rawSettings : undefined,
-        notifications: notifsRes.data || [],
-        communications: commsRes.data || [],
-        rolePreferences: DEFAULT_ROLE_PREFERENCES,
+        settings: Object.keys(rawSettings).length > 0 ? { ...DEFAULT_SCHOOL_SETTINGS, ...rawSettings } : DEFAULT_SCHOOL_SETTINGS,
+        notifications: (notifsRes.data || []).map((n: any) => ({
+          ...n,
+          targetRoles: Array.isArray(n.targetRoles)
+            ? n.targetRoles
+            : Array.isArray(n.target_roles)
+            ? n.target_roles
+            : ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'],
+          read: Boolean(n.read),
+        })),
+        communications: (commsRes.data || []).map((c: any) => ({
+          ...c,
+          senderRole: c.senderRole || c.sender_role || 'ADMIN',
+          targetRoles: Array.isArray(c.targetRoles)
+            ? c.targetRoles
+            : Array.isArray(c.target_roles)
+            ? c.target_roles
+            : ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'],
+        })),
+        rolePreferences: (DEFAULT_ROLE_PREFERENCES && DEFAULT_ROLE_PREFERENCES?.ADMIN)
+          ? DEFAULT_ROLE_PREFERENCES
+          : {
+              ADMIN: { role: 'ADMIN', channels: { inApp: true, browserPush: true, email: true, smsWhatsapp: true }, categories: { enrollmentStatus: true, examAvailable: true, deadlines: true, examResults: true, announcements: true, directMessages: true }, soundEnabled: true, quietHours: { enabled: false, start: '22:00', end: '07:00' } },
+              TEACHER: { role: 'TEACHER', channels: { inApp: true, browserPush: true, email: true, smsWhatsapp: false }, categories: { enrollmentStatus: false, examAvailable: true, deadlines: true, examResults: true, announcements: true, directMessages: true }, soundEnabled: true, quietHours: { enabled: true, start: '21:00', end: '07:30' } },
+              STUDENT: { role: 'STUDENT', channels: { inApp: true, browserPush: true, email: true, smsWhatsapp: false }, categories: { enrollmentStatus: true, examAvailable: true, deadlines: true, examResults: true, announcements: true, directMessages: true }, soundEnabled: true, quietHours: { enabled: true, start: '22:00', end: '07:00' } },
+              PARENT: { role: 'PARENT', channels: { inApp: true, browserPush: true, email: true, smsWhatsapp: true }, categories: { enrollmentStatus: true, examAvailable: true, deadlines: true, examResults: true, announcements: true, directMessages: true }, soundEnabled: true, quietHours: { enabled: true, start: '22:00', end: '07:00' } },
+            },
         schoolUnits: unitsRes.data || [],
         municipalSecretary: undefined,
         syncLogs: logsRes.data || [],
-        userAccounts: usersRes.data || [],
+        userAccounts: (usersRes.data && usersRes.data.length > 0)
+          ? usersRes.data.map((u: any) => ({
+              ...u,
+              role: (u.role && ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'].includes(u.role)) ? u.role : 'ADMIN',
+            }))
+          : DEFAULT_USER_ACCOUNTS,
         developerContact: undefined,
         bnccSkills: [],
         stateRegulations: [],

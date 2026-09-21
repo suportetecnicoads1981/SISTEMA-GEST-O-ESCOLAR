@@ -55,10 +55,10 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({
   if (!isOpen) return null;
 
   // Filter for active role
-  const roleNotifications = notifications.filter(
-    (n) => n.targetRoles.includes(currentRole) || n.targetRoles.length === 0
+  const roleNotifications = (notifications || []).filter(
+    (n) => n?.targetRoles?.includes(currentRole) || (n?.targetRoles && n.targetRoles.length === 0) || !n?.targetRoles
   );
-  const unreadNotifications = roleNotifications.filter((n) => !n.read);
+  const unreadNotifications = roleNotifications.filter((n) => !n?.read);
   const displayItems = roleNotifications.slice(0, 5);
 
   const getTypeIcon = (type: NotificationType) => {

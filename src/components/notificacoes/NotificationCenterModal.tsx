@@ -24,8 +24,9 @@ import {
   RoleNotificationPreferences,
   UserRole,
 } from '../../types';
+import { DEFAULT_ROLE_PREFERENCES } from '../../data/defaultData';
 
-const FALLBACK_ROLE_PREFERENCES: Record<UserRole, RoleNotificationPreferences> = {
+const INLINE_DEFAULT_ROLE_PREFERENCES: Record<UserRole, RoleNotificationPreferences> = {
   ADMIN: {
     role: 'ADMIN',
     channels: { inApp: true, browserPush: true, email: true, smsWhatsapp: true },
@@ -54,6 +55,20 @@ const FALLBACK_ROLE_PREFERENCES: Record<UserRole, RoleNotificationPreferences> =
     soundEnabled: true,
     quietHours: { enabled: true, start: '22:00', end: '07:00' },
   },
+};
+
+const getBaseFallback = (role?: UserRole): RoleNotificationPreferences => {
+  const safeRole: UserRole =
+    role && (role === 'ADMIN' || role === 'TEACHER' || role === 'STUDENT' || role === 'PARENT')
+      ? role
+      : 'ADMIN';
+  if (DEFAULT_ROLE_PREFERENCES && typeof DEFAULT_ROLE_PREFERENCES === 'object') {
+    const fromDefault = DEFAULT_ROLE_PREFERENCES[safeRole];
+    if (fromDefault && typeof fromDefault === 'object' && fromDefault.channels && fromDefault.categories) {
+      return fromDefault;
+    }
+  }
+  return INLINE_DEFAULT_ROLE_PREFERENCES[safeRole] || INLINE_DEFAULT_ROLE_PREFERENCES.ADMIN;
 };
 
 interface NotificationCenterModalProps {
@@ -88,19 +103,37 @@ const NotificationCenterModalContent: React.FC<NotificationCenterModalProps> = (
   const [filterType, setFilterType] = useState<string>('ALL');
   const [onlyUnread, setOnlyUnread] = useState<boolean>(false);
 
-  const getResolvedPrefs = (role: UserRole): RoleNotificationPreferences => {
+  const getResolvedPrefs = (role?: UserRole): RoleNotificationPreferences => {
     const validRole: UserRole =
-      role && FALLBACK_ROLE_PREFERENCES[role] ? role : 'ADMIN';
-    const fallback = FALLBACK_ROLE_PREFERENCES[validRole];
-    const userRolePref = preferences ? preferences[validRole] : undefined;
+      role && (role === 'ADMIN' || role === 'TEACHER' || role === 'STUDENT' || role === 'PARENT')
+        ? role
+        : 'ADMIN';
+    const fallback = getBaseFallback(validRole);
+    const userRolePref = preferences && typeof preferences === 'object' ? preferences[validRole] : undefined;
 
-    if (userRolePref) {
+    if (userRolePref && typeof userRolePref === 'object') {
       return {
         ...fallback,
         ...userRolePref,
-        channels: { ...fallback.channels, ...(userRolePref.channels || {}) },
-        categories: { ...fallback.categories, ...(userRolePref.categories || {}) },
-        quietHours: { ...fallback.quietHours, ...(userRolePref.quietHours || {}) },
+        channels: {
+          inApp: userRolePref.channels?.inApp ?? fallback?.channels?.inApp ?? true,
+          browserPush: userRolePref.channels?.browserPush ?? fallback?.channels?.browserPush ?? true,
+          email: userRolePref.channels?.email ?? fallback?.channels?.email ?? true,
+          smsWhatsapp: userRolePref.channels?.smsWhatsapp ?? fallback?.channels?.smsWhatsapp ?? false,
+        },
+        categories: {
+          enrollmentStatus: userRolePref.categories?.enrollmentStatus ?? fallback?.categories?.enrollmentStatus ?? true,
+          examAvailable: userRolePref.categories?.examAvailable ?? fallback?.categories?.examAvailable ?? true,
+          deadlines: userRolePref.categories?.deadlines ?? fallback?.categories?.deadlines ?? true,
+          examResults: userRolePref.categories?.examResults ?? fallback?.categories?.examResults ?? true,
+          announcements: userRolePref.categories?.announcements ?? fallback?.categories?.announcements ?? true,
+          directMessages: userRolePref.categories?.directMessages ?? fallback?.categories?.directMessages ?? true,
+        },
+        quietHours: {
+          enabled: userRolePref.quietHours?.enabled ?? fallback?.quietHours?.enabled ?? false,
+          start: userRolePref.quietHours?.start ?? fallback?.quietHours?.start ?? '22:00',
+          end: userRolePref.quietHours?.end ?? fallback?.quietHours?.end ?? '07:00',
+        },
       };
     }
     return fallback;
@@ -766,7 +799,28 @@ const NotificationCenterModalContent: React.FC<NotificationCenterModalProps> = (
   );
 };
 
+class SafeModalBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(err: any) {
+    console.warn('[NotificationCenterModal] Silently handled modal render error:', err);
+  }
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
+}
+
 export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (props) => {
   if (!props.isOpen) return null;
-  return <NotificationCenterModalContent {...props} />;
+  return (
+    <SafeModalBoundary>
+      <NotificationCenterModalContent {...props} />
+    </SafeModalBoundary>
+  );
 };

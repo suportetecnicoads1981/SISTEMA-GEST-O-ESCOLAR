@@ -148,7 +148,22 @@ export function sanitizeLegacyLocalStorage(): void {
       }
     }
 
-    // 3. Saneia o histórico de backups para remover cópias redundantes de 'data'
+    // 3.5. Garante que rolePreferences esteja íntegro com todas as roles
+    const rawData = localStorage.getItem(KEYS.DATA);
+    if (rawData) {
+      try {
+        const parsedData = JSON.parse(rawData);
+        if (parsedData && (!parsedData.rolePreferences || !parsedData.rolePreferences?.ADMIN)) {
+          parsedData.rolePreferences = {
+            ...DEFAULT_ROLE_PREFERENCES,
+            ...(parsedData.rolePreferences || {}),
+          };
+          localStorage.setItem(KEYS.DATA, JSON.stringify(parsedData));
+        }
+      } catch {}
+    }
+
+    // 4. Saneia o histórico de backups para remover cópias redundantes de 'data'
     const rawHistory = localStorage.getItem(KEYS.AUTO_BACKUP_HISTORY);
     if (rawHistory) {
       try {
@@ -556,7 +571,9 @@ export function getStoredData(): AppStateData {
       settings: parsed.settings || DEFAULT_SCHOOL_SETTINGS,
       notifications: [],
       communications: [],
-      rolePreferences: parsed.rolePreferences || DEFAULT_ROLE_PREFERENCES,
+      rolePreferences: (parsed?.rolePreferences && parsed?.rolePreferences?.ADMIN)
+        ? { ...DEFAULT_ROLE_PREFERENCES, ...parsed.rolePreferences }
+        : DEFAULT_ROLE_PREFERENCES,
       schoolUnits: [],
       municipalSecretary: parsed.municipalSecretary || DEFAULT_MUNICIPAL_SECRETARY,
       syncLogs: hasArr(parsed.syncLogs) ? parsed.syncLogs : [],
@@ -937,7 +954,9 @@ export function restoreBackup(backup: SystemBackup): void {
       settings: backup.data.settings,
       notifications: backup.data.notifications || DEFAULT_NOTIFICATIONS,
       communications: backup.data.communications || DEFAULT_COMMUNICATIONS,
-      rolePreferences: backup.data.rolePreferences || DEFAULT_ROLE_PREFERENCES,
+      rolePreferences: (backup?.data?.rolePreferences && backup?.data?.rolePreferences?.ADMIN)
+        ? { ...DEFAULT_ROLE_PREFERENCES, ...backup.data.rolePreferences }
+        : DEFAULT_ROLE_PREFERENCES,
       schoolUnits: (backup.data as any).schoolUnits || DEFAULT_SCHOOL_UNITS,
       syncLogs: (backup.data as any).syncLogs || DEFAULT_SYNC_LOGS,
       userAccounts: (backup.data as any).userAccounts || DEFAULT_USER_ACCOUNTS,
