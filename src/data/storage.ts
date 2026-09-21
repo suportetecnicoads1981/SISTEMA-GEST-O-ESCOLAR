@@ -545,6 +545,10 @@ export function getStoredData(): AppStateData {
     return clean;
   }
 
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return getCleanDatabase();
+  }
+
   const raw = localStorage.getItem(KEYS.DATA);
   if (!raw) {
     const clean = getCleanDatabase();

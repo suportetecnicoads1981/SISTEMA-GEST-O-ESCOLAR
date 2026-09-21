@@ -900,19 +900,150 @@ END $$;
     const tasks = [
       { name: 'students', data: stored.students, customSync: () => this.syncStudentsToSupabase(stored.students) },
       { name: 'school_classes', data: stored.classes, customSync: () => this.syncClassesToSupabase(stored.classes) },
-      { name: 'subjects', data: stored.subjects, customSync: () => this.syncTableGeneric('subjects', stored.subjects) },
-      { name: 'courses', data: stored.courses, customSync: () => this.syncTableGeneric('courses', stored.courses) },
-      { name: 'questions', data: stored.questions, customSync: () => this.syncTableGeneric('questions', stored.questions) },
-      { name: 'exams', data: stored.exams, customSync: () => this.syncTableGeneric('exams', stored.exams) },
+      { 
+        name: 'subjects', 
+        data: stored.subjects, 
+        customSync: () => this.syncTableGeneric(
+          'subjects', 
+          (stored.subjects || []).map((s: any, idx: number) => ({
+            id: s.id || ('sub_' + idx),
+            name: s.name,
+            code: s.code || ('COD-' + idx),
+            segment: s.segment || 'ENSINO_FUNDAMENTAL',
+            teacher_name: s.teacherName || null,
+            workload_hours: s.workloadHours || 80,
+          }))
+        ) 
+      },
+      { 
+        name: 'courses', 
+        data: stored.courses, 
+        customSync: () => this.syncTableGeneric(
+          'courses', 
+          (stored.courses || []).map((c: any, idx: number) => ({
+            id: c.id || ('course_' + idx),
+            name: c.name,
+            segment: c.segment || 'ENSINO_FUNDAMENTAL',
+            duration_years: c.durationYears || 1,
+            description: c.description || null,
+          }))
+        ) 
+      },
+      { 
+        name: 'questions', 
+        data: stored.questions, 
+        customSync: () => this.syncTableGeneric(
+          'questions', 
+          (stored.questions || []).map((q: any, idx: number) => ({
+            id: q.id || ('q_' + idx),
+            code: q.code || ('Q-' + (idx + 100)),
+            subject: q.subject || q.subjectId || 'Matemática',
+            topic: q.topic || null,
+            grade_level: q.gradeLevel || '6º Ano',
+            bncc_skill: q.bnccSkill || null,
+            difficulty: q.difficulty || 'MEDIO',
+            type: q.type || 'MULTIPLE_CHOICE',
+            stem: q.statement || q.stem || q.text || 'Enunciado da questão',
+            options: q.options || [],
+            explanation: q.explanation || null,
+          }))
+        ) 
+      },
+      { 
+        name: 'exams', 
+        data: stored.exams, 
+        customSync: () => this.syncTableGeneric(
+          'exams', 
+          (stored.exams || []).map((e: any, idx: number) => ({
+            id: e.id || ('exam_' + idx),
+            title: e.title || ('Avaliação ' + (idx + 1)),
+            description: e.description || null,
+            subject: e.subject || e.subjectId || 'Geral',
+            class_id: e.classId || null,
+            teacher_name: e.teacherName || null,
+            school_year: e.schoolYear || 2026,
+            term: e.term || '1º Bimestre',
+            total_points: e.totalPoints || 10.0,
+            passing_score: e.passingScore || 6.0,
+            time_limit_minutes: e.timeLimitMinutes || 60,
+            questions: e.questions || [],
+            status: e.status || 'PUBLISHED',
+          }))
+        ) 
+      },
       { name: 'exam_submissions', data: stored.submissions, customSync: () => this.syncTableGeneric('exam_submissions', stored.submissions) },
       { name: 'attendance_sheets', data: stored.attendanceSheets, customSync: () => this.syncTableGeneric('attendance_sheets', stored.attendanceSheets) },
       { name: 'lesson_registries', data: stored.lessonRegistries, customSync: () => this.syncTableGeneric('lesson_registries', stored.lessonRegistries) },
       { name: 'academic_histories', data: stored.academicHistories, customSync: () => this.syncTableGeneric('academic_histories', stored.academicHistories) },
-      { name: 'school_units', data: stored.schoolUnits, customSync: () => this.syncTableGeneric('school_units', stored.schoolUnits) },
-      { name: 'user_accounts', data: stored.userAccounts, customSync: () => this.syncTableGeneric('user_accounts', stored.userAccounts) },
+      { 
+        name: 'school_units', 
+        data: stored.schoolUnits, 
+        customSync: () => this.syncTableGeneric(
+          'school_units', 
+          (stored.schoolUnits || []).map((u: any, idx: number) => ({
+            id: u.id || ('unit_' + idx),
+            name: u.name,
+            code: u.code || ('UNID-' + idx),
+            type: u.type || 'SEDE_CENTRAL',
+            inep_code: u.inepCode || null,
+            city: u.city || 'São Paulo',
+            state: u.state || 'SP',
+            principal_name: u.principalName || null,
+            phone: u.phone || null,
+            email: u.email || null,
+            active: u.active !== undefined ? u.active : true,
+          }))
+        ) 
+      },
+      { 
+        name: 'user_accounts', 
+        data: stored.userAccounts, 
+        customSync: () => this.syncTableGeneric(
+          'user_accounts', 
+          (stored.userAccounts || []).map((u: any, idx: number) => ({
+            id: u.id || ('user_' + idx),
+            name: u.name,
+            login: u.login || (u.email ? u.email.split('@')[0] : ('user_' + idx)),
+            email: u.email,
+            role: u.role || 'TEACHER',
+            sector: u.sector || 'SECRETARIA',
+            sector_title: u.sectorTitle || null,
+            active: u.active !== undefined ? u.active : true,
+            permissions: u.permissions || {},
+          }))
+        ) 
+      },
       { name: 'communications', data: stored.communications, customSync: () => this.syncTableGeneric('communications', stored.communications) },
       { name: 'notifications', data: stored.notifications, customSync: () => this.syncTableGeneric('notifications', stored.notifications) },
-      { name: 'school_settings', data: [stored.settings], customSync: () => this.syncTableGeneric('school_settings', [{ id: 'school_settings_main', ...stored.settings }]) },
+      { 
+        name: 'school_settings', 
+        data: [stored.settings], 
+        customSync: () => {
+          const s = stored.settings || {} as any;
+          return this.syncTableGeneric('school_settings', [{
+            id: 'school_settings_main',
+            name: s.name || 'SucessoEdu Escola Modelo',
+            trade_name: s.tradeName || s.name || 'SucessoEdu',
+            inep_code: s.inepCode || '12345678',
+            cnpj: s.cnpj || null,
+            accreditation_decree: s.accreditationDecree || null,
+            address: s.address || null,
+            city: s.city || 'São Paulo',
+            state: s.state || 'SP',
+            phone: s.phone || null,
+            email: s.email || null,
+            principal_name: s.principalName || null,
+            secretary_name: s.secretaryName || null,
+            logo_url: s.logoUrl || null,
+            neighborhood: s.neighborhood || null,
+            zip_code: s.zipCode || null,
+            website: s.website || null,
+            principal_title: s.principalTitle || null,
+            secretary_registration: s.secretaryRegistration || null,
+            system_version: 'v5.2.0',
+          }]);
+        } 
+      },
       { name: 'sync_audit_logs', data: stored.syncLogs, customSync: () => this.syncTableGeneric('sync_audit_logs', stored.syncLogs) },
     ];
 
