@@ -460,7 +460,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
       permissions: {
         ...prev.permissions,
         [moduleKey]: {
-          ...prev.permissions[moduleKey],
+          ...(prev?.permissions?.[moduleKey] || {}),
           [action]: value,
         },
       },
@@ -1464,7 +1464,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-slate-700">
                         {MODULE_DEFINITIONS.map((mod) => {
-                          const perm = formData.permissions[mod.key] || {
+                          const perm = formData?.permissions?.[mod.key] || {
                             canRead: false,
                             canCreate: false,
                             canEdit: false,

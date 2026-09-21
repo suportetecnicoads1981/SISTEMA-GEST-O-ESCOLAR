@@ -150,7 +150,7 @@ const NotificationCenterModalContent: React.FC<NotificationCenterModalProps> = (
     try {
       const activePrefs = preferences || INLINE_DEFAULT_ROLE_PREFERENCES;
       if (activePrefs && typeof activePrefs === 'object' && activePrefs !== null) {
-        userRolePref = (activePrefs as any)?.[validRole];
+        userRolePref = (activePrefs as any)?.[validRole] || (activePrefs as any)?.['ADMIN'] || (activePrefs as any)?.['STUDENT'];
       }
     } catch {}
 

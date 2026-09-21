@@ -153,21 +153,19 @@ export function sanitizeLegacyLocalStorage(): void {
     if (rawData) {
       try {
         const parsedData = JSON.parse(rawData);
-        if (
-          parsedData &&
-          (!parsedData.rolePreferences ||
-            typeof parsedData.rolePreferences !== 'object' ||
-            !parsedData.rolePreferences?.ADMIN ||
-            !parsedData.rolePreferences?.TEACHER ||
-            !parsedData.rolePreferences?.STUDENT)
-        ) {
-          parsedData.rolePreferences = {
-            ...(typeof DEFAULT_ROLE_PREFERENCES === 'object' && DEFAULT_ROLE_PREFERENCES !== null ? DEFAULT_ROLE_PREFERENCES : {}),
-            ...(typeof parsedData.rolePreferences === 'object' && parsedData.rolePreferences !== null ? parsedData.rolePreferences : {}),
-          };
+        if (parsedData && typeof parsedData === 'object') {
+          if (!parsedData.rolePreferences || typeof parsedData.rolePreferences !== 'object' || parsedData.rolePreferences === null) {
+            parsedData.rolePreferences = { ...DEFAULT_ROLE_PREFERENCES };
+          }
           (['ADMIN', 'TEACHER', 'STUDENT', 'PARENT', 'GUEST'] as UserRole[]).forEach((roleKey) => {
-            if (!parsedData.rolePreferences[roleKey] || typeof parsedData.rolePreferences[roleKey] !== 'object') {
-              parsedData.rolePreferences[roleKey] = DEFAULT_ROLE_PREFERENCES?.[roleKey];
+            if (!parsedData.rolePreferences[roleKey] || typeof parsedData.rolePreferences[roleKey] !== 'object' || parsedData.rolePreferences[roleKey] === null) {
+              parsedData.rolePreferences[roleKey] = DEFAULT_ROLE_PREFERENCES?.[roleKey] || {
+                role: roleKey,
+                channels: { inApp: true, browserPush: true, email: true, smsWhatsapp: false },
+                categories: { enrollmentStatus: true, examAvailable: true, deadlines: true, examResults: true, announcements: true, directMessages: true },
+                soundEnabled: true,
+                quietHours: { enabled: false, start: '22:00', end: '07:00' },
+              };
             }
           });
           localStorage.setItem(KEYS.DATA, JSON.stringify(parsedData));

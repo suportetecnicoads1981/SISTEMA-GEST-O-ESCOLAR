@@ -1996,9 +1996,9 @@ export default function App() {
             }
           }}
           preferences={
-            (data?.rolePreferences && typeof data.rolePreferences === 'object' && (data.rolePreferences?.ADMIN || data.rolePreferences?.TEACHER || data.rolePreferences?.STUDENT))
+            data?.rolePreferences && typeof data.rolePreferences === 'object' && Object.keys(data.rolePreferences).length > 0
               ? data.rolePreferences
-              : (DEFAULT_ROLE_PREFERENCES && typeof DEFAULT_ROLE_PREFERENCES === 'object' && (DEFAULT_ROLE_PREFERENCES?.ADMIN || DEFAULT_ROLE_PREFERENCES?.STUDENT))
+              : (DEFAULT_ROLE_PREFERENCES && typeof DEFAULT_ROLE_PREFERENCES === 'object' && Object.keys(DEFAULT_ROLE_PREFERENCES).length > 0)
               ? DEFAULT_ROLE_PREFERENCES
               : INLINE_DEFAULT_ROLE_PREFERENCES
           }
