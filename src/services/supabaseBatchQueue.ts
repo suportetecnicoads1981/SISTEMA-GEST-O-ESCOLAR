@@ -70,6 +70,53 @@ class SupabaseBatchQueue {
     }
   }
 
+  private sanitizeForTable(table: string, records: any[]): any[] {
+    if (table === 'exams') {
+      return records.map((e: any, idx: number) => ({
+        id: e.id || ('exam_' + idx),
+        title: e.title || ('Avaliação ' + (idx + 1)),
+        description: e.description || null,
+        subject: e.subject || e.subjectId || 'Geral',
+        class_id: e.classId || null,
+        teacher_name: e.teacherName || null,
+        school_year: e.schoolYear || 2026,
+        term: e.term || '1º Bimestre',
+        total_points: e.totalPoints || 10.0,
+        passing_score: e.passingScore || 6.0,
+        time_limit_minutes: e.timeLimitMinutes || 60,
+        questions: e.questions || [],
+        status: e.status || 'PUBLISHED',
+      }));
+    }
+    if (table === 'students') {
+      return records.map((s: any, idx: number) => ({
+        id: s.id || ('std_' + idx),
+        name: s.name,
+        registration_number: s.registrationNumber || s.registration_number || ('RA-2026-' + idx),
+        status: s.status || 'ACTIVE',
+        class_id: s.classId || s.class_id || null,
+        birth_date: s.birthDate || s.birth_date || '2015-01-01',
+        cpf: s.cpf || null,
+        rg: s.rg || null,
+        gender: s.gender || 'M',
+        email: s.email || null,
+        phone: s.phone || null,
+        guardian_name: s.guardianName || s.guardian_name || 'Responsável Legal',
+        guardian_phone: s.guardianPhone || s.guardian_phone || null,
+        address: s.address || null,
+        city: s.city || 'São Paulo',
+        state: s.state || 'SP',
+        location_zone: s.locationZone || s.location_zone || 'URBANA',
+        cadastral_status: s.cadastralStatus || s.cadastral_status || 'COMPLETE',
+        medical_observations: s.medicalObservations || s.medical_observations || null,
+        has_aee: s.hasAee !== undefined ? s.hasAee : (s.has_aee || false),
+        photo_url: s.photoUrl || s.photo_url || null,
+        school_unit_id: s.schoolUnitId || s.school_unit_id || null,
+      }));
+    }
+    return records;
+  }
+
   public async flush(): Promise<void> {
     if (this.isFlushing || this.queue.size === 0) return;
     this.isFlushing = true;
@@ -81,8 +128,10 @@ class SupabaseBatchQueue {
       const supabase = getSupabaseClient();
       
       for (const [table, recordMap] of currentQueue.entries()) {
-        const recordsArray = Array.from(recordMap.values());
-        if (recordsArray.length === 0) continue;
+        const rawArray = Array.from(recordMap.values());
+        if (rawArray.length === 0) continue;
+
+        const recordsArray = this.sanitizeForTable(table, rawArray);
 
         // Batch upsert in chunks of 500 to respect Postgres limits
         const chunkSize = 500;
@@ -94,17 +143,19 @@ class SupabaseBatchQueue {
           });
 
           if (result.error) {
-            console.warn(`[Supabase Batch] Failed to upsert table "${table}" after retries:`, result.error);
-            // Re-enqueue failed records back to queue to prevent data loss
-            if (!this.queue.has(table)) {
-              this.queue.set(table, new Map());
-            }
-            const fallbackMap = this.queue.get(table)!;
-            for (const rec of chunk) {
-              if (rec && rec.id) {
-                fallbackMap.set(rec.id, rec);
-              } else {
-                fallbackMap.set(`non_id_${Math.random()}`, rec);
+            console.warn(`[Supabase Batch] Failed to upsert table "${table}":`, result.error);
+            // Only re-enqueue if error is temporary/network/rate-limit related (429, 5xx), NOT schema mismatch (PGRST204)
+            const code = result.error?.code || '';
+            const isSchemaError = code === 'PGRST204' || code === '42703';
+            if (!isSchemaError) {
+              if (!this.queue.has(table)) {
+                this.queue.set(table, new Map());
+              }
+              const fallbackMap = this.queue.get(table)!;
+              for (const rec of chunk) {
+                if (rec && rec.id) {
+                  fallbackMap.set(rec.id, rec);
+                }
               }
             }
           } else {

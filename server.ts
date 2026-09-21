@@ -198,15 +198,45 @@ app.get('/api/ai/test-connection', async (req, res) => {
   }
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: 'Responda apenas exatamente a palavra: GEMINI_ONLINE',
-    });
+    const candidateModels = ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+    let lastError: any = null;
+    let successResponse = null;
+    let usedModel = 'gemini-3.8-flash';
+
+    for (const model of candidateModels) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: 'Responda apenas exatamente a palavra: GEMINI_ONLINE',
+        });
+        successResponse = response.text?.trim() || 'GEMINI_ONLINE';
+        usedModel = model;
+        break;
+      } catch (err: any) {
+        lastError = err;
+        const msg = (err?.message || '').toLowerCase();
+        if (msg.includes('rate') || msg.includes('limit') || msg.includes('quota') || msg.includes('resource_exhausted')) {
+          continue; // tentar próximo modelo em caso de limite de taxa
+        } else {
+          break;
+        }
+      }
+    }
+
+    if (successResponse) {
+      return res.json({
+        configured: true,
+        working: true,
+        model: usedModel,
+        response: successResponse,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     res.json({
       configured: true,
-      working: true,
-      model: 'gemini-3.8-flash',
-      response: response.text?.trim() || 'GEMINI_ONLINE',
+      working: false,
+      error: lastError?.message || 'Falha ao comunicar com Gemini API',
       timestamp: new Date().toISOString(),
     });
   } catch (err: any) {
@@ -1096,15 +1126,45 @@ Analise os seguintes resultados da avaliação escolar:
 
 Gere 3 recomendações pedagógicas de intervenção e um plano de ação sucinto em tópicos para os professores. Responda em Português do Brasil com foco em recuperação da aprendizagem.`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: prompt,
-    });
+    const candidateModels = ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+    let textResponse = null;
 
+    for (const model of candidateModels) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: prompt,
+        });
+        textResponse = response.text;
+        break;
+      } catch (genErr: any) {
+        const msg = (genErr?.message || '').toLowerCase();
+        if (msg.includes('rate') || msg.includes('limit') || msg.includes('quota') || msg.includes('resource_exhausted')) {
+          continue;
+        } else {
+          break;
+        }
+      }
+    }
+
+    if (textResponse) {
+      return res.json({
+        success: true,
+        source: 'GEMINI_AI',
+        text: textResponse,
+      });
+    }
+
+    // Se todos os modelos esgotaram quota ou falharam, retornar fallback pedagógico seguro
     res.json({
       success: true,
-      source: 'GEMINI_AI',
-      text: response.text,
+      source: 'RULE_ENGINE_FALLBACK',
+      recommendations: [
+        `Reforço prioritário para a turma ${className} na disciplina de ${subject}.`,
+        `Focar nas habilidades BNCC com maior taxa de erro identificadas na avaliação "${examTitle}".`,
+        `Recomenda-se metodologia ativa com resolução dialogada dos distratores mais assinalados.`,
+      ],
+      text: `### 📋 Plano de Ação Pedagógica (Modo de Continuidade Operacional)\n\n1. **Diagnóstico Imediato:** Revisão em sala das questões críticas da avaliação "${examTitle}" (${subject}).\n2. **Agrupamento Produtivo:** Formação de duplas com níveis distintos de proficiência para discussão dos distratores mais assinalados.\n3. **Recuperação Paralela:** Aulas práticas focadas nos tópicos essenciais da BNCC da turma ${className}.`,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erro ao processar insights pedagógicos';

@@ -56,17 +56,29 @@ export const INLINE_DEFAULT_ROLE_PREFERENCES: Record<UserRole, RoleNotificationP
   },
 };
 
+const HARD_FALLBACK_PREF: RoleNotificationPreferences = {
+  role: 'ADMIN',
+  channels: { inApp: true, browserPush: true, email: true, smsWhatsapp: true },
+  categories: { enrollmentStatus: true, examAvailable: true, deadlines: true, examResults: true, announcements: true, directMessages: true },
+  soundEnabled: true,
+  quietHours: { enabled: false, start: '22:00', end: '07:00' },
+};
+
 const getBaseFallback = (role?: UserRole): RoleNotificationPreferences => {
   const safeRole: UserRole =
     role && (role === 'ADMIN' || role === 'TEACHER' || role === 'STUDENT' || role === 'PARENT')
       ? role
       : 'ADMIN';
-  const item = INLINE_DEFAULT_ROLE_PREFERENCES?.[safeRole] || INLINE_DEFAULT_ROLE_PREFERENCES?.['ADMIN'];
+  const item =
+    (typeof INLINE_DEFAULT_ROLE_PREFERENCES === 'object' && INLINE_DEFAULT_ROLE_PREFERENCES !== null
+      ? INLINE_DEFAULT_ROLE_PREFERENCES[safeRole] || INLINE_DEFAULT_ROLE_PREFERENCES['ADMIN']
+      : null) || HARD_FALLBACK_PREF;
+
   return {
     ...item,
-    channels: { ...item.channels },
-    categories: { ...item.categories },
-    quietHours: { ...item.quietHours },
+    channels: { ...(item?.channels || HARD_FALLBACK_PREF.channels) },
+    categories: { ...(item?.categories || HARD_FALLBACK_PREF.categories) },
+    quietHours: { ...(item?.quietHours || HARD_FALLBACK_PREF.quietHours) },
   };
 };
 
