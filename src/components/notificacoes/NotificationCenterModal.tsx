@@ -54,6 +54,13 @@ export const INLINE_DEFAULT_ROLE_PREFERENCES: Record<UserRole, RoleNotificationP
     soundEnabled: true,
     quietHours: { enabled: true, start: '22:00', end: '07:00' },
   },
+  GUEST: {
+    role: 'GUEST',
+    channels: { inApp: true, browserPush: false, email: false, smsWhatsapp: false },
+    categories: { enrollmentStatus: false, examAvailable: false, deadlines: false, examResults: false, announcements: true, directMessages: false },
+    soundEnabled: true,
+    quietHours: { enabled: false, start: '22:00', end: '07:00' },
+  },
 };
 
 const HARD_FALLBACK_PREF: RoleNotificationPreferences = {
@@ -64,16 +71,15 @@ const HARD_FALLBACK_PREF: RoleNotificationPreferences = {
   quietHours: { enabled: false, start: '22:00', end: '07:00' },
 };
 
+import { normalizeRole } from '../../utils/roleNormalizer';
+
 const getBaseFallback = (role?: UserRole): RoleNotificationPreferences => {
-  const safeRole: UserRole =
-    role && (role === 'ADMIN' || role === 'TEACHER' || role === 'STUDENT' || role === 'PARENT')
-      ? role
-      : 'ADMIN';
+  const safeRole: UserRole = normalizeRole(role);
   
   let item: RoleNotificationPreferences | undefined;
   try {
     if (typeof INLINE_DEFAULT_ROLE_PREFERENCES === 'object' && INLINE_DEFAULT_ROLE_PREFERENCES !== null) {
-      item = INLINE_DEFAULT_ROLE_PREFERENCES[safeRole] || INLINE_DEFAULT_ROLE_PREFERENCES.ADMIN;
+      item = INLINE_DEFAULT_ROLE_PREFERENCES?.[safeRole] || INLINE_DEFAULT_ROLE_PREFERENCES?.['ADMIN'] || INLINE_DEFAULT_ROLE_PREFERENCES?.['STUDENT'];
     }
   } catch {}
 
@@ -124,7 +130,7 @@ const NotificationCenterModalContent: React.FC<NotificationCenterModalProps> = (
   notifications = [],
   currentRole = 'ADMIN',
   onChangeRole,
-  preferences,
+  preferences = INLINE_DEFAULT_ROLE_PREFERENCES,
   onSavePreferences,
   onMarkAsRead,
   onMarkAllAsRead,
@@ -137,35 +143,39 @@ const NotificationCenterModalContent: React.FC<NotificationCenterModalProps> = (
   const [onlyUnread, setOnlyUnread] = useState<boolean>(false);
 
   const getResolvedPrefs = (role?: UserRole): RoleNotificationPreferences => {
-    const validRole: UserRole =
-      role && (role === 'ADMIN' || role === 'TEACHER' || role === 'STUDENT' || role === 'PARENT')
-        ? role
-        : 'ADMIN';
+    const validRole: UserRole = normalizeRole(role);
     const fallback = getBaseFallback(validRole);
-    const userRolePref = preferences && typeof preferences === 'object' ? preferences[validRole] : undefined;
+    let userRolePref: any = undefined;
 
-    if (userRolePref && typeof userRolePref === 'object') {
+    try {
+      const activePrefs = preferences || INLINE_DEFAULT_ROLE_PREFERENCES;
+      if (activePrefs && typeof activePrefs === 'object' && activePrefs !== null) {
+        userRolePref = (activePrefs as any)?.[validRole];
+      }
+    } catch {}
+
+    if (userRolePref && typeof userRolePref === 'object' && userRolePref !== null) {
       return {
-        ...fallback,
-        ...userRolePref,
+        role: validRole,
+        soundEnabled: userRolePref?.soundEnabled ?? fallback?.soundEnabled ?? true,
         channels: {
-          inApp: userRolePref.channels?.inApp ?? fallback?.channels?.inApp ?? true,
-          browserPush: userRolePref.channels?.browserPush ?? fallback?.channels?.browserPush ?? true,
-          email: userRolePref.channels?.email ?? fallback?.channels?.email ?? true,
-          smsWhatsapp: userRolePref.channels?.smsWhatsapp ?? fallback?.channels?.smsWhatsapp ?? false,
+          inApp: userRolePref?.channels?.inApp ?? fallback?.channels?.inApp ?? true,
+          browserPush: userRolePref?.channels?.browserPush ?? fallback?.channels?.browserPush ?? true,
+          email: userRolePref?.channels?.email ?? fallback?.channels?.email ?? true,
+          smsWhatsapp: userRolePref?.channels?.smsWhatsapp ?? fallback?.channels?.smsWhatsapp ?? false,
         },
         categories: {
-          enrollmentStatus: userRolePref.categories?.enrollmentStatus ?? fallback?.categories?.enrollmentStatus ?? true,
-          examAvailable: userRolePref.categories?.examAvailable ?? fallback?.categories?.examAvailable ?? true,
-          deadlines: userRolePref.categories?.deadlines ?? fallback?.categories?.deadlines ?? true,
-          examResults: userRolePref.categories?.examResults ?? fallback?.categories?.examResults ?? true,
-          announcements: userRolePref.categories?.announcements ?? fallback?.categories?.announcements ?? true,
-          directMessages: userRolePref.categories?.directMessages ?? fallback?.categories?.directMessages ?? true,
+          enrollmentStatus: userRolePref?.categories?.enrollmentStatus ?? fallback?.categories?.enrollmentStatus ?? true,
+          examAvailable: userRolePref?.categories?.examAvailable ?? fallback?.categories?.examAvailable ?? true,
+          deadlines: userRolePref?.categories?.deadlines ?? fallback?.categories?.deadlines ?? true,
+          examResults: userRolePref?.categories?.examResults ?? fallback?.categories?.examResults ?? true,
+          announcements: userRolePref?.categories?.announcements ?? fallback?.categories?.announcements ?? true,
+          directMessages: userRolePref?.categories?.directMessages ?? fallback?.categories?.directMessages ?? true,
         },
         quietHours: {
-          enabled: userRolePref.quietHours?.enabled ?? fallback?.quietHours?.enabled ?? false,
-          start: userRolePref.quietHours?.start ?? fallback?.quietHours?.start ?? '22:00',
-          end: userRolePref.quietHours?.end ?? fallback?.quietHours?.end ?? '07:00',
+          enabled: userRolePref?.quietHours?.enabled ?? fallback?.quietHours?.enabled ?? false,
+          start: userRolePref?.quietHours?.start ?? fallback?.quietHours?.start ?? '22:00',
+          end: userRolePref?.quietHours?.end ?? fallback?.quietHours?.end ?? '07:00',
         },
       };
     }

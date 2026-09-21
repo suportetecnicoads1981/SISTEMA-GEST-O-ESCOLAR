@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import {
   Student,
   SchoolClass,
@@ -51,7 +51,6 @@ import { DocumentIssuer, DocumentType } from './components/documentos/DocumentIs
 import { QuestionBank } from './components/questoes/QuestionBank';
 import { ExamManager } from './components/provas/ExamManager';
 import { StudentExamRoom } from './components/provas/StudentExamRoom';
-import { PedagogicalDashboard } from './components/relatorios/PedagogicalDashboard';
 import { AssessmentResultsReport } from './components/relatorios/AssessmentResultsReport';
 import { MunicipalSyncModule } from './components/municipal/MunicipalSyncModule';
 import { CommunicationModule } from './components/comunicacao/CommunicationModule';
@@ -61,6 +60,8 @@ import {
   NotificationCenterModal,
   INLINE_DEFAULT_ROLE_PREFERENCES,
 } from './components/notificacoes/NotificationCenterModal';
+import { normalizeRole, getRolePreferenceSafely } from './utils/roleNormalizer';
+import { AuthBarrier } from './components/auth/AuthBarrier';
 import { FeedbackSuggestionsModal } from './components/common/FeedbackSuggestionsModal';
 import { NetworkInstaller } from './components/config/NetworkInstaller';
 import { SystemUpdateModule } from './components/config/SystemUpdateModule';
@@ -70,16 +71,7 @@ import { TopOverviewBanner } from './components/layout/TopOverviewBanner';
 import { WelcomeUpdateModal } from './components/common/WelcomeUpdateModal';
 import { VersionControlModal } from './components/version/VersionControlModal';
 import { ModulesArchitectureDiagramModal } from './components/config/ModulesArchitectureDiagramModal';
-import { SystemArchitectureHub } from './components/architecture/SystemArchitectureHub';
 import { UniversalDataImportModal } from './components/secretaria/UniversalDataImportModal';
-import { OmniDeployHub } from './components/omnideploy/OmniDeployHub';
-import { NexusDeployerHub } from './components/nexusdeployer/NexusDeployerHub';
-import { NexusInstallHub } from './components/nexusinstall/NexusInstallHub';
-import { NexusBuildHub } from './components/nexusbuild/NexusBuildHub';
-import { CleanSlateHub } from './components/cleanslate/CleanSlateHub';
-import { InstalaFlowHub } from './components/instalaflow/InstalaFlowHub';
-import { DataSyncProHub } from './components/datasync/DataSyncProHub';
-import { AdminTIHub } from './components/admin/AdminTIHub';
 import { WorkspaceTabsBar } from './components/layout/WorkspaceTabsBar';
 import { WindowsTitleBar } from './components/layout/WindowsTitleBar';
 import { WindowsStartMenu } from './components/layout/WindowsStartMenu';
@@ -89,9 +81,71 @@ import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
 import { KeyboardShortcutsModal } from './components/common/KeyboardShortcutsModal';
 import { ShortcutToast } from './components/common/ShortcutToast';
 import { GuidedTourModal } from './components/common/GuidedTourModal';
+import { ModuleLoadingFallback } from './components/common/ModuleLoadingFallback';
 import { Bell, CheckCircle2, X } from 'lucide-react';
 import { startMessageQueueWorker, stopMessageQueueWorker } from './services/messageQueueService';
 import { DatabaseAutomatorService } from './services/databaseAutomatorService';
+
+// Carregamento Preguiçoso (Lazy Loading) para módulos e dashboards de grande densidade
+const PedagogicalDashboard = lazy(() =>
+  import('./components/relatorios/PedagogicalDashboard').then((m) => ({
+    default: m.PedagogicalDashboard,
+  }))
+);
+
+const NexusBuildHub = lazy(() =>
+  import('./components/nexusbuild/NexusBuildHub').then((m) => ({
+    default: m.NexusBuildHub,
+  }))
+);
+
+const SystemArchitectureHub = lazy(() =>
+  import('./components/architecture/SystemArchitectureHub').then((m) => ({
+    default: m.SystemArchitectureHub,
+  }))
+);
+
+const OmniDeployHub = lazy(() =>
+  import('./components/omnideploy/OmniDeployHub').then((m) => ({
+    default: m.OmniDeployHub,
+  }))
+);
+
+const NexusDeployerHub = lazy(() =>
+  import('./components/nexusdeployer/NexusDeployerHub').then((m) => ({
+    default: m.NexusDeployerHub,
+  }))
+);
+
+const NexusInstallHub = lazy(() =>
+  import('./components/nexusinstall/NexusInstallHub').then((m) => ({
+    default: m.NexusInstallHub,
+  }))
+);
+
+const CleanSlateHub = lazy(() =>
+  import('./components/cleanslate/CleanSlateHub').then((m) => ({
+    default: m.CleanSlateHub,
+  }))
+);
+
+const InstalaFlowHub = lazy(() =>
+  import('./components/instalaflow/InstalaFlowHub').then((m) => ({
+    default: m.InstalaFlowHub,
+  }))
+);
+
+const DataSyncProHub = lazy(() =>
+  import('./components/datasync/DataSyncProHub').then((m) => ({
+    default: m.DataSyncProHub,
+  }))
+);
+
+const AdminTIHub = lazy(() =>
+  import('./components/admin/AdminTIHub').then((m) => ({
+    default: m.AdminTIHub,
+  }))
+);
 
 export default function App() {
   const [data, setData] = useState(() => getStoredData());
@@ -265,7 +319,7 @@ export default function App() {
       if (e.detail) {
         setData({
           ...e.detail,
-          rolePreferences: (e.detail?.rolePreferences && e.detail?.rolePreferences?.ADMIN)
+          rolePreferences: (e.detail?.rolePreferences && typeof e.detail.rolePreferences === 'object' && e.detail.rolePreferences?.ADMIN)
             ? { ...DEFAULT_ROLE_PREFERENCES, ...e.detail.rolePreferences }
             : DEFAULT_ROLE_PREFERENCES,
         });
@@ -334,6 +388,7 @@ export default function App() {
 
     const userPrefs =
       data?.rolePreferences?.[currentRole] ||
+      getRolePreferenceSafely(data?.rolePreferences, currentRole) ||
       DEFAULT_ROLE_PREFERENCES?.[currentRole] ||
       DEFAULT_ROLE_PREFERENCES?.ADMIN ||
       INLINE_DEFAULT_ROLE_PREFERENCES?.[currentRole] ||
@@ -1591,20 +1646,22 @@ export default function App() {
 
             {/* TAB: EVOLUÇÃO PEDAGÓGICA DO ALUNO E TURMA COM GRÁFICOS */}
             {activeTab === 'PEDAGOGICAL_DASHBOARD' && (
-              <PedagogicalDashboard
-                initialSection={pedagogicalInitialSection}
-                exams={data.exams}
-                questions={data.questions}
-                students={data.students}
-                classes={data.classes}
-                submissions={data.submissions}
-                schoolUnits={data.schoolUnits || []}
-                subjects={data.subjects || []}
-                settings={data.settings}
-                academicHistories={data.academicHistories || []}
-                onBack={() => handleNavigate('MAIN_DASHBOARD')}
-                onNavigate={handleNavigate}
-              />
+              <Suspense fallback={<ModuleLoadingFallback moduleName="Evolução Pedagógica & Indicadores BNCC" />}>
+                <PedagogicalDashboard
+                  initialSection={pedagogicalInitialSection}
+                  exams={data.exams}
+                  questions={data.questions}
+                  students={data.students}
+                  classes={data.classes}
+                  submissions={data.submissions}
+                  schoolUnits={data.schoolUnits || []}
+                  subjects={data.subjects || []}
+                  settings={data.settings}
+                  academicHistories={data.academicHistories || []}
+                  onBack={() => handleNavigate('MAIN_DASHBOARD')}
+                  onNavigate={handleNavigate}
+                />
+              </Suspense>
             )}
 
             {/* TAB: RELATÓRIO OFICIAL DE AVALIAÇÕES POR NÍVEL E POR ESCOLA */}
@@ -1785,65 +1842,81 @@ export default function App() {
 
             {/* TAB: CENTRAL DE ADMINISTRAÇÃO & TI (PAINEL GERAL E HUB DE NAVEGAÇÃO RÁPIDA) */}
             {activeTab === 'ADMIN_TI' && (
-              <AdminTIHub
-                schoolName={data.settings?.name || 'SucessoEdu Gestão Educacional'}
-                onNavigate={handleNavigate}
-                onBack={handleGoBack}
-                userAccountsCount={data.userAccounts?.length || 0}
-              />
+              <Suspense fallback={<ModuleLoadingFallback moduleName="Central de Administração & TI" />}>
+                <AdminTIHub
+                  schoolName={data.settings?.name || 'SucessoEdu Gestão Educacional'}
+                  onNavigate={handleNavigate}
+                  onBack={handleGoBack}
+                  userAccountsCount={data.userAccounts?.length || 0}
+                />
+              </Suspense>
             )}
 
             {/* TAB: OMNIDEPLOY - SISTEMA DE GESTÃO E INSTALAÇÃO HÍBRIDA (GOOGLE MATERIAL 3) */}
             {activeTab === 'OMNI_DEPLOY' && (
-              <OmniDeployHub
-                schoolName={data.settings?.name || 'SucessoEdu Gestão Educacional'}
-                onNavigate={handleNavigate}
-                onBack={handleGoBack}
-              />
+              <Suspense fallback={<ModuleLoadingFallback moduleName="OmniDeploy Gestão Híbrida" />}>
+                <OmniDeployHub
+                  schoolName={data.settings?.name || 'SucessoEdu Gestão Educacional'}
+                  onNavigate={handleNavigate}
+                  onBack={handleGoBack}
+                />
+              </Suspense>
             )}
 
             {/* TAB: NEXUS DEPLOYER - PROVISIONAMENTO E UPDATES NA NUVEM */}
             {activeTab === 'NEXUS_DEPLOYER' && (
-              <NexusDeployerHub
-                schoolName={data.settings?.name || 'SucessoEdu Gestão Educacional'}
-                onNavigate={handleNavigate}
-                onBack={handleGoBack}
-              />
+              <Suspense fallback={<ModuleLoadingFallback moduleName="Nexus Deployer & Nuvem" />}>
+                <NexusDeployerHub
+                  schoolName={data.settings?.name || 'SucessoEdu Gestão Educacional'}
+                  onNavigate={handleNavigate}
+                  onBack={handleGoBack}
+                />
+              </Suspense>
             )}
 
             {/* TAB: NEXUS INSTALL - GERENCIADOR DE MÓDULOS, REDE DINÂMICA E INSTALADOR COMPACTO */}
             {activeTab === 'NEXUS_INSTALL' && (
-              <NexusInstallHub
-                onNavigate={handleNavigate}
-                onBack={handleGoBack}
-              />
+              <Suspense fallback={<ModuleLoadingFallback moduleName="Nexus Install & Gerenciador de Rede" />}>
+                <NexusInstallHub
+                  onNavigate={handleNavigate}
+                  onBack={handleGoBack}
+                />
+              </Suspense>
             )}
 
             {/* TAB: SUCESSOEDU SISTEMA - SISTEMA DE DIAGNÓSTICO, INSTALAÇÃO E EMPACOTAMENTO TOTAL (C:\SucessoEduSistema) */}
             {activeTab === 'NEXUS_BUILD' && (
-              <NexusBuildHub
-                onNavigate={handleNavigate}
-                onBack={handleGoBack}
-              />
+              <Suspense fallback={<ModuleLoadingFallback moduleName="Nexus Build Hub & Empacotador" />}>
+                <NexusBuildHub
+                  onNavigate={handleNavigate}
+                  onBack={handleGoBack}
+                />
+              </Suspense>
             )}
 
             {/* TAB: CLEANSLATE ENTERPRISE HUB - ELECTRON, REACT & SUPABASE */}
             {activeTab === 'CLEANSLATE_HUB' && (
-              <CleanSlateHub
-                schoolName={data.settings?.name || 'SucessoEdu Gestão Educacional'}
-                onNavigate={handleNavigate}
-                onBack={handleGoBack}
-              />
+              <Suspense fallback={<ModuleLoadingFallback moduleName="CleanSlate Enterprise Hub" />}>
+                <CleanSlateHub
+                  schoolName={data.settings?.name || 'SucessoEdu Gestão Educacional'}
+                  onNavigate={handleNavigate}
+                  onBack={handleGoBack}
+                />
+              </Suspense>
             )}
 
             {/* TAB: INSTALAFLOW - SISTEMA DE GESTÃO DE DEPLOY E INSTALAÇÃO HÍBRIDA (SUPABASE EDITION) */}
             {activeTab === 'INSTALAFLOW' && (
-              <InstalaFlowHub onNavigate={handleNavigate} />
+              <Suspense fallback={<ModuleLoadingFallback moduleName="InstalaFlow Deploy & Instalação" />}>
+                <InstalaFlowHub onNavigate={handleNavigate} />
+              </Suspense>
             )}
 
             {/* TAB: DATASYNC PRO - SISTEMA INTEGRADO SUPABASE (SCHEMA DDL + WEBP + RECOVERY ZIP) */}
             {activeTab === 'DATASYNC_PRO' && (
-              <DataSyncProHub />
+              <Suspense fallback={<ModuleLoadingFallback moduleName="DataSync Pro & Supabase Engine" />}>
+                <DataSyncProHub />
+              </Suspense>
             )}
 
             {/* TAB: INSTALADOR DE REDE LOCAL, NUVEM E BACKUP */}
@@ -1856,9 +1929,11 @@ export default function App() {
 
             {/* TAB: DIAGRAMA DE ARQUITETURA & CENTRAL DE SOLICITAÇÕES PARA IA */}
             {activeTab === 'ARCHITECTURE_DIAGRAM' && (
-              <SystemArchitectureHub
-                onNavigateToTab={handleNavigate}
-              />
+              <Suspense fallback={<ModuleLoadingFallback moduleName="Diagrama de Arquitetura do Sistema" />}>
+                <SystemArchitectureHub
+                  onNavigateToTab={handleNavigate}
+                />
+              </Suspense>
             )}
 
             {/* TAB: SOBRE O SISTEMA & DADOS DO DESENVOLVEDOR */}
@@ -1921,9 +1996,9 @@ export default function App() {
             }
           }}
           preferences={
-            (data?.rolePreferences && data.rolePreferences?.ADMIN)
+            (data?.rolePreferences && typeof data.rolePreferences === 'object' && (data.rolePreferences?.ADMIN || data.rolePreferences?.TEACHER || data.rolePreferences?.STUDENT))
               ? data.rolePreferences
-              : (DEFAULT_ROLE_PREFERENCES && DEFAULT_ROLE_PREFERENCES?.ADMIN)
+              : (DEFAULT_ROLE_PREFERENCES && typeof DEFAULT_ROLE_PREFERENCES === 'object' && (DEFAULT_ROLE_PREFERENCES?.ADMIN || DEFAULT_ROLE_PREFERENCES?.STUDENT))
               ? DEFAULT_ROLE_PREFERENCES
               : INLINE_DEFAULT_ROLE_PREFERENCES
           }

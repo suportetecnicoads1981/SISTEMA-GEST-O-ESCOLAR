@@ -22,6 +22,8 @@ export default defineConfig(() => {
             'vendor-ui': ['lucide-react', 'motion'],
             'vendor-charts': ['recharts'],
             'vendor-data': ['xlsx', 'jszip'],
+            'standalone-generator': ['./src/utils/standaloneAppHtml', './src/utils/standaloneAppHtmlViews'],
+            'installer-scripts': ['./src/utils/installerGenerator', './src/utils/omniDeployGenerator'],
           },
         },
       },

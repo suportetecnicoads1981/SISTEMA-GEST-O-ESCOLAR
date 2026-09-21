@@ -153,11 +153,23 @@ export function sanitizeLegacyLocalStorage(): void {
     if (rawData) {
       try {
         const parsedData = JSON.parse(rawData);
-        if (parsedData && (!parsedData.rolePreferences || !parsedData.rolePreferences?.ADMIN)) {
+        if (
+          parsedData &&
+          (!parsedData.rolePreferences ||
+            typeof parsedData.rolePreferences !== 'object' ||
+            !parsedData.rolePreferences?.ADMIN ||
+            !parsedData.rolePreferences?.TEACHER ||
+            !parsedData.rolePreferences?.STUDENT)
+        ) {
           parsedData.rolePreferences = {
             ...(typeof DEFAULT_ROLE_PREFERENCES === 'object' && DEFAULT_ROLE_PREFERENCES !== null ? DEFAULT_ROLE_PREFERENCES : {}),
-            ...(parsedData.rolePreferences || {}),
+            ...(typeof parsedData.rolePreferences === 'object' && parsedData.rolePreferences !== null ? parsedData.rolePreferences : {}),
           };
+          (['ADMIN', 'TEACHER', 'STUDENT', 'PARENT', 'GUEST'] as UserRole[]).forEach((roleKey) => {
+            if (!parsedData.rolePreferences[roleKey] || typeof parsedData.rolePreferences[roleKey] !== 'object') {
+              parsedData.rolePreferences[roleKey] = DEFAULT_ROLE_PREFERENCES?.[roleKey];
+            }
+          });
           localStorage.setItem(KEYS.DATA, JSON.stringify(parsedData));
         }
       } catch {}
@@ -575,9 +587,10 @@ export function getStoredData(): AppStateData {
       settings: parsed.settings || DEFAULT_SCHOOL_SETTINGS,
       notifications: [],
       communications: [],
-      rolePreferences: (parsed?.rolePreferences && parsed?.rolePreferences?.ADMIN)
-        ? { ...DEFAULT_ROLE_PREFERENCES, ...parsed.rolePreferences }
-        : DEFAULT_ROLE_PREFERENCES,
+      rolePreferences: {
+        ...DEFAULT_ROLE_PREFERENCES,
+        ...(parsed?.rolePreferences && typeof parsed.rolePreferences === 'object' ? parsed.rolePreferences : {}),
+      },
       schoolUnits: [],
       municipalSecretary: parsed.municipalSecretary || DEFAULT_MUNICIPAL_SECRETARY,
       syncLogs: hasArr(parsed.syncLogs) ? parsed.syncLogs : [],
@@ -958,7 +971,7 @@ export function restoreBackup(backup: SystemBackup): void {
       settings: backup.data.settings,
       notifications: backup.data.notifications || DEFAULT_NOTIFICATIONS,
       communications: backup.data.communications || DEFAULT_COMMUNICATIONS,
-      rolePreferences: (backup?.data?.rolePreferences && backup?.data?.rolePreferences?.ADMIN)
+      rolePreferences: (backup?.data?.rolePreferences && typeof backup.data.rolePreferences === 'object' && backup?.data?.rolePreferences?.ADMIN)
         ? { ...DEFAULT_ROLE_PREFERENCES, ...backup.data.rolePreferences }
         : DEFAULT_ROLE_PREFERENCES,
       schoolUnits: (backup.data as any).schoolUnits || DEFAULT_SCHOOL_UNITS,

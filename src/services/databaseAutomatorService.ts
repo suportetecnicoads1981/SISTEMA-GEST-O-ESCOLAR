@@ -10,7 +10,9 @@
  * 5. Registro de telemetria e auditoria de migração
  */
 
-import { getStoredData, saveStoredData, performAutoBackup, AppStateData } from '../data/storage';
+import { getStoredData, saveStoredData, performAutoBackup, sanitizeLegacyLocalStorage, AppStateData } from '../data/storage';
+import { DEFAULT_ROLE_PREFERENCES } from '../data/defaultData';
+import { UserRole } from '../types';
 import { RelationalIntegrityService, RelationalAuditReport } from './relationalIntegrityService';
 import { SchemaManager } from './datasync/SchemaManager';
 import { AuthAutomator } from './datasync/AuthAutomator';
@@ -18,6 +20,7 @@ import { AuthAutomator } from './datasync/AuthAutomator';
 export const CURRENT_DATABASE_SCHEMA_VERSION = '5.5.1';
 const DB_VERSION_KEY = 'sucessoedu_db_schema_version';
 const DB_AUTO_UPDATE_CONFIG_KEY = 'sucessoedu_db_autoupdate_config';
+export const DB_REPAIR_HISTORY_KEY = 'sucessoedu_db_repair_history';
 
 export interface DatabaseAutoUpdateConfig {
   autoMigrateOnStartup: boolean;
@@ -26,6 +29,28 @@ export interface DatabaseAutoUpdateConfig {
   periodicSanityCheckMinutes: number;
   lastMigrationDate?: string;
   lastMigrationStatus?: 'SUCCESS' | 'WARNING' | 'ERROR';
+}
+
+export interface DatabaseRepairHistoryEntry {
+  id: string;
+  timestamp: string;
+  actionType:
+    | 'ROLE_PREFERENCES'
+    | 'UNDEFINED_PROPERTIES_SCHEMA'
+    | 'LOCALSTORAGE_CORRUPTION'
+    | 'RELATIONAL_AUTO_HEAL'
+    | 'FULL_MIGRATION'
+    | 'STARTUP_AUTO_MIGRATE'
+    | 'MANUAL_REPAIR';
+  actionTitle: string;
+  success: boolean;
+  message: string;
+  fixesAppliedCount: number;
+  fixesAppliedDetails: string[];
+  healthScoreBefore?: number;
+  healthScoreAfter?: number;
+  executorRole?: string;
+  durationMs?: number;
 }
 
 export interface MigrationStepLog {
@@ -78,6 +103,113 @@ export class DatabaseAutomatorService {
     try {
       localStorage.setItem(DB_AUTO_UPDATE_CONFIG_KEY, JSON.stringify(config));
     } catch {}
+  }
+
+  /**
+   * Obtém o histórico completo de reparos do banco de dados
+   */
+  public static getRepairHistory(): DatabaseRepairHistoryEntry[] {
+    try {
+      const stored = localStorage.getItem(DB_REPAIR_HISTORY_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('[DatabaseAutomatorService] Erro ao carregar histórico de reparos:', e);
+    }
+    return [];
+  }
+
+  /**
+   * Registra um evento de reparo no histórico de auditoria de TI
+   */
+  public static recordRepairEvent(
+    entry: Omit<DatabaseRepairHistoryEntry, 'id' | 'timestamp'>
+  ): DatabaseRepairHistoryEntry {
+    const history = this.getRepairHistory();
+    const newEntry: DatabaseRepairHistoryEntry = {
+      ...entry,
+      id: `repair_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: new Date().toISOString(),
+    };
+
+    const updatedHistory = [newEntry, ...history].slice(0, 100);
+
+    try {
+      localStorage.setItem(DB_REPAIR_HISTORY_KEY, JSON.stringify(updatedHistory));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('sucessoedu_db_repair_history_updated', { detail: updatedHistory })
+        );
+      }
+    } catch (e) {
+      console.warn('[DatabaseAutomatorService] Erro ao salvar histórico de reparos:', e);
+    }
+
+    return newEntry;
+  }
+
+  /**
+   * Limpa todo o histórico de reparos armazenado
+   */
+  public static clearRepairHistory(): void {
+    try {
+      localStorage.removeItem(DB_REPAIR_HISTORY_KEY);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('sucessoedu_db_repair_history_updated', { detail: [] })
+        );
+      }
+    } catch (e) {
+      console.warn('[DatabaseAutomatorService] Erro ao limpar histórico de reparos:', e);
+    }
+  }
+
+  /**
+   * Gera um relatório textual consolidado para auditoria do Administrador de TI
+   */
+  public static exportRepairHistoryLogText(): string {
+    const history = this.getRepairHistory();
+    const now = new Date().toLocaleString('pt-BR');
+
+    let report = `===============================================================================\n`;
+    report += ` SUCESSOEDU GESTÃO EDUCACIONAL - RELATÓRIO DE REPAROS E AUDITORIA DE TI\n`;
+    report += ` Data da Exportação: ${now}\n`;
+    report += ` Versão Alvo do Schema: v${CURRENT_DATABASE_SCHEMA_VERSION} Enterprise\n`;
+    report += ` Total de Eventos de Reparo Registrados: ${history.length}\n`;
+    report += `===============================================================================\n\n`;
+
+    if (history.length === 0) {
+      report += `Nenhum histórico de reparo registrado até o momento.\n`;
+    } else {
+      history.forEach((h, idx) => {
+        report += `[REGISTRO #${idx + 1}] ID: ${h.id}\n`;
+        report += `  Data/Hora: ${new Date(h.timestamp).toLocaleString('pt-BR')}\n`;
+        report += `  Ação: ${h.actionTitle} (${h.actionType})\n`;
+        report += `  Status: ${h.success ? '✅ SUCESSO' : '❌ FALHA'}\n`;
+        report += `  Mensagem: ${h.message}\n`;
+        if (h.healthScoreBefore !== undefined && h.healthScoreAfter !== undefined) {
+          report += `  Evolução do Score de Saúde: ${h.healthScoreBefore}% ➔ ${h.healthScoreAfter}%\n`;
+        }
+        if (h.durationMs !== undefined) {
+          report += `  Tempo de Execução: ${h.durationMs}ms\n`;
+        }
+        report += `  Correções Aplicadas (${h.fixesAppliedCount}):\n`;
+        if (h.fixesAppliedDetails && h.fixesAppliedDetails.length > 0) {
+          h.fixesAppliedDetails.forEach((f) => {
+            report += `    • ${f}\n`;
+          });
+        } else {
+          report += `    • Nenhuma correção detalhada fornecida.\n`;
+        }
+        report += `-------------------------------------------------------------------------------\n\n`;
+      });
+    }
+
+    return report;
   }
 
   /**
@@ -332,7 +464,7 @@ export class DatabaseAutomatorService {
 
     AuthAutomator.recordAuditLog('DDL_EXECUTION', 'SUCCESS');
 
-    return {
+    const result: AutomatedMigrationResult = {
       success: steps.every((s) => s.status === 'SUCCESS' || s.status === 'WARNING'),
       schemaVersion: CURRENT_DATABASE_SCHEMA_VERSION,
       startedAt,
@@ -346,6 +478,206 @@ export class DatabaseAutomatorService {
       healthScoreAfter,
       backupId,
     };
+
+    this.recordRepairEvent({
+      actionType: 'FULL_MIGRATION',
+      actionTitle: `Atualização e Migração Total do Banco v${CURRENT_DATABASE_SCHEMA_VERSION}`,
+      success: result.success,
+      message: result.success
+        ? `Migração executada com exito em ${totalDurationMs}ms (${fixesApplied.length} correções e ${tablesUpdated.length} tabelas atualizadas).`
+        : `Migração concluída com erros nas etapas.`,
+      fixesAppliedCount: fixesApplied.length,
+      fixesAppliedDetails: fixesApplied.length > 0 ? fixesApplied : steps.map((s) => `${s.title}: ${s.details}`),
+      healthScoreBefore,
+      healthScoreAfter,
+      durationMs: totalDurationMs,
+    });
+
+    return result;
+  }
+
+  /**
+   * Correção 1: Higieniza e repara rolePreferences e permissões de perfil
+   */
+  public static repairRolePreferences(): { success: boolean; message: string } {
+    try {
+      sanitizeLegacyLocalStorage();
+      const data = getStoredData();
+      const mergedPrefs = {
+        ...DEFAULT_ROLE_PREFERENCES,
+        ...(data.rolePreferences && typeof data.rolePreferences === 'object' ? data.rolePreferences : {}),
+      };
+      const roles: UserRole[] = ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT', 'GUEST'];
+      roles.forEach((r) => {
+        if (!mergedPrefs[r] || typeof mergedPrefs[r] !== 'object') {
+          mergedPrefs[r] = DEFAULT_ROLE_PREFERENCES[r];
+        }
+      });
+      data.rolePreferences = mergedPrefs;
+      saveStoredData(data);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sucessoedu_data_updated', { detail: data }));
+      }
+      const msg = 'RolePreferences e permissões de perfil higienizadas e restauradas com sucesso!';
+      this.recordRepairEvent({
+        actionType: 'ROLE_PREFERENCES',
+        actionTitle: 'Higienização de RolePreferences',
+        success: true,
+        message: msg,
+        fixesAppliedCount: 1,
+        fixesAppliedDetails: [
+          'Chaves de permissões de perfil (ADMIN, TEACHER, STUDENT, PARENT, GUEST) restauradas com padrão.',
+        ],
+      });
+      return { success: true, message: msg };
+    } catch (e: any) {
+      const msg = `Falha ao reparar RolePreferences: ${e.message}`;
+      this.recordRepairEvent({
+        actionType: 'ROLE_PREFERENCES',
+        actionTitle: 'Higienização de RolePreferences',
+        success: false,
+        message: msg,
+        fixesAppliedCount: 0,
+        fixesAppliedDetails: [`Erro: ${e.message}`],
+      });
+      return { success: false, message: msg };
+    }
+  }
+
+  /**
+   * Correção 2: Repara propriedades indefinidas, schemas ausentes e estado nulo no storage
+   */
+  public static repairUndefinedPropertiesAndSchema(): { success: boolean; message: string } {
+    try {
+      sanitizeLegacyLocalStorage();
+      const data = getStoredData();
+      const healResult = RelationalIntegrityService.autoHeal(data);
+      const mergedPrefs = {
+        ...DEFAULT_ROLE_PREFERENCES,
+        ...(healResult.healedData.rolePreferences && typeof healResult.healedData.rolePreferences === 'object' ? healResult.healedData.rolePreferences : {}),
+      };
+      const roles: UserRole[] = ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT', 'GUEST'];
+      roles.forEach((r) => {
+        if (!mergedPrefs[r] || typeof mergedPrefs[r] !== 'object') {
+          mergedPrefs[r] = DEFAULT_ROLE_PREFERENCES[r];
+        }
+      });
+      healResult.healedData.rolePreferences = mergedPrefs;
+      saveStoredData(healResult.healedData);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sucessoedu_data_updated', { detail: healResult.healedData }));
+      }
+      const msg = `Schema e propriedades indefinidas reparados com sucesso! (${healResult.fixesApplied.length} correções aplicadas)`;
+      this.recordRepairEvent({
+        actionType: 'UNDEFINED_PROPERTIES_SCHEMA',
+        actionTitle: 'Reparo de Propriedades e Schemas Ausentes',
+        success: true,
+        message: msg,
+        fixesAppliedCount: healResult.fixesApplied.length,
+        fixesAppliedDetails: healResult.fixesApplied.length > 0 ? healResult.fixesApplied : ['Sem propriedades ausentes detectadas.'],
+      });
+      return {
+        success: true,
+        message: msg,
+      };
+    } catch (e: any) {
+      const msg = `Falha ao reparar estado e schema: ${e.message}`;
+      this.recordRepairEvent({
+        actionType: 'UNDEFINED_PROPERTIES_SCHEMA',
+        actionTitle: 'Reparo de Propriedades e Schemas Ausentes',
+        success: false,
+        message: msg,
+        fixesAppliedCount: 0,
+        fixesAppliedDetails: [`Erro: ${e.message}`],
+      });
+      return { success: false, message: msg };
+    }
+  }
+
+  /**
+   * Correção 3: Saneia corrupções no LocalStorage e IndexedDB
+   */
+  public static repairLocalStorageCorruption(): { success: boolean; message: string } {
+    try {
+      sanitizeLegacyLocalStorage();
+      const rawData = localStorage.getItem('sucessoedu_app_data');
+      if (rawData) {
+        try {
+          const parsed = JSON.parse(rawData);
+          saveStoredData(parsed);
+        } catch {
+          const cleanData = getStoredData();
+          saveStoredData(cleanData);
+        }
+      }
+      const msg = 'LocalStorage purgado e saneado com integridade!';
+      this.recordRepairEvent({
+        actionType: 'LOCALSTORAGE_CORRUPTION',
+        actionTitle: 'Saneamento do LocalStorage',
+        success: true,
+        message: msg,
+        fixesAppliedCount: 1,
+        fixesAppliedDetails: ['Estrutura do LocalStorage reconstruída e saneada contra corrupções.'],
+      });
+      return { success: true, message: msg };
+    } catch (e: any) {
+      const msg = `Erro ao sanear LocalStorage: ${e.message}`;
+      this.recordRepairEvent({
+        actionType: 'LOCALSTORAGE_CORRUPTION',
+        actionTitle: 'Saneamento do LocalStorage',
+        success: false,
+        message: msg,
+        fixesAppliedCount: 0,
+        fixesAppliedDetails: [`Erro: ${e.message}`],
+      });
+      return { success: false, message: msg };
+    }
+  }
+
+  /**
+   * Correção 4: Executa auto-cura relacional total em turmas, alunos e notas
+   */
+  public static runRelationalAutoHeal(): { success: boolean; fixesAppliedCount: number; message: string } {
+    try {
+      const data = getStoredData();
+      const { healedData, fixesApplied } = RelationalIntegrityService.autoHeal(data);
+      saveStoredData(healedData);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sucessoedu_data_updated', { detail: healedData }));
+      }
+      const msg = `Auto-Cura relacional concluída com ${fixesApplied.length} correções aplicadas!`;
+      this.recordRepairEvent({
+        actionType: 'RELATIONAL_AUTO_HEAL',
+        actionTitle: 'Auto-Cura Relacional de Registros',
+        success: true,
+        message: msg,
+        fixesAppliedCount: fixesApplied.length,
+        fixesAppliedDetails: fixesApplied.length > 0 ? fixesApplied : ['Nenhum registro relacional órfão encontrado.'],
+      });
+      return {
+        success: true,
+        fixesAppliedCount: fixesApplied.length,
+        message: msg,
+      };
+    } catch (e: any) {
+      const msg = `Falha na Auto-Cura relacional: ${e.message}`;
+      this.recordRepairEvent({
+        actionType: 'RELATIONAL_AUTO_HEAL',
+        actionTitle: 'Auto-Cura Relacional de Registros',
+        success: false,
+        message: msg,
+        fixesAppliedCount: 0,
+        fixesAppliedDetails: [`Erro: ${e.message}`],
+      });
+      return { success: false, fixesAppliedCount: 0, message: msg };
+    }
+  }
+
+  /**
+   * Correção 5: Executa atualização automatizada de banco de dados completa
+   */
+  public static async runFullDatabaseMigration(): Promise<AutomatedMigrationResult> {
+    return await this.executeAutomatedUpdate();
   }
 
   /**

@@ -48,6 +48,7 @@ import {
   SchoolUnit,
   SecurityAuditLog,
 } from '../../types';
+import { UserManagementTable } from './UserManagementTable';
 
 interface UserAccessControlProps {
   users: UserAccount[];
@@ -217,10 +218,11 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSectorFilter, setSelectedSectorFilter] = useState<string>('ALL');
-  const [activeMainTab, setActiveMainTab] = useState<'USERS' | 'MATRIX' | 'AUDIT'>('USERS');
+  const [activeMainTab, setActiveMainTab] = useState<'USERS' | 'RBAC' | 'MATRIX' | 'AUDIT'>('USERS');
   const [isEditingModalOpen, setIsEditingModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
   const [deleteCandidateUser, setDeleteCandidateUser] = useState<UserAccount | null>(null);
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -438,6 +440,16 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
     setTimeout(() => setSuccessMessage(null), 3500);
   };
 
+  const handleConfirmDeleteAllUsers = () => {
+    // Mantém a conta do Administrador Mestre ou a conta atualmente autenticada para garantir o acesso do operador
+    const masterAccount = users.find((u) => u.isMaster || u.id === currentUser.id) || currentUser;
+    const updated = [masterAccount];
+    onUpdateUsers(updated);
+    setShowDeleteAllModal(false);
+    setSuccessMessage(`Todos os usuários cadastrados foram excluídos com sucesso. Mantida apenas a conta Administrador Mestre (${masterAccount.name}).`);
+    setTimeout(() => setSuccessMessage(null), 5000);
+  };
+
   const handlePermissionChange = (
     moduleKey: SystemModuleKey,
     action: keyof ModulePermission,
@@ -512,12 +524,34 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveMainTab('RBAC')}
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeMainTab === 'RBAC'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+            title="Gestão de Roles e RBAC com Invalidação de Sessão"
+          >
+            <Key className="h-3.5 w-3.5" />
+            <span>Gestão de Permissões (RBAC)</span>
+          </button>
+
+          <button
             onClick={handleOpenCreateModal}
             className="px-3 py-1.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
             title="Cadastrar um novo usuário no sistema"
           >
             <Plus className="h-3.5 w-3.5" />
             <span>Novo Usuário</span>
+          </button>
+
+          <button
+            onClick={() => setShowDeleteAllModal(true)}
+            className="px-3 py-1.5 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+            title="Excluir todos os usuários cadastrados (preservando o Mestre)"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            <span>Excluir Todos os Usuários</span>
           </button>
 
           <button
@@ -884,6 +918,17 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
         </>
       )}
 
+      {/* VIEW RBAC: GESTÃO DE PERMISSÕES RBAC (SUPABASE EDGE FUNCTION & SESSION REVOCATION) */}
+      {activeMainTab === 'RBAC' && (
+        <UserManagementTable
+          users={users}
+          currentUser={currentUser}
+          schoolUnits={schoolUnits}
+          onUpdateUsers={onUpdateUsers}
+          onSwitchUser={onSwitchCurrentUser}
+        />
+      )}
+
       {/* VIEW 2: MATRIZ DE NÍVEIS DE ACESSO */}
       {activeMainTab === 'MATRIX' && (
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-6">
@@ -1056,6 +1101,52 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                 className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 transition-colors cursor-pointer shadow-xs"
               >
                 Sim, Excluir Usuário
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EXCLUIR TODOS OS USUÁRIOS COM CONFIRMAÇÃO */}
+      {showDeleteAllModal && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in-50 duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl border border-rose-200 w-full max-w-lg p-6 space-y-4">
+            <div className="h-14 w-14 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
+              <AlertTriangle className="h-7 w-7" />
+            </div>
+
+            <div className="text-center space-y-1.5">
+              <h3 className="font-black text-slate-900 text-lg">Excluir Todos os Usuários Cadastrados?</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Atenção: Esta ação removerá <strong>todos os {users.length} usuários cadastrados</strong> no sistema de uma só vez.
+              </p>
+            </div>
+
+            <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-xs text-rose-900 space-y-1.5">
+              <div className="font-bold flex items-center gap-1.5 text-rose-700">
+                <Shield className="h-4 w-4 shrink-0 text-rose-600" />
+                Medida de Proteção contra Lockout:
+              </div>
+              <p className="text-[11px] text-rose-800 leading-normal">
+                Para impedir o bloqueio total do acesso ao ERP, a conta do <strong>Administrador Mestre ({currentUser.name})</strong> será mantida intacta como único perfil ativo.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowDeleteAllModal(false)}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteAllUsers}
+                className="px-5 py-2.5 rounded-xl text-xs font-black text-white bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 transition-all cursor-pointer shadow-lg shadow-rose-600/30 flex items-center gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Sim, Excluir Todos os Usuários</span>
               </button>
             </div>
           </div>

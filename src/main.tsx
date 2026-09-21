@@ -2,6 +2,8 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { AuthProvider } from './contexts/AuthContext';
+import { AuthBarrier } from './components/auth/AuthBarrier';
 import { sanitizeLegacyLocalStorage } from './data/storage';
 import './index.css';
 
@@ -29,7 +31,11 @@ window.addEventListener('unhandledrejection', (event) => {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      <App />
+      <AuthProvider>
+        <AuthBarrier>
+          <App />
+        </AuthBarrier>
+      </AuthProvider>
     </ErrorBoundary>
   </StrictMode>,
 );

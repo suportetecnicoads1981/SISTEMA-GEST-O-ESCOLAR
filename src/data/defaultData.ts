@@ -749,6 +749,25 @@ export const DEFAULT_ROLE_PREFERENCES: Record<UserRole, RoleNotificationPreferen
     soundEnabled: true,
     quietHours: { enabled: false, start: '22:00', end: '07:00' },
   },
+  GUEST: {
+    role: 'GUEST',
+    channels: {
+      inApp: true,
+      browserPush: false,
+      email: false,
+      smsWhatsapp: false,
+    },
+    categories: {
+      enrollmentStatus: false,
+      examAvailable: false,
+      deadlines: false,
+      examResults: false,
+      announcements: true,
+      directMessages: false,
+    },
+    soundEnabled: true,
+    quietHours: { enabled: false, start: '22:00', end: '07:00' },
+  },
 };
 
 export const DEFAULT_NOTIFICATIONS: NotificationItem[] = [

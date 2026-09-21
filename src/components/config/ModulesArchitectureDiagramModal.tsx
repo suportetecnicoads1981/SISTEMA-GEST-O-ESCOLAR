@@ -1,5 +1,11 @@
-import React from 'react';
-import { SystemArchitectureHub } from '../architecture/SystemArchitectureHub';
+import React, { Suspense, lazy } from 'react';
+import { ModuleLoadingFallback } from '../common/ModuleLoadingFallback';
+
+const SystemArchitectureHub = lazy(() =>
+  import('../architecture/SystemArchitectureHub').then((m) => ({
+    default: m.SystemArchitectureHub,
+  }))
+);
 
 interface ModulesArchitectureDiagramModalProps {
   isOpen: boolean;
@@ -29,15 +35,17 @@ export const ModulesArchitectureDiagramModal: React.FC<ModulesArchitectureDiagra
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-2 sm:p-4 md:p-6 overflow-y-auto">
       <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-7xl h-[94vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        <SystemArchitectureHub
-          onNavigateToTab={(tab) => {
-            navigateFn?.(tab);
-            onClose();
-          }}
-          initialModuleId={initialModuleId}
-          isModalMode={true}
-          onClose={onClose}
-        />
+        <Suspense fallback={<ModuleLoadingFallback moduleName="Diagrama de Arquitetura & Módulos" />}>
+          <SystemArchitectureHub
+            onNavigateToTab={(tab) => {
+              navigateFn?.(tab);
+              onClose();
+            }}
+            initialModuleId={initialModuleId}
+            isModalMode={true}
+            onClose={onClose}
+          />
+        </Suspense>
       </div>
     </div>
   );

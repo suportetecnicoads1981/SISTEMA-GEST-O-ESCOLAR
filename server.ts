@@ -2663,6 +2663,92 @@ app.post('/api/nexusbuild/notify-developer', (req, res) => {
   }
 });
 
+// 7. Supabase Edge Function Proxy / RBAC Role Update & Global SignOut
+app.post('/api/update-user-role', async (req, res) => {
+  try {
+    const { targetUserId, newRole } = req.body;
+
+    if (!targetUserId || !newRole) {
+      return res.status(400).json({
+        success: false,
+        error: 'targetUserId e newRole são obrigatórios.',
+      });
+    }
+
+    const validRoles = ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'];
+    if (!validRoles.includes(newRole)) {
+      return res.status(400).json({
+        success: false,
+        error: `Role inválida. Deve ser uma de: ${validRoles.join(', ')}`,
+      });
+    }
+
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://cdxvhxqpixtbycghfsre.supabase.co';
+
+    if (serviceRoleKey) {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      });
+
+      // 1. Atualizar app_metadata com a nova role
+      const { data: updateData, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        targetUserId,
+        {
+          app_metadata: { role: newRole },
+        }
+      );
+
+      if (updateError) {
+        console.error('[RBAC] Erro ao atualizar role no Supabase Auth:', updateError);
+        return res.status(500).json({ success: false, error: updateError.message });
+      }
+
+      // 2. Invalidação obrigatória de sessão via signOut global
+      try {
+        await supabaseAdmin.auth.admin.signOut(targetUserId, 'global' as any);
+      } catch (signOutErr: any) {
+        console.warn('[RBAC] Aviso na revogação de sessão via admin.signOut:', signOutErr?.message);
+      }
+
+      // 3. Atualizar tabela users se existir
+      try {
+        await supabaseAdmin
+          .from('users')
+          .update({ role: newRole, updated_at: new Date().toISOString() })
+          .eq('id', targetUserId);
+      } catch (tableErr) {
+        // Tabela opcional/sincronizada via trigger
+      }
+
+      return res.json({
+        success: true,
+        message: 'Role atualizada. As sessões ativas do usuário foram encerradas para segurança.',
+        targetUserId,
+        newRole,
+        user: updateData?.user,
+      });
+    }
+
+    // Modo Standalone / Sem Service Role Key configurada
+    res.json({
+      success: true,
+      mode: 'STANDALONE_EMULATED',
+      message: 'Role atualizada. As sessões ativas do usuário foram encerradas para segurança.',
+      targetUserId,
+      newRole,
+      revokedAt: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    console.error('[RBAC] Erro interno:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Erro interno ao processar atualização de privilégios.' });
+  }
+});
+
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

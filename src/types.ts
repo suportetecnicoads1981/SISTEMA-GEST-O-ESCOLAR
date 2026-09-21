@@ -651,11 +651,29 @@ export interface UserAccount {
   lastLogin?: string;
 }
 
+export interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole | string;
+  avatar_url?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const ROLES = {
+  ADMIN: 'ADMIN' as UserRole,
+  TEACHER: 'TEACHER' as UserRole,
+  STUDENT: 'STUDENT' as UserRole,
+  PARENT: 'PARENT' as UserRole,
+  GUEST: 'GUEST' as UserRole,
+} as const;
+
 /* ==========================================================================
    SISTEMA DE NOTIFICAÇÕES & MÓDULO DE COMUNICAÇÃO
    ========================================================================== */
 
-export type UserRole = 'ADMIN' | 'TEACHER' | 'STUDENT' | 'PARENT';
+export type UserRole = 'ADMIN' | 'TEACHER' | 'STUDENT' | 'PARENT' | 'GUEST';
 
 export type NotificationType =
   | 'ENROLLMENT_STATUS'      // Matrículas aprovadas / recusadas / pendentes

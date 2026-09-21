@@ -1,6 +1,6 @@
 import { getSupabaseClient } from './datasync/supabaseClient';
 import { SupabaseDatabaseService } from './datasync/SupabaseDatabaseService';
-import { AppStateData } from '../data/storage';
+import type { AppStateData } from '../data/storage';
 import { DEFAULT_ROLE_PREFERENCES, DEFAULT_SCHOOL_SETTINGS, DEFAULT_USER_ACCOUNTS } from '../data/defaultData';
 
 export class SupabasePersistenceService {
@@ -90,14 +90,7 @@ export class SupabasePersistenceService {
             ? c.target_roles
             : ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'],
         })),
-        rolePreferences: (DEFAULT_ROLE_PREFERENCES && DEFAULT_ROLE_PREFERENCES?.ADMIN)
-          ? DEFAULT_ROLE_PREFERENCES
-          : {
-              ADMIN: { role: 'ADMIN', channels: { inApp: true, browserPush: true, email: true, smsWhatsapp: true }, categories: { enrollmentStatus: true, examAvailable: true, deadlines: true, examResults: true, announcements: true, directMessages: true }, soundEnabled: true, quietHours: { enabled: false, start: '22:00', end: '07:00' } },
-              TEACHER: { role: 'TEACHER', channels: { inApp: true, browserPush: true, email: true, smsWhatsapp: false }, categories: { enrollmentStatus: false, examAvailable: true, deadlines: true, examResults: true, announcements: true, directMessages: true }, soundEnabled: true, quietHours: { enabled: true, start: '21:00', end: '07:30' } },
-              STUDENT: { role: 'STUDENT', channels: { inApp: true, browserPush: true, email: true, smsWhatsapp: false }, categories: { enrollmentStatus: true, examAvailable: true, deadlines: true, examResults: true, announcements: true, directMessages: true }, soundEnabled: true, quietHours: { enabled: true, start: '22:00', end: '07:00' } },
-              PARENT: { role: 'PARENT', channels: { inApp: true, browserPush: true, email: true, smsWhatsapp: true }, categories: { enrollmentStatus: true, examAvailable: true, deadlines: true, examResults: true, announcements: true, directMessages: true }, soundEnabled: true, quietHours: { enabled: true, start: '22:00', end: '07:00' } },
-            },
+        rolePreferences: DEFAULT_ROLE_PREFERENCES,
         schoolUnits: unitsRes.data || [],
         municipalSecretary: undefined,
         syncLogs: logsRes.data || [],
