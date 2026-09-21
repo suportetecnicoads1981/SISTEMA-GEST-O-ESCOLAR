@@ -1,26 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Bell,
   CheckCircle2,
-  XCircle,
   AlertTriangle,
   Clock,
   Settings,
   Trash2,
   CheckCheck,
   ExternalLink,
-  Volume2,
-  VolumeX,
   Smartphone,
   Mail,
   MessageSquare,
   Shield,
-  GraduationCap,
-  Users,
   BookOpen,
   UserCheck,
   Award,
-  Filter,
   X,
   Sparkles,
 } from 'lucide-react';
@@ -31,13 +25,44 @@ import {
   UserRole,
 } from '../../types';
 
+const FALLBACK_ROLE_PREFERENCES: Record<UserRole, RoleNotificationPreferences> = {
+  ADMIN: {
+    role: 'ADMIN',
+    channels: { inApp: true, browserPush: true, email: true, smsWhatsapp: true },
+    categories: { enrollmentStatus: true, examAvailable: true, deadlines: true, examResults: true, announcements: true, directMessages: true },
+    soundEnabled: true,
+    quietHours: { enabled: false, start: '22:00', end: '07:00' },
+  },
+  TEACHER: {
+    role: 'TEACHER',
+    channels: { inApp: true, browserPush: true, email: true, smsWhatsapp: false },
+    categories: { enrollmentStatus: false, examAvailable: true, deadlines: true, examResults: true, announcements: true, directMessages: true },
+    soundEnabled: true,
+    quietHours: { enabled: true, start: '21:00', end: '07:30' },
+  },
+  STUDENT: {
+    role: 'STUDENT',
+    channels: { inApp: true, browserPush: true, email: true, smsWhatsapp: false },
+    categories: { enrollmentStatus: true, examAvailable: true, deadlines: true, examResults: true, announcements: true, directMessages: true },
+    soundEnabled: true,
+    quietHours: { enabled: true, start: '22:00', end: '07:00' },
+  },
+  PARENT: {
+    role: 'PARENT',
+    channels: { inApp: true, browserPush: true, email: true, smsWhatsapp: true },
+    categories: { enrollmentStatus: true, examAvailable: true, deadlines: true, examResults: true, announcements: true, directMessages: true },
+    soundEnabled: true,
+    quietHours: { enabled: true, start: '22:00', end: '07:00' },
+  },
+};
+
 interface NotificationCenterModalProps {
   isOpen: boolean;
   onClose: () => void;
   notifications: NotificationItem[];
   currentRole: UserRole;
   onChangeRole: (role: UserRole) => void;
-  preferences: Record<UserRole, RoleNotificationPreferences>;
+  preferences?: Record<UserRole, RoleNotificationPreferences>;
   onSavePreferences: (role: UserRole, prefs: RoleNotificationPreferences) => void;
   onMarkAsRead: (id: string) => void;
   onMarkAllAsRead: () => void;
@@ -46,11 +71,10 @@ interface NotificationCenterModalProps {
   onTriggerTestPush: () => void;
 }
 
-export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = ({
-  isOpen,
+const NotificationCenterModalContent: React.FC<NotificationCenterModalProps> = ({
   onClose,
-  notifications,
-  currentRole,
+  notifications = [],
+  currentRole = 'ADMIN',
   onChangeRole,
   preferences,
   onSavePreferences,
@@ -64,24 +88,42 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
   const [filterType, setFilterType] = useState<string>('ALL');
   const [onlyUnread, setOnlyUnread] = useState<boolean>(false);
 
-  // Copy of preferences for the current role
-  const rolePrefs = preferences[currentRole] || preferences.ADMIN;
-  const [localPrefs, setLocalPrefs] = useState<RoleNotificationPreferences>(rolePrefs);
+  const getResolvedPrefs = (role: UserRole): RoleNotificationPreferences => {
+    const validRole: UserRole =
+      role && FALLBACK_ROLE_PREFERENCES[role] ? role : 'ADMIN';
+    const fallback = FALLBACK_ROLE_PREFERENCES[validRole];
+    const userRolePref = preferences ? preferences[validRole] : undefined;
 
-  if (!isOpen) return null;
+    if (userRolePref) {
+      return {
+        ...fallback,
+        ...userRolePref,
+        channels: { ...fallback.channels, ...(userRolePref.channels || {}) },
+        categories: { ...fallback.categories, ...(userRolePref.categories || {}) },
+        quietHours: { ...fallback.quietHours, ...(userRolePref.quietHours || {}) },
+      };
+    }
+    return fallback;
+  };
+
+  const [localPrefs, setLocalPrefs] = useState<RoleNotificationPreferences>(() => getResolvedPrefs(currentRole));
+
+  useEffect(() => {
+    setLocalPrefs(getResolvedPrefs(currentRole));
+  }, [currentRole, preferences]);
 
   // Filter notifications for current role
-  const roleNotifications = notifications.filter(
-    (n) => n.targetRoles.includes(currentRole) || n.targetRoles.length === 0
+  const roleNotifications = (notifications || []).filter(
+    (n) => n?.targetRoles?.includes(currentRole) || (n?.targetRoles && n.targetRoles.length === 0) || !n?.targetRoles
   );
 
   const filteredNotifications = roleNotifications.filter((n) => {
-    const matchesType = filterType === 'ALL' || n.type === filterType;
-    const matchesUnread = !onlyUnread || !n.read;
+    const matchesType = filterType === 'ALL' || n?.type === filterType;
+    const matchesUnread = !onlyUnread || !n?.read;
     return matchesType && matchesUnread;
   });
 
-  const unreadCount = roleNotifications.filter((n) => !n.read).length;
+  const unreadCount = roleNotifications.filter((n) => !n?.read).length;
 
   const getTypeBadge = (type: NotificationType) => {
     switch (type) {
@@ -140,6 +182,8 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
         return 'Aluno (Maria Clara)';
       case 'PARENT':
         return 'Pai / Responsável';
+      default:
+        return 'Usuário';
     }
   };
 
@@ -193,7 +237,7 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                   key={role}
                   onClick={() => {
                     onChangeRole(role);
-                    setLocalPrefs(preferences[role] || preferences.ADMIN);
+                    setLocalPrefs(getResolvedPrefs(role));
                   }}
                   className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
                     currentRole === role
@@ -224,7 +268,7 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
             </button>
             <button
               onClick={() => {
-                setLocalPrefs(preferences[currentRole] || preferences.ADMIN);
+                setLocalPrefs(getResolvedPrefs(currentRole));
                 setActiveView('SETTINGS');
               }}
               className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1 ${
@@ -334,12 +378,14 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                 filteredNotifications.map((notif) => {
                   const badge = getTypeBadge(notif.type);
                   const Icon = badge.icon;
-                  const formattedDate = new Date(notif.createdAt).toLocaleString('pt-BR', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  });
+                  const formattedDate = notif.createdAt
+                    ? new Date(notif.createdAt).toLocaleString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : '';
 
                   return (
                     <div
@@ -470,11 +516,11 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                   </div>
                   <input
                     type="checkbox"
-                    checked={localPrefs.channels.inApp}
+                    checked={localPrefs?.channels?.inApp ?? true}
                     onChange={(e) =>
                       setLocalPrefs((prev) => ({
                         ...prev,
-                        channels: { ...prev.channels, inApp: e.target.checked },
+                        channels: { ...(prev?.channels || {}), inApp: e.target.checked } as any,
                       }))
                     }
                     className="h-4 w-4 text-indigo-600 rounded"
@@ -491,11 +537,11 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                   </div>
                   <input
                     type="checkbox"
-                    checked={localPrefs.channels.browserPush}
+                    checked={localPrefs?.channels?.browserPush ?? true}
                     onChange={(e) =>
                       setLocalPrefs((prev) => ({
                         ...prev,
-                        channels: { ...prev.channels, browserPush: e.target.checked },
+                        channels: { ...(prev?.channels || {}), browserPush: e.target.checked } as any,
                       }))
                     }
                     className="h-4 w-4 text-indigo-600 rounded"
@@ -512,11 +558,11 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                   </div>
                   <input
                     type="checkbox"
-                    checked={localPrefs.channels.email}
+                    checked={localPrefs?.channels?.email ?? true}
                     onChange={(e) =>
                       setLocalPrefs((prev) => ({
                         ...prev,
-                        channels: { ...prev.channels, email: e.target.checked },
+                        channels: { ...(prev?.channels || {}), email: e.target.checked } as any,
                       }))
                     }
                     className="h-4 w-4 text-indigo-600 rounded"
@@ -533,11 +579,11 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                   </div>
                   <input
                     type="checkbox"
-                    checked={localPrefs.channels.smsWhatsapp}
+                    checked={localPrefs?.channels?.smsWhatsapp ?? false}
                     onChange={(e) =>
                       setLocalPrefs((prev) => ({
                         ...prev,
-                        channels: { ...prev.channels, smsWhatsapp: e.target.checked },
+                        channels: { ...(prev?.channels || {}), smsWhatsapp: e.target.checked } as any,
                       }))
                     }
                     className="h-4 w-4 text-indigo-600 rounded"
@@ -558,11 +604,11 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                   </span>
                   <input
                     type="checkbox"
-                    checked={localPrefs.categories.enrollmentStatus}
+                    checked={localPrefs?.categories?.enrollmentStatus ?? true}
                     onChange={(e) =>
                       setLocalPrefs((prev) => ({
                         ...prev,
-                        categories: { ...prev.categories, enrollmentStatus: e.target.checked },
+                        categories: { ...(prev?.categories || {}), enrollmentStatus: e.target.checked } as any,
                       }))
                     }
                     className="h-4 w-4 text-indigo-600 rounded"
@@ -575,11 +621,11 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                   </span>
                   <input
                     type="checkbox"
-                    checked={localPrefs.categories.examAvailable}
+                    checked={localPrefs?.categories?.examAvailable ?? true}
                     onChange={(e) =>
                       setLocalPrefs((prev) => ({
                         ...prev,
-                        categories: { ...prev.categories, examAvailable: e.target.checked },
+                        categories: { ...(prev?.categories || {}), examAvailable: e.target.checked } as any,
                       }))
                     }
                     className="h-4 w-4 text-indigo-600 rounded"
@@ -592,11 +638,11 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                   </span>
                   <input
                     type="checkbox"
-                    checked={localPrefs.categories.deadlines}
+                    checked={localPrefs?.categories?.deadlines ?? true}
                     onChange={(e) =>
                       setLocalPrefs((prev) => ({
                         ...prev,
-                        categories: { ...prev.categories, deadlines: e.target.checked },
+                        categories: { ...(prev?.categories || {}), deadlines: e.target.checked } as any,
                       }))
                     }
                     className="h-4 w-4 text-indigo-600 rounded"
@@ -609,11 +655,11 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                   </span>
                   <input
                     type="checkbox"
-                    checked={localPrefs.categories.examResults}
+                    checked={localPrefs?.categories?.examResults ?? true}
                     onChange={(e) =>
                       setLocalPrefs((prev) => ({
                         ...prev,
-                        categories: { ...prev.categories, examResults: e.target.checked },
+                        categories: { ...(prev?.categories || {}), examResults: e.target.checked } as any,
                       }))
                     }
                     className="h-4 w-4 text-indigo-600 rounded"
@@ -626,11 +672,11 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                   </span>
                   <input
                     type="checkbox"
-                    checked={localPrefs.categories.announcements}
+                    checked={localPrefs?.categories?.announcements ?? true}
                     onChange={(e) =>
                       setLocalPrefs((prev) => ({
                         ...prev,
-                        categories: { ...prev.categories, announcements: e.target.checked },
+                        categories: { ...(prev?.categories || {}), announcements: e.target.checked } as any,
                       }))
                     }
                     className="h-4 w-4 text-indigo-600 rounded"
@@ -643,11 +689,11 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                   </span>
                   <input
                     type="checkbox"
-                    checked={localPrefs.categories.directMessages}
+                    checked={localPrefs?.categories?.directMessages ?? true}
                     onChange={(e) =>
                       setLocalPrefs((prev) => ({
                         ...prev,
-                        categories: { ...prev.categories, directMessages: e.target.checked },
+                        categories: { ...(prev?.categories || {}), directMessages: e.target.checked } as any,
                       }))
                     }
                     className="h-4 w-4 text-indigo-600 rounded"
@@ -662,7 +708,7 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                 <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={localPrefs.soundEnabled}
+                    checked={localPrefs?.soundEnabled ?? true}
                     onChange={(e) =>
                       setLocalPrefs((prev) => ({ ...prev, soundEnabled: e.target.checked }))
                     }
@@ -718,4 +764,9 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
       </div>
     </div>
   );
+};
+
+export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (props) => {
+  if (!props.isOpen) return null;
+  return <NotificationCenterModalContent {...props} />;
 };

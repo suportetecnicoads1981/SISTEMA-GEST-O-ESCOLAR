@@ -36,6 +36,7 @@ import {
   sendWhatsAppMessage,
   performAutoBackup,
 } from './data/storage';
+import { DEFAULT_ROLE_PREFERENCES } from './data/defaultData';
 import { getSupabaseClient } from './services/supabaseClient';
 import { supabaseBatchQueue } from './services/supabaseBatchQueue';
 import { Header } from './components/layout/Header';
@@ -311,7 +312,10 @@ export default function App() {
       setToastNotification(null);
     }, 5000);
 
-    const userPrefs = data.rolePreferences?.[currentRole];
+    const userPrefs =
+      data?.rolePreferences?.[currentRole] ||
+      DEFAULT_ROLE_PREFERENCES?.[currentRole] ||
+      DEFAULT_ROLE_PREFERENCES?.ADMIN;
     if (userPrefs?.soundEnabled !== false) {
       playNotificationSound();
     }
@@ -794,7 +798,7 @@ export default function App() {
     setData((prev) => ({
       ...prev,
       rolePreferences: {
-        ...prev.rolePreferences,
+        ...(prev.rolePreferences || DEFAULT_ROLE_PREFERENCES),
         [role]: prefs,
       },
     }));
@@ -1888,7 +1892,7 @@ export default function App() {
             setCurrentUser(matchingAccount);
           }
         }}
-        preferences={data.rolePreferences}
+        preferences={data.rolePreferences || DEFAULT_ROLE_PREFERENCES}
         onSavePreferences={handleSaveNotificationPreferences}
         onMarkAsRead={handleMarkNotificationAsRead}
         onMarkAllAsRead={handleMarkAllNotificationsAsRead}

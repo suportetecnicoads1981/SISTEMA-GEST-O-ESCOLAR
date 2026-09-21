@@ -1,6 +1,7 @@
 import { getSupabaseClient } from './datasync/supabaseClient';
 import { SupabaseDatabaseService } from './datasync/SupabaseDatabaseService';
 import { AppStateData } from '../data/storage';
+import { DEFAULT_ROLE_PREFERENCES } from '../data/defaultData';
 
 export class SupabasePersistenceService {
   private static isSubscribed = false;
@@ -73,7 +74,7 @@ export class SupabasePersistenceService {
         settings: Object.keys(rawSettings).length > 0 ? rawSettings : undefined,
         notifications: notifsRes.data || [],
         communications: commsRes.data || [],
-        rolePreferences: undefined,
+        rolePreferences: DEFAULT_ROLE_PREFERENCES,
         schoolUnits: unitsRes.data || [],
         municipalSecretary: undefined,
         syncLogs: logsRes.data || [],
