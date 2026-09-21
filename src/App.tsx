@@ -57,7 +57,10 @@ import { MunicipalSyncModule } from './components/municipal/MunicipalSyncModule'
 import { CommunicationModule } from './components/comunicacao/CommunicationModule';
 import { WhatsAppModule } from './components/comunicacao/WhatsAppModule';
 import { UserAccessControl } from './components/usuarios/UserAccessControl';
-import { NotificationCenterModal } from './components/notificacoes/NotificationCenterModal';
+import {
+  NotificationCenterModal,
+  INLINE_DEFAULT_ROLE_PREFERENCES,
+} from './components/notificacoes/NotificationCenterModal';
 import { FeedbackSuggestionsModal } from './components/common/FeedbackSuggestionsModal';
 import { NetworkInstaller } from './components/config/NetworkInstaller';
 import { SystemUpdateModule } from './components/config/SystemUpdateModule';
@@ -332,7 +335,9 @@ export default function App() {
     const userPrefs =
       data?.rolePreferences?.[currentRole] ||
       DEFAULT_ROLE_PREFERENCES?.[currentRole] ||
-      DEFAULT_ROLE_PREFERENCES?.ADMIN;
+      DEFAULT_ROLE_PREFERENCES?.ADMIN ||
+      INLINE_DEFAULT_ROLE_PREFERENCES?.[currentRole] ||
+      INLINE_DEFAULT_ROLE_PREFERENCES?.ADMIN;
     if (userPrefs?.soundEnabled !== false) {
       playNotificationSound();
     }
@@ -1915,7 +1920,13 @@ export default function App() {
               setCurrentUser(matchingAccount);
             }
           }}
-          preferences={(data?.rolePreferences && data.rolePreferences?.ADMIN) ? data.rolePreferences : DEFAULT_ROLE_PREFERENCES}
+          preferences={
+            (data?.rolePreferences && data.rolePreferences?.ADMIN)
+              ? data.rolePreferences
+              : (DEFAULT_ROLE_PREFERENCES && DEFAULT_ROLE_PREFERENCES?.ADMIN)
+              ? DEFAULT_ROLE_PREFERENCES
+              : INLINE_DEFAULT_ROLE_PREFERENCES
+          }
           onSavePreferences={handleSaveNotificationPreferences}
           onMarkAsRead={handleMarkNotificationAsRead}
           onMarkAllAsRead={handleMarkAllNotificationsAsRead}

@@ -34,6 +34,17 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   public componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('[SucessoEdu ErrorBoundary] Erro capturado na renderização:', error, errorInfo);
     this.setState({ error, errorInfo });
+
+    // Auto-recuperação imediata para erros de schema / rolePreferences residuais
+    if (
+      error?.message?.includes('ADMIN') ||
+      error?.message?.includes('rolePreferences') ||
+      error?.message?.includes('undefined (reading')
+    ) {
+      try {
+        sanitizeLegacyLocalStorage();
+      } catch {}
+    }
   }
 
   private handleReload = () => {
@@ -80,6 +91,17 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   public render() {
     if (this.state.hasError) {
+      // Auto-higieniza se for erro de ADMIN / rolePreferences no localStorage do usuário
+      if (
+        this.state.error?.message?.includes('ADMIN') ||
+        this.state.error?.message?.includes('rolePreferences') ||
+        this.state.error?.message?.includes('undefined (reading')
+      ) {
+        try {
+          sanitizeLegacyLocalStorage();
+        } catch {}
+      }
+
       return (
         <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 sm:p-6 font-sans antialiased">
           <div className="max-w-2xl w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">

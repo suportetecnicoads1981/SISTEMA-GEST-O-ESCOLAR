@@ -24,9 +24,8 @@ import {
   RoleNotificationPreferences,
   UserRole,
 } from '../../types';
-import { DEFAULT_ROLE_PREFERENCES } from '../../data/defaultData';
 
-const INLINE_DEFAULT_ROLE_PREFERENCES: Record<UserRole, RoleNotificationPreferences> = {
+export const INLINE_DEFAULT_ROLE_PREFERENCES: Record<UserRole, RoleNotificationPreferences> = {
   ADMIN: {
     role: 'ADMIN',
     channels: { inApp: true, browserPush: true, email: true, smsWhatsapp: true },
@@ -62,13 +61,13 @@ const getBaseFallback = (role?: UserRole): RoleNotificationPreferences => {
     role && (role === 'ADMIN' || role === 'TEACHER' || role === 'STUDENT' || role === 'PARENT')
       ? role
       : 'ADMIN';
-  if (DEFAULT_ROLE_PREFERENCES && typeof DEFAULT_ROLE_PREFERENCES === 'object') {
-    const fromDefault = DEFAULT_ROLE_PREFERENCES[safeRole];
-    if (fromDefault && typeof fromDefault === 'object' && fromDefault.channels && fromDefault.categories) {
-      return fromDefault;
-    }
-  }
-  return INLINE_DEFAULT_ROLE_PREFERENCES[safeRole] || INLINE_DEFAULT_ROLE_PREFERENCES.ADMIN;
+  const item = INLINE_DEFAULT_ROLE_PREFERENCES?.[safeRole] || INLINE_DEFAULT_ROLE_PREFERENCES?.['ADMIN'];
+  return {
+    ...item,
+    channels: { ...item.channels },
+    categories: { ...item.categories },
+    quietHours: { ...item.quietHours },
+  };
 };
 
 interface NotificationCenterModalProps {
