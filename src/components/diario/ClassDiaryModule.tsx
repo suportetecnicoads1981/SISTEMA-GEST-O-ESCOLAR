@@ -67,6 +67,28 @@ interface ClassDiaryModuleProps {
   onNavigate?: (tab: string, payload?: any) => void;
 }
 
+// Regulamento padrão (fallback nacional/LDB) usado quando ainda não há nenhuma
+// normativa estadual cadastrada ou array nulo/vazio.
+const DEFAULT_STATE_REGULATION: StateEducationRegulation = {
+  id: 'reg-nacional-default',
+  stateCode: 'NACIONAL',
+  stateName: 'Nacional (Padrão LDB)',
+  regulationTitle: 'Lei de Diretrizes e Bases da Educação Nacional (LDB 9.394/96)',
+  legislationNumber: 'LDB 9.394/96',
+  minAttendancePercentage: 75,
+  minInfantileAttendancePercentage: 60,
+  termType: 'BIMESTRAL',
+  termsCount: 4,
+  minAnnualSchoolDays: 200,
+  minAnnualWorkloadHours: 800,
+  consecutiveAbsencesAlert: 5,
+  alternateAbsencesAlertPercent: 15,
+  allowMedicalJustification: true,
+  requiresBnccRegistrationInDiary: true,
+  conselhoTutelarNotificationRule:
+    'A partir de 30% de faltas injustificadas no período (Art. 12, Lei 9.394/96 e ECA).',
+};
+
 export function ClassDiaryModule({
   students = [],
   classes = [],
@@ -92,29 +114,36 @@ export function ClassDiaryModule({
   const [activeTab, setActiveTab] = useState<'ATTENDANCE' | 'LESSONS' | 'OVERVIEW_DIARY' | 'REGULATIONS'>('ATTENDANCE');
 
   // Filters for Active Class & Subject
-  const [selectedClassId, setSelectedClassId] = useState<string>(() => classes[0]?.id || '');
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>(() => subjects[0]?.id || '');
+  const [selectedClassId, setSelectedClassId] = useState<string>(() => classes?.[0]?.id || '');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>(() => subjects?.[0]?.id || '');
   const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [selectedTerm, setSelectedTerm] = useState<string>('3º Bimestre');
   const [lessonNumber, setLessonNumber] = useState<number>(1);
   const [teacherNameInput, setTeacherNameInput] = useState<string>('Prof. Rodrigo Peixoto');
 
   // Attendance Form State
-  const activeClass = useMemo(() => classes.find((c) => c.id === selectedClassId), [classes, selectedClassId]);
-  const activeSubject = useMemo(() => subjects.find((s) => s.id === selectedSubjectId), [subjects, selectedSubjectId]);
+  const activeClass = useMemo(() => (classes || []).find((c) => c?.id === selectedClassId), [classes, selectedClassId]);
+  const activeSubject = useMemo(() => (subjects || []).find((s) => s?.id === selectedSubjectId), [subjects, selectedSubjectId]);
   const classStudents = useMemo(() => {
-    return students
-      .filter((s) => s.classId === selectedClassId && s.status !== 'TRANSFERRED')
-      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    return (students || [])
+      .filter((s) => s && s.classId === selectedClassId && s.status !== 'TRANSFERRED')
+      .sort((a, b) => (a?.name || '').localeCompare(b?.name || '', 'pt-BR'));
   }, [students, selectedClassId]);
 
+  // Safe normalized state regulations list
+  const safeStateRegulations = useMemo(() => {
+    const list = (Array.isArray(stateRegulations) ? stateRegulations : []).filter(Boolean);
+    return list.length > 0 ? list : [DEFAULT_STATE_REGULATION];
+  }, [stateRegulations]);
+
   // Current active regulation
-  const activeRegulation = useMemo(() => {
+  const activeRegulation: StateEducationRegulation = useMemo(() => {
     return (
-      stateRegulations.find((r) => r.stateCode === activeStateRegulationCode) ||
-      stateRegulations[0]
+      safeStateRegulations.find((r) => r?.stateCode === activeStateRegulationCode) ||
+      safeStateRegulations[0] ||
+      DEFAULT_STATE_REGULATION
     );
-  }, [stateRegulations, activeStateRegulationCode]);
+  }, [safeStateRegulations, activeStateRegulationCode]);
 
   // Attendance Entries in the active editor
   const [localAttendance, setLocalAttendance] = useState<Record<string, { status: AttendanceStatus; justification?: string; cert?: string }>>({});
@@ -316,8 +345,8 @@ export function ClassDiaryModule({
             id: `reg-${parsed.stateCode.toLowerCase()}-${Date.now()}`,
             isCustomImported: true,
           };
-          onImportStateRegulation(regToSave);
-          onSelectActiveStateRegulation(regToSave.stateCode);
+          onImportStateRegulation?.(regToSave);
+          onSelectActiveStateRegulation?.(regToSave.stateCode);
           setShowImportRegulationModal(false);
           alert(`Normativa estadual "${regToSave.regulationTitle}" importada com sucesso!`);
         } else {
@@ -404,7 +433,7 @@ export function ClassDiaryModule({
               </h1>
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                 <ShieldCheck className="h-3.5 w-3.5" />
-                Normativa: {activeRegulation.stateCode} ({activeRegulation.legislationNumber})
+                Normativa: {activeRegulation?.stateCode || 'NACIONAL'} ({activeRegulation?.legislationNumber || 'LDB 9.394/96'})
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-1">
@@ -433,7 +462,7 @@ export function ClassDiaryModule({
             className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
           >
             <Settings2 className="h-4 w-4" />
-            <span>Normas Estaduais ({stateRegulations.length})</span>
+            <span>Normas Estaduais ({safeStateRegulations.length})</span>
           </button>
         </div>
       </div>
@@ -466,7 +495,7 @@ export function ClassDiaryModule({
             onChange={(e) => setSelectedClassId(e.target.value)}
             className="w-full bg-slate-800 border border-slate-700 text-white text-xs rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 font-medium cursor-pointer"
           >
-            {classes.map((cls) => (
+            {(classes || []).map((cls) => (
               <option key={cls.id} value={cls.id}>
                 {cls.name} ({cls.shift})
               </option>
@@ -483,7 +512,7 @@ export function ClassDiaryModule({
             onChange={(e) => setSelectedSubjectId(e.target.value)}
             className="w-full bg-slate-800 border border-slate-700 text-white text-xs rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 font-medium cursor-pointer"
           >
-            {subjects.map((sub) => (
+            {(subjects || []).map((sub) => (
               <option key={sub.id} value={sub.id}>
                 {sub.name}
               </option>
@@ -628,13 +657,13 @@ export function ClassDiaryModule({
                 {classAttendanceStats.avgRate}%
               </span>
               <span className="text-xs text-slate-500 mt-0.5 block">
-                Mínimo Legal ({activeRegulation.stateCode}): {activeRegulation.minAttendancePercentage}%
+                Mínimo Legal ({activeRegulation?.stateCode || 'NACIONAL'}): {activeRegulation?.minAttendancePercentage ?? 75}%
               </span>
             </div>
 
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                Alerta de Faltas ({activeRegulation.consecutiveAbsencesAlert} consecutivas)
+                Alerta de Faltas ({activeRegulation?.consecutiveAbsencesAlert ?? 5} consecutivas)
               </span>
               <span className="text-2xl font-black text-amber-600 mt-1 block">
                 {classAttendanceStats.atRiskCount} Alunos
@@ -1183,7 +1212,7 @@ export function ClassDiaryModule({
                 Quadro Resumo de Frequência dos Alunos
               </span>
               <span className="text-xs font-medium text-slate-500">
-                Carga Horária Mínima Obrigatória: {activeRegulation.minAnnualWorkloadHours}h / 200 dias
+                Carga Horária Mínima Obrigatória: {activeRegulation?.minAnnualWorkloadHours ?? 800}h / 200 dias
               </span>
             </div>
 
@@ -1220,7 +1249,8 @@ export function ClassDiaryModule({
                     const totalLessonsGiven = relevantSheets.length || 1;
                     const effectivePresences = presentCount + justifiedCount;
                     const rate = Math.round((effectivePresences / totalLessonsGiven) * 100);
-                    const isBelowMin = rate < activeRegulation.minAttendancePercentage;
+                    const minPct = activeRegulation?.minAttendancePercentage ?? 75;
+                    const isBelowMin = rate < minPct;
 
                     return (
                       <tr key={st.id} className="hover:bg-slate-50">
@@ -1252,7 +1282,7 @@ export function ClassDiaryModule({
                           ) : (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                               <CheckCircle2 className="h-3 w-3" />
-                              Regular ({activeRegulation.stateCode})
+                              Regular ({activeRegulation?.stateCode || 'NACIONAL'})
                             </span>
                           )}
                         </td>
@@ -1297,12 +1327,12 @@ export function ClassDiaryModule({
 
           {/* Cards of Available State Regulations */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {stateRegulations.map((reg) => {
-              const isActive = reg.stateCode === activeStateRegulationCode;
+            {safeStateRegulations.map((reg) => {
+              const isActive = (reg?.stateCode || '') === activeStateRegulationCode;
 
               return (
                 <div
-                  key={reg.id}
+                  key={reg.id || `reg-${reg.stateCode}`}
                   className={`p-5 rounded-2xl border transition-all flex flex-col justify-between ${
                     isActive
                       ? 'bg-indigo-50/60 border-indigo-500 shadow-md ring-2 ring-indigo-500/20'
@@ -1318,7 +1348,7 @@ export function ClassDiaryModule({
                             : 'bg-slate-100 text-slate-800'
                         }`}
                       >
-                        UF: {reg.stateCode}
+                        UF: {reg?.stateCode || 'BR'}
                       </span>
                       {isActive && (
                         <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -1370,7 +1400,7 @@ export function ClassDiaryModule({
                     {!isActive ? (
                       <button
                         type="button"
-                        onClick={() => onSelectActiveStateRegulation(reg.stateCode)}
+                        onClick={() => onSelectActiveStateRegulation?.(reg?.stateCode || 'NACIONAL')}
                         className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
                       >
                         Ativar Este Estado
@@ -1538,12 +1568,12 @@ export function ClassDiaryModule({
             { label: 'Disciplina', value: activeSubject?.name || '—' },
             { label: 'Professor(a)', value: teacherNameInput },
             { label: 'Data da Emissão', value: new Date().toLocaleDateString('pt-BR') },
-            { label: 'Normativa', value: `${activeRegulation.stateCode} (${activeRegulation.legislationNumber})` },
+            { label: 'Normativa', value: `${activeRegulation?.stateCode || 'NACIONAL'} (${activeRegulation?.legislationNumber || 'LDB 9.394/96'})` },
           ]}
           summaryMetrics={[
             { label: 'Total de Alunos', value: classStudents.length },
             { label: 'Freq. Média Turma', value: `${classAttendanceStats.avgRate}%`, colorClass: 'text-emerald-700' },
-            { label: 'Mínimo Legal', value: `${activeRegulation.minAttendancePercentage}%` },
+            { label: 'Mínimo Legal', value: `${activeRegulation?.minAttendancePercentage ?? 75}%` },
             { label: 'Aulas Ministradas', value: classAttendanceStats.totalLessons },
           ]}
           defaultFileName={`diario_classe_${(activeClass?.name || 'turma').toLowerCase().replace(/\s+/g, '_')}`}

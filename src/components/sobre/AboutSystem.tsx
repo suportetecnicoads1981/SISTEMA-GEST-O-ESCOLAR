@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   Info,
   Code2,
@@ -37,10 +37,21 @@ import {
   Building2,
 } from 'lucide-react';
 import { SchoolSettings, DeveloperContact } from '../../types';
+import { DEFAULT_SCHOOL_SETTINGS } from '../../data/defaultData';
+
+const DEFAULT_DEVELOPER_CONTACT: DeveloperContact = {
+  name: 'Equipe SucessoEdu',
+  company: 'SucessoEdu Gestão Educacional',
+  email: 'suportetecnicoads@gmail.com',
+  phone: '(00) 00000-0000',
+  supportAvailability: 'Seg. a Sex., 8h às 18h',
+  license: 'Licença Enterprise',
+  systemVersion: 'v5.4.2-ENTERPRISE',
+};
 
 interface AboutSystemProps {
-  settings: SchoolSettings;
-  developerContact: DeveloperContact;
+  settings?: SchoolSettings;
+  developerContact?: DeveloperContact;
   onUpdateDeveloperContact: (contact: DeveloperContact) => void;
   onUpdateSettings?: (settings: SchoolSettings) => void;
   onBack?: () => void;
@@ -49,7 +60,7 @@ interface AboutSystemProps {
 }
 
 export const AboutSystem: React.FC<AboutSystemProps> = ({
-  settings,
+  settings = DEFAULT_SCHOOL_SETTINGS,
   developerContact,
   onUpdateDeveloperContact,
   onUpdateSettings,
@@ -57,11 +68,21 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
   onNavigate,
   onOpenVersionControl,
 }) => {
+  const safeContact: DeveloperContact = useMemo(() => {
+    return {
+      ...DEFAULT_DEVELOPER_CONTACT,
+      ...(developerContact || {}),
+    };
+  }, [developerContact]);
+
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState<DeveloperContact>({ ...developerContact });
+  const [formData, setFormData] = useState<DeveloperContact>(() => ({
+    ...DEFAULT_DEVELOPER_CONTACT,
+    ...(developerContact || {}),
+  }));
   const [savedSuccess, setSavedSuccess] = useState(false);
-  const [schoolLogoPreview, setSchoolLogoPreview] = useState<string>(settings.logoUrl || '');
-  const [managementLogoPreview, setManagementLogoPreview] = useState<string>(settings.managementLogoUrl || '');
+  const [schoolLogoPreview, setSchoolLogoPreview] = useState<string>(settings?.logoUrl || '');
+  const [managementLogoPreview, setManagementLogoPreview] = useState<string>(settings?.managementLogoUrl || '');
   const [logoSuccessMsg, setLogoSuccessMsg] = useState(false);
   const schoolLogoInputRef = useRef<HTMLInputElement>(null);
   const managementLogoInputRef = useRef<HTMLInputElement>(null);
@@ -356,7 +377,7 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
 
           <button
             onClick={() => {
-              setFormData({ ...developerContact });
+              setFormData({ ...safeContact });
               setIsEditing(!isEditing);
             }}
             className="px-4 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs sm:text-sm flex items-center gap-2 transition-colors cursor-pointer shrink-0"
@@ -540,15 +561,15 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
                 <Building className="h-4 w-4 text-indigo-600" />
                 <span>Empresa Desenvolvedora</span>
               </div>
-              <div className="text-slate-800 font-bold text-base">{developerContact.company}</div>
-              {developerContact.cnpj && (
+              <div className="text-slate-800 font-bold text-base">{safeContact.company || 'SucessoEdu Gestão Educacional'}</div>
+              {safeContact.cnpj && (
                 <div className="text-slate-500">
-                  <span className="font-semibold">CNPJ:</span> {developerContact.cnpj}
+                  <span className="font-semibold">CNPJ:</span> {safeContact.cnpj}
                 </div>
               )}
               <div className="text-slate-500 flex items-center gap-1.5">
                 <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                <span>{developerContact.location}</span>
+                <span>{safeContact.location || 'Brasil'}</span>
               </div>
             </div>
 
@@ -560,18 +581,18 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
               <div className="text-slate-800 font-semibold flex items-center gap-2">
                 <span className="text-slate-400">E-mail:</span>
                 <a
-                  href={`mailto:${developerContact.email}`}
+                  href={`mailto:${safeContact.email}`}
                   className="text-indigo-600 hover:underline font-bold"
                 >
-                  {developerContact.email}
+                  {safeContact.email}
                 </a>
               </div>
               <div className="text-slate-800 font-semibold flex items-center gap-2">
                 <span className="text-slate-400">WhatsApp / Fone:</span>
-                <span className="text-slate-900 font-bold">{developerContact.phone}</span>
+                <span className="text-slate-900 font-bold">{safeContact.phone}</span>
               </div>
               <div className="text-slate-500 text-[11px] leading-relaxed">
-                {developerContact.supportAvailability}
+                {safeContact.supportAvailability}
               </div>
             </div>
 
@@ -593,7 +614,7 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
               </div>
               <div className="flex items-center justify-between">
                 <div className="text-slate-900 font-bold text-sm font-mono">
-                  {developerContact.systemVersion || 'v5.4.1-ENTERPRISE'}
+                  {safeContact.systemVersion || 'v5.4.1-ENTERPRISE'}
                 </div>
                 {onOpenVersionControl && (
                   <button
@@ -605,7 +626,7 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
                 )}
               </div>
               <div className="text-slate-600 text-[11px] leading-relaxed">
-                {developerContact.license}
+                {safeContact.license}
               </div>
               <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-emerald-700 font-bold text-[11px]">

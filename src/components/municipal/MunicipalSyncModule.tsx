@@ -57,8 +57,11 @@ import {
 import {
   generateMunicipalSyncPacket,
   mergeMunicipalSyncPacket,
+  safeLocalStorageSet,
 } from '../../data/storage';
 import { DEFAULT_MUNICIPAL_SECRETARY } from '../../data/defaultData';
+import { getSupabaseClient } from '../../services/supabaseClient';
+import { SupabasePersistenceService } from '../../services/supabasePersistenceService';
 import { SchoolUnitModal } from './SchoolUnitModal';
 import { MunicipalSecretaryModal } from './MunicipalSecretaryModal';
 import { MunicipalLinkageCertificateModal } from './MunicipalLinkageCertificateModal';
@@ -230,6 +233,123 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
   // Search in school units
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [zoneFilter, setZoneFilter] = useState<'ALL' | 'ZONA_URBANA' | 'ZONA_RURAL'>('ALL');
+
+  // Supabase Realtime synchronization state
+  const [realtimeStatus, setRealtimeStatus] = useState<'CONNECTED' | 'SYNCING' | 'DISCONNECTED'>('DISCONNECTED');
+  const [lastRealtimeSyncTime, setLastRealtimeSyncTime] = useState<string | null>(null);
+  const [realtimeChangeSummary, setRealtimeChangeSummary] = useState<string | null>(null);
+
+  // Global Supabase Realtime Listener for Municipal and School State
+  useEffect(() => {
+    let channel: any = null;
+    let isMounted = true;
+
+    try {
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        channel = supabase
+          .channel('sucessoedu-municipal-realtime')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public' },
+            async (payload) => {
+              if (!isMounted) return;
+              console.log('🔄 [MunicipalSyncModule] Mudança detectada no Supabase:', payload?.table, payload?.eventType);
+              
+              const table = payload?.table || 'dados';
+              const eventType = payload?.eventType === 'INSERT' ? 'Novo registro em' : payload?.eventType === 'UPDATE' ? 'Atualização em' : payload?.eventType === 'DELETE' ? 'Exclusão em' : 'Sincronização em';
+              
+              setRealtimeStatus('SYNCING');
+              setRealtimeChangeSummary(`${eventType} ${table}`);
+
+              try {
+                // Fetch fresh state safely without null pointer exceptions
+                const fresh = await SupabasePersistenceService.fetchAppStateFromSupabase();
+                if (fresh && isMounted) {
+                  // Validate & sanitize incoming entities defensively
+                  if (Array.isArray(fresh.schoolUnits) && onUpdateSchoolUnits) {
+                    const validUnits: SchoolUnit[] = fresh.schoolUnits
+                      .filter((u): u is SchoolUnit => Boolean(u && typeof u === 'object' && u.id))
+                      .map((u: any) => ({
+                        id: String(u?.id ?? `unit_${Math.random().toString(36).substring(2, 7)}`),
+                        name: String(u?.name ?? 'Escola Municipal'),
+                        inepCode: String(u?.inepCode ?? u?.inep_code ?? '00000000'),
+                        type: (u?.type || 'ESCOLA_SEDE') as any,
+                        locationZone: (u?.locationZone || u?.location_zone || 'ZONA_URBANA') as any,
+                        district: String(u?.district ?? 'Centro'),
+                        address: String(u?.address ?? ''),
+                        city: String(u?.city ?? 'Município'),
+                        state: String(u?.state ?? 'SP'),
+                        directorName: String(u?.directorName ?? u?.director_name ?? 'Direção Geral'),
+                        phone: String(u?.phone ?? ''),
+                        email: String(u?.email ?? ''),
+                        totalStudents: Number(u?.totalStudents ?? u?.total_students ?? 0),
+                        totalClasses: Number(u?.totalClasses ?? u?.total_classes ?? 0),
+                        totalTeachers: Number(u?.totalTeachers ?? u?.total_teachers ?? 0),
+                        syncStatus: (u?.syncStatus || u?.sync_status || 'SINCRONIZADO') as any,
+                        lastSyncTimestamp: u?.lastSyncTimestamp || u?.last_sync_timestamp,
+                        hasInternet: Boolean(u?.hasInternet ?? u?.has_internet ?? true),
+                        isLinkedToSecretary: u?.isLinkedToSecretary !== false,
+                        municipalSecretaryId: u?.municipalSecretaryId || u?.municipal_secretary_id,
+                        municipalSecretaryName: u?.municipalSecretaryName || u?.municipal_secretary_name,
+                        municipalSecretaryCnpj: u?.municipalSecretaryCnpj || u?.municipal_secretary_cnpj,
+                        linkageCode: u?.linkageCode || u?.linkage_code,
+                        linkageDecree: u?.linkageDecree || u?.linkage_decree,
+                        linkageDate: u?.linkageDate || u?.linkage_date,
+                      }));
+                    onUpdateSchoolUnits(validUnits);
+                  }
+
+                  if (Array.isArray(fresh.syncLogs) && onUpdateSyncLogs) {
+                    const validLogs = fresh.syncLogs.filter((l): l is SyncAuditLog => Boolean(l && typeof l === 'object' && l.id));
+                    onUpdateSyncLogs(validLogs);
+                  }
+
+                  if (fresh.municipalSecretary && typeof fresh.municipalSecretary === 'object' && onUpdateMunicipalSecretary) {
+                    onUpdateMunicipalSecretary(fresh.municipalSecretary);
+                  }
+
+                  // Trigger parent global refresh if available
+                  if (onRefreshData) {
+                    onRefreshData();
+                  }
+
+                  setLastRealtimeSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+                  setRealtimeStatus('CONNECTED');
+                }
+              } catch (fetchErr) {
+                console.warn('⚠️ [MunicipalSyncModule] Falha ao processar atualização em tempo real:', fetchErr);
+                if (isMounted) {
+                  setRealtimeStatus('CONNECTED');
+                }
+              }
+            }
+          )
+          .subscribe((status) => {
+            if (!isMounted) return;
+            if (status === 'SUBSCRIBED') {
+              setRealtimeStatus('CONNECTED');
+              setLastRealtimeSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              setRealtimeStatus('DISCONNECTED');
+            }
+          });
+      }
+    } catch (e) {
+      console.warn('Supabase Realtime not available:', e);
+      setRealtimeStatus('DISCONNECTED');
+    }
+
+    return () => {
+      isMounted = false;
+      if (channel) {
+        try {
+          const supabase = getSupabaseClient();
+          supabase?.removeChannel(channel);
+        } catch (_) {}
+      }
+    };
+  }, [onUpdateSchoolUnits, onUpdateSyncLogs, onUpdateMunicipalSecretary, onRefreshData]);
 
   // School Unit Modal states
   const [isSchoolUnitModalOpen, setIsSchoolUnitModalOpen] = useState(false);
@@ -615,7 +735,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
           </div>
         </div>
 
-        {/* Quick Municipal Stats Row */}
+        {/* Quick Municipal Stats Row + Supabase Realtime Status Bar */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-white/10 text-xs">
           <div className="bg-white/5 rounded-xl p-2.5">
             <span className="text-[10px] text-emerald-200 uppercase font-semibold block">Total de Escolas na Rede</span>
@@ -632,6 +752,72 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
           <div className="bg-white/5 rounded-xl p-2.5">
             <span className="text-[10px] text-emerald-200 uppercase font-semibold block">Taxa de Aprovação</span>
             <span className="text-lg font-black text-white">{censusStats.taxaAprovacao}%</span>
+          </div>
+        </div>
+
+        {/* Realtime Live State Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 px-3 py-2 rounded-xl bg-slate-950/40 border border-emerald-500/20 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5">
+              {realtimeStatus === 'CONNECTED' ? (
+                <>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </>
+              ) : realtimeStatus === 'SYNCING' ? (
+                <>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                </>
+              ) : (
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-slate-400"></span>
+              )}
+            </span>
+            <span className="font-bold text-emerald-300 text-[11px]">
+              {realtimeStatus === 'CONNECTED'
+                ? 'Supabase Realtime Ativo • Sincronização Contínua'
+                : realtimeStatus === 'SYNCING'
+                ? 'Sincronizando Alterações do Banco de Dados...'
+                : 'Sincronização Local • Pronto'}
+            </span>
+            {realtimeChangeSummary && (
+              <span className="px-2 py-0.5 rounded-md bg-emerald-950/80 text-emerald-200 text-[10px] border border-emerald-500/30">
+                {realtimeChangeSummary}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 text-[11px] text-emerald-200/80">
+            {lastRealtimeSyncTime && (
+              <span>Última sincronização: <strong>{lastRealtimeSyncTime}</strong></span>
+            )}
+            <button
+              onClick={async () => {
+                setRealtimeStatus('SYNCING');
+                try {
+                  const fresh = await SupabasePersistenceService.fetchAppStateFromSupabase();
+                  if (fresh) {
+                    if (Array.isArray(fresh.schoolUnits) && onUpdateSchoolUnits) {
+                      onUpdateSchoolUnits(fresh.schoolUnits);
+                    }
+                    if (Array.isArray(fresh.syncLogs) && onUpdateSyncLogs) {
+                      onUpdateSyncLogs(fresh.syncLogs);
+                    }
+                    if (fresh.municipalSecretary && onUpdateMunicipalSecretary) {
+                      onUpdateMunicipalSecretary(fresh.municipalSecretary);
+                    }
+                    if (onRefreshData) onRefreshData();
+                  }
+                  setLastRealtimeSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+                  setRealtimeStatus('CONNECTED');
+                } catch {
+                  setRealtimeStatus('CONNECTED');
+                }
+              }}
+              className="hover:text-white underline cursor-pointer text-[10px]"
+              title="Forçar leitura imediata do Supabase"
+            >
+              Atualizar Agora
+            </button>
           </div>
         </div>
       </div>

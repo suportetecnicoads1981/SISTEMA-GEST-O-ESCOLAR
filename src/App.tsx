@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import {
   Student,
   SchoolClass,
@@ -40,6 +40,7 @@ import {
   DEFAULT_ROLE_PREFERENCES,
   DEFAULT_SCHOOL_SETTINGS,
   DEFAULT_MUNICIPAL_SECRETARY,
+  DEFAULT_DEVELOPER_CONTACT,
 } from './data/defaultData';
 import { getSupabaseClient } from './services/supabaseClient';
 import { supabaseBatchQueue } from './services/supabaseBatchQueue';
@@ -56,6 +57,7 @@ import { QuestionBank } from './components/questoes/QuestionBank';
 import { ExamManager } from './components/provas/ExamManager';
 import { StudentExamRoom } from './components/provas/StudentExamRoom';
 import { AssessmentResultsReport } from './components/relatorios/AssessmentResultsReport';
+import { PedagogicalDashboard } from './components/relatorios/PedagogicalDashboard';
 import { MunicipalSyncModule } from './components/municipal/MunicipalSyncModule';
 import { CommunicationModule } from './components/comunicacao/CommunicationModule';
 import { WhatsAppModule } from './components/comunicacao/WhatsAppModule';
@@ -90,72 +92,16 @@ import { Bell, CheckCircle2, X } from 'lucide-react';
 import { startMessageQueueWorker, stopMessageQueueWorker } from './services/messageQueueService';
 import { DatabaseAutomatorService } from './services/databaseAutomatorService';
 
-// Carregamento Preguiçoso (Lazy Loading) para módulos e dashboards de grande densidade
-const PedagogicalDashboard = lazy(() =>
-  import('./components/relatorios/PedagogicalDashboard').then((m) => ({
-    default: m.PedagogicalDashboard,
-  }))
-);
-
-const NexusBuildHub = lazy(() =>
-  import('./components/nexusbuild/NexusBuildHub').then((m) => ({
-    default: m.NexusBuildHub,
-  }))
-);
-
-const SystemArchitectureHub = lazy(() =>
-  import('./components/architecture/SystemArchitectureHub').then((m) => ({
-    default: m.SystemArchitectureHub,
-  }))
-);
-
-const OmniDeployHub = lazy(() =>
-  import('./components/omnideploy/OmniDeployHub').then((m) => ({
-    default: m.OmniDeployHub,
-  }))
-);
-
-const NexusDeployerHub = lazy(() =>
-  import('./components/nexusdeployer/NexusDeployerHub').then((m) => ({
-    default: m.NexusDeployerHub,
-  }))
-);
-
-const NexusInstallHub = lazy(() =>
-  import('./components/nexusinstall/NexusInstallHub').then((m) => ({
-    default: m.NexusInstallHub,
-  }))
-);
-
-const CleanSlateHub = lazy(() =>
-  import('./components/cleanslate/CleanSlateHub').then((m) => ({
-    default: m.CleanSlateHub,
-  }))
-);
-
-const InstalaFlowHub = lazy(() =>
-  import('./components/instalaflow/InstalaFlowHub').then((m) => ({
-    default: m.InstalaFlowHub,
-  }))
-);
-
-const DataSyncProHub = lazy(() =>
-  import('./components/datasync/DataSyncProHub').then((m) => ({
-    default: m.DataSyncProHub,
-  }))
-);
-
-const DebugFlowHub = lazy(() =>
-  import('./components/debugflow/DebugFlowHub').then((m) => ({
-    default: m.DebugFlowHub,
-  }))
-);
-
-const AdminTIHub = lazy(() =>
-  import('./components/admin/AdminTIHub').then((m) => ({
-    default: m.AdminTIHub,
-  }))
-);
+import { NexusBuildHub } from './components/nexusbuild/NexusBuildHub';
+import { SystemArchitectureHub } from './components/architecture/SystemArchitectureHub';
+import { OmniDeployHub } from './components/omnideploy/OmniDeployHub';
+import { NexusDeployerHub } from './components/nexusdeployer/NexusDeployerHub';
+import { NexusInstallHub } from './components/nexusinstall/NexusInstallHub';
+import { CleanSlateHub } from './components/cleanslate/CleanSlateHub';
+import { InstalaFlowHub } from './components/instalaflow/InstalaFlowHub';
+import { DataSyncProHub } from './components/datasync/DataSyncProHub';
+import { DebugFlowHub } from './components/debugflow/DebugFlowHub';
+import { AdminTIHub } from './components/admin/AdminTIHub';
 
 export default function App() {
   const [data, setData] = useState(() => getStoredData());
@@ -1962,8 +1908,8 @@ export default function App() {
             {/* TAB: SOBRE O SISTEMA & DADOS DO DESENVOLVEDOR */}
             {activeTab === 'ABOUT' && (
               <AboutSystem
-                settings={data.settings}
-                developerContact={data.developerContact}
+                settings={data?.settings || DEFAULT_SCHOOL_SETTINGS}
+                developerContact={data?.developerContact || DEFAULT_DEVELOPER_CONTACT}
                 onUpdateDeveloperContact={handleUpdateDeveloperContact}
                 onUpdateSettings={handleUpdateSettings}
                 onBack={handleGoBack}

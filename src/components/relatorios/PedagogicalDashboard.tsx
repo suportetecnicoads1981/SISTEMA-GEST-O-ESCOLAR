@@ -125,11 +125,11 @@ const DEFAULT_DASHBOX_CONFIG: DashBoxConfig = {
 };
 
 export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
-  exams,
-  questions,
-  students,
-  classes,
-  submissions,
+  exams = [],
+  questions = [],
+  students = [],
+  classes = [],
+  submissions = [],
   schoolUnits = [],
   subjects = [],
   settings,
@@ -139,7 +139,7 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
   onNavigate,
 }) => {
   const [activeSection, setActiveSection] = useState<'DASHBOARD' | 'RESULTS_BY_SCHOOL_LEVEL' | 'EVOLUTION'>(initialSection);
-  const [selectedExamId, setSelectedExamId] = useState<string>(exams[0]?.id || '');
+  const [selectedExamId, setSelectedExamId] = useState<string>(exams?.[0]?.id || '');
   const [selectedClassId, setSelectedClassId] = useState<string>('ALL');
 
   useEffect(() => {
@@ -221,7 +221,7 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
     }
   };
 
-  const selectedExam = exams.find((e) => e.id === selectedExamId) || exams[0];
+  const selectedExam = (exams || []).find((e) => e.id === selectedExamId) || exams?.[0];
 
   const [isGeneratingAiInsight, setIsGeneratingAiInsight] = useState(false);
   const [aiInsightData, setAiInsightData] = useState<{
