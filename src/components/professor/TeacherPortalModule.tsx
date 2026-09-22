@@ -80,22 +80,22 @@ interface TeacherPortalModuleProps {
 }
 
 export const TeacherPortalModule: React.FC<TeacherPortalModuleProps> = ({
-  students,
-  classes,
-  subjects,
-  schoolUnits,
+  students = [],
+  classes = [],
+  subjects = [],
+  schoolUnits = [],
   settings,
-  bnccSkills,
-  stateRegulations,
-  activeStateRegulationCode,
-  attendanceSheets,
-  lessonRegistries,
-  classGradeSheets,
-  exams,
-  questions,
-  submissions,
-  teacherLessonPlans,
-  teacherStudentNotes,
+  bnccSkills = [],
+  stateRegulations = [],
+  activeStateRegulationCode = 'SP',
+  attendanceSheets = [],
+  lessonRegistries = [],
+  classGradeSheets = [],
+  exams = [],
+  questions = [],
+  submissions = [],
+  teacherLessonPlans = [],
+  teacherStudentNotes = [],
   currentUserTeacherName,
   onSaveAttendanceSheet,
   onSaveLessonRegistry,
@@ -143,18 +143,21 @@ export const TeacherPortalModule: React.FC<TeacherPortalModuleProps> = ({
 
   // Filter classes and subjects assigned to this teacher
   const teacherSubjects = useMemo(() => {
-    const list = subjects.filter(
+    const safeTeacher = typeof activeTeacherName === 'string' ? activeTeacherName.toLowerCase() : '';
+    const list = (subjects || []).filter(
       (s) =>
-        s.teacherName &&
-        s.teacherName.toLowerCase().includes(activeTeacherName.toLowerCase())
+        s &&
+        typeof s.teacherName === 'string' &&
+        safeTeacher &&
+        s.teacherName.toLowerCase().includes(safeTeacher)
     );
-    return list.length > 0 ? list : subjects;
+    return list.length > 0 ? list : (subjects || []);
   }, [subjects, activeTeacherName]);
 
   const teacherClasses = useMemo(() => {
-    const subjectClassIds = new Set(teacherSubjects.map((s) => s.classId).filter(Boolean));
-    const list = classes.filter((c) => subjectClassIds.has(c.id));
-    return list.length > 0 ? list : classes;
+    const subjectClassIds = new Set(teacherSubjects.map((s) => s?.classId).filter(Boolean));
+    const list = (classes || []).filter((c) => c && subjectClassIds.has(c.id));
+    return list.length > 0 ? list : (classes || []);
   }, [classes, teacherSubjects]);
 
   // Selected Class & Subject in Context

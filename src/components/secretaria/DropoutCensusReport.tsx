@@ -59,8 +59,8 @@ interface DropoutCensusReportProps {
 }
 
 export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
-  students,
-  classes,
+  students = [],
+  classes = [],
   schoolUnits = [],
   onUpdateStudent,
   onBack,

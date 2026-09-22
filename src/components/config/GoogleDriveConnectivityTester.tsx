@@ -682,9 +682,11 @@ FIM DO ARQUIVO DE TESTE
   };
 
   // Filter files
-  const filteredFiles = folderFiles.filter((f) =>
-    f.name.toLowerCase().includes(fileFilter.toLowerCase())
-  );
+  const filteredFiles = folderFiles.filter((f) => {
+    if (!f) return false;
+    const q = (fileFilter || '').toLowerCase().trim();
+    return !q || (f.name && f.name.toLowerCase().includes(q));
+  });
 
   return (
     <div id="google-drive-connectivity-tester" className="space-y-6">

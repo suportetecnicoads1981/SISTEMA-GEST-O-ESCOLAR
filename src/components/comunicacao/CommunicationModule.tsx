@@ -322,10 +322,13 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
 
   // Filter messages
   const filteredMessages = messages.filter((msg) => {
+    if (!msg) return false;
+    const q = (searchQuery || '').toLowerCase().trim();
     const matchesSearch =
-      msg.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      msg.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      msg.senderName.toLowerCase().includes(searchQuery.toLowerCase());
+      !q ||
+      (msg.title && msg.title.toLowerCase().includes(q)) ||
+      (msg.content && msg.content.toLowerCase().includes(q)) ||
+      (msg.senderName && msg.senderName.toLowerCase().includes(q));
 
     const matchesCategory = filterCategory === 'ALL' || msg.category === filterCategory;
     const matchesPriority = filterPriority === 'ALL' || msg.priority === filterPriority;

@@ -151,13 +151,16 @@ export const SystemArchitectureHub: React.FC<SystemArchitectureHubProps> = ({
 
   // Filter modules
   const filteredModules = useMemo(() => {
+    const q = (searchTerm || '').toLowerCase().trim();
     return SYSTEM_MODULES_CATALOG.filter((m) => {
+      if (!m) return false;
       const matchSearch =
-        m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.tagline.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.sourceFiles.some((f) => f.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        m.databaseEntities.some((e) => e.toLowerCase().includes(searchTerm.toLowerCase()));
+        !q ||
+        (m.name && m.name.toLowerCase().includes(q)) ||
+        (m.tagline && m.tagline.toLowerCase().includes(q)) ||
+        (m.id && m.id.toLowerCase().includes(q)) ||
+        (m.sourceFiles && m.sourceFiles.some((f) => f && f.toLowerCase().includes(q))) ||
+        (m.databaseEntities && m.databaseEntities.some((e) => e && e.toLowerCase().includes(q)));
 
       const matchCategory = selectedCategory === 'TODAS' || m.category === selectedCategory;
       const matchTier = selectedTier === 'TODOS' || m.tier === selectedTier;
@@ -1158,12 +1161,14 @@ export const SystemArchitectureHub: React.FC<SystemArchitectureHubProps> = ({
             {/* Modules Roadmap & Fixes Cards List */}
             <div className="space-y-6">
               {SYSTEM_MODULES_CATALOG.filter((m) => {
-                const term = searchTerm.toLowerCase();
+                if (!m) return false;
+                const term = (searchTerm || '').toLowerCase().trim();
                 const matchSearch =
-                  m.name.toLowerCase().includes(term) ||
-                  m.tagline.toLowerCase().includes(term) ||
-                  m.id.toLowerCase().includes(term) ||
-                  m.sourceFiles.some((f) => f.toLowerCase().includes(term));
+                  !term ||
+                  (m.name && m.name.toLowerCase().includes(term)) ||
+                  (m.tagline && m.tagline.toLowerCase().includes(term)) ||
+                  (m.id && m.id.toLowerCase().includes(term)) ||
+                  (m.sourceFiles && m.sourceFiles.some((f) => f && f.toLowerCase().includes(term)));
                 const matchCategory = selectedCategory === 'TODAS' || m.category === selectedCategory;
                 return matchSearch && matchCategory;
               }).map((mod) => {

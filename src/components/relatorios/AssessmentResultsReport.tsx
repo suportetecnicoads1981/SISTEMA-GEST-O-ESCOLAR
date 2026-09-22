@@ -180,14 +180,16 @@ export const AssessmentResultsReport: React.FC<AssessmentResultsReportProps> = (
         (selectedSegment === 'FUNDAMENTAL_1' && item.gradeLevel.match(/[1-5]º/)) ||
         (selectedSegment === 'FUNDAMENTAL_2' && item.gradeLevel.match(/[6-9]º/));
       const matchExam = selectedExamId === 'ALL' || item.examId === selectedExamId;
+      const subIdFilter = (selectedSubjectId || '').toLowerCase().trim();
       const matchSubject =
         selectedSubjectId === 'ALL' ||
-        item.subjectName.toLowerCase().includes(selectedSubjectId.toLowerCase());
+        (item.subjectName && item.subjectName.toLowerCase().includes(subIdFilter));
+      const q = (searchTerm || '').toLowerCase().trim();
       const matchSearch =
-        !searchTerm ||
-        item.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.enrollmentNumber.includes(searchTerm) ||
-        item.className.toLowerCase().includes(searchTerm.toLowerCase());
+        !q ||
+        (item.studentName && item.studentName.toLowerCase().includes(q)) ||
+        (item.enrollmentNumber && item.enrollmentNumber.toLowerCase().includes(q)) ||
+        (item.className && item.className.toLowerCase().includes(q));
 
       return matchSchool && matchSegment && matchExam && matchSubject && matchSearch;
     });

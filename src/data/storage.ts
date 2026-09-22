@@ -574,22 +574,22 @@ export function getStoredData(): AppStateData {
     const hasArr = (arr: any) => Array.isArray(arr);
 
     const loadedState: AppStateData = {
-      students: [],
-      classes: [],
+      students: hasArr(parsed.students) ? parsed.students : [],
+      classes: hasArr(parsed.classes) ? parsed.classes : [],
       subjects: hasArr(parsed.subjects) && parsed.subjects.length > 0 ? parsed.subjects : DEFAULT_SUBJECTS,
       courses: hasArr(parsed.courses) && parsed.courses.length > 0 ? parsed.courses : DEFAULT_COURSES,
-      questions: [],
-      exams: [],
-      submissions: [],
-      academicHistories: [],
+      questions: hasArr(parsed.questions) ? parsed.questions : [],
+      exams: hasArr(parsed.exams) ? parsed.exams : [],
+      submissions: hasArr(parsed.submissions) ? parsed.submissions : [],
+      academicHistories: hasArr(parsed.academicHistories) ? parsed.academicHistories : [],
       settings: parsed.settings || DEFAULT_SCHOOL_SETTINGS,
-      notifications: [],
-      communications: [],
+      notifications: hasArr(parsed.notifications) ? parsed.notifications : [],
+      communications: hasArr(parsed.communications) ? parsed.communications : [],
       rolePreferences: {
         ...DEFAULT_ROLE_PREFERENCES,
         ...(parsed?.rolePreferences && typeof parsed.rolePreferences === 'object' ? parsed.rolePreferences : {}),
       },
-      schoolUnits: [],
+      schoolUnits: hasArr(parsed.schoolUnits) ? parsed.schoolUnits : [],
       municipalSecretary: parsed.municipalSecretary || DEFAULT_MUNICIPAL_SECRETARY,
       syncLogs: hasArr(parsed.syncLogs) ? parsed.syncLogs : [],
       userAccounts: hasArr(parsed.userAccounts) && parsed.userAccounts.length > 0 ? parsed.userAccounts : DEFAULT_USER_ACCOUNTS,
@@ -597,14 +597,14 @@ export function getStoredData(): AppStateData {
       bnccSkills: hasArr(parsed.bnccSkills) && parsed.bnccSkills.length > 0 ? parsed.bnccSkills : DEFAULT_BNCC_SKILLS,
       stateRegulations: hasArr(parsed.stateRegulations) && parsed.stateRegulations.length > 0 ? parsed.stateRegulations : DEFAULT_STATE_REGULATIONS,
       activeStateRegulationCode: parsed.activeStateRegulationCode || 'SP',
-      attendanceSheets: [],
-      lessonRegistries: [],
-      classGradeSheets: [],
-      teacherLessonPlans: [],
-      teacherStudentNotes: [],
+      attendanceSheets: hasArr(parsed.attendanceSheets) ? parsed.attendanceSheets : [],
+      lessonRegistries: hasArr(parsed.lessonRegistries) ? parsed.lessonRegistries : [],
+      classGradeSheets: hasArr(parsed.classGradeSheets) ? parsed.classGradeSheets : [],
+      teacherLessonPlans: hasArr(parsed.teacherLessonPlans) ? parsed.teacherLessonPlans : [],
+      teacherStudentNotes: hasArr(parsed.teacherStudentNotes) ? parsed.teacherStudentNotes : [],
       whatsappConfig: parsed.whatsappConfig || DEFAULT_WHATSAPP_CONFIG,
       whatsappTemplates: parsed.whatsappTemplates || DEFAULT_WHATSAPP_TEMPLATES,
-      whatsappLogs: [],
+      whatsappLogs: hasArr(parsed.whatsappLogs) ? parsed.whatsappLogs : [],
       systemUpdates: parsed.systemUpdates || DEFAULT_SYSTEM_UPDATES,
       auditLogs: hasArr(parsed.auditLogs) ? parsed.auditLogs : [],
     };
@@ -1220,22 +1220,27 @@ export function generateMunicipalSyncPacket(
   schoolUnit: SchoolUnit,
   operatorName: string
 ): MunicipalSyncPacket {
-  const current = getStoredData();
+  const current: AppStateData = getStoredData();
+  const currentStudents = current.students || [];
+  const currentClasses = current.classes || [];
+  const currentExams = current.exams || [];
+  const currentSubmissions = current.submissions || [];
+  const currentAcademicHistories = current.academicHistories || [];
 
-  const packetId = `SYNC-PACKET-${schoolUnit.inepCode}-${Date.now()}`;
+  const packetId = `SYNC-PACKET-${schoolUnit?.inepCode || 'INEP'}-${Date.now()}`;
   const timestamp = new Date().toISOString();
   
   // Calculate summary counts
   const summary = {
-    studentsCount: current.students.length,
-    classesCount: current.classes.length,
-    examsCount: current.exams.length,
-    submissionsCount: current.submissions.length,
-    academicHistoriesCount: current.academicHistories.length,
+    studentsCount: currentStudents.length,
+    classesCount: currentClasses.length,
+    examsCount: currentExams.length,
+    submissionsCount: currentSubmissions.length,
+    academicHistoriesCount: currentAcademicHistories.length,
   };
 
   const simpleChecksum = `SHA256-EDU-${btoa(
-    `${schoolUnit.inepCode}|${summary.studentsCount}|${summary.submissionsCount}|${timestamp}`
+    `${schoolUnit?.inepCode || ''}|${summary.studentsCount}|${summary.submissionsCount}|${timestamp}`
   ).slice(0, 32)}`;
 
   return {
@@ -1246,24 +1251,24 @@ export function generateMunicipalSyncPacket(
       lastSyncDate: timestamp,
       syncStatus: 'SINCRONIZADO',
     },
-    municipalityName: current.municipalSecretary?.city || current.settings.city || 'Cumaru do Norte',
-    stateCode: current.municipalSecretary?.state || current.settings.state || 'PA',
+    municipalityName: current.municipalSecretary?.city || current.settings?.city || 'Cumaru do Norte',
+    stateCode: current.municipalSecretary?.state || current.settings?.state || 'PA',
     exportedAt: timestamp,
     operatorName,
     checksum: simpleChecksum,
     municipalSecretary: current.municipalSecretary || DEFAULT_MUNICIPAL_SECRETARY,
     summary,
     data: {
-      students: current.students,
-      classes: current.classes,
-      exams: current.exams,
-      submissions: current.submissions,
-      academicHistories: current.academicHistories,
+      students: currentStudents,
+      classes: currentClasses,
+      exams: currentExams,
+      submissions: currentSubmissions,
+      academicHistories: currentAcademicHistories,
       censusExtra: {
-        specialNeedsCount: Math.round(current.students.length * 0.08),
-        transportUsersCount: Math.round(current.students.length * 0.35),
-        schoolFeedBeneficiariesCount: current.students.length,
-        dropoutRiskCount: Math.round(current.students.length * 0.04),
+        specialNeedsCount: Math.round(currentStudents.length * 0.08),
+        transportUsersCount: Math.round(currentStudents.length * 0.35),
+        schoolFeedBeneficiariesCount: currentStudents.length,
+        dropoutRiskCount: Math.round(currentStudents.length * 0.04),
       },
     },
   };
@@ -1277,18 +1282,18 @@ export function mergeMunicipalSyncPacket(
   operatorName: string
 ): { success: boolean; log: SyncAuditLog; error?: string } {
   // Transação Atômica: Ponto de Restauração Preventivo (Rollback Checkpoint)
-  const current = getStoredData();
+  const current: AppStateData = getStoredData();
   const rollbackCheckpoint = JSON.parse(JSON.stringify(current));
 
   try {
-    const packetData = packet.data;
+    const packetData = packet?.data || ({} as any);
     if (!packet || !packet.schoolUnit || !packet.schoolUnit.id) {
       throw new Error('Pacote .edusync inválido: Metadados da Unidade Escolar ausentes.');
     }
 
     // PASSO 1: Atualizar / Inserir Unidade Escolar (Escolas)
     const unitMap = new Map<string, SchoolUnit>();
-    current.schoolUnits.forEach((u) => unitMap.set(u.id, u));
+    (current.schoolUnits || []).forEach((u) => unitMap.set(u.id, u));
 
     const targetUnitId = packet.schoolUnit.id;
     const targetInep = packet.schoolUnit.inepCode;
@@ -1304,10 +1309,10 @@ export function mergeMunicipalSyncPacket(
 
     // PASSO 2: Inserir / Atualizar Turmas (com vínculo na escola)
     const classMap = new Map<string, SchoolClass>();
-    current.classes.forEach((c) => classMap.set(c.id, c));
+    (current.classes || []).forEach((c) => classMap.set(c.id, c));
     let newClasses = 0;
 
-    (packetData.classes || []).forEach((c) => {
+    (packetData.classes || []).forEach((c: any) => {
       if (!c.id || !c.name) {
         throw new Error(`Falha de integridade relacional: Turma inválida sem identificador no pacote.`);
       }
@@ -1320,10 +1325,10 @@ export function mergeMunicipalSyncPacket(
 
     // PASSO 3: Inserir / Atualizar Alunos (com vínculo na turma e escola)
     const studentMap = new Map<string, Student>();
-    current.students.forEach((s) => studentMap.set(s.id, s));
+    (current.students || []).forEach((s) => studentMap.set(s.id, s));
     let newStudents = 0;
 
-    (packetData.students || []).forEach((s) => {
+    (packetData.students || []).forEach((s: any) => {
       if (!s.id || !s.name) {
         throw new Error(`Falha de integridade relacional: Aluno inválido sem nome ou ID no pacote.`);
       }
@@ -1337,7 +1342,7 @@ export function mergeMunicipalSyncPacket(
 
     // PASSO 4: Inserir / Atualizar Matrículas e Históricos Acadêmicos
     const histMap = new Map<string, AcademicHistory>();
-    current.academicHistories.forEach((h) => histMap.set(h.id, h));
+    (current.academicHistories || []).forEach((h) => histMap.set(h.id, h));
     (packetData.academicHistories || []).forEach((h) => {
       if (!h.id || !h.studentId) return;
       // Validação de orfandade: se o aluno não existir, reverte o pacote
@@ -1349,17 +1354,17 @@ export function mergeMunicipalSyncPacket(
 
     // PASSO 5: Inserir / Atualizar Provas e Submissões
     const examMap = new Map<string, Exam>();
-    current.exams.forEach((e) => examMap.set(e.id, e));
+    (current.exams || []).forEach((e) => examMap.set(e.id, e));
     let newExams = 0;
-    (packetData.exams || []).forEach((e) => {
+    (packetData.exams || []).forEach((e: any) => {
       if (!examMap.has(e.id)) newExams++;
       examMap.set(e.id, e);
     });
 
     const subMap = new Map<string, ExamSubmission>();
-    current.submissions.forEach((s) => subMap.set(s.id, s));
+    (current.submissions || []).forEach((s) => subMap.set(s.id, s));
     let newSubs = 0;
-    (packetData.submissions || []).forEach((sub) => {
+    (packetData.submissions || []).forEach((sub: any) => {
       if (!subMap.has(sub.id)) newSubs++;
       subMap.set(sub.id, sub);
     });
@@ -1367,7 +1372,7 @@ export function mergeMunicipalSyncPacket(
     // PASSO 6: Consistência de Dados & Critério de Aceite 3
     // Atualizar unidades escolares garantindo que totalStudents seja idêntico à soma real de alunos ativos
     const allStudentsList = Array.from(studentMap.values());
-    const updatedUnits = current.schoolUnits.map((u) => {
+    const updatedUnits = (current.schoolUnits || []).map((u) => {
       const isTarget = u.id === existingUnitKey || (targetInep && u.inepCode === targetInep);
       const activeCountForThisUnit = allStudentsList.filter(
         (s) =>

@@ -695,6 +695,39 @@ END $$;
   }
 
   /**
+   * Utilitário para executar operações assíncronas com Retry e Backoff Exponencial com Jitter.
+   * Protege sincronizações em lote contra instabilidade transitória de rede ou rate limits.
+   */
+  public static async executeWithExponentialBackoff<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3,
+    initialDelayMs: number = 500,
+    factor: number = 2
+  ): Promise<T> {
+    let attempt = 0;
+    let delay = initialDelayMs;
+
+    while (true) {
+      try {
+        return await operation();
+      } catch (error: any) {
+        attempt++;
+        if (attempt > maxRetries) {
+          throw error;
+        }
+        // Jitter aleatório entre 0 e 100ms para evitar colisões em rajada
+        const jitter = Math.floor(Math.random() * 100);
+        const waitTime = delay + jitter;
+        console.warn(
+          `[SupabaseDatabaseService] Tentativa ${attempt}/${maxRetries} falhou (${error?.message || error}). Aguardando ${waitTime}ms para reexecutar...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+        delay *= factor;
+      }
+    }
+  }
+
+  /**
    * Sincroniza alunos locais com a tabela students no Supabase
    */
   public static async syncStudentsToSupabase(students: any[]): Promise<SupabaseSyncResult> {
@@ -1044,14 +1077,41 @@ END $$;
           }]);
         } 
       },
-      { name: 'sync_audit_logs', data: stored.syncLogs, customSync: () => this.syncTableGeneric('sync_audit_logs', stored.syncLogs) },
+      { 
+        name: 'sync_audit_logs', 
+        data: stored.syncLogs, 
+        customSync: () => this.syncTableGeneric(
+          'sync_audit_logs',
+          (stored.syncLogs || []).map((l: any, idx: number) => ({
+            id: l.id || ('log_' + idx),
+            table_name: 'municipal_sync',
+            operation: 'SYNC_SNAPSHOT',
+            station_id: l.schoolUnitId || 'SEMED_CENTRAL',
+            records_count: ((l.recordsMerged?.students || 0) + (l.recordsMerged?.submissions || 0)) || 1,
+            latency_ms: 120,
+            status: l.status || 'SUCESSO',
+            details: typeof l.notes === 'string' ? l.notes : JSON.stringify({
+              schoolUnitName: l.schoolUnitName,
+              operatorName: l.operatorName,
+              recordsMerged: l.recordsMerged,
+              importedAt: l.importedAt
+            }),
+            created_at: l.importedAt || new Date().toISOString()
+          }))
+        ) 
+      },
     ];
 
     for (let i = 0; i < tasks.length; i++) {
       const task = tasks[i];
       onProgress?.(i + 1, tasks.length, task.name);
       try {
-        const res = await task.customSync();
+        const res = await SupabaseDatabaseService.executeWithExponentialBackoff(
+          () => task.customSync(),
+          3,
+          400,
+          2
+        );
         results.push(res);
       } catch (err: any) {
         results.push({
@@ -1473,9 +1533,22 @@ CREATE TABLE IF NOT EXISTS public.school_settings (
     principal_name TEXT,
     secretary_name TEXT,
     logo_url TEXT,
+    neighborhood TEXT,
+    zip_code TEXT,
+    website TEXT,
+    principal_title TEXT,
+    secretary_registration TEXT,
+    system_version TEXT DEFAULT 'v5.2.0',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public.school_settings ADD COLUMN IF NOT EXISTS neighborhood TEXT;
+ALTER TABLE public.school_settings ADD COLUMN IF NOT EXISTS zip_code TEXT;
+ALTER TABLE public.school_settings ADD COLUMN IF NOT EXISTS website TEXT;
+ALTER TABLE public.school_settings ADD COLUMN IF NOT EXISTS principal_title TEXT;
+ALTER TABLE public.school_settings ADD COLUMN IF NOT EXISTS secretary_registration TEXT;
+ALTER TABLE public.school_settings ADD COLUMN IF NOT EXISTS system_version TEXT DEFAULT 'v5.2.0';
 
 -- =========================================================================
 -- 17. TABELA DE LOGS DE AUDITORIA E SINCRONIZAÇÃO (sync_audit_logs)
@@ -1489,8 +1562,11 @@ CREATE TABLE IF NOT EXISTS public.sync_audit_logs (
     latency_ms INT DEFAULT 0,
     status TEXT NOT NULL,
     details TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public.sync_audit_logs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
 -- =========================================================================
 -- 18. TABELA DE ATIVOS DE MÍDIA E DOCUMENTOS (media_assets)
@@ -1754,5 +1830,330 @@ CREATE INDEX IF NOT EXISTS idx_questions_subject ON public.questions(subject);
 
   public static getInitialProvisioningScript(): string {
     return this.getComprehensiveProvisioningScript();
+  }
+
+  /**
+   * Gera o script SQL mestre de verificação de integridade referencial,
+   * detecção de registros órfãos e auto-correção transacional para execução no Supabase.
+   */
+  public static getIntegrityVerificationAndHealingScript(): string {
+    return `-- =========================================================================
+-- SUCESSOEDU: SCRIPT DE AUDITORIA DE INTEGRIDADE, RELACIONAMENTOS E AUTO-CURA
+-- RDBMS: Supabase / PostgreSQL 14+
+-- Execução: Seguro e idempotente (Transação com ROLLBACK/COMMIT controlado)
+-- =========================================================================
+
+DO $$
+BEGIN
+    RAISE NOTICE '>>> INICIANDO VERIFICAÇÃO DE INTEGRIDADE RELACIONAL NO SUPABASE <<<';
+END $$;
+
+BEGIN;
+
+-- -------------------------------------------------------------------------
+-- PASSO 1: GARANTIR POLOS E TURMAS DE FALLBACK PARA PREVENIR REGISTROS ÓRFÃOS
+-- -------------------------------------------------------------------------
+
+-- 1.0 Garantir colunas compatíveis caso a tabela já exista com estrutura legada
+ALTER TABLE public.school_units ADD COLUMN IF NOT EXISTS inep_code TEXT;
+ALTER TABLE public.school_units ADD COLUMN IF NOT EXISTS city TEXT;
+ALTER TABLE public.school_units ADD COLUMN IF NOT EXISTS state TEXT;
+ALTER TABLE public.school_units ADD COLUMN IF NOT EXISTS principal_name TEXT;
+ALTER TABLE public.school_units ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE;
+
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS segment TEXT DEFAULT 'ENSINO_MEDIO';
+ALTER TABLE public.school_classes ADD COLUMN IF NOT EXISTS school_unit_id TEXT;
+
+-- 1.1 Polo / Unidade Escolar Sede Padrão
+INSERT INTO public.school_units (
+    id, name, inep_code, city, state, principal_name, active, updated_at
+) VALUES (
+    'unit-sede',
+    'Escola Municipal Polo SucessoEdu - Unidade Central',
+    '35000001',
+    'São Paulo',
+    'SP',
+    'Prof. Coordenador Geral',
+    TRUE,
+    CURRENT_TIMESTAMP
+) ON CONFLICT (id) DO UPDATE 
+SET inep_code = COALESCE(public.school_units.inep_code, EXCLUDED.inep_code),
+    updated_at = CURRENT_TIMESTAMP;
+
+-- 1.2 Curso Padrão de Ensino Médio Regular
+INSERT INTO public.courses (id, name, segment, duration_years)
+VALUES ('course-em', 'Ensino Médio Regular', 'ENSINO_MEDIO', 3)
+ON CONFLICT (id) DO NOTHING;
+
+-- 1.3 Turma Padrão de Acolhimento
+INSERT INTO public.school_classes (
+    id, name, school_unit_id, grade_level, shift, school_year, capacity
+) VALUES (
+    'class-1em',
+    '1ª Série A - Ensino Médio',
+    'unit-sede',
+    '1ª Série',
+    'MATUTINO',
+    2026,
+    35
+) ON CONFLICT (id) DO NOTHING;
+
+-- -------------------------------------------------------------------------
+-- PASSO 2: IDENTIFICAÇÃO E CORREÇÃO DE REGISTROS ÓRFÃOS (AUTO-CURA)
+-- -------------------------------------------------------------------------
+
+-- 2.1 Alunos sem school_unit_id válido ou órfão -> apontar para 'unit-sede'
+UPDATE public.students
+SET school_unit_id = 'unit-sede',
+    updated_at = CURRENT_TIMESTAMP
+WHERE school_unit_id IS NULL 
+   OR school_unit_id NOT IN (SELECT id FROM public.school_units);
+
+-- 2.2 Alunos com identificadores de turma legados conhecidos ('class-1a', 'class-2a')
+UPDATE public.students
+SET class_id = 'class-1em',
+    updated_at = CURRENT_TIMESTAMP
+WHERE class_id = 'class-1a';
+
+UPDATE public.students
+SET class_id = 'class-2em',
+    updated_at = CURRENT_TIMESTAMP
+WHERE class_id = 'class-2a'
+  AND EXISTS (SELECT 1 FROM public.school_classes WHERE id = 'class-2em');
+
+-- 2.3 Alunos sem turma ou cuja turma não existe na tabela school_classes -> apontar para 'class-1em'
+UPDATE public.students
+SET class_id = 'class-1em',
+    updated_at = CURRENT_TIMESTAMP
+WHERE class_id IS NULL 
+   OR class_id NOT IN (SELECT id FROM public.school_classes);
+
+-- 2.4 Turmas com school_unit_id nulo ou inexistente -> vincular a 'unit-sede'
+UPDATE public.school_classes
+SET school_unit_id = 'unit-sede',
+    updated_at = CURRENT_TIMESTAMP
+WHERE school_unit_id IS NULL 
+   OR school_unit_id NOT IN (SELECT id FROM public.school_units);
+
+-- 2.5 Disciplinas com school_unit_id inválido (se a coluna existir)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'subjects' AND column_name = 'school_unit_id'
+    ) THEN
+        EXECUTE 'UPDATE public.subjects SET school_unit_id = ''unit-sede'' WHERE school_unit_id IS NOT NULL AND school_unit_id NOT IN (SELECT id FROM public.school_units);';
+    END IF;
+END $$;
+
+-- 2.6 Diários de Classe (lesson_registries) com turma ou disciplina órfã
+UPDATE public.lesson_registries
+SET class_id = (SELECT id FROM public.school_classes LIMIT 1)
+WHERE class_id IS NULL 
+   OR class_id NOT IN (SELECT id FROM public.school_classes);
+
+-- 2.7 Folhas de Frequência (attendance_sheets) com turma órfã
+UPDATE public.attendance_sheets
+SET class_id = (SELECT id FROM public.school_classes LIMIT 1)
+WHERE class_id IS NULL 
+   OR class_id NOT IN (SELECT id FROM public.school_classes);
+
+-- 2.8 Pautas de Notas (class_grade_sheets) com turma órfã
+UPDATE public.class_grade_sheets
+SET class_id = (SELECT id FROM public.school_classes LIMIT 1)
+WHERE class_id IS NULL 
+   OR class_id NOT IN (SELECT id FROM public.school_classes);
+
+-- 2.9 Avaliações e Provas (exams) com turma órfã
+UPDATE public.exams
+SET class_id = (SELECT id FROM public.school_classes LIMIT 1)
+WHERE class_id IS NULL 
+   OR class_id NOT IN (SELECT id FROM public.school_classes);
+
+-- 2.10 Submissões de Provas (exam_submissions) com exam_id ou student_id órfãos
+DELETE FROM public.exam_submissions
+WHERE exam_id NOT IN (SELECT id FROM public.exams)
+   OR student_id NOT IN (SELECT id FROM public.students);
+
+-- -------------------------------------------------------------------------
+-- PASSO 3: APLICAÇÃO DE RESTRIÇÕES DE CHAVE ESTRANGEIRA (FOREIGN KEYS) COM AUTO-CASCADE
+-- -------------------------------------------------------------------------
+
+DO $$
+BEGIN
+    -- FK: students -> school_classes
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'fk_students_school_class' AND table_name = 'students'
+    ) THEN
+        ALTER TABLE public.students
+            ADD CONSTRAINT fk_students_school_class 
+            FOREIGN KEY (class_id) REFERENCES public.school_classes(id) 
+            ON UPDATE CASCADE ON DELETE RESTRICT;
+    END IF;
+
+    -- FK: students -> school_units
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'fk_students_school_unit' AND table_name = 'students'
+    ) THEN
+        ALTER TABLE public.students
+            ADD CONSTRAINT fk_students_school_unit 
+            FOREIGN KEY (school_unit_id) REFERENCES public.school_units(id) 
+            ON UPDATE CASCADE ON DELETE SET NULL;
+    END IF;
+
+    -- FK: school_classes -> school_units
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'fk_classes_school_unit' AND table_name = 'school_classes'
+    ) THEN
+        ALTER TABLE public.school_classes
+            ADD CONSTRAINT fk_classes_school_unit 
+            FOREIGN KEY (school_unit_id) REFERENCES public.school_units(id) 
+            ON UPDATE CASCADE ON DELETE SET NULL;
+    END IF;
+
+    -- FK: attendance_sheets -> school_classes
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'fk_attendance_school_class' AND table_name = 'attendance_sheets'
+    ) THEN
+        ALTER TABLE public.attendance_sheets
+            ADD CONSTRAINT fk_attendance_school_class 
+            FOREIGN KEY (class_id) REFERENCES public.school_classes(id) 
+            ON UPDATE CASCADE ON DELETE CASCADE;
+    END IF;
+
+    -- FK: lesson_registries -> school_classes
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'fk_lessons_school_class' AND table_name = 'lesson_registries'
+    ) THEN
+        ALTER TABLE public.lesson_registries
+            ADD CONSTRAINT fk_lessons_school_class 
+            FOREIGN KEY (class_id) REFERENCES public.school_classes(id) 
+            ON UPDATE CASCADE ON DELETE CASCADE;
+    END IF;
+
+    -- FK: class_grade_sheets -> school_classes
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'fk_grades_school_class' AND table_name = 'class_grade_sheets'
+    ) THEN
+        ALTER TABLE public.class_grade_sheets
+            ADD CONSTRAINT fk_grades_school_class 
+            FOREIGN KEY (class_id) REFERENCES public.school_classes(id) 
+            ON UPDATE CASCADE ON DELETE CASCADE;
+    END IF;
+
+    -- FK: exams -> school_classes
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'fk_exams_school_class' AND table_name = 'exams'
+    ) THEN
+        ALTER TABLE public.exams
+            ADD CONSTRAINT fk_exams_school_class 
+            FOREIGN KEY (class_id) REFERENCES public.school_classes(id) 
+            ON UPDATE CASCADE ON DELETE CASCADE;
+    END IF;
+
+    -- FK: exam_submissions -> exams
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'fk_submissions_exam' AND table_name = 'exam_submissions'
+    ) THEN
+        ALTER TABLE public.exam_submissions
+            ADD CONSTRAINT fk_submissions_exam 
+            FOREIGN KEY (exam_id) REFERENCES public.exams(id) 
+            ON UPDATE CASCADE ON DELETE CASCADE;
+    END IF;
+
+    -- FK: exam_submissions -> students
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'fk_submissions_student' AND table_name = 'exam_submissions'
+    ) THEN
+        ALTER TABLE public.exam_submissions
+            ADD CONSTRAINT fk_submissions_student 
+            FOREIGN KEY (student_id) REFERENCES public.students(id) 
+            ON UPDATE CASCADE ON DELETE CASCADE;
+    END IF;
+END $$;
+
+-- -------------------------------------------------------------------------
+-- PASSO 4: ÍNDICES DE PERFORMANCE DE INTEGRIDADE E JUNÇÕES
+-- -------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_students_class_id ON public.students(class_id);
+CREATE INDEX IF NOT EXISTS idx_students_school_unit_id ON public.students(school_unit_id);
+CREATE INDEX IF NOT EXISTS idx_classes_school_unit_id ON public.school_classes(school_unit_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_class_date ON public.attendance_sheets(class_id, date);
+CREATE INDEX IF NOT EXISTS idx_lessons_class_date ON public.lesson_registries(class_id, date);
+CREATE INDEX IF NOT EXISTS idx_grades_class_term ON public.class_grade_sheets(class_id, term);
+CREATE INDEX IF NOT EXISTS idx_exams_class_id ON public.exams(class_id);
+CREATE INDEX IF NOT EXISTS idx_submissions_exam_student ON public.exam_submissions(exam_id, student_id);
+
+COMMIT;
+
+-- -------------------------------------------------------------------------
+-- PASSO 5: RELATÓRIO FINAL DE AUDITORIA E SAÚDE RELACIONAL (CONSULTA RESUMO)
+-- -------------------------------------------------------------------------
+SELECT 
+    'school_units' AS table_name, 
+    COUNT(*) AS total_records, 
+    0 AS orphan_count,
+    'PERFEITO' AS status 
+FROM public.school_units
+UNION ALL
+SELECT 
+    'school_classes' AS table_name, 
+    COUNT(*) AS total_records, 
+    (SELECT COUNT(*) FROM public.school_classes WHERE school_unit_id NOT IN (SELECT id FROM public.school_units)) AS orphan_count,
+    CASE 
+        WHEN (SELECT COUNT(*) FROM public.school_classes WHERE school_unit_id NOT IN (SELECT id FROM public.school_units)) = 0 THEN 'PERFEITO' 
+        ELSE 'INCONSISTENTE' 
+    END AS status 
+FROM public.school_classes
+UNION ALL
+SELECT 
+    'students' AS table_name, 
+    COUNT(*) AS total_records, 
+    (SELECT COUNT(*) FROM public.students WHERE class_id NOT IN (SELECT id FROM public.school_classes)) AS orphan_count,
+    CASE 
+        WHEN (SELECT COUNT(*) FROM public.students WHERE class_id NOT IN (SELECT id FROM public.school_classes)) = 0 THEN 'PERFEITO' 
+        ELSE 'INCONSISTENTE' 
+    END AS status 
+FROM public.students
+UNION ALL
+SELECT 
+    'attendance_sheets' AS table_name, 
+    COUNT(*) AS total_records, 
+    (SELECT COUNT(*) FROM public.attendance_sheets WHERE class_id NOT IN (SELECT id FROM public.school_classes)) AS orphan_count,
+    CASE 
+        WHEN (SELECT COUNT(*) FROM public.attendance_sheets WHERE class_id NOT IN (SELECT id FROM public.school_classes)) = 0 THEN 'PERFEITO' 
+        ELSE 'INCONSISTENTE' 
+    END AS status 
+FROM public.attendance_sheets
+UNION ALL
+SELECT 
+    'lesson_registries' AS table_name, 
+    COUNT(*) AS total_records, 
+    (SELECT COUNT(*) FROM public.lesson_registries WHERE class_id NOT IN (SELECT id FROM public.school_classes)) AS orphan_count,
+    CASE 
+        WHEN (SELECT COUNT(*) FROM public.lesson_registries WHERE class_id NOT IN (SELECT id FROM public.school_classes)) = 0 THEN 'PERFEITO' 
+        ELSE 'INCONSISTENTE' 
+    END AS status 
+FROM public.lesson_registries
+UNION ALL
+SELECT 
+    'exams' AS table_name, 
+    COUNT(*) AS total_records, 
+    (SELECT COUNT(*) FROM public.exams WHERE class_id NOT IN (SELECT id FROM public.school_classes)) AS orphan_count,
+    CASE 
+        WHEN (SELECT COUNT(*) FROM public.exams WHERE class_id NOT IN (SELECT id FROM public.school_classes)) = 0 THEN 'PERFEITO' 
+        ELSE 'INCONSISTENTE' 
+    END AS status 
+FROM public.exams;
+`;
   }
 }

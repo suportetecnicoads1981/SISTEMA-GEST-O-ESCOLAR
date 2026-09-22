@@ -8,6 +8,7 @@ import {
   BarChart3,
   Network,
   ShieldCheck,
+  ShieldAlert,
   Info,
   CheckCircle2,
   GraduationCap,
@@ -193,6 +194,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     'CLEANSLATE_HUB',
     'INSTALAFLOW',
     'DATASYNC_PRO',
+    'DEBUG_FLOW',
     'USER_CONTROL',
     'SYSTEM_UPDATES',
     'NETWORK_INSTALLER',
@@ -344,6 +346,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label: 'Sincronização Remota (.edusync)',
           icon: Folder,
           badge: 'Offline',
+        },
+        {
+          id: 'DEBUG_FLOW',
+          label: 'DebugFlow & Auditoria Full-Stack',
+          icon: ShieldAlert,
+          badge: 'Supabase',
         },
         {
           id: 'USER_CONTROL',

@@ -94,8 +94,8 @@ interface StudentListProps {
 }
 
 export const StudentList: React.FC<StudentListProps> = ({
-  students,
-  classes,
+  students = [],
+  classes = [],
   courses = [],
   histories = [],
   schoolUnits = [],

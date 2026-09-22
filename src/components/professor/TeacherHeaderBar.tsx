@@ -32,21 +32,21 @@ interface TeacherHeaderBarProps {
 }
 
 export const TeacherHeaderBar: React.FC<TeacherHeaderBarProps> = ({
-  activeTeacherName,
+  activeTeacherName = '',
   onChangeTeacher,
-  availableTeachers,
-  teacherClasses,
-  teacherSubjects,
-  activeClassId,
+  availableTeachers = [],
+  teacherClasses = [],
+  teacherSubjects = [],
+  activeClassId = '',
   onSelectClass,
-  activeSubjectId,
+  activeSubjectId = '',
   onSelectSubject,
-  selectedTerm,
+  selectedTerm = '1º Bimestre',
   onChangeTerm,
   onBack,
   backButtonLabel,
 }) => {
-  const totalWorkload = teacherSubjects.reduce((acc, s) => acc + (s.workloadHours || 80), 0);
+  const totalWorkload = (teacherSubjects || []).reduce((acc, s) => acc + ((s && s.workloadHours) || 80), 0);
 
   return (
     <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-indigo-900/40 space-y-5">

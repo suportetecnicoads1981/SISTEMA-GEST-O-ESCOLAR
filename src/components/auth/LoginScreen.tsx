@@ -128,13 +128,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
   // Filtered Users List
   const filteredUsers = useMemo(() => {
+    const q = (userSearchTerm || '').toLowerCase().trim();
     return userAccounts.filter((u) => {
+      if (!u) return false;
       const matchSearch =
-        u.name.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-        u.login.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-        (u.email && u.email.toLowerCase().includes(userSearchTerm.toLowerCase())) ||
-        (u.sectorTitle && u.sectorTitle.toLowerCase().includes(userSearchTerm.toLowerCase())) ||
-        u.sector.toLowerCase().includes(userSearchTerm.toLowerCase());
+        !q ||
+        (u.name && u.name.toLowerCase().includes(q)) ||
+        (u.login && u.login.toLowerCase().includes(q)) ||
+        (u.email && u.email.toLowerCase().includes(q)) ||
+        (u.sectorTitle && u.sectorTitle.toLowerCase().includes(q)) ||
+        (u.sector && u.sector.toLowerCase().includes(q));
 
       const matchSector =
         selectedSectorFilter === 'ALL' ||
@@ -170,9 +173,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setErrorMsg('');
 
     setTimeout(() => {
-      const cleanUser = username.trim().toLowerCase();
+      const cleanUser = (username || '').trim().toLowerCase();
       const match = userAccounts.find(
-        (u) => (u.login.toLowerCase() === cleanUser || (u.email && u.email.toLowerCase() === cleanUser)) && (u.active !== false)
+        (u) =>
+          u &&
+          ((u.login && u.login.toLowerCase() === cleanUser) ||
+            (u.email && u.email.toLowerCase() === cleanUser)) &&
+          u.active !== false
       );
 
       if (match) {

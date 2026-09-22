@@ -36,7 +36,11 @@ import {
   sendWhatsAppMessage,
   performAutoBackup,
 } from './data/storage';
-import { DEFAULT_ROLE_PREFERENCES } from './data/defaultData';
+import {
+  DEFAULT_ROLE_PREFERENCES,
+  DEFAULT_SCHOOL_SETTINGS,
+  DEFAULT_MUNICIPAL_SECRETARY,
+} from './data/defaultData';
 import { getSupabaseClient } from './services/supabaseClient';
 import { supabaseBatchQueue } from './services/supabaseBatchQueue';
 import { Header } from './components/layout/Header';
@@ -138,6 +142,12 @@ const InstalaFlowHub = lazy(() =>
 const DataSyncProHub = lazy(() =>
   import('./components/datasync/DataSyncProHub').then((m) => ({
     default: m.DataSyncProHub,
+  }))
+);
+
+const DebugFlowHub = lazy(() =>
+  import('./components/debugflow/DebugFlowHub').then((m) => ({
+    default: m.DebugFlowHub,
   }))
 );
 
@@ -565,13 +575,15 @@ export default function App() {
       // Se explicitUnits foi passado (gerado pelo módulo de importação com detecção de séries atendidas)
       if (explicitUnits && explicitUnits.length > 0) {
         explicitUnits.forEach((u) => {
+          if (!u) return;
+          const uName = (u.name || '').toLowerCase().trim();
           if (
             !existingUnits.some(
               (eu) =>
-                eu.id === u.id ||
-                eu.name.toLowerCase().trim() === u.name.toLowerCase().trim()
+                eu &&
+                (eu.id === u.id || (eu.name && eu.name.toLowerCase().trim() === uName))
             ) &&
-            !newUnits.some((nu) => nu.id === u.id)
+            !newUnits.some((nu) => nu && nu.id === u.id)
           ) {
             newUnits.push(u);
           }
@@ -580,19 +592,23 @@ export default function App() {
 
       // Também verifica se algum aluno tem schoolOriginName que ainda não está nas unidades
       imported.forEach((s) => {
-        if (s.schoolOriginName) {
+        if (s && s.schoolOriginName) {
           const cleanName = s.schoolOriginName.replace(/^ESCOLA:\s*/i, '').trim();
+          const cleanNameLower = cleanName.toLowerCase();
+          const origNameLower = s.schoolOriginName.toLowerCase();
           const existing = existingUnits.find(
             (u) =>
-              u.name.toLowerCase() === cleanName.toLowerCase() ||
-              u.name.toLowerCase() === s.schoolOriginName?.toLowerCase()
+              u &&
+              ((u.name && u.name.toLowerCase() === cleanNameLower) ||
+                (u.name && u.name.toLowerCase() === origNameLower))
           );
           if (
             !existing &&
             !newUnits.some(
               (u) =>
-                u.name.toLowerCase() === cleanName.toLowerCase() ||
-                u.name.toLowerCase() === s.schoolOriginName?.toLowerCase()
+                u &&
+                ((u.name && u.name.toLowerCase() === cleanNameLower) ||
+                  (u.name && u.name.toLowerCase() === origNameLower))
             )
           ) {
             newUnits.push({
@@ -1476,14 +1492,14 @@ export default function App() {
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
           counts={{
-            students: data.students.length,
-            exams: data.exams.length,
-            questions: data.questions.length,
-            submissions: data.submissions.length,
-            schoolUnits: data.schoolUnits?.length || 0,
-            userAccounts: data.userAccounts?.length || 0,
+            students: data?.students?.length || 0,
+            exams: data?.exams?.length || 0,
+            questions: data?.questions?.length || 0,
+            submissions: data?.submissions?.length || 0,
+            schoolUnits: data?.schoolUnits?.length || 0,
+            userAccounts: data?.userAccounts?.length || 0,
             unreadNotifications: unreadNotificationCount,
-            unreadMessages: (data.communications || []).length,
+            unreadMessages: (data?.communications || []).length,
           }}
         />
 
@@ -1742,15 +1758,15 @@ export default function App() {
             {/* TAB: GESTÃO MUNICIPAL & POLOS REMOTOS FORA DA REDE (.edusync) */}
             {activeTab === 'MUNICIPAL_SYNC' && (
               <MunicipalSyncModule
-                schoolUnits={data.schoolUnits || []}
-                syncLogs={data.syncLogs || []}
-                students={data.students}
-                classes={data.classes}
-                exams={data.exams}
-                submissions={data.submissions}
-                academicHistories={data.academicHistories}
-                settings={data.settings}
-                municipalSecretary={data.municipalSecretary}
+                schoolUnits={data?.schoolUnits || []}
+                syncLogs={data?.syncLogs || []}
+                students={data?.students || []}
+                classes={data?.classes || []}
+                exams={data?.exams || []}
+                submissions={data?.submissions || []}
+                academicHistories={data?.academicHistories || []}
+                settings={data?.settings || DEFAULT_SCHOOL_SETTINGS}
+                municipalSecretary={data?.municipalSecretary || DEFAULT_MUNICIPAL_SECRETARY}
                 onUpdateSchoolUnits={(units) =>
                   setData((prev) => ({ ...prev, schoolUnits: units }))
                 }
@@ -1919,6 +1935,13 @@ export default function App() {
               </Suspense>
             )}
 
+            {/* TAB: DEBUGFLOW - AUDITORIA DE INTEGRIDADE E SINCRONIZAÇÃO FULL-STACK */}
+            {activeTab === 'DEBUG_FLOW' && (
+              <Suspense fallback={<ModuleLoadingFallback moduleName="DebugFlow & Auditoria Full-Stack" />}>
+                <DebugFlowHub onBack={handleGoBack} onNavigateToTab={handleNavigate} />
+              </Suspense>
+            )}
+
             {/* TAB: INSTALADOR DE REDE LOCAL, NUVEM E BACKUP */}
             {activeTab === 'NETWORK_INSTALLER' && (
               <NetworkInstaller
@@ -1963,9 +1986,9 @@ export default function App() {
         onOpenQuickSearch={() => setIsQuickSearchOpen(true)}
         onOpenNotifications={() => setIsNotificationModalOpen(true)}
         unreadNotificationsCount={unreadNotificationCount}
-        schoolName={data.settings?.name}
-        totalStudents={data.students.length}
-        totalClasses={data.classes.length}
+        schoolName={data?.settings?.name}
+        totalStudents={data?.students?.length || 0}
+        totalClasses={data?.classes?.length || 0}
       />
 
       {/* MENU INICIAR DO WINDOWS 11 (START MENU) */}
@@ -2074,9 +2097,9 @@ export default function App() {
       <UniversalDataImportModal
         isOpen={isUniversalImportModalOpen}
         onClose={() => setIsUniversalImportModalOpen(false)}
-        classes={data.classes}
-        schoolUnits={data.schoolUnits || []}
-        studentsCount={data.students.length}
+        classes={data?.classes || []}
+        schoolUnits={data?.schoolUnits || []}
+        studentsCount={data?.students?.length || 0}
         onImportStudents={handleBatchImportStudents}
         onUpdateStudent={handleSaveStudent}
         onNavigateToPendencias={() => {

@@ -216,10 +216,10 @@ export const UninstallationModule: React.FC<UninstallationModuleProps> = ({
               <Users className="h-4 w-4 text-indigo-600" />
             </div>
             <div className="text-xl font-black text-slate-900">
-              {currentData.students.length}
+              {currentData?.students?.length || 0}
             </div>
             <p className="text-[10px] text-slate-500 mt-0.5">
-              {currentData.students.length === 0 ? 'Base limpa (0 registros)' : 'Dados simulados ativos'}
+              {(currentData?.students?.length || 0) === 0 ? 'Base limpa (0 registros)' : 'Dados simulados ativos'}
             </p>
           </div>
 

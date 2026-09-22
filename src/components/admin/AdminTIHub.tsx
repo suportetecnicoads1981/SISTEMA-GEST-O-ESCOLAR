@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck,
+  ShieldAlert,
   Server,
   Cpu,
   Box,
@@ -186,6 +187,20 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
       highlight: true,
     },
     {
+      id: 'DEBUG_FLOW',
+      title: 'DebugFlow • Auditoria Full-Stack',
+      subtitle: 'Scanner de Build, Bridge de Schemas & Backup Unificado',
+      category: 'DATABASE' as AdminCategory,
+      badge: 'Supabase Engine',
+      badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+      icon: ShieldAlert,
+      iconColor: 'text-indigo-600 bg-indigo-50',
+      description:
+        'Auditoria rigorosa de erros de compilação TypeScript, mapeamento de tabelas criadas no Dashboard Supabase e rotina de backup consolidado (Dump SQL + Frontend Assets).',
+      actionLabel: 'Abrir DebugFlow',
+      highlight: true,
+    },
+    {
       id: 'INSTALAFLOW',
       title: 'InstalaFlow Híbrido',
       subtitle: 'Supabase Edition • Resolução de Conflitos',
@@ -290,12 +305,14 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
   ];
 
   const filteredModules = modules.filter((m) => {
+    if (!m) return false;
     const matchesCategory = selectedCategory === 'ALL' || m.category === selectedCategory;
+    const q = (searchQuery || '').toLowerCase().trim();
     const matchesSearch =
-      !searchQuery ||
-      m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.subtitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.description.toLowerCase().includes(searchQuery.toLowerCase());
+      !q ||
+      (m.title && m.title.toLowerCase().includes(q)) ||
+      (m.subtitle && m.subtitle.toLowerCase().includes(q)) ||
+      (m.description && m.description.toLowerCase().includes(q));
     return matchesCategory && matchesSearch;
   });
 

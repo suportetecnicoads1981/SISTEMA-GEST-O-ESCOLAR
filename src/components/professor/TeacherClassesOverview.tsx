@@ -42,30 +42,32 @@ interface TeacherClassesOverviewProps {
 }
 
 export const TeacherClassesOverview: React.FC<TeacherClassesOverviewProps> = ({
-  teacherName,
-  classes,
-  subjects,
-  students,
-  attendanceSheets,
-  lessonRegistries,
-  gradeSheets,
-  exams,
+  teacherName = '',
+  classes = [],
+  subjects = [],
+  students = [],
+  attendanceSheets = [],
+  lessonRegistries = [],
+  gradeSheets = [],
+  exams = [],
   onSelectClassAndTab,
   onNavigateToTab,
 }) => {
+  const safeTeacherName = typeof teacherName === 'string' ? teacherName.toLowerCase() : '';
+
   // Aggregate stats across all teacher classes
-  const totalStudents = students.filter((s) =>
-    classes.some((c) => c.id === s.classId && s.status === 'ACTIVE')
+  const totalStudents = (students || []).filter((s) =>
+    s && (classes || []).some((c) => c && c.id === s.classId && s.status === 'ACTIVE')
   ).length;
 
-  const totalLessons = lessonRegistries.filter((l) =>
-    l.teacherName.toLowerCase().includes(teacherName.toLowerCase()) ||
-    subjects.some((s) => s.id === l.subjectId)
+  const totalLessons = (lessonRegistries || []).filter((l) =>
+    (l && typeof l.teacherName === 'string' && safeTeacherName && l.teacherName.toLowerCase().includes(safeTeacherName)) ||
+    (l && (subjects || []).some((s) => s && s.id === l.subjectId))
   ).length;
 
-  const totalExams = exams.filter((e) =>
-    e.teacherName.toLowerCase().includes(teacherName.toLowerCase()) ||
-    classes.some((c) => c.id === e.classId)
+  const totalExams = (exams || []).filter((e) =>
+    (e && typeof e.teacherName === 'string' && safeTeacherName && e.teacherName.toLowerCase().includes(safeTeacherName)) ||
+    (e && (classes || []).some((c) => c && c.id === e.classId))
   ).length;
 
   return (
@@ -174,23 +176,24 @@ export const TeacherClassesOverview: React.FC<TeacherClassesOverviewProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {classes.map((cls) => {
-            const classStudents = students.filter(
-              (s) => s.classId === cls.id && s.status === 'ACTIVE'
+          {(classes || []).map((cls) => {
+            if (!cls) return null;
+            const classStudents = (students || []).filter(
+              (s) => s && s.classId === cls.id && s.status === 'ACTIVE'
             );
             const classAeeCount = classStudents.filter(
-              (s) => s.hasAEE || (s.specialConditions && s.specialConditions.length > 0)
+              (s) => s && (s.hasAEE || (s.specialConditions && s.specialConditions.length > 0))
             ).length;
 
-            const classLessons = lessonRegistries.filter((l) => l.classId === cls.id);
-            const classExams = exams.filter((e) => e.classId === cls.id);
-            const classGradeSheet = gradeSheets.find((g) => g.classId === cls.id);
+            const classLessons = (lessonRegistries || []).filter((l) => l && l.classId === cls.id);
+            const classExams = (exams || []).filter((e) => e && e.classId === cls.id);
+            const classGradeSheet = (gradeSheets || []).find((g) => g && g.classId === cls.id);
 
             // Compute average attendance rate if available
-            const classAttendances = attendanceSheets.filter((a) => a.classId === cls.id);
+            const classAttendances = (attendanceSheets || []).filter((a) => a && a.classId === cls.id);
             const avgAttendance = classAttendances.length > 0
               ? Math.round(
-                  classAttendances.reduce((acc, curr) => acc + (curr.attendanceRate || 85), 0) /
+                  classAttendances.reduce((acc, curr) => acc + ((curr && curr.attendanceRate) || 85), 0) /
                   classAttendances.length
                 )
               : 92;
@@ -198,7 +201,7 @@ export const TeacherClassesOverview: React.FC<TeacherClassesOverviewProps> = ({
             // Compute grade average if available
             const gradeAvg = classGradeSheet?.grades && classGradeSheet.grades.length > 0
               ? (
-                  classGradeSheet.grades.reduce((acc, g) => acc + (g.termAverage || 0), 0) /
+                  classGradeSheet.grades.reduce((acc, g) => acc + ((g && g.termAverage) || 0), 0) /
                   classGradeSheet.grades.length
                 ).toFixed(1)
               : '7.8';

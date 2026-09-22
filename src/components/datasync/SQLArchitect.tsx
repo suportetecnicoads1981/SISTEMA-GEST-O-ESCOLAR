@@ -21,6 +21,7 @@ import { SchemaManager } from '../../services/datasync/SchemaManager';
 import { BackupZipRecord, SQLCommandAnalysis } from '../../types/datasync';
 import { AuthAutomator } from '../../services/datasync/AuthAutomator';
 import { RelationalIntegrityService } from '../../services/relationalIntegrityService';
+import { SupabaseDatabaseService } from '../../services/datasync/SupabaseDatabaseService';
 import { getStoredData } from '../../data/storage';
 
 interface SQLArchitectProps {
@@ -201,7 +202,19 @@ export const SQLArchitect: React.FC<SQLArchitectProps> = ({ onBackupGenerated })
         </div>
 
         {/* Botão Oficial de Geração do Script SQL Completo */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => {
+              const auditScript = SupabaseDatabaseService.getIntegrityVerificationAndHealingScript();
+              handleApplyTemplate(auditScript);
+            }}
+            className="px-3 py-1.5 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-500/40 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Carregar Script de Auditoria, Integridade Referencial e Auto-Cura no Supabase"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Auditoria & Auto-Cura Supabase</span>
+          </button>
+
           <button
             onClick={() => {
               const fullScript = RelationalIntegrityService.generateDatabaseUpdateScript(getStoredData());
@@ -216,14 +229,14 @@ export const SQLArchitect: React.FC<SQLArchitectProps> = ({ onBackupGenerated })
 
           <button
             onClick={() => {
-              const fullScript = RelationalIntegrityService.generateDatabaseUpdateScript(getStoredData());
-              RelationalIntegrityService.downloadSqlScript(fullScript, 'atualizar_banco_sucessoedu_v5.5.sql');
+              const auditScript = SupabaseDatabaseService.getIntegrityVerificationAndHealingScript();
+              RelationalIntegrityService.downloadSqlScript(auditScript, 'auditoria_integridade_auto_cura_supabase.sql');
             }}
             className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-600/20"
-            title="Baixar arquivo .sql para rodar no PostgreSQL, Supabase ou SQLite"
+            title="Baixar arquivo .sql para rodar no Supabase e auto-corrigir relacionamentos"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Baixar .SQL Oficial</span>
+            <span>Baixar .SQL Auto-Cura</span>
           </button>
         </div>
       </div>

@@ -270,11 +270,14 @@ export const AppIntegrityChecker: React.FC<AppIntegrityCheckerProps> = ({
   // Filtered files
   const filteredResults = useMemo(() => {
     if (!report) return [];
+    const q = (searchTerm || '').toLowerCase().trim();
     return report.results.filter((item) => {
+      if (!item) return false;
       const matchesSearch =
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.path.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.expectedSha256.toLowerCase().includes(searchTerm.toLowerCase());
+        !q ||
+        (item.name && item.name.toLowerCase().includes(q)) ||
+        (item.path && item.path.toLowerCase().includes(q)) ||
+        (item.expectedSha256 && item.expectedSha256.toLowerCase().includes(q));
 
       if (!matchesSearch) return false;
 

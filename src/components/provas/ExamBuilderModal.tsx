@@ -198,11 +198,13 @@ export const ExamBuilderModal: React.FC<ExamBuilderModalProps> = ({
 
   const availableBankFiltered = questions.filter((q) => {
     if (!questionSearchFilter) return true;
+    if (!q) return false;
+    const filter = questionSearchFilter.toLowerCase().trim();
     return (
-      q.stem.toLowerCase().includes(questionSearchFilter.toLowerCase()) ||
-      q.topic.toLowerCase().includes(questionSearchFilter.toLowerCase()) ||
-      q.subject.toLowerCase().includes(questionSearchFilter.toLowerCase()) ||
-      q.code.toLowerCase().includes(questionSearchFilter.toLowerCase())
+      (q.stem && q.stem.toLowerCase().includes(filter)) ||
+      (q.topic && q.topic.toLowerCase().includes(filter)) ||
+      (q.subject && q.subject.toLowerCase().includes(filter)) ||
+      (q.code && q.code.toLowerCase().includes(filter))
     );
   });
 

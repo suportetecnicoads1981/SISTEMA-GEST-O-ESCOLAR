@@ -161,6 +161,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'InstalaFlow Híbrido • Gestão de Deploy e Instalação Supabase';
       case 'DATASYNC_PRO':
         return 'DataSync Pro • Sincronização & Migração Supabase';
+      case 'DEBUG_FLOW':
+        return 'DebugFlow • Auditoria Full-Stack & Sincronização Supabase';
       case 'USER_CONTROL':
         return 'Controle de Usuários, Setores & Permissões';
       case 'SYSTEM_UPDATES':
@@ -226,6 +228,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'InstalaFlow';
       case 'DATASYNC_PRO':
         return 'DataSync Pro';
+      case 'DEBUG_FLOW':
+        return 'DebugFlow';
       case 'USER_CONTROL':
         return 'Controle de Usuários';
       case 'SYSTEM_UPDATES':

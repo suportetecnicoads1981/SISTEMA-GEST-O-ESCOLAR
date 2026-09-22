@@ -41,15 +41,15 @@ interface TeacherAttendanceTabProps {
 }
 
 export const TeacherAttendanceTab: React.FC<TeacherAttendanceTabProps> = ({
-  teacherName,
-  classes,
-  subjects,
-  students,
+  teacherName = '',
+  classes = [],
+  subjects = [],
+  students = [],
   settings,
   activeClassId,
   activeSubjectId,
   selectedTerm,
-  attendanceSheets,
+  attendanceSheets = [],
   onSaveAttendanceSheet,
 }) => {
   const [selectedDate, setSelectedDate] = useState<string>(
@@ -70,18 +70,20 @@ export const TeacherAttendanceTab: React.FC<TeacherAttendanceTabProps> = ({
   );
 
   const classStudents = useMemo(() => {
-    return students
-      .filter((s) => s.classId === activeClass?.id && s.status === 'ACTIVE')
-      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    return (students || [])
+      .filter((s) => s && s.classId === activeClass?.id && s.status === 'ACTIVE')
+      .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR'));
   }, [students, activeClass]);
 
   const filteredStudents = useMemo(() => {
-    if (!searchStudent.trim()) return classStudents;
-    const term = searchStudent.toLowerCase();
-    return classStudents.filter(
+    const list = classStudents || [];
+    if (!searchStudent.trim()) return list;
+    const term = searchStudent.toLowerCase().trim();
+    return list.filter(
       (s) =>
-        s.name.toLowerCase().includes(term) ||
-        s.enrollmentNumber.toLowerCase().includes(term)
+        s &&
+        ((s.name && s.name.toLowerCase().includes(term)) ||
+          (s.enrollmentNumber && s.enrollmentNumber.toLowerCase().includes(term)))
     );
   }, [classStudents, searchStudent]);
 

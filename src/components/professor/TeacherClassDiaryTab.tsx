@@ -41,15 +41,15 @@ interface TeacherClassDiaryTabProps {
 }
 
 export const TeacherClassDiaryTab: React.FC<TeacherClassDiaryTabProps> = ({
-  teacherName,
-  classes,
-  subjects,
+  teacherName = '',
+  classes = [],
+  subjects = [],
   settings,
-  bnccSkills,
+  bnccSkills = [],
   activeClassId,
   activeSubjectId,
   selectedTerm,
-  lessonRegistries,
+  lessonRegistries = [],
   onSaveLessonRegistry,
   onDeleteLessonRegistry,
 }) => {
@@ -83,20 +83,22 @@ export const TeacherClassDiaryTab: React.FC<TeacherClassDiaryTabProps> = ({
 
   // Filter lessons for active class and subject
   const currentClassLessons = useMemo(() => {
-    return lessonRegistries
-      .filter((l) => l.classId === activeClass?.id && l.subjectId === activeSubject?.id)
+    return (lessonRegistries || [])
+      .filter((l) => l && l.classId === activeClass?.id && l.subjectId === activeSubject?.id)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [lessonRegistries, activeClass?.id, activeSubject?.id]);
 
   // Filtered BNCC Skills
   const availableBnccSkills = useMemo(() => {
-    if (!bnccSearch.trim()) return bnccSkills.slice(0, 12);
-    const q = bnccSearch.toLowerCase();
-    return bnccSkills.filter(
+    const list = bnccSkills || [];
+    if (!bnccSearch.trim()) return list.slice(0, 12);
+    const q = bnccSearch.toLowerCase().trim();
+    return list.filter(
       (b) =>
-        b.code.toLowerCase().includes(q) ||
-        b.description.toLowerCase().includes(q) ||
-        b.knowledgeObject.toLowerCase().includes(q)
+        b &&
+        ((b.code && b.code.toLowerCase().includes(q)) ||
+          (b.description && b.description.toLowerCase().includes(q)) ||
+          (b.knowledgeObject && b.knowledgeObject.toLowerCase().includes(q)))
     );
   }, [bnccSkills, bnccSearch]);
 

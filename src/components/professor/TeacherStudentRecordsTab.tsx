@@ -39,16 +39,16 @@ interface TeacherStudentRecordsTabProps {
 }
 
 export const TeacherStudentRecordsTab: React.FC<TeacherStudentRecordsTabProps> = ({
-  teacherName,
-  classes,
-  subjects,
-  students,
-  attendanceSheets,
-  gradeSheets,
+  teacherName = '',
+  classes = [],
+  subjects = [],
+  students = [],
+  attendanceSheets = [],
+  gradeSheets = [],
   activeClassId,
   activeSubjectId,
   selectedTerm,
-  pedagogicalNotes,
+  pedagogicalNotes = [],
   onSavePedagogicalNote,
 }) => {
   const activeClass = useMemo(
@@ -62,9 +62,9 @@ export const TeacherStudentRecordsTab: React.FC<TeacherStudentRecordsTabProps> =
   );
 
   const classStudents = useMemo(() => {
-    return students
-      .filter((s) => s.classId === activeClass?.id && s.status === 'ACTIVE')
-      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    return (students || [])
+      .filter((s) => s && s.classId === activeClass?.id && s.status === 'ACTIVE')
+      .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR'));
   }, [students, activeClass]);
 
   const [selectedStudentId, setSelectedStudentId] = useState<string>(
@@ -79,12 +79,14 @@ export const TeacherStudentRecordsTab: React.FC<TeacherStudentRecordsTabProps> =
   const [shareCoordination, setShareCoordination] = useState<boolean>(true);
 
   const filteredStudents = useMemo(() => {
-    if (!searchTerm.trim()) return classStudents;
-    const q = searchTerm.toLowerCase();
-    return classStudents.filter(
+    const list = classStudents || [];
+    if (!searchTerm.trim()) return list;
+    const q = searchTerm.toLowerCase().trim();
+    return list.filter(
       (s) =>
-        s.name.toLowerCase().includes(q) ||
-        s.enrollmentNumber.toLowerCase().includes(q)
+        s &&
+        ((s.name && s.name.toLowerCase().includes(q)) ||
+          (s.enrollmentNumber && s.enrollmentNumber.toLowerCase().includes(q)))
     );
   }, [classStudents, searchTerm]);
 

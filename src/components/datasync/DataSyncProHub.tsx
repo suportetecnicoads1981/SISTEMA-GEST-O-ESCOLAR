@@ -17,8 +17,10 @@ import {
   Layers,
   Lock,
   ExternalLink,
-  Sliders
+  Sliders,
+  ShieldAlert,
 } from 'lucide-react';
+import { DebugFlowHub } from '../debugflow/DebugFlowHub';
 import { SupabaseConnectionService, SUPABASE_CONFIG } from '../../services/datasync/supabaseClient';
 import { SmartUploader } from './SmartUploader';
 import { SQLArchitect } from './SQLArchitect';
@@ -34,6 +36,7 @@ import { DatabaseAutomationDashbox } from './DatabaseAutomationDashbox';
 import { getStoredData, AppStateData } from '../../data/storage';
 
 type DataSyncTab =
+  | 'DEBUG_FLOW'
   | 'DATABASE_SYNC'
   | 'UPLOADER'
   | 'SQL_ARCHITECT'
@@ -185,6 +188,18 @@ export const DataSyncProHub: React.FC = () => {
       {/* Navegação de Abas do DataSync Pro */}
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
         <button
+          onClick={() => setActiveTab('DEBUG_FLOW')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'DEBUG_FLOW'
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+              : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800'
+          }`}
+        >
+          <ShieldAlert className="w-4 h-4 text-indigo-400" />
+          DebugFlow & Full-Stack Audit
+        </button>
+
+        <button
           onClick={() => setActiveTab('DATABASE_SYNC')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'DATABASE_SYNC'
@@ -273,6 +288,10 @@ export const DataSyncProHub: React.FC = () => {
       <div className="space-y-6">
         {/* Dashbox Global de Automação do Banco de Dados */}
         <DatabaseAutomationDashbox />
+
+        {activeTab === 'DEBUG_FLOW' && (
+          <DebugFlowHub />
+        )}
 
         {activeTab === 'DATABASE_SYNC' && (
           <SupabaseLiveDatabaseView />

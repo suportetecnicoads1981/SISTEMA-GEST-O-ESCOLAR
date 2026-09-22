@@ -125,14 +125,17 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
   }, [questionToEdit, isOpen, subjectList]);
 
   const filteredBnccSkills = useMemo(() => {
+    const q = (bnccSearch || '').toLowerCase().trim();
     return DEFAULT_BNCC_SKILLS.filter((sk) => {
+      if (!sk) return false;
       const matchSegment =
         bnccSegmentFilter === 'ALL' || sk.segment === bnccSegmentFilter;
       const matchText =
-        sk.code.toLowerCase().includes(bnccSearch.toLowerCase()) ||
-        sk.description.toLowerCase().includes(bnccSearch.toLowerCase()) ||
-        sk.subject.toLowerCase().includes(bnccSearch.toLowerCase()) ||
-        sk.educationLevel.toLowerCase().includes(bnccSearch.toLowerCase());
+        !q ||
+        (sk.code && sk.code.toLowerCase().includes(q)) ||
+        (sk.description && sk.description.toLowerCase().includes(q)) ||
+        (sk.subject && sk.subject.toLowerCase().includes(q)) ||
+        (sk.educationLevel && sk.educationLevel.toLowerCase().includes(q));
       return matchSegment && matchText;
     });
   }, [bnccSegmentFilter, bnccSearch]);

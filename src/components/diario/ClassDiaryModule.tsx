@@ -68,16 +68,16 @@ interface ClassDiaryModuleProps {
 }
 
 export function ClassDiaryModule({
-  students,
-  classes,
-  subjects,
-  schoolUnits,
+  students = [],
+  classes = [],
+  subjects = [],
+  schoolUnits = [],
   settings,
-  bnccSkills,
-  stateRegulations,
-  activeStateRegulationCode,
-  attendanceSheets,
-  lessonRegistries,
+  bnccSkills = [],
+  stateRegulations = [],
+  activeStateRegulationCode = 'SP',
+  attendanceSheets = [],
+  lessonRegistries = [],
   onSaveAttendanceSheet,
   onSaveLessonRegistry,
   onDeleteLessonRegistry,
@@ -241,12 +241,15 @@ export function ClassDiaryModule({
   // Filter BNCC skills relevant to class
   const [bnccSearch, setBnccSearch] = useState('');
   const filteredBnccSkills = useMemo(() => {
-    return bnccSkills.filter((s) => {
+    const q = (bnccSearch || '').toLowerCase().trim();
+    if (!q) return bnccSkills || [];
+    return (bnccSkills || []).filter((s) => {
+      if (!s) return false;
       const matchSearch =
-        s.code.toLowerCase().includes(bnccSearch.toLowerCase()) ||
-        s.description.toLowerCase().includes(bnccSearch.toLowerCase()) ||
-        s.subject.toLowerCase().includes(bnccSearch.toLowerCase());
-      return matchSearch;
+        (s.code && s.code.toLowerCase().includes(q)) ||
+        (s.description && s.description.toLowerCase().includes(q)) ||
+        (s.subject && s.subject.toLowerCase().includes(q));
+      return Boolean(matchSearch);
     });
   }, [bnccSkills, bnccSearch]);
 
@@ -1543,7 +1546,7 @@ export function ClassDiaryModule({
             { label: 'Mínimo Legal', value: `${activeRegulation.minAttendancePercentage}%` },
             { label: 'Aulas Ministradas', value: classAttendanceStats.totalLessons },
           ]}
-          defaultFileName={`diario_classe_${activeClass?.name?.toLowerCase().replace(/\s+/g, '_')}`}
+          defaultFileName={`diario_classe_${(activeClass?.name || 'turma').toLowerCase().replace(/\s+/g, '_')}`}
           columns={[
             {
               key: 'enrollmentNumber',

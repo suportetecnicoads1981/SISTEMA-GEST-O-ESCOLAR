@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { z } from 'zod';
 import {
   Building2,
   Upload,
@@ -63,14 +64,14 @@ import { MunicipalSecretaryModal } from './MunicipalSecretaryModal';
 import { MunicipalLinkageCertificateModal } from './MunicipalLinkageCertificateModal';
 
 interface MunicipalSyncModuleProps {
-  schoolUnits: SchoolUnit[];
-  syncLogs: SyncAuditLog[];
-  students: Student[];
-  classes: SchoolClass[];
-  exams: Exam[];
-  submissions: ExamSubmission[];
-  academicHistories: AcademicHistory[];
-  settings: SchoolSettings;
+  schoolUnits?: SchoolUnit[];
+  syncLogs?: SyncAuditLog[];
+  students?: Student[];
+  classes?: SchoolClass[];
+  exams?: Exam[];
+  submissions?: ExamSubmission[];
+  academicHistories?: AcademicHistory[];
+  settings?: SchoolSettings;
   municipalSecretary?: MunicipalSecretaryInfo;
   onUpdateSchoolUnits?: (units: SchoolUnit[]) => void;
   onUpdateSyncLogs?: (logs: SyncAuditLog[]) => void;
@@ -80,23 +81,129 @@ interface MunicipalSyncModuleProps {
   onNavigate?: (tab: string, payload?: any) => void;
 }
 
-export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = ({
-  schoolUnits,
-  syncLogs,
-  students,
-  classes,
-  exams,
-  submissions,
-  academicHistories,
-  settings,
-  municipalSecretary,
-  onUpdateSchoolUnits,
-  onUpdateSyncLogs,
-  onUpdateMunicipalSecretary,
-  onRefreshData,
-  onBack,
-  onNavigate,
-}) => {
+const LoadingSpinner: React.FC = () => (
+  <div className="p-16 flex flex-col items-center justify-center space-y-4 bg-white rounded-2xl border border-slate-200 shadow-sm mx-auto my-12 max-w-md">
+    <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+    <div className="text-center">
+      <h3 className="text-sm font-bold text-slate-800">Carregando Módulo Municipal (.edusync)</h3>
+      <p className="text-xs text-slate-500 mt-1">Validando integridade de alunos, turmas e exames...</p>
+    </div>
+  </div>
+);
+
+const StudentSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().optional(),
+  registrationNumber: z.string().optional(),
+  classId: z.string().optional(),
+  unitId: z.string().optional(),
+}).passthrough();
+
+const SchoolClassSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().optional(),
+  grade: z.string().optional(),
+  unitId: z.string().optional(),
+}).passthrough();
+
+const ExamSchema = z.object({
+  id: z.string().optional(),
+  title: z.string().optional(),
+  subject: z.string().optional(),
+}).passthrough();
+
+const SchoolUnitSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().optional(),
+  inepCode: z.string().optional(),
+  district: z.string().optional(),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  directorName: z.string().optional(),
+  totalStudents: z.number().optional(),
+  totalClasses: z.number().optional(),
+  totalTeachers: z.number().optional(),
+}).passthrough();
+
+const useDataValidation = (props?: MunicipalSyncModuleProps) => {
+  const rawStudents = props?.students;
+  const rawClasses = props?.classes;
+  const rawExams = props?.exams;
+  const rawSchoolUnits = props?.schoolUnits;
+  const syncLogs = props?.syncLogs ?? [];
+  const submissions = props?.submissions ?? [];
+  const academicHistories = props?.academicHistories ?? [];
+
+  const students = useMemo(() => {
+    if (!Array.isArray(rawStudents)) return [];
+    return rawStudents.filter((s): s is Student => Boolean(s && typeof s === 'object'));
+  }, [rawStudents]);
+
+  const classes = useMemo(() => {
+    if (!Array.isArray(rawClasses)) return [];
+    return rawClasses.filter((c): c is SchoolClass => Boolean(c && typeof c === 'object'));
+  }, [rawClasses]);
+
+  const exams = useMemo(() => {
+    if (!Array.isArray(rawExams)) return [];
+    return rawExams.filter((e): e is Exam => Boolean(e && typeof e === 'object'));
+  }, [rawExams]);
+
+  const schoolUnits = useMemo(() => {
+    if (!Array.isArray(rawSchoolUnits)) return [];
+    return rawSchoolUnits
+      .filter((u): u is SchoolUnit => Boolean(u && typeof u === 'object'))
+      .map((u: any) => ({
+        ...u,
+        totalStudents: Number(u?.totalStudents ?? 0),
+        totalClasses: Number(u?.totalClasses ?? 0),
+        totalTeachers: Number(u?.totalTeachers ?? 0),
+        name: u?.name ?? 'Escola Municipal',
+        inepCode: u?.inepCode ?? '00000000',
+        district: u?.district ?? 'Centro',
+        address: u?.address ?? '',
+        city: u?.city ?? 'Município',
+        state: u?.state ?? 'SP',
+        directorName: u?.directorName ?? 'Direção Geral',
+      }));
+  }, [rawSchoolUnits]);
+
+  const isLoading = !props || props.students === undefined || props.classes === undefined || props.exams === undefined;
+
+  return {
+    students,
+    classes,
+    exams,
+    schoolUnits,
+    syncLogs,
+    submissions,
+    academicHistories,
+    isLoading,
+  };
+};
+
+export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) => {
+  const {
+    students,
+    classes,
+    exams,
+    schoolUnits,
+    syncLogs,
+    submissions,
+    academicHistories,
+    isLoading,
+  } = useDataValidation(props);
+
+  const settings = props?.settings;
+  const municipalSecretary = props?.municipalSecretary;
+  const onUpdateSchoolUnits = props?.onUpdateSchoolUnits;
+  const onUpdateSyncLogs = props?.onUpdateSyncLogs;
+  const onUpdateMunicipalSecretary = props?.onUpdateMunicipalSecretary;
+  const onRefreshData = props?.onRefreshData;
+  const onBack = props?.onBack;
+  const onNavigate = props?.onNavigate;
+
   const [activeSubTab, setActiveSubTab] = useState<
     'OVERVIEW' | 'SEMED_CENTRAL' | 'REMOTE_EXPORT' | 'CENTRAL_IMPORT' | 'CENSUS_REPORT' | 'PERFORMANCE_RANKING'
   >('OVERVIEW');
@@ -324,7 +431,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = ({
 
       if (result.success) {
         setImportSuccessMessage(
-          `Unificação concluída com sucesso! ${result.log.recordsMerged.students} novos alunos e ${result.log.recordsMerged.submissions} registros de provas foram consolidados na base municipal.`
+          `Unificação concluída com sucesso! ${result?.log?.recordsMerged?.students ?? 0} novos alunos e ${result?.log?.recordsMerged?.submissions ?? 0} registros de provas foram consolidados na base municipal.`
         );
         setParsedPacket(null);
         setImportFileContent('');
@@ -356,6 +463,10 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = ({
       taxaEvasao: 1.8,
     };
   }, [schoolUnits]);
+
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <div className="space-y-4">
@@ -949,10 +1060,10 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = ({
                       <td className="p-3 font-bold text-slate-800">{log.schoolUnitName}</td>
                       <td className="p-3 text-slate-600">{log.operatorName}</td>
                       <td className="p-3 text-center font-bold text-emerald-700">
-                        +{log.recordsMerged.students}
+                        +{log?.recordsMerged?.students ?? 0}
                       </td>
                       <td className="p-3 text-center font-bold text-indigo-700">
-                        +{log.recordsMerged.submissions}
+                        +{log?.recordsMerged?.submissions ?? 0}
                       </td>
                       <td className="p-3 text-center">
                         <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
@@ -1481,25 +1592,25 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = ({
                 <div className="p-3 bg-white rounded-xl border border-slate-200">
                   <span className="text-[10px] text-slate-400 block font-bold">Estudantes</span>
                   <span className="text-lg font-black text-slate-800">
-                    {parsedPacket.summary.studentsCount}
+                    {parsedPacket?.summary?.studentsCount ?? 0}
                   </span>
                 </div>
                 <div className="p-3 bg-white rounded-xl border border-slate-200">
                   <span className="text-[10px] text-slate-400 block font-bold">Turmas</span>
                   <span className="text-lg font-black text-slate-800">
-                    {parsedPacket.summary.classesCount}
+                    {parsedPacket?.summary?.classesCount ?? 0}
                   </span>
                 </div>
                 <div className="p-3 bg-white rounded-xl border border-slate-200">
                   <span className="text-[10px] text-slate-400 block font-bold">Provas</span>
                   <span className="text-lg font-black text-slate-800">
-                    {parsedPacket.summary.examsCount}
+                    {parsedPacket?.summary?.examsCount ?? 0}
                   </span>
                 </div>
                 <div className="p-3 bg-white rounded-xl border border-slate-200">
                   <span className="text-[10px] text-slate-400 block font-bold">Gabaritos Enviados</span>
                   <span className="text-lg font-black text-slate-800">
-                    {parsedPacket.summary.submissionsCount}
+                    {parsedPacket?.summary?.submissionsCount ?? 0}
                   </span>
                 </div>
               </div>

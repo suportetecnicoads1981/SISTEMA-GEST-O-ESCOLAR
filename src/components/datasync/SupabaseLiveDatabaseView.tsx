@@ -30,8 +30,10 @@ import {
   ShieldAlert,
   Lock,
   Unlock,
-  Key
+  Key,
+  Download
 } from 'lucide-react';
+import { RelationalIntegrityService } from '../../services/relationalIntegrityService';
 import {
   SupabaseDatabaseService,
   SupabaseSyncResult,
@@ -65,6 +67,16 @@ export const SupabaseLiveDatabaseView: React.FC = () => {
   // Script DDL
   const [copiedSql, setCopiedSql] = useState(false);
   const ddlScript = useMemo(() => SupabaseDatabaseService.getComprehensiveProvisioningScript(), []);
+
+  // Script Integridade & Auto-Cura
+  const [copiedHealingSql, setCopiedHealingSql] = useState(false);
+  const integrityHealingSql = useMemo(() => SupabaseDatabaseService.getIntegrityVerificationAndHealingScript(), []);
+
+  const handleCopyHealingSql = () => {
+    navigator.clipboard.writeText(integrityHealingSql);
+    setCopiedHealingSql(true);
+    setTimeout(() => setCopiedHealingSql(false), 2500);
+  };
 
   // RLS Security Audit & Hardening
   const [rlsReport, setRlsReport] = useState<RlsAuditReport | null>(null);
@@ -777,6 +789,86 @@ export const SupabaseLiveDatabaseView: React.FC = () => {
 
         <pre className="p-4 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-emerald-400/90 overflow-x-auto max-h-60 leading-relaxed">
           {ddlScript}
+        </pre>
+      </div>
+
+      {/* 6. Script de Verificação de Integridade, Relacionamentos e Auto-Cura */}
+      <div className="bg-slate-900 border border-emerald-500/30 rounded-xl p-6 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-emerald-400" />
+              <h3 className="text-sm font-bold text-slate-50">
+                Auditoria de Integridade Referencial, Relacionamentos & Auto-Cura
+              </h3>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Script transacional seguro que detecta dados órfãos, corrige chaves estrangeiras (students, turmas, polos, diários, notas, provas) e aplica Foreign Keys com ON DELETE/CASCADE.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                RelationalIntegrityService.downloadSqlScript(
+                  integrityHealingSql,
+                  'auditoria_integridade_auto_cura_supabase.sql'
+                );
+              }}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 shadow transition-all cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-400" />
+              Baixar .SQL
+            </button>
+
+            <button
+              onClick={handleCopyHealingSql}
+              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold flex items-center gap-2 shadow transition-all cursor-pointer"
+            >
+              {copiedHealingSql ? (
+                <>
+                  <Check className="w-4 h-4 text-slate-950" />
+                  Copiado!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4" />
+                  Copiar Script de Auto-Cura
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
+            <span className="font-bold text-slate-200 flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> 1. Normalização de Órfãos
+            </span>
+            <p className="text-[11px] text-slate-400">
+              Associa automaticamente alunos, notas e chamadas sem turma ou polo para unidades válidas.
+            </p>
+          </div>
+          <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
+            <span className="font-bold text-slate-200 flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> 2. Aplicação de Foreign Keys
+            </span>
+            <p className="text-[11px] text-slate-400">
+              Cria constraints de integridade referencial com ON UPDATE CASCADE e ON DELETE CASCADE/SET NULL.
+            </p>
+          </div>
+          <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
+            <span className="font-bold text-slate-200 flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> 3. Relatório de Saúde
+            </span>
+            <p className="text-[11px] text-slate-400">
+              Emite um SELECT consolidado ao final mostrando se todas as tabelas estão com 0 órfãos ('PERFEITO').
+            </p>
+          </div>
+        </div>
+
+        <pre className="p-4 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-emerald-400/90 overflow-x-auto max-h-60 leading-relaxed">
+          {integrityHealingSql}
         </pre>
       </div>
     </div>

@@ -4155,9 +4155,9 @@ jobs:
                     : pkg.improvements.filter((i) => i.category === activeCategoryFilter);
 
                 if (searchQuery.trim()) {
-                  const q = searchQuery.toLowerCase();
+                  const q = searchQuery.toLowerCase().trim();
                   filteredImps = filteredImps.filter(
-                    (i) => i.title.toLowerCase().includes(q) || i.description.toLowerCase().includes(q)
+                    (i) => i && ((i.title && i.title.toLowerCase().includes(q)) || (i.description && i.description.toLowerCase().includes(q)))
                   );
                 }
 

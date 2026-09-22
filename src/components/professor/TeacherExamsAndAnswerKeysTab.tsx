@@ -121,11 +121,14 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
 
   // Provas do docente / turma ativa
   const teacherExams = useMemo(() => {
-    return exams.filter(
+    const safeTeacher = (teacherName || '').toLowerCase().trim();
+    const safeSubjName = (activeSubject?.name || '').toLowerCase().trim();
+    return (exams || []).filter(
       (e) =>
-        e.classId === activeClass?.id ||
-        (e.teacherName && e.teacherName.toLowerCase().includes(teacherName.toLowerCase())) ||
-        (e.subject && activeSubject && e.subject.toLowerCase() === activeSubject.name.toLowerCase())
+        e &&
+        (e.classId === activeClass?.id ||
+          (safeTeacher && e.teacherName && e.teacherName.toLowerCase().includes(safeTeacher)) ||
+          (safeSubjName && e.subject && e.subject.toLowerCase() === safeSubjName))
     );
   }, [exams, activeClass?.id, teacherName, activeSubject]);
 

@@ -95,16 +95,19 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
   );
 
   const filteredExams = useMemo(() => {
+    const q = (searchTerm || '').toLowerCase().trim();
     return exams.filter((exam) => {
+      if (!exam) return false;
       const matchSearch =
-        exam.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        exam.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        exam.teacherName.toLowerCase().includes(searchTerm.toLowerCase());
+        !q ||
+        (exam.title && exam.title.toLowerCase().includes(q)) ||
+        (exam.subject && exam.subject.toLowerCase().includes(q)) ||
+        (exam.teacherName && exam.teacherName.toLowerCase().includes(q));
 
       const matchClass =
         selectedClassFilter === 'ALL' || exam.classId === selectedClassFilter;
 
-      return matchSearch && matchClass;
+      return Boolean(matchSearch && matchClass);
     });
   }, [exams, searchTerm, selectedClassFilter]);
 

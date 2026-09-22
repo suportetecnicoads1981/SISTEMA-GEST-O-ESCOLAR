@@ -93,7 +93,27 @@ export class SupabasePersistenceService {
         rolePreferences: DEFAULT_ROLE_PREFERENCES,
         schoolUnits: unitsRes.data || [],
         municipalSecretary: undefined,
-        syncLogs: logsRes.data || [],
+        syncLogs: (logsRes.data || []).map((l: any) => {
+          let parsedDetails: any = {};
+          if (l.details && typeof l.details === 'string') {
+            try { parsedDetails = JSON.parse(l.details); } catch (_) {}
+          }
+          return {
+            id: l.id || ('log_' + Math.random().toString(36).substring(2, 7)),
+            schoolUnitId: l.schoolUnitId || l.station_id || 'SEMED_CENTRAL',
+            schoolUnitName: l.schoolUnitName || parsedDetails.schoolUnitName || 'Polo Municipal',
+            importedAt: l.importedAt || l.created_at || new Date().toISOString(),
+            operatorName: l.operatorName || parsedDetails.operatorName || 'Administrador',
+            recordsMerged: l.recordsMerged || parsedDetails.recordsMerged || {
+              students: l.records_count || 0,
+              classes: 0,
+              exams: 0,
+              submissions: 0
+            },
+            status: l.status || 'SUCESSO',
+            notes: typeof l.notes === 'string' ? l.notes : (typeof l.details === 'string' ? l.details : 'Sincronização realizada com sucesso.')
+          };
+        }),
         userAccounts: (usersRes.data && usersRes.data.length > 0)
           ? usersRes.data.map((u: any) => ({
               ...u,

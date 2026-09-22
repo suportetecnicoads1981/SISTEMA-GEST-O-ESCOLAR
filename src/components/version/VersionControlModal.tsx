@@ -104,13 +104,15 @@ export const VersionControlModal: React.FC<VersionControlModalProps> = ({
 
   // Filter improvements of the selected version package
   const filteredImprovements = activePkg.improvements.filter((imp) => {
+    if (!imp) return false;
     const matchesCategory =
       selectedCategory === 'TODOS' || imp.category === selectedCategory;
+    const q = (searchQuery || '').toLowerCase().trim();
     const matchesSearch =
-      !searchQuery.trim() ||
-      imp.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      imp.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      imp.category.toLowerCase().includes(searchQuery.toLowerCase());
+      !q ||
+      (imp.title && imp.title.toLowerCase().includes(q)) ||
+      (imp.description && imp.description.toLowerCase().includes(q)) ||
+      (imp.category && imp.category.toLowerCase().includes(q));
     return matchesCategory && matchesSearch;
   });
 

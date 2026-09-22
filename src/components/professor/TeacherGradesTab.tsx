@@ -40,15 +40,15 @@ interface TeacherGradesTabProps {
 }
 
 export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
-  teacherName,
-  classes,
-  subjects,
-  students,
+  teacherName = '',
+  classes = [],
+  subjects = [],
+  students = [],
   settings,
   activeClassId,
   activeSubjectId,
   selectedTerm,
-  gradeSheets,
+  gradeSheets = [],
   onSaveGradeSheet,
 }) => {
   const activeClass = useMemo(
@@ -62,9 +62,9 @@ export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
   );
 
   const classStudents = useMemo(() => {
-    return students
-      .filter((s) => s.classId === activeClass?.id && s.status === 'ACTIVE')
-      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    return (students || [])
+      .filter((s) => s && s.classId === activeClass?.id && s.status === 'ACTIVE')
+      .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR'));
   }, [students, activeClass]);
 
   // Local State for Grade Entries: studentId -> StudentBimonthlyGradeEntry

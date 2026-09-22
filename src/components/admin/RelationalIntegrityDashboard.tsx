@@ -88,11 +88,14 @@ export const RelationalIntegrityDashboard: React.FC<Props> = ({
 
   // Filtragem de tabelas
   const filteredTables = useMemo(() => {
+    const q = (searchTerm || '').toLowerCase().trim();
     return report.tableSummaries.filter((tbl) => {
+      if (!tbl) return false;
       const matchSearch =
-        tbl.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        tbl.tableName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        tbl.testedForeignKeys.some((k) => k.toLowerCase().includes(searchTerm.toLowerCase()));
+        !q ||
+        (tbl.displayName && tbl.displayName.toLowerCase().includes(q)) ||
+        (tbl.tableName && tbl.tableName.toLowerCase().includes(q)) ||
+        (tbl.testedForeignKeys && tbl.testedForeignKeys.some((k) => k && k.toLowerCase().includes(q)));
 
       if (!matchSearch) return false;
       if (statusFilter === 'HEALTHY') return tbl.status === 'HEALTHY';
