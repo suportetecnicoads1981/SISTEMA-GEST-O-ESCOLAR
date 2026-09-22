@@ -349,23 +349,23 @@ export function getCleanDatabase(options?: CleanInstallationOptions): AppStateDa
 
   const initialSettings: SchoolSettings = {
     ...DEFAULT_SCHOOL_SETTINGS,
-    name: options?.schoolName || 'Minha Instituição de Ensino',
-    tradeName: options?.schoolName ? `${options.schoolName} S/S` : 'Instituto Educacional',
-    inepCode: '',
-    cnpj: '',
-    accreditationDecree: '',
-    address: '',
-    neighborhood: '',
-    city: options?.city || 'São Paulo',
-    state: options?.state || 'SP',
-    zipCode: '',
-    phone: '',
-    email: options?.adminEmail || 'contato@escola.edu.br',
-    website: '',
-    principalName: '',
-    principalTitle: 'Diretor(a) Pedagógico(a)',
-    secretaryName: '',
-    secretaryRegistration: '',
+    name: options?.schoolName || DEFAULT_SCHOOL_SETTINGS.name,
+    tradeName: options?.schoolName ? `${options.schoolName} S/S` : DEFAULT_SCHOOL_SETTINGS.tradeName,
+    inepCode: DEFAULT_SCHOOL_SETTINGS.inepCode,
+    cnpj: DEFAULT_SCHOOL_SETTINGS.cnpj,
+    accreditationDecree: DEFAULT_SCHOOL_SETTINGS.accreditationDecree,
+    address: DEFAULT_SCHOOL_SETTINGS.address,
+    neighborhood: DEFAULT_SCHOOL_SETTINGS.neighborhood,
+    city: options?.city || DEFAULT_SCHOOL_SETTINGS.city,
+    state: options?.state || DEFAULT_SCHOOL_SETTINGS.state,
+    zipCode: DEFAULT_SCHOOL_SETTINGS.zipCode,
+    phone: DEFAULT_SCHOOL_SETTINGS.phone,
+    email: options?.adminEmail || DEFAULT_SCHOOL_SETTINGS.email,
+    website: DEFAULT_SCHOOL_SETTINGS.website,
+    principalName: DEFAULT_SCHOOL_SETTINGS.principalName,
+    principalTitle: DEFAULT_SCHOOL_SETTINGS.principalTitle,
+    secretaryName: DEFAULT_SCHOOL_SETTINGS.secretaryName,
+    secretaryRegistration: DEFAULT_SCHOOL_SETTINGS.secretaryRegistration,
   };
 
   const headquarterUnit: SchoolUnit = {
@@ -410,7 +410,7 @@ export function getCleanDatabase(options?: CleanInstallationOptions): AppStateDa
     developerContact: DEFAULT_DEVELOPER_CONTACT,
     bnccSkills: DEFAULT_BNCC_SKILLS, // Competências BNCC mantidas
     stateRegulations: DEFAULT_STATE_REGULATIONS, // Regulamentações estaduais mantidas
-    activeStateRegulationCode: options?.state || 'SP',
+    activeStateRegulationCode: options?.state || 'PA',
     attendanceSheets: [],
     lessonRegistries: [],
     classGradeSheets: [],
@@ -431,7 +431,7 @@ export function getCleanDatabase(options?: CleanInstallationOptions): AppStateDa
         userSector: activeMaster.sector,
         actionType: 'EXPORTAR_DADOS',
         module: 'configuracoes',
-        details: 'Base de dados de teste limpa. Mantidos apenas os dados da secretaria de educação e matrizes curriculares.',
+        details: 'Base de dados limpa. Mantido apenas o cadastro da Secretaria Municipal de Educação de Cumaru do Norte/PA e matrizes curriculares.',
         ipAddress: '127.0.0.1',
         status: 'SUCESSO',
       },
@@ -482,7 +482,7 @@ export function resetToDemoDatabase(): AppStateData {
     developerContact: DEFAULT_DEVELOPER_CONTACT,
     bnccSkills: DEFAULT_BNCC_SKILLS,
     stateRegulations: DEFAULT_STATE_REGULATIONS,
-    activeStateRegulationCode: 'SP',
+    activeStateRegulationCode: 'PA',
     attendanceSheets: DEFAULT_ATTENDANCE_SHEETS,
     lessonRegistries: DEFAULT_LESSON_REGISTRIES,
     classGradeSheets: DEFAULT_CLASS_GRADE_SHEETS,
@@ -543,14 +543,20 @@ export function getStoredData(): AppStateData {
     }).catch(() => {});
   }
 
-  const CLEAN_SECRETARIA_ONLY_FLAG = 'sucessoedu_clean_secretaria_only_v542';
+  const CLEAN_SECRETARIA_ONLY_FLAG = 'sucessoedu_clean_cumaru_do_norte_prod_v544';
   if (typeof window !== 'undefined' && localStorage.getItem(CLEAN_SECRETARIA_ONLY_FLAG) !== 'true') {
-    const clean = getCleanDatabase();
+    const clean = getCleanDatabase({
+      schoolName: DEFAULT_SCHOOL_SETTINGS.name,
+      city: 'Cumaru do Norte',
+      state: 'PA',
+      adminEmail: 'suportetecnicoads@gmail.com',
+    });
     saveStoredData(clean);
     try {
       localStorage.setItem(CLEAN_SECRETARIA_ONLY_FLAG, 'true');
       localStorage.setItem('sucessoedu_clean_install', 'true');
       localStorage.setItem('sucessoedu_database_mode', 'CLEAN');
+      localStorage.setItem('sucessoedu_logged_user_id', 'user-master-01');
     } catch {}
     return clean;
   }

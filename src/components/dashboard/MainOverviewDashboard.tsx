@@ -417,6 +417,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
       {/* DASHBOX DE STATUS COM NOVAS ATUALIZAÇÕES DISPONÍVEIS & OTA */}
       {/* ========================================================= */}
       <SystemUpdateStatusDashbox
+        systemVersion={settings?.systemVersion || 'v5.5.0 Enterprise'}
         onNavigateToUpdates={() => onNavigate('INSTALAFLOW')}
       />
 

@@ -30,7 +30,8 @@ export class SupabasePersistenceService {
         commsRes,
         notifsRes,
         settingsRes,
-        logsRes
+        logsRes,
+        updatesRes
       ] = await Promise.all([
         supabase.from('students').select('*'),
         supabase.from('school_classes').select('*'),
@@ -49,6 +50,7 @@ export class SupabasePersistenceService {
         supabase.from('notifications').select('*'),
         supabase.from('school_settings').select('*'),
         supabase.from('sync_audit_logs').select('*'),
+        supabase.from('system_updates').select('*'),
       ]);
 
       if (studentsRes.error && classesRes.error) {
@@ -132,7 +134,23 @@ export class SupabasePersistenceService {
         whatsappConfig: undefined,
         whatsappTemplates: [],
         whatsappLogs: [],
-        systemUpdates: [],
+        systemUpdates: (updatesRes.data && updatesRes.data.length > 0)
+          ? updatesRes.data.map((u: any) => ({
+              id: u.id,
+              version: u.version,
+              title: u.title,
+              summary: u.summary || u.description || '',
+              description: u.description || u.summary || '',
+              releaseDate: u.releaseDate || u.release_date || new Date().toISOString().split('T')[0],
+              severity: u.severity || 'MAJOR',
+              sizeFormatted: u.sizeFormatted || u.size_formatted || '58.4 MB',
+              sha256Checksum: u.sha256Checksum || u.sha256_checksum || '',
+              author: u.author || 'SEDUC / SucessoEdu',
+              isInstalled: Boolean(u.isInstalled || u.is_installed),
+              isCloudAvailable: true,
+              improvements: Array.isArray(u.improvements) ? u.improvements : [],
+            }))
+          : [],
         auditLogs: logsRes.data || [],
       };
 

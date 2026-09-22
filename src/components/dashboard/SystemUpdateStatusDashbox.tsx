@@ -19,11 +19,13 @@ import {
 import { TARGET_GOOGLE_DRIVE_ACCOUNT } from '../../services/googleDriveService';
 
 interface SystemUpdateStatusDashboxProps {
+  systemVersion?: string;
   onNavigateToUpdates: () => void;
   onOpenReportBuilder?: () => void;
 }
 
 export const SystemUpdateStatusDashbox: React.FC<SystemUpdateStatusDashboxProps> = ({
+  systemVersion = 'v5.5.0 Enterprise',
   onNavigateToUpdates,
   onOpenReportBuilder,
 }) => {
@@ -139,7 +141,7 @@ export const SystemUpdateStatusDashbox: React.FC<SystemUpdateStatusDashboxProps>
             <div className="space-y-2 text-xs">
               <div className="flex justify-between items-center p-2 rounded-xl bg-slate-900/80 border border-slate-800">
                 <span className="text-slate-400">Versão em Operação:</span>
-                <span className="font-mono font-bold text-white">v5.5.0 Enterprise</span>
+                <span className="font-mono font-bold text-white">{systemVersion}</span>
               </div>
               <div className="flex justify-between items-center p-2 rounded-xl bg-emerald-950/40 border border-emerald-700/40">
                 <span className="text-emerald-300 font-semibold">Versão Homologada Nuvem:</span>

@@ -302,8 +302,8 @@ export default function App() {
 
         setData(prev => ({
           ...prev,
-          students: studentsRes.data && studentsRes.data.length > 0 ? studentsRes.data : prev.students,
-          exams: examsRes.data && examsRes.data.length > 0 ? examsRes.data : prev.exams,
+          students: studentsRes.data !== null && Array.isArray(studentsRes.data) ? studentsRes.data : prev.students,
+          exams: examsRes.data !== null && Array.isArray(examsRes.data) ? examsRes.data : prev.exams,
           notifications: notifsRes.data && notifsRes.data.length > 0
             ? notifsRes.data.map((n: any) => ({
                 ...n,

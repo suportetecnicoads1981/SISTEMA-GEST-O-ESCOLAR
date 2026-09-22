@@ -42,7 +42,7 @@ export function buildDefaultDbObject(schoolName?: string, initialData?: any, isC
 
   const sourceClasses = (initialData?.classes && Array.isArray(initialData.classes) && initialData.classes.length > 0)
     ? initialData.classes
-    : DEFAULT_CLASSES;
+    : (!isClean ? DEFAULT_CLASSES : []);
 
   const formattedClasses = sourceClasses.map((c: any) => ({
     id: c.id,
@@ -167,7 +167,9 @@ export function buildDefaultDbObject(schoolName?: string, initialData?: any, isC
     subjects: initialData?.subjects || DEFAULT_SUBJECTS,
     courses: initialData?.courses || DEFAULT_COURSES,
     academicHistories: initialData?.academicHistories || DEFAULT_ACADEMIC_HISTORIES,
-    schoolUnits: initialData?.schoolUnits || DEFAULT_SCHOOL_UNITS,
+    schoolUnits: (initialData?.schoolUnits && Array.isArray(initialData.schoolUnits))
+      ? initialData.schoolUnits
+      : (!isClean ? DEFAULT_SCHOOL_UNITS : []),
     users: formattedUsers,
     attendance: initialData?.attendance || {},
     notifications: formattedNotifications,

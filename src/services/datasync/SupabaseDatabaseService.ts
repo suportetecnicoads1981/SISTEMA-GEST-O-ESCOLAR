@@ -172,6 +172,13 @@ export const ECOSYSTEM_TABLES: TableDefinitionMeta[] = [
     description: 'Rastreabilidade de sincronizações locais e remotas com timestamps.',
     localKey: 'syncLogs',
   },
+  {
+    tableName: 'system_updates',
+    displayName: 'Atualizações do Sistema',
+    category: 'INFRASTRUCTURE',
+    description: 'Catálogo de versões e pacotes de atualização publicados na nuvem.',
+    localKey: 'systemUpdates',
+  },
 ];
 
 export interface RlsAuditCheck {
@@ -1099,6 +1106,27 @@ END $$;
             created_at: l.importedAt || new Date().toISOString()
           }))
         ) 
+      },
+      {
+        name: 'system_updates',
+        data: stored.systemUpdates,
+        customSync: () => this.syncTableGeneric(
+          'system_updates',
+          (stored.systemUpdates || []).map((u: any, idx: number) => ({
+            id: u.id || ('update_' + idx),
+            version: u.version,
+            title: u.title,
+            summary: u.summary || u.description || '',
+            description: u.description || u.summary || '',
+            release_date: u.releaseDate || u.release_date || new Date().toISOString().split('T')[0],
+            severity: u.severity || 'MAJOR',
+            size_formatted: u.sizeFormatted || u.size_formatted || '58.4 MB',
+            sha256_checksum: u.sha256Checksum || u.sha256_checksum || '',
+            author: u.author || 'SEDUC / SucessoEdu',
+            is_installed: Boolean(u.isInstalled || u.is_installed),
+            improvements: u.improvements || [],
+          }))
+        )
       },
     ];
 
