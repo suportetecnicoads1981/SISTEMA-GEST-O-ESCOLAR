@@ -7,6 +7,7 @@
 
 import { getSupabaseClient, SUPABASE_CONFIG } from './supabaseClient';
 import { getStoredData, AppStateData } from '../../data/storage';
+import { toRemoteRow, SUPABASE_TABLE_COLUMNS, ADMIN_ONLY_TABLES } from './supabaseRowMapper';
 
 export interface SupabaseSyncResult {
   success: boolean;
@@ -879,17 +880,29 @@ END $$;
         };
       }
 
-      // Converte payload para formato seguro com id
-      const payload = records.map((r, idx) => {
-        if (typeof r !== 'object' || r === null) {
-          return { id: `item_${idx}`, data: r };
-        }
+      // Converte para as colunas reais da tabela (snake_case) e descarta registros sem
+      // os campos obrigatórios, que fariam o lote inteiro ser recusado.
+      const nowIso = new Date().toISOString();
+      const payload = records
+        .filter((r) => typeof r === 'object' && r !== null)
+        .map((r, idx) => {
+          const withMeta: Record<string, any> = { ...r, id: r.id || `auto_${idx}_${Date.now()}` };
+          if (SUPABASE_TABLE_COLUMNS[tableName]?.includes('updated_at')) {
+            withMeta.updated_at = nowIso;
+          }
+          return toRemoteRow(tableName, withMeta);
+        })
+        .filter((r): r is Record<string, any> => r !== null);
+
+      if (payload.length === 0) {
         return {
-          ...r,
-          id: r.id || `auto_${idx}_${Date.now()}`,
-          updated_at: new Date().toISOString(),
+          success: true,
+          table: tableName,
+          count: 0,
+          latencyMs: 0,
+          message: `Nenhum registro válido na tabela '${tableName}' para sincronizar.`,
         };
-      });
+      }
 
       const { data, error } = await supabase
         .from(tableName)
@@ -934,10 +947,25 @@ END $$;
   public static async syncAllEntitiesToSupabase(
     onProgress?: (current: number, total: number, tableName: string) => void
   ): Promise<SupabaseSyncResult[]> {
+    // As políticas RLS só permitem gravação para usuários autenticados da equipe.
+    const { data: sessionData } = await getSupabaseClient().auth.getSession();
+    const session = sessionData?.session;
+    if (!session) {
+      return [{
+        success: false,
+        table: '*',
+        count: 0,
+        latencyMs: 0,
+        message: 'Sincronização em nuvem aguardando login: entre com uma conta cadastrada no Supabase.',
+        error: 'NO_SESSION',
+      }];
+    }
+    const isAdmin = String(session.user?.app_metadata?.role || '').toUpperCase() === 'ADMIN';
+
     const stored = getStoredData();
     const results: SupabaseSyncResult[] = [];
 
-    const tasks = [
+    const allTasks = [
       { name: 'students', data: stored.students, customSync: () => this.syncStudentsToSupabase(stored.students) },
       { name: 'school_classes', data: stored.classes, customSync: () => this.syncClassesToSupabase(stored.classes) },
       { 
@@ -1129,6 +1157,9 @@ END $$;
         )
       },
     ];
+
+    // Tabelas administrativas só são gravadas por ADMIN (as demais contas recebem erro de RLS).
+    const tasks = allTasks.filter((t) => isAdmin || !ADMIN_ONLY_TABLES.has(t.name));
 
     for (let i = 0; i < tasks.length; i++) {
       const task = tasks[i];

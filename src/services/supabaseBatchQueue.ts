@@ -1,4 +1,5 @@
 import { getSupabaseClient } from './supabaseClient';
+import { toRemoteRow } from './datasync/supabaseRowMapper';
 
 export interface QueuedBatchItem {
   id: string;
@@ -266,7 +267,7 @@ class SupabaseBatchQueue {
         location_zone: s.locationZone || s.location_zone || 'URBANA',
         cadastral_status: s.cadastralStatus || s.cadastral_status || 'COMPLETE',
         medical_observations: s.medicalObservations || s.medical_observations || null,
-        has_aee: s.hasAee !== undefined ? s.hasAee : (s.has_aee || false),
+        has_aee: Boolean(s.hasAEE ?? s.hasAeeSupport ?? s.hasAee ?? s.has_aee ?? false),
         photo_url: s.photoUrl || s.photo_url || null,
         school_unit_id: s.schoolUnitId || s.school_unit_id || null,
       }));
@@ -283,7 +284,9 @@ class SupabaseBatchQueue {
       }));
     }
 
-    return records;
+    return records
+      .map((r) => (r && typeof r === 'object' ? toRemoteRow(table, r) : null))
+      .filter((r): r is Record<string, any> => r !== null);
   }
 
   /**
@@ -295,6 +298,15 @@ class SupabaseBatchQueue {
 
     // Se estiver offline, preserva os itens sem consumir tentativas
     if (!this.isOnline()) {
+      return;
+    }
+
+    // Sem login no Supabase as políticas RLS recusam a gravação: mantém os itens na
+    // fila, sem consumir tentativas, até o usuário se autenticar.
+    try {
+      const { data: sessionData } = await getSupabaseClient().auth.getSession();
+      if (!sessionData?.session) return;
+    } catch {
       return;
     }
 

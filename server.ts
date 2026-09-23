@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import os from 'os';
@@ -2720,6 +2721,106 @@ app.post('/api/nexusbuild/notify-developer', (req, res) => {
   }
 });
 
+// Cliente administrativo do Supabase + verificação de que quem chama é um ADMIN autenticado.
+// Responde ao cliente e retorna null quando a verificação falha.
+async function requireSupabaseAdmin(req: express.Request, res: express.Response) {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://cdxvhxqpixtbycghfsre.supabase.co';
+  if (!serviceRoleKey) {
+    res.status(501).json({
+      success: false,
+      error: 'SUPABASE_SERVICE_ROLE_KEY não configurada no servidor. Configure a chave para gerenciar contas na nuvem.',
+    });
+    return null;
+  }
+  const { createClient } = await import('@supabase/supabase-js');
+  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  // Somente um ADMIN autenticado pode gerenciar contas e privilégios. Sem esta checagem,
+  // qualquer pessoa na rede podia se promover a ADMIN com uma simples requisição.
+  const authHeader = req.headers.authorization || '';
+  const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  if (!accessToken) {
+    res.status(401).json({ success: false, error: 'Autenticação obrigatória. Entre com uma conta de administrador da nuvem.' });
+    return null;
+  }
+  const { data: callerData, error: callerError } = await supabaseAdmin.auth.getUser(accessToken);
+  if (callerError || !callerData?.user) {
+    res.status(401).json({ success: false, error: 'Sessão inválida ou expirada. Faça login novamente.' });
+    return null;
+  }
+  if (String(callerData.user.app_metadata?.role || '').toUpperCase() !== 'ADMIN') {
+    res.status(403).json({ success: false, error: 'Apenas administradores podem gerenciar contas de usuários.' });
+    return null;
+  }
+  return supabaseAdmin;
+}
+
+const CLOUD_ROLES = ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'];
+
+// Cria (ou atualiza a senha/papel de) uma conta de acesso no Supabase Auth.
+app.post('/api/admin/cloud-user', async (req, res) => {
+  try {
+    const { email, password, role, name } = req.body || {};
+    const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return res.status(400).json({ success: false, error: 'E-mail inválido. A conta na nuvem exige um e-mail válido.' });
+    }
+    if (typeof password !== 'string' || password.length < 6 || password.length > 72) {
+      return res.status(400).json({ success: false, error: 'A senha deve ter entre 6 e 72 caracteres.' });
+    }
+    if (!CLOUD_ROLES.includes(role)) {
+      return res.status(400).json({ success: false, error: `Papel inválido. Use: ${CLOUD_ROLES.join(', ')}.` });
+    }
+
+    const supabaseAdmin = await requireSupabaseAdmin(req, res);
+    if (!supabaseAdmin) return;
+
+    const displayName = typeof name === 'string' ? name.slice(0, 200) : undefined;
+    const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      email: cleanEmail,
+      password,
+      email_confirm: true,
+      app_metadata: { role },
+      user_metadata: displayName ? { name: displayName } : {},
+    });
+
+    if (!createError && created?.user) {
+      return res.json({ success: true, created: true, userId: created.user.id, message: 'Acesso na nuvem criado com sucesso.' });
+    }
+
+    // Conta já existente: atualiza senha e papel.
+    let existingId: string | null = null;
+    for (let page = 1; page <= 20 && !existingId; page++) {
+      const { data: list, error: listError } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
+      if (listError || !list?.users?.length) break;
+      existingId = (list.users as any[]).find((u: any) => (u.email || '').toLowerCase() === cleanEmail)?.id || null;
+      if (list.users.length < 200) break;
+    }
+    if (!existingId) {
+      return res.status(500).json({ success: false, error: createError?.message || 'Não foi possível criar a conta na nuvem.' });
+    }
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(existingId, {
+      password,
+      app_metadata: { role },
+      ...(displayName ? { user_metadata: { name: displayName } } : {}),
+    });
+    if (updateError) {
+      return res.status(500).json({ success: false, error: updateError.message });
+    }
+    // Encerra sessões antigas, pois a senha mudou.
+    try {
+      await supabaseAdmin.auth.admin.signOut(existingId, 'global' as any);
+    } catch {}
+    return res.json({ success: true, created: false, userId: existingId, message: 'Senha e papel da conta na nuvem atualizados.' });
+  } catch (err: any) {
+    console.error('[CloudUser] Erro interno:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Erro interno ao gerenciar conta na nuvem.' });
+  }
+});
+
 // 7. Supabase Edge Function Proxy / RBAC Role Update & Global SignOut
 app.post('/api/update-user-role', async (req, res) => {
   try {
@@ -2741,31 +2842,10 @@ app.post('/api/update-user-role', async (req, res) => {
     }
 
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://cdxvhxqpixtbycghfsre.supabase.co';
 
     if (serviceRoleKey) {
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      });
-
-      // Somente um ADMIN autenticado pode alterar privilégios. Sem esta checagem,
-      // qualquer pessoa na rede podia se promover a ADMIN com uma simples requisição.
-      const authHeader = req.headers.authorization || '';
-      const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-      if (!accessToken) {
-        return res.status(401).json({ success: false, error: 'Autenticação obrigatória para alterar privilégios.' });
-      }
-      const { data: callerData, error: callerError } = await supabaseAdmin.auth.getUser(accessToken);
-      if (callerError || !callerData?.user) {
-        return res.status(401).json({ success: false, error: 'Sessão inválida ou expirada. Faça login novamente.' });
-      }
-      if (String(callerData.user.app_metadata?.role || '').toUpperCase() !== 'ADMIN') {
-        return res.status(403).json({ success: false, error: 'Apenas administradores podem alterar privilégios de usuários.' });
-      }
+      const supabaseAdmin = await requireSupabaseAdmin(req, res);
+      if (!supabaseAdmin) return;
 
       // 1. Atualizar app_metadata com a nova role
       const { data: updateData, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(

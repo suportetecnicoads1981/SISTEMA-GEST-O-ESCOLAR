@@ -32,6 +32,8 @@ import {
 } from 'lucide-react';
 import { UserAccount, SchoolUnit, UserRole, UserSector } from '../../types';
 import { getLatestAutoBackup } from '../../data/storage';
+import { getSupabaseClient } from '../../services/datasync/supabaseClient';
+import { getDefaultSectorPermissions } from '../usuarios/UserAccessControl';
 import {
   hashPassword,
   verifyPassword,
@@ -179,12 +181,29 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setActiveTabMode('FORM');
   };
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  /**
+   * Tenta autenticar no Supabase (necessário para acessar os dados da nuvem).
+   * Retorna a sessão, ou null se as credenciais não existirem lá ou se estiver offline.
+   */
+  const trySupabaseSignIn = async (email: string, pwd: string) => {
+    if (!email || !pwd || (typeof navigator !== 'undefined' && navigator.onLine === false)) return null;
+    try {
+      const attempt = getSupabaseClient().auth.signInWithPassword({ email, password: pwd });
+      const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000));
+      const result = await Promise.race([attempt, timeout]);
+      if (!result || result.error || !result.data?.user) return null;
+      return result.data;
+    } catch {
+      return null;
+    }
+  };
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMsg('');
 
-    setTimeout(() => {
+    {
       const cleanUser = (username || '').trim().toLowerCase();
       let match = userAccounts.find(
         (u) =>
@@ -219,6 +238,51 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         };
       }
 
+      // 1) Login na nuvem (Supabase Auth): libera a sincronização protegida por RLS e
+      //    funciona em qualquer computador. O papel vem do app_metadata definido pelo ADMIN.
+      const email = cleanUser.includes('@') ? cleanUser : (match?.email || '').toLowerCase();
+      const cloud = email ? await trySupabaseSignIn(email, password) : null;
+      if (cloud?.user) {
+        const cloudRole = String(cloud.user.app_metadata?.role || '').toUpperCase();
+        const role: UserRole = (['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'].includes(cloudRole) ? cloudRole : 'STUDENT') as UserRole;
+        const existing =
+          (match && match.email?.toLowerCase() === email ? match : undefined) ||
+          userAccounts.find((u) => u?.email?.toLowerCase() === email);
+        const sector: UserSector = existing?.sector || (role === 'ADMIN' ? 'MASTER' : role === 'TEACHER' ? 'PROFESSOR' : 'ALUNO');
+
+        if (existing && existing.active === false) {
+          await getSupabaseClient().auth.signOut().catch(() => {});
+          setIsLoading(false);
+          setErrorMsg('Credenciais inválidas ou usuário inativo no banco de dados.');
+          return;
+        }
+
+        const account: UserAccount = existing
+          ? { ...existing, role }
+          : {
+              id: `usr-${cloud.user.id}`,
+              name: String(cloud.user.user_metadata?.name || email.split('@')[0]),
+              login: email.split('@')[0],
+              email,
+              role,
+              sector,
+              sectorTitle: role === 'ADMIN' ? 'Administrador (Supabase)' : role === 'TEACHER' ? 'Corpo Docente' : 'Usuário',
+              isMaster: role === 'ADMIN',
+              active: true,
+              createdAt: new Date().toISOString(),
+              permissions: getDefaultSectorPermissions(sector),
+            };
+
+        // Guarda a senha (em hash) para permitir o login também sem internet neste computador.
+        const passwordHash = hashPassword(password);
+        onPasswordUpdate?.({ ...account, password: passwordHash }, passwordHash);
+        setIsLoading(false);
+        setPassword('');
+        onLoginSuccess({ ...account, password: passwordHash });
+        return;
+      }
+
+      // 2) Sem conta na nuvem ou sem internet: autenticação local deste computador.
       if (!match) {
         setIsLoading(false);
         setErrorMsg('Credenciais inválidas ou usuário inativo no banco de dados.');
@@ -227,6 +291,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
       if (!hasPasswordDefined(match.password)) {
         setIsLoading(false);
+        if (match.cloudSynced) {
+          // Conta gerenciada na nuvem: a senha é a cadastrada no Supabase pelo administrador.
+          // Permitir "primeiro acesso" aqui deixaria qualquer pessoa definir a senha dela.
+          setErrorMsg(
+            navigator.onLine === false
+              ? 'Sem internet: o primeiro acesso desta conta neste computador precisa de conexão para validar a senha na nuvem.'
+              : 'Credenciais inválidas. Use a senha cadastrada pelo administrador para esta conta.'
+          );
+          return;
+        }
         setFirstAccessUser(match);
         setNewPassword('');
         setConfirmNewPassword('');
@@ -247,7 +321,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       setIsLoading(false);
       setPassword('');
       onLoginSuccess(match);
-    }, 400);
+    }
   };
 
   const handleFirstAccessSubmit = (e: React.FormEvent) => {

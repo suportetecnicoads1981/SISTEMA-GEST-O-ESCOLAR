@@ -43,6 +43,7 @@ import {
   DEFAULT_DEVELOPER_CONTACT,
 } from './data/defaultData';
 import { getSupabaseClient } from './services/supabaseClient';
+import { SupabasePersistenceService } from './services/supabasePersistenceService';
 import { supabaseBatchQueue } from './services/supabaseBatchQueue';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
@@ -231,7 +232,8 @@ export default function App() {
     return false;
   };
 
-  // Grava o hash da senha (primeiro acesso ou conversão de senha legada em texto puro).
+  // Grava o hash da senha (primeiro acesso, conversão de senha legada ou cópia local
+  // da senha após login no Supabase) e atualiza o papel vindo da nuvem.
   const handlePasswordUpdate = (user: UserAccount, passwordHash: string) => {
     setData((prev) => {
       const accounts = prev.userAccounts || [];
@@ -239,7 +241,7 @@ export default function App() {
       return {
         ...prev,
         userAccounts: exists
-          ? accounts.map((u) => (u.id === user.id ? { ...u, password: passwordHash } : u))
+          ? accounts.map((u) => (u.id === user.id ? { ...u, role: user.role, password: passwordHash } : u))
           : [...accounts, { ...user, password: passwordHash }],
       };
     });
@@ -287,38 +289,20 @@ export default function App() {
     syncTablesToSupabase();
   }, [data.students, data.exams, data.notifications]);
 
-  // Load initial state from Supabase tables (students, exams, notifications)
+  // Recarrega o estado da nuvem quando o login no Supabase é concluído (a carga
+  // inicial já é feita por getStoredData). A mesclagem é não destrutiva.
   useEffect(() => {
-    async function loadTablesFromSupabase() {
-      try {
-        const supabase = getSupabaseClient();
-        const [studentsRes, examsRes, notifsRes] = await Promise.all([
-          supabase.from('students').select('*'),
-          supabase.from('exams').select('*'),
-          supabase.from('notifications').select('*'),
-        ]);
-
-        setData(prev => (remoteOriginDataRef.current = {
-          ...prev,
-          students: studentsRes.data !== null && Array.isArray(studentsRes.data) ? studentsRes.data : prev.students,
-          exams: examsRes.data !== null && Array.isArray(examsRes.data) ? examsRes.data : prev.exams,
-          notifications: notifsRes.data && notifsRes.data.length > 0
-            ? notifsRes.data.map((n: any) => ({
-                ...n,
-                targetRoles: Array.isArray(n.targetRoles)
-                  ? n.targetRoles
-                  : Array.isArray(n.target_roles)
-                  ? n.target_roles
-                  : ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'],
-                read: Boolean(n.read),
-              }))
-            : prev.notifications,
-        }));
-      } catch (err) {
-        console.warn('Supabase initial select warning:', err);
+    const loadFromCloud = async () => {
+      const remote = await SupabasePersistenceService.fetchAppStateFromSupabase();
+      if (remote) {
+        window.dispatchEvent(new CustomEvent('sucessoedu_db_changed', { detail: remote }));
       }
-    }
-    loadTablesFromSupabase();
+    };
+    const { data: authListener } = getSupabaseClient().auth.onAuthStateChange((event) => {
+      // Adiado: chamar o Supabase dentro deste callback trava o cliente de autenticação.
+      if (event === 'SIGNED_IN') setTimeout(loadFromCloud, 0);
+    });
+    return () => authListener.subscription.unsubscribe();
   }, []);
 
   // Sincronizar estado global instantaneamente quando ocorrer limpeza de base ou restauração demo
@@ -513,6 +497,8 @@ export default function App() {
       localStorage.removeItem('sucessoedu_auth_session');
       localStorage.removeItem('sucessoedu_logged_user_id');
     } catch {}
+    // Encerra também a sessão do Supabase (senão a sincronização continuaria autenticada).
+    getSupabaseClient().auth.signOut().catch(() => {});
     setAuthenticatedUserId(null);
     setIsAuthenticated(false);
     setOpenTabs(['MAIN_DASHBOARD']);
