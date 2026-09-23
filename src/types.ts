@@ -645,6 +645,8 @@ export interface UserAccount {
   schoolUnitName?: string;
   isMaster: boolean;
   active: boolean;
+  /** Conta recebida da tabela user_accounts do Supabase: exige login na nuvem no primeiro acesso. */
+  cloudSynced?: boolean;
   avatarUrl?: string;
   permissions: Record<SystemModuleKey, ModulePermission>;
   createdAt: string;

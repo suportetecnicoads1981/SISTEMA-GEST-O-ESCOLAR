@@ -65,3 +65,15 @@ Ao gerar scripts ou realizar manutenções em `src/utils/installerGenerator.ts`:
 - `/src/utils/installerGenerator.ts`: Gerador de todos os scripts Windows/Linux (`.bat`, `.ps1`, `.vbs`, `.sh`), instalador unificado e pacotes ZIP (`JSZip`).
 - `/src/utils/standaloneAppHtml.ts`: Gerador do SPA HTML standalone offline.
 - `/src/components/*`: Componentes modulares da interface.
+
+---
+
+## 5. Autenticação, Senhas e Segurança da Nuvem (Supabase)
+1. **Login em duas camadas** (`src/components/auth/LoginScreen.tsx`):
+   - Primeiro tenta o **Supabase Auth** (e-mail + senha). O papel vem de `app_metadata.role` (definido só pelo ADMIN via servidor) e libera a sincronização em nuvem.
+   - Sem internet ou sem conta na nuvem, usa a **senha local** do computador (hash `sha256$iterações$sal$hash` em `src/utils/passwordHasher.ts`, JS puro para funcionar em `http://IP-da-rede`).
+   - Contas vindas da nuvem (`cloudSynced`) não podem ter a senha criada via "primeiro acesso": exigem o login na nuvem.
+2. **Nunca** chamar métodos do Supabase dentro de `onAuthStateChange` sem adiar com `setTimeout(..., 0)` — isso trava o login.
+3. **RLS** (`supabase/migrations/20260923_rls_staff_access_policies.sql`): `anon` não acessa nada; `ADMIN`/`TEACHER` autenticados leem e gravam; tabelas administrativas e exclusões só `ADMIN`. **Nunca** criar políticas `USING (true)`.
+4. **Sincronização** (`src/services/datasync/supabaseRowMapper.ts`): converter camelCase ↔ snake_case pelas colunas reais; a leitura da nuvem é **mescla não destrutiva** (lista vazia não apaga dados locais) e só ocorre com sessão ativa.
+5. **Servidor**: `/api/admin/cloud-user` e `/api/update-user-role` exigem `SUPABASE_SERVICE_ROLE_KEY` no `.env` e token de um ADMIN autenticado.

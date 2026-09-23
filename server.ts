@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import os from 'os';
@@ -12,6 +13,35 @@ const PORT = 3000;
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Limite simples de requisições por IP (em memória). Usado nas rotas que chamam a
+// API paga do Gemini: sem ele qualquer pessoa na rede podia esgotar a cota.
+function createRateLimiter(maxRequests: number, windowMs: number) {
+  const hits = new Map<string, { count: number; resetAt: number }>();
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const now = Date.now();
+    const key = req.ip || req.socket.remoteAddress || 'desconhecido';
+    const entry = hits.get(key);
+    if (!entry || entry.resetAt <= now) {
+      hits.set(key, { count: 1, resetAt: now + windowMs });
+      if (hits.size > 10000) {
+        for (const [k, v] of hits) if (v.resetAt <= now) hits.delete(k);
+      }
+      return next();
+    }
+    entry.count += 1;
+    if (entry.count > maxRequests) {
+      res.setHeader('Retry-After', String(Math.ceil((entry.resetAt - now) / 1000)));
+      return res.status(429).json({
+        success: false,
+        error: 'Muitas requisições em pouco tempo. Aguarde um minuto e tente novamente.',
+      });
+    }
+    return next();
+  };
+}
+
+app.use('/api/ai', createRateLimiter(20, 60 * 1000));
 
 // Helper to get local network IP addresses
 function getLocalNetworkAddresses(): { name: string; address: string; family: string }[] {
@@ -673,9 +703,20 @@ arquivos na pasta "Atualizações e melhorias".
 
 // POST /api/updates/publish - Publish a new version to Cloud Storage
 app.post('/api/updates/publish', (req, res) => {
-  const { version, title, summary, description, severity, sizeFormatted, improvements, sha256Checksum, author } = req.body;
-  if (!version || !title) {
+  const { version, title, summary, description, severity, sizeFormatted, improvements, sha256Checksum, author } = req.body || {};
+  if (typeof version !== 'string' || typeof title !== 'string' || !version.trim() || !title.trim()) {
     return res.status(400).json({ error: 'Versão e título são obrigatórios.' });
+  }
+  // Limites de tamanho: evitam textos gigantes e crescimento ilimitado da lista em memória.
+  const optionalTexts = { summary, description, severity, sizeFormatted, sha256Checksum, author };
+  const invalidText = Object.entries(optionalTexts).find(
+    ([, v]) => v !== undefined && (typeof v !== 'string' || v.length > 5000)
+  );
+  if (version.length > 50 || title.length > 200 || invalidText) {
+    return res.status(400).json({ error: 'Campos do pacote inválidos ou longos demais.' });
+  }
+  if (improvements !== undefined && (!Array.isArray(improvements) || improvements.length > 200)) {
+    return res.status(400).json({ error: 'Lista de melhorias inválida.' });
   }
 
   const newPkg = {
@@ -699,6 +740,9 @@ app.post('/api/updates/publish', (req, res) => {
     p.isLatest = false;
   });
   CLOUD_UPDATE_REPOSITORY.unshift(newPkg);
+  if (CLOUD_UPDATE_REPOSITORY.length > 100) {
+    CLOUD_UPDATE_REPOSITORY.length = 100;
+  }
 
   res.json({
     success: true,
@@ -1265,10 +1309,17 @@ const CANONICAL_NEXUS_FILES = [
 ];
 
 function getNexusRootDir(customPath?: string): string {
-  if (customPath && customPath.startsWith('/') && !customPath.includes('..')) {
-    return customPath;
+  // O diretório vem do corpo da requisição (sem autenticação). Antes, qualquer
+  // caminho absoluto era aceito, permitindo criar/sobrescrever arquivos em
+  // qualquer pasta do servidor. Agora só são aceitos caminhos dentro de nexus_root.
+  const baseDir = path.join(process.cwd(), 'nexus_root');
+  if (typeof customPath === 'string' && path.isAbsolute(customPath)) {
+    const resolved = path.resolve(customPath);
+    if (resolved === baseDir || resolved.startsWith(baseDir + path.sep)) {
+      return resolved;
+    }
   }
-  return path.join(process.cwd(), 'nexus_root');
+  return baseDir;
 }
 
 // Armazenamento em memória/disco para instalações e logs de erro persistentes
@@ -2262,15 +2313,22 @@ app.get('/api/nexusinstall/network/detect', async (req, res) => {
 // Endpoint: Gravação de configuração persistida no Secret Manager
 app.post('/api/nexusinstall/network/save-secret', (req, res) => {
   try {
-    const { port, ip } = req.body;
-    const envContent = `PORT=${port}\nHOST_IP=${ip}\nHOSTNAME=${os.hostname()}\nALLOCATED_AT=${new Date().toISOString()}\nSECRET_SYNC=true\n`;
+    const { port, ip } = req.body || {};
+    const portNum = Number(port);
+    if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) {
+      return res.status(400).json({ success: false, error: 'Porta inválida (use um número entre 1 e 65535).' });
+    }
+    if (typeof ip !== 'string' || net.isIP(ip) === 0) {
+      return res.status(400).json({ success: false, error: 'Endereço IP inválido.' });
+    }
+    const envContent = `PORT=${portNum}\nHOST_IP=${ip}\nHOSTNAME=${os.hostname()}\nALLOCATED_AT=${new Date().toISOString()}\nSECRET_SYNC=true\n`;
     fs.writeFileSync(path.join(process.cwd(), '.nexus-runtime.env'), envContent, 'utf-8');
 
     res.json({
       success: true,
       secretId: 'projects/sucessoedu-hub/secrets/NEXUS_RUNTIME_NETWORK',
       version: '1',
-      stored: { port, ip },
+      stored: { port: portNum, ip },
       updatedAt: new Date().toISOString()
     });
   } catch (err: any) {
@@ -2663,6 +2721,106 @@ app.post('/api/nexusbuild/notify-developer', (req, res) => {
   }
 });
 
+// Cliente administrativo do Supabase + verificação de que quem chama é um ADMIN autenticado.
+// Responde ao cliente e retorna null quando a verificação falha.
+async function requireSupabaseAdmin(req: express.Request, res: express.Response) {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://cdxvhxqpixtbycghfsre.supabase.co';
+  if (!serviceRoleKey) {
+    res.status(501).json({
+      success: false,
+      error: 'SUPABASE_SERVICE_ROLE_KEY não configurada no servidor. Configure a chave para gerenciar contas na nuvem.',
+    });
+    return null;
+  }
+  const { createClient } = await import('@supabase/supabase-js');
+  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  // Somente um ADMIN autenticado pode gerenciar contas e privilégios. Sem esta checagem,
+  // qualquer pessoa na rede podia se promover a ADMIN com uma simples requisição.
+  const authHeader = req.headers.authorization || '';
+  const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  if (!accessToken) {
+    res.status(401).json({ success: false, error: 'Autenticação obrigatória. Entre com uma conta de administrador da nuvem.' });
+    return null;
+  }
+  const { data: callerData, error: callerError } = await supabaseAdmin.auth.getUser(accessToken);
+  if (callerError || !callerData?.user) {
+    res.status(401).json({ success: false, error: 'Sessão inválida ou expirada. Faça login novamente.' });
+    return null;
+  }
+  if (String(callerData.user.app_metadata?.role || '').toUpperCase() !== 'ADMIN') {
+    res.status(403).json({ success: false, error: 'Apenas administradores podem gerenciar contas de usuários.' });
+    return null;
+  }
+  return supabaseAdmin;
+}
+
+const CLOUD_ROLES = ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'];
+
+// Cria (ou atualiza a senha/papel de) uma conta de acesso no Supabase Auth.
+app.post('/api/admin/cloud-user', async (req, res) => {
+  try {
+    const { email, password, role, name } = req.body || {};
+    const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return res.status(400).json({ success: false, error: 'E-mail inválido. A conta na nuvem exige um e-mail válido.' });
+    }
+    if (typeof password !== 'string' || password.length < 6 || password.length > 72) {
+      return res.status(400).json({ success: false, error: 'A senha deve ter entre 6 e 72 caracteres.' });
+    }
+    if (!CLOUD_ROLES.includes(role)) {
+      return res.status(400).json({ success: false, error: `Papel inválido. Use: ${CLOUD_ROLES.join(', ')}.` });
+    }
+
+    const supabaseAdmin = await requireSupabaseAdmin(req, res);
+    if (!supabaseAdmin) return;
+
+    const displayName = typeof name === 'string' ? name.slice(0, 200) : undefined;
+    const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      email: cleanEmail,
+      password,
+      email_confirm: true,
+      app_metadata: { role },
+      user_metadata: displayName ? { name: displayName } : {},
+    });
+
+    if (!createError && created?.user) {
+      return res.json({ success: true, created: true, userId: created.user.id, message: 'Acesso na nuvem criado com sucesso.' });
+    }
+
+    // Conta já existente: atualiza senha e papel.
+    let existingId: string | null = null;
+    for (let page = 1; page <= 20 && !existingId; page++) {
+      const { data: list, error: listError } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
+      if (listError || !list?.users?.length) break;
+      existingId = (list.users as any[]).find((u: any) => (u.email || '').toLowerCase() === cleanEmail)?.id || null;
+      if (list.users.length < 200) break;
+    }
+    if (!existingId) {
+      return res.status(500).json({ success: false, error: createError?.message || 'Não foi possível criar a conta na nuvem.' });
+    }
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(existingId, {
+      password,
+      app_metadata: { role },
+      ...(displayName ? { user_metadata: { name: displayName } } : {}),
+    });
+    if (updateError) {
+      return res.status(500).json({ success: false, error: updateError.message });
+    }
+    // Encerra sessões antigas, pois a senha mudou.
+    try {
+      await supabaseAdmin.auth.admin.signOut(existingId, 'global' as any);
+    } catch {}
+    return res.json({ success: true, created: false, userId: existingId, message: 'Senha e papel da conta na nuvem atualizados.' });
+  } catch (err: any) {
+    console.error('[CloudUser] Erro interno:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Erro interno ao gerenciar conta na nuvem.' });
+  }
+});
+
 // 7. Supabase Edge Function Proxy / RBAC Role Update & Global SignOut
 app.post('/api/update-user-role', async (req, res) => {
   try {
@@ -2684,16 +2842,10 @@ app.post('/api/update-user-role', async (req, res) => {
     }
 
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://cdxvhxqpixtbycghfsre.supabase.co';
 
     if (serviceRoleKey) {
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      });
+      const supabaseAdmin = await requireSupabaseAdmin(req, res);
+      if (!supabaseAdmin) return;
 
       // 1. Atualizar app_metadata com a nova role
       const { data: updateData, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(

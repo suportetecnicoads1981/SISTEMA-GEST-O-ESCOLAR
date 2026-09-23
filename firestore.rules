@@ -23,6 +23,17 @@ service cloud.firestore {
       );
     }
 
+    // Documento existente pertence ao tenant do usuário (leitura, edição, exclusão).
+    // Em leituras request.resource é nulo, por isso deve-se usar resource.data.
+    function ownsExistingDoc() {
+      return isAuthenticated() && resource.data.tenant_id == request.auth.token.tenant_id;
+    }
+
+    // Documento gravado continua no tenant do usuário (criação e edição).
+    function writesOwnTenant() {
+      return isAuthenticated() && request.resource.data.tenant_id == request.auth.token.tenant_id;
+    }
+
     // Regras de Autenticação & Configurações de Tenants
     match /tenants_auth_configs/{tenantId} {
       allow read: if belongsToTenant(tenantId);
@@ -31,62 +42,51 @@ service cloud.firestore {
 
     // Módulo CRM: Leads & Oportunidades
     match /crm_leads_opportunities/{docId} {
-      allow read, write: if isAuthenticated() && (
-        isTechnicalAdmin() ||
-        (request.resource.data.tenant_id == request.auth.token.tenant_id)
-      );
+      allow read, delete: if isTechnicalAdmin() || ownsExistingDoc();
+      allow create: if isTechnicalAdmin() || writesOwnTenant();
+      allow update: if isTechnicalAdmin() || (ownsExistingDoc() && writesOwnTenant());
     }
 
     // Módulo CRM: Contas & Contatos
     match /crm_accounts_contacts/{docId} {
-      allow read, write: if isAuthenticated() && (
-        isTechnicalAdmin() ||
-        (request.resource.data.tenant_id == request.auth.token.tenant_id)
-      );
+      allow read, delete: if isTechnicalAdmin() || ownsExistingDoc();
+      allow create: if isTechnicalAdmin() || writesOwnTenant();
+      allow update: if isTechnicalAdmin() || (ownsExistingDoc() && writesOwnTenant());
     }
 
     // Módulo Financeiro: Contas a Receber
     match /fin_accounts_receivable/{docId} {
-      allow read, write: if isAuthenticated() && (
-        isTechnicalAdmin() ||
-        (request.resource.data.tenant_id == request.auth.token.tenant_id)
-      );
+      allow read, delete: if isTechnicalAdmin() || ownsExistingDoc();
+      allow create: if isTechnicalAdmin() || writesOwnTenant();
+      allow update: if isTechnicalAdmin() || (ownsExistingDoc() && writesOwnTenant());
     }
 
     // Módulo Financeiro: Contas a Pagar
     match /fin_accounts_payable/{docId} {
-      allow read, write: if isAuthenticated() && (
-        isTechnicalAdmin() ||
-        (request.resource.data.tenant_id == request.auth.token.tenant_id)
-      );
+      allow read, delete: if isTechnicalAdmin() || ownsExistingDoc();
+      allow create: if isTechnicalAdmin() || writesOwnTenant();
+      allow update: if isTechnicalAdmin() || (ownsExistingDoc() && writesOwnTenant());
     }
 
     // Módulo Financeiro: Livro Razão e Lançamentos Contábeis
     match /fin_ledger_entries/{docId} {
-      allow read: if isAuthenticated() && (
-        isTechnicalAdmin() ||
-        (resource.data.tenant_id == request.auth.token.tenant_id)
-      );
-      allow write: if isAuthenticated() && (
-        isTechnicalAdmin() ||
-        (request.resource.data.tenant_id == request.auth.token.tenant_id)
-      );
+      allow read, delete: if isTechnicalAdmin() || ownsExistingDoc();
+      allow create: if isTechnicalAdmin() || writesOwnTenant();
+      allow update: if isTechnicalAdmin() || (ownsExistingDoc() && writesOwnTenant());
     }
 
     // Módulo Inventário: Itens de Estoque
     match /inv_stock_items/{docId} {
-      allow read, write: if isAuthenticated() && (
-        isTechnicalAdmin() ||
-        (request.resource.data.tenant_id == request.auth.token.tenant_id)
-      );
+      allow read, delete: if isTechnicalAdmin() || ownsExistingDoc();
+      allow create: if isTechnicalAdmin() || writesOwnTenant();
+      allow update: if isTechnicalAdmin() || (ownsExistingDoc() && writesOwnTenant());
     }
 
     // Módulo Inventário: Movimentações de Estoque (Lotes e Rastreabilidade)
     match /inv_stock_movements/{docId} {
-      allow read, write: if isAuthenticated() && (
-        isTechnicalAdmin() ||
-        (request.resource.data.tenant_id == request.auth.token.tenant_id)
-      );
+      allow read, delete: if isTechnicalAdmin() || ownsExistingDoc();
+      allow create: if isTechnicalAdmin() || writesOwnTenant();
+      allow update: if isTechnicalAdmin() || (ownsExistingDoc() && writesOwnTenant());
     }
 
     // Histórico de Releases e Auditoria do NexusCore

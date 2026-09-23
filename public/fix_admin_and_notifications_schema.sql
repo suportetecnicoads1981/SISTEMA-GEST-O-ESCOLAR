@@ -1,3 +1,8 @@
+-- ⚠️  ATENÇÃO: NÃO EXECUTE ESTE SCRIPT NO PROJETO ATUAL.
+-- Ele cria políticas USING (true), que deixam os dados dos alunos acessíveis a
+-- qualquer pessoa com a chave pública do aplicativo (violação da LGPD).
+-- As políticas corretas estão em supabase/migrations/20260923_rls_staff_access_policies.sql
+
 -- =========================================================================
 -- SUCESSOEDU GESTÃO EDUCACIONAL - SCRIPT DE CORREÇÃO E INTEGRIDADE SQL
 -- DIAGNÓSTICO E CORREÇÃO: "TypeError: Cannot read properties of undefined (reading 'ADMIN')"

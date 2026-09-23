@@ -1,4 +1,13 @@
-importScripts('https://storage.googleapis.com/workbox-cdn/releases/7.0.0/workbox-sw.js');
+// Se o CDN do Workbox estiver inacessível (sem internet, firewall da escola),
+// importScripts lança exceção e o Service Worker inteiro falhava ao registrar.
+// Com o try/catch o SW continua funcionando, apenas sem as rotas de cache.
+try {
+  importScripts('https://storage.googleapis.com/workbox-cdn/releases/7.0.0/workbox-sw.js');
+} catch (err) {
+  console.warn('[SucessoEdu SW] Não foi possível carregar o Workbox:', err);
+}
+
+const workbox = self.workbox;
 
 if (workbox) {
   console.log('[SucessoEdu SW] Workbox carregado com sucesso.');
@@ -38,10 +47,13 @@ if (workbox) {
     })
   );
 
-  // Cache para requisições de API / Supabase - StaleWhileRevalidate
+  // Cache para requisições de API / Supabase - NetworkFirst
+  // (StaleWhileRevalidate exibia dados de alunos/notas desatualizados logo após
+  // uma edição; agora a rede tem prioridade e o cache só é usado offline)
   workbox.routing.registerRoute(
     ({ url }) => url.pathname.includes('/rest/v1/') || url.origin.includes('supabase.co'),
-    new workbox.strategies.StaleWhileRevalidate({
+    new workbox.strategies.NetworkFirst({
+      networkTimeoutSeconds: 5,
       cacheName: 'sucessoedu-api-cache-v542',
       plugins: [
         new workbox.expiration.ExpirationPlugin({

@@ -49,6 +49,8 @@ import {
   SecurityAuditLog,
 } from '../../types';
 import { UserManagementTable } from './UserManagementTable';
+import { hashPassword, PASSWORD_MASK } from '../../utils/passwordHasher';
+import { getSupabaseClient } from '../../services/datasync/supabaseClient';
 
 interface UserAccessControlProps {
   users: UserAccount[];
@@ -225,6 +227,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [cloudMessage, setCloudMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   // Form State for Create/Edit Modal
   const [formData, setFormData] = useState<{
@@ -311,7 +314,8 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
       id: user.id,
       name: user.name,
       login: user.login,
-      password: user.password || '••••••••',
+      // A senha armazenada é um hash e nunca é exibida; campo vazio mantém a senha atual.
+      password: '',
       email: user.email,
       phone: user.phone || '',
       sector: user.sector,
@@ -380,7 +384,9 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
       id: formData.id,
       name: formData.name.trim(),
       login: formData.login.trim(),
-      password: formData.password || undefined,
+      password: formData.password && formData.password !== PASSWORD_MASK
+        ? hashPassword(formData.password)
+        : editingUser?.password,
       email: formData.email.trim(),
       phone: formData.phone.trim(),
       role: secInfo.defaultRole,
@@ -407,6 +413,40 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
     setIsEditingModalOpen(false);
     setSuccessMessage(`Usuário "${updatedUserObj.name}" salvo com sucesso com perfil de "${secInfo.shortLabel}"!`);
     setTimeout(() => setSuccessMessage(null), 4000);
+
+    // Senha nova ou alterada: cria/atualiza também o acesso na nuvem (Supabase Auth),
+    // para que o usuário possa entrar em qualquer computador.
+    const typedPassword = formData.password && formData.password !== PASSWORD_MASK ? formData.password : '';
+    if (typedPassword && updatedUserObj.email) {
+      syncCloudAccess(updatedUserObj, typedPassword);
+    }
+  };
+
+  const syncCloudAccess = async (user: UserAccount, plainPassword: string) => {
+    try {
+      const { data: sessionData } = await getSupabaseClient().auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) {
+        setCloudMessage({
+          ok: false,
+          text: `"${user.name}" foi salvo apenas neste computador. Para criar o acesso na nuvem, entre com uma conta de administrador cadastrada no Supabase e salve a senha novamente.`,
+        });
+        return;
+      }
+      const response = await fetch('/api/admin/cloud-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ email: user.email, password: plainPassword, role: user.role, name: user.name }),
+      });
+      const result = await response.json().catch(() => ({}));
+      setCloudMessage(
+        response.ok && result.success
+          ? { ok: true, text: `Acesso na nuvem de "${user.name}" (${user.email}): ${result.message}` }
+          : { ok: false, text: `Acesso na nuvem de "${user.name}" não foi criado: ${result.error || 'erro desconhecido.'}` }
+      );
+    } catch {
+      setCloudMessage({ ok: false, text: `Sem conexão com o servidor: o acesso na nuvem de "${user.name}" não foi criado.` });
+    }
   };
 
   const handleToggleUserActive = (user: UserAccount) => {
@@ -629,6 +669,23 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3 text-emerald-800 text-sm font-semibold shadow-xs animate-in fade-in-50 duration-200">
           <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
           <span>{successMessage}</span>
+        </div>
+      )}
+
+      {cloudMessage && (
+        <div
+          className={`rounded-2xl p-4 flex items-start gap-3 text-sm font-semibold shadow-xs border ${
+            cloudMessage.ok ? 'bg-sky-50 border-sky-200 text-sky-800' : 'bg-amber-50 border-amber-200 text-amber-800'
+          }`}
+        >
+          <span className="flex-1">{cloudMessage.text}</span>
+          <button
+            type="button"
+            onClick={() => setCloudMessage(null)}
+            className="text-xs underline cursor-pointer shrink-0"
+          >
+            Fechar
+          </button>
         </div>
       )}
 
@@ -1272,7 +1329,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                       type={showPassword ? 'text' : 'password'}
                       value={formData.password || ''}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      placeholder="Senha do usuário..."
+                      placeholder={editingUser ? 'Deixe em branco para manter a senha atual' : 'Senha do usuário...'}
                       className="w-full pl-3 pr-16 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono"
                     />
                     <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">

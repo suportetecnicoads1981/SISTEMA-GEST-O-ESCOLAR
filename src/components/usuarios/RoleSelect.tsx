@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Shield, ChevronDown, Check, AlertTriangle, Loader2 } from 'lucide-react';
 import { UserRole, ROLES } from '../../types';
+import { getSupabaseClient } from '../../services/datasync/supabaseClient';
 
 interface RoleSelectProps {
   userId: string;
@@ -68,9 +69,15 @@ export const RoleSelect: React.FC<RoleSelectProps> = ({
 
     try {
       // 1. Invocar Edge Function / API Endpoint para atualização e invalidação de sessão
+      // Envia o token da sessão: o servidor só aceita alterações feitas por um ADMIN autenticado.
+      const { data: sessionData } = await getSupabaseClient().auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
       const response = await fetch('/api/update-user-role', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify({
           targetUserId: userId,
           newRole: pendingRole,
@@ -95,15 +102,9 @@ export const RoleSelect: React.FC<RoleSelectProps> = ({
       }
     } catch (err: any) {
       console.error('[RoleSelect] Erro na requisição:', err);
-      // Fallback local se estiver offline
-      setSelectedRole(pendingRole);
-      if (onRoleChanged) {
-        onRoleChanged(userId, pendingRole);
-      }
-      setToastMessage('Role atualizada localmente. As sessões ativas do usuário foram encerradas para segurança.');
-      setTimeout(() => {
-        setToastMessage(null);
-      }, 5000);
+      // Sem conexão com o servidor a alteração NÃO foi aplicada; antes a tela
+      // exibia sucesso e mostrava uma role que o usuário de fato não possuía.
+      alert('Não foi possível contatar o servidor. A permissão do usuário não foi alterada.');
     } finally {
       setIsUpdating(false);
       setPendingRole(null);

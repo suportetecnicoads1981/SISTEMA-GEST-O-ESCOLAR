@@ -169,9 +169,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
         setIsInitializing(false);
       } else if (newSession?.user) {
-        await fetchProfile(newSession.user);
-        setLoading(false);
-        setIsInitializing(false);
+        // Chamadas ao Supabase dentro deste callback travam o login (o cliente mantém
+        // um bloqueio até todos os ouvintes terminarem). Adia a busca do perfil.
+        const sessionUser = newSession.user;
+        setTimeout(async () => {
+          if (!isMounted) return;
+          await fetchProfile(sessionUser);
+          setLoading(false);
+          setIsInitializing(false);
+        }, 0);
       } else {
         setLoading(false);
         setIsInitializing(false);

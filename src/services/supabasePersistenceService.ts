@@ -1,10 +1,28 @@
 import { getSupabaseClient } from './datasync/supabaseClient';
 import { SupabaseDatabaseService } from './datasync/SupabaseDatabaseService';
 import type { AppStateData } from '../data/storage';
-import { DEFAULT_ROLE_PREFERENCES, DEFAULT_SCHOOL_SETTINGS, DEFAULT_USER_ACCOUNTS } from '../data/defaultData';
+import { DEFAULT_SCHOOL_SETTINGS } from '../data/defaultData';
+import { fromRemoteRow, mergeRemoteIntoLocal } from './datasync/supabaseRowMapper';
 
 export class SupabasePersistenceService {
   private static isSubscribed = false;
+
+  /** Estado completo gravado localmente (mesma chave usada por storage.ts). */
+  private static readLocalState(): AppStateData | null {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('sucessoedu_master_store_v5') : null;
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === 'object' ? (parsed as AppStateData) : null;
+    } catch {
+      return null;
+    }
+  }
+  private static readonly SAVE_DEBOUNCE_MS = 1500;
+  private static readonly REALTIME_DEBOUNCE_MS = 2000;
+  private static pendingSave: Promise<void> | null = null;
+  private static isSyncing = false;
+  private static resyncRequested = false;
+  private static realtimeRefetchTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * Fetch all app state entities from Supabase PostgreSQL tables and map to AppStateData
@@ -12,7 +30,22 @@ export class SupabasePersistenceService {
   public static async fetchAppStateFromSupabase(): Promise<AppStateData | null> {
     try {
       const supabase = getSupabaseClient();
-      
+
+      // Sem sessão autenticada as políticas RLS devolvem listas vazias: não há o que buscar.
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) {
+        return null;
+      }
+
+      const local = SupabasePersistenceService.readLocalState();
+      if (!local) {
+        // Sem estado local para mesclar: evita montar um estado parcial que apagaria campos.
+        return null;
+      }
+      const localAccountsById = new Map<string, any>(
+        (Array.isArray(local.userAccounts) ? local.userAccounts : []).map((u: any) => [u.id, u])
+      );
+
       const [
         studentsRes,
         classesRes,
@@ -30,8 +63,7 @@ export class SupabasePersistenceService {
         commsRes,
         notifsRes,
         settingsRes,
-        logsRes,
-        updatesRes
+        updatesRes,
       ] = await Promise.all([
         supabase.from('students').select('*'),
         supabase.from('school_classes').select('*'),
@@ -49,7 +81,6 @@ export class SupabasePersistenceService {
         supabase.from('communications').select('*'),
         supabase.from('notifications').select('*'),
         supabase.from('school_settings').select('*'),
-        supabase.from('sync_audit_logs').select('*'),
         supabase.from('system_updates').select('*'),
       ]);
 
@@ -58,100 +89,78 @@ export class SupabasePersistenceService {
         return null;
       }
 
-      const rawSettings = settingsRes.data?.[0] || {};
-      delete rawSettings.id;
+      const rowsOf = (res: { data: any[] | null; error: any }) => (res.error ? null : res.data);
+      const withRoles = (row: Record<string, any>) => {
+        const mapped = fromRemoteRow(row);
+        mapped.targetRoles = Array.isArray(row.targetRoles)
+          ? row.targetRoles
+          : Array.isArray(row.target_roles)
+          ? row.target_roles
+          : ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'];
+        return mapped;
+      };
 
+      const remoteSettingsRow = rowsOf(settingsRes)?.[0];
+      const remoteSettings = remoteSettingsRow ? fromRemoteRow(remoteSettingsRow) : null;
+      if (remoteSettings) {
+        delete remoteSettings.id;
+        delete remoteSettings.createdAt;
+        delete remoteSettings.updatedAt;
+      }
+
+      // Mescla não destrutiva: dados da nuvem atualizam os registros locais por id,
+      // campos e coleções que não existem na nuvem continuam como estão localmente.
       const freshData: AppStateData = {
-        students: studentsRes.data || [],
-        classes: (classesRes.data || []).map((c: any) => ({
-          ...c,
-          maxCapacity: c.capacity || c.maxCapacity,
+        ...local,
+        students: mergeRemoteIntoLocal(local.students, rowsOf(studentsRes), (row) => {
+          const mapped = fromRemoteRow(row);
+          if (row.registration_number) mapped.enrollmentNumber = row.registration_number;
+          if (typeof row.has_aee === 'boolean') mapped.hasAEE = row.has_aee;
+          delete mapped.registrationNumber;
+          delete mapped.hasAee;
+          return mapped;
+        }),
+        classes: mergeRemoteIntoLocal(local.classes, rowsOf(classesRes), (row) => {
+          const mapped = fromRemoteRow(row);
+          if (row.capacity) mapped.maxCapacity = row.capacity;
+          return mapped;
+        }),
+        subjects: mergeRemoteIntoLocal(local.subjects, rowsOf(subjectsRes)),
+        courses: mergeRemoteIntoLocal(local.courses, rowsOf(coursesRes)),
+        questions: mergeRemoteIntoLocal(local.questions, rowsOf(questionsRes)),
+        exams: mergeRemoteIntoLocal(local.exams, rowsOf(examsRes)),
+        submissions: mergeRemoteIntoLocal(local.submissions, rowsOf(submissionsRes)),
+        attendanceSheets: mergeRemoteIntoLocal(local.attendanceSheets, rowsOf(attendanceRes)),
+        lessonRegistries: mergeRemoteIntoLocal(local.lessonRegistries, rowsOf(lessonsRes)),
+        classGradeSheets: mergeRemoteIntoLocal(local.classGradeSheets, rowsOf(gradeSheetsRes)),
+        academicHistories: mergeRemoteIntoLocal(local.academicHistories, rowsOf(historiesRes)),
+        schoolUnits: mergeRemoteIntoLocal(local.schoolUnits, rowsOf(unitsRes)),
+        communications: mergeRemoteIntoLocal(local.communications, rowsOf(commsRes), withRoles),
+        notifications: mergeRemoteIntoLocal(local.notifications, rowsOf(notifsRes), (row) => ({
+          ...withRoles(row),
+          read: Boolean(row.read),
         })),
-        subjects: subjectsRes.data || [],
-        courses: coursesRes.data || [],
-        questions: questionsRes.data || [],
-        exams: examsRes.data || [],
-        submissions: submissionsRes.data || [],
-        academicHistories: historiesRes.data || [],
-        settings: Object.keys(rawSettings).length > 0 ? { ...DEFAULT_SCHOOL_SETTINGS, ...rawSettings } : DEFAULT_SCHOOL_SETTINGS,
-        notifications: (notifsRes.data || []).map((n: any) => ({
-          ...n,
-          targetRoles: Array.isArray(n.targetRoles)
-            ? n.targetRoles
-            : Array.isArray(n.target_roles)
-            ? n.target_roles
-            : ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'],
-          read: Boolean(n.read),
-        })),
-        communications: (commsRes.data || []).map((c: any) => ({
-          ...c,
-          senderRole: c.senderRole || c.sender_role || 'ADMIN',
-          targetRoles: Array.isArray(c.targetRoles)
-            ? c.targetRoles
-            : Array.isArray(c.target_roles)
-            ? c.target_roles
-            : ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'],
-        })),
-        rolePreferences: DEFAULT_ROLE_PREFERENCES,
-        schoolUnits: unitsRes.data || [],
-        municipalSecretary: undefined,
-        syncLogs: (logsRes.data || []).map((l: any) => {
-          let parsedDetails: any = {};
-          if (l.details && typeof l.details === 'string') {
-            try { parsedDetails = JSON.parse(l.details); } catch (_) {}
-          }
+        systemUpdates: mergeRemoteIntoLocal(local.systemUpdates as any[], rowsOf(updatesRes), (row) => ({
+          ...fromRemoteRow(row),
+          isCloudAvailable: true,
+          improvements: Array.isArray(row.improvements) ? row.improvements : [],
+        })) as any,
+        settings: remoteSettings
+          ? { ...DEFAULT_SCHOOL_SETTINGS, ...(local.settings || {}), ...remoteSettings }
+          : local.settings,
+        userAccounts: mergeRemoteIntoLocal(local.userAccounts, rowsOf(usersRes), (u) => {
+          // A tabela remota não guarda senha nem a marca de Master: esses campos são
+          // preservados da cópia local. Sem isso, cada sincronização apagava as senhas.
+          const localAcc = localAccountsById.get(u.id);
           return {
-            id: l.id || ('log_' + Math.random().toString(36).substring(2, 7)),
-            schoolUnitId: l.schoolUnitId || l.station_id || 'SEMED_CENTRAL',
-            schoolUnitName: l.schoolUnitName || parsedDetails.schoolUnitName || 'Polo Municipal',
-            importedAt: l.importedAt || l.created_at || new Date().toISOString(),
-            operatorName: l.operatorName || parsedDetails.operatorName || 'Administrador',
-            recordsMerged: l.recordsMerged || parsedDetails.recordsMerged || {
-              students: l.records_count || 0,
-              classes: 0,
-              exams: 0,
-              submissions: 0
-            },
-            status: l.status || 'SUCESSO',
-            notes: typeof l.notes === 'string' ? l.notes : (typeof l.details === 'string' ? l.details : 'Sincronização realizada com sucesso.')
+            ...fromRemoteRow(u),
+            password: localAcc?.password,
+            isMaster: Boolean(localAcc?.isMaster),
+            cloudSynced: true,
+            // Papel desconhecido recebe o menor privilégio (antes virava ADMIN).
+            role: (u.role && ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'].includes(u.role)) ? u.role : 'STUDENT',
           };
         }),
-        userAccounts: (usersRes.data && usersRes.data.length > 0)
-          ? usersRes.data.map((u: any) => ({
-              ...u,
-              role: (u.role && ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'].includes(u.role)) ? u.role : 'ADMIN',
-            }))
-          : DEFAULT_USER_ACCOUNTS,
-        developerContact: undefined,
-        bnccSkills: [],
-        stateRegulations: [],
-        activeStateRegulationCode: 'SP',
-        attendanceSheets: attendanceRes.data || [],
-        lessonRegistries: lessonsRes.data || [],
-        classGradeSheets: gradeSheetsRes.data || [],
-        teacherLessonPlans: [],
-        teacherStudentNotes: [],
-        whatsappConfig: undefined,
-        whatsappTemplates: [],
-        whatsappLogs: [],
-        systemUpdates: (updatesRes.data && updatesRes.data.length > 0)
-          ? updatesRes.data.map((u: any) => ({
-              id: u.id,
-              version: u.version,
-              title: u.title,
-              summary: u.summary || u.description || '',
-              description: u.description || u.summary || '',
-              releaseDate: u.releaseDate || u.release_date || new Date().toISOString().split('T')[0],
-              severity: u.severity || 'MAJOR',
-              sizeFormatted: u.sizeFormatted || u.size_formatted || '58.4 MB',
-              sha256Checksum: u.sha256Checksum || u.sha256_checksum || '',
-              author: u.author || 'SEDUC / SucessoEdu',
-              isInstalled: Boolean(u.isInstalled || u.is_installed),
-              isCloudAvailable: true,
-              improvements: Array.isArray(u.improvements) ? u.improvements : [],
-            }))
-          : [],
-        auditLogs: logsRes.data || [],
       };
 
       return freshData;
@@ -164,11 +173,41 @@ export class SupabasePersistenceService {
   /**
    * Save app state to Supabase PostgreSQL database
    */
-  public static async saveAppStateToSupabase(data: AppStateData): Promise<void> {
+  public static saveAppStateToSupabase(_data?: AppStateData): Promise<void> {
+    // Cada gravação local dispara uma sincronização completa de todas as tabelas.
+    // Várias gravações seguidas (ex.: ao abrir módulos) geravam dezenas de upserts
+    // simultâneos (ERR_INSUFFICIENT_RESOURCES). Aqui as chamadas são agrupadas:
+    // aguarda-se um intervalo curto e executa-se uma única sincronização por vez,
+    // sempre lendo o estado mais recente do localStorage.
+    if (!this.pendingSave) {
+      this.pendingSave = new Promise<void>((resolve) => {
+        setTimeout(async () => {
+          this.pendingSave = null;
+          await this.runSync();
+          resolve();
+        }, SupabasePersistenceService.SAVE_DEBOUNCE_MS);
+      });
+    }
+    return this.pendingSave;
+  }
+
+  private static async runSync(): Promise<void> {
+    if (this.isSyncing) {
+      // Já existe uma sincronização em andamento: agenda mais uma ao final dela.
+      this.resyncRequested = true;
+      return;
+    }
+    this.isSyncing = true;
     try {
       await SupabaseDatabaseService.syncAllEntitiesToSupabase();
     } catch (err) {
       console.warn('Failed to push state to Supabase:', err);
+    } finally {
+      this.isSyncing = false;
+      if (this.resyncRequested) {
+        this.resyncRequested = false;
+        this.saveAppStateToSupabase().catch(() => {});
+      }
     }
   }
 
@@ -184,12 +223,18 @@ export class SupabasePersistenceService {
         .on(
           'postgres_changes',
           { event: '*', schema: 'public' },
-          async (payload) => {
+          (payload) => {
             console.log('🔄 [Supabase Realtime] Change detected in table:', payload.table);
-            const fresh = await this.fetchAppStateFromSupabase();
-            if (fresh) {
-              onUpdate(fresh);
-            }
+            // Um upsert em lote gera um evento por linha; sem agrupamento cada evento
+            // recarregava todas as tabelas. Recarrega uma única vez após a rajada.
+            if (this.realtimeRefetchTimer) clearTimeout(this.realtimeRefetchTimer);
+            this.realtimeRefetchTimer = setTimeout(async () => {
+              this.realtimeRefetchTimer = null;
+              const fresh = await this.fetchAppStateFromSupabase();
+              if (fresh) {
+                onUpdate(fresh);
+              }
+            }, SupabasePersistenceService.REALTIME_DEBOUNCE_MS);
           }
         )
         .subscribe((status) => {

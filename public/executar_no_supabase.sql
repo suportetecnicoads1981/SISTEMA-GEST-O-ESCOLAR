@@ -1,3 +1,8 @@
+-- ⚠️  ATENÇÃO: NÃO EXECUTE ESTE SCRIPT NO PROJETO ATUAL.
+-- Ele cria políticas USING (true), que deixam os dados dos alunos acessíveis a
+-- qualquer pessoa com a chave pública do aplicativo (violação da LGPD).
+-- As políticas corretas estão em supabase/migrations/20260923_rls_staff_access_policies.sql
+
 -- =============================================================================
 -- SUCESSOEDU & SUPABASE: SCRIPT COMPLETO DE AUDITORIA, VERIFICAÇÃO E CORREÇÃO
 -- 100% IDEMPOTENTE E DEFENSIVO (Executa com sucesso mesmo em tabelas existentes)
