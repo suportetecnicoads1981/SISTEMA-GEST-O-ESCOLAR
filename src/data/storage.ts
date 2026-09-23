@@ -395,7 +395,7 @@ export function getCleanDatabase(options?: CleanInstallationOptions): AppStateDa
   return {
     students: [], // Alunos de teste limpos
     classes: [], // Turmas de teste limpas para importação de novas escolas e turmas
-    subjects: DEFAULT_SUBJECTS, // Matriz referencial de disciplinas BNCC mantida
+    subjects: [], // Produção: a escola cadastra as próprias disciplinas (as de exemplo tinham professores fictícios)
     courses: DEFAULT_COURSES,   // Estrutura padrão de níveis de ensino mantida
     questions: [], // Questões de teste limpas
     exams: [], // Avaliações de teste limpas
@@ -587,7 +587,8 @@ export function getStoredData(): AppStateData {
     const loadedState: AppStateData = {
       students: hasArr(parsed.students) ? parsed.students : [],
       classes: hasArr(parsed.classes) ? parsed.classes : [],
-      subjects: hasArr(parsed.subjects) && parsed.subjects.length > 0 ? parsed.subjects : DEFAULT_SUBJECTS,
+      // Lista vazia é válida (base de produção sem disciplinas ainda cadastradas).
+      subjects: hasArr(parsed.subjects) ? parsed.subjects : [],
       courses: hasArr(parsed.courses) && parsed.courses.length > 0 ? parsed.courses : DEFAULT_COURSES,
       questions: hasArr(parsed.questions) ? parsed.questions : [],
       exams: hasArr(parsed.exams) ? parsed.exams : [],
