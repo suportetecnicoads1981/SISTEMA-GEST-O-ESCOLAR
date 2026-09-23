@@ -1595,10 +1595,10 @@ export default function App() {
             {/* TAB: EMISSÃO DE DOCUMENTOS E CERTIFICADOS */}
             {activeTab === 'DOCUMENTS' && (
               <DocumentIssuer
-                students={data.students}
-                classes={data.classes}
-                histories={data.academicHistories}
-                settings={data.settings}
+                students={data?.students || []}
+                classes={data?.classes || []}
+                histories={data?.academicHistories || []}
+                settings={data?.settings || DEFAULT_SCHOOL_SETTINGS}
                 preSelectedStudentId={documentSelectedStudentId}
                 preSelectedDocType={documentSelectedType}
                 onBack={() => handleNavigate('MAIN_DASHBOARD')}

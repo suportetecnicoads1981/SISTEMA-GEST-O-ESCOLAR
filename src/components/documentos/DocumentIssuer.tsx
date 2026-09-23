@@ -60,9 +60,24 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
   const [customObservation, setCustomObservation] = useState('');
   const [copied, setCopied] = useState(false);
 
-  const selectedStudent = students.find((s) => s.id === selectedStudentId) || students[0];
-  const selectedClass = classes.find((c) => c.id === selectedStudent?.classId);
-  const studentHistory = histories.find((h) => h.studentId === selectedStudent?.id) || histories[0];
+  const selectedStudent = (students || []).find((s) => s.id === selectedStudentId) || students?.[0];
+  const selectedClass = (classes || []).find((c) => c.id === selectedStudent?.classId);
+  const matchedHistory = (histories || []).find((h) => h.studentId === selectedStudent?.id) || histories?.[0];
+
+  const safeHistory: AcademicHistory = matchedHistory || {
+    id: `hist-fallback-${selectedStudent?.id || 'empty'}`,
+    studentId: selectedStudent?.id || '',
+    schoolYear: selectedClass?.schoolYear || new Date().getFullYear(),
+    gradeLevel: selectedClass?.name || 'Ensino Fundamental / Médio',
+    schoolName: settings?.name || 'Instituição de Ensino',
+    cityState: `${settings?.city || 'Brasil'} - ${settings?.state || 'BR'}`,
+    records: [],
+    generalAverage: 0,
+    attendanceRate: 100,
+    finalResult: 'EM_CURSO',
+    observations: 'Registro acadêmico em processamento ou aguardando consolidação das avaliações do período.',
+    issuedAt: new Date().toISOString(),
+  };
 
   const currentDateFormatted = new Intl.DateTimeFormat('pt-BR', {
     day: 'numeric',
@@ -392,30 +407,38 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {studentHistory.records.map((rec) => (
-                      <tr key={rec.id} className="hover:bg-slate-50/50">
-                        <td className="border border-slate-300 p-2 font-medium text-slate-900">{rec.subjectName}</td>
-                        <td className="border border-slate-300 p-2 text-center">{rec.workloadHours}h</td>
-                        <td className="border border-slate-300 p-2 text-center">{rec.bimonthlyGrades.b1 ?? '-'}</td>
-                        <td className="border border-slate-300 p-2 text-center">{rec.bimonthlyGrades.b2 ?? '-'}</td>
-                        <td className="border border-slate-300 p-2 text-center">{rec.bimonthlyGrades.b3 ?? '-'}</td>
-                        <td className="border border-slate-300 p-2 text-center">{rec.bimonthlyGrades.b4 ?? '-'}</td>
-                        <td className="border border-slate-300 p-2 text-center font-bold text-indigo-900">{rec.finalGrade}</td>
-                        <td className="border border-slate-300 p-2 text-center">{rec.totalAbsences}</td>
-                        <td className="border border-slate-300 p-2 text-center font-semibold text-emerald-700">
-                          {rec.status}
+                    {(safeHistory.records || []).length > 0 ? (
+                      safeHistory.records.map((rec) => (
+                        <tr key={rec.id} className="hover:bg-slate-50/50">
+                          <td className="border border-slate-300 p-2 font-medium text-slate-900">{rec.subjectName}</td>
+                          <td className="border border-slate-300 p-2 text-center">{rec.workloadHours}h</td>
+                          <td className="border border-slate-300 p-2 text-center">{rec.bimonthlyGrades?.b1 ?? '-'}</td>
+                          <td className="border border-slate-300 p-2 text-center">{rec.bimonthlyGrades?.b2 ?? '-'}</td>
+                          <td className="border border-slate-300 p-2 text-center">{rec.bimonthlyGrades?.b3 ?? '-'}</td>
+                          <td className="border border-slate-300 p-2 text-center">{rec.bimonthlyGrades?.b4 ?? '-'}</td>
+                          <td className="border border-slate-300 p-2 text-center font-bold text-indigo-900">{rec.finalGrade ?? '-'}</td>
+                          <td className="border border-slate-300 p-2 text-center">{rec.totalAbsences ?? 0}</td>
+                          <td className="border border-slate-300 p-2 text-center font-semibold text-emerald-700">
+                            {rec.status || 'EM_ANDAMENTO'}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={9} className="border border-slate-300 p-4 text-center text-slate-500 italic">
+                          Nenhum componente curricular lançado no histórico deste estudante até o momento.
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                   <tfoot className="bg-slate-50 font-bold">
                     <tr>
                       <td className="border border-slate-300 p-2 text-right">Resultado Global:</td>
                       <td className="border border-slate-300 p-2 text-center">880h</td>
                       <td colSpan={4} className="border border-slate-300 p-2 text-right">Média Geral:</td>
-                      <td className="border border-slate-300 p-2 text-center text-indigo-900">{studentHistory.generalAverage}</td>
-                      <td className="border border-slate-300 p-2 text-center">{studentHistory.attendanceRate}% freq.</td>
-                      <td className="border border-slate-300 p-2 text-center text-emerald-700">{studentHistory.finalResult}</td>
+                      <td className="border border-slate-300 p-2 text-center text-indigo-900">{safeHistory.generalAverage ?? '-'}</td>
+                      <td className="border border-slate-300 p-2 text-center">{safeHistory.attendanceRate ?? 100}% freq.</td>
+                      <td className="border border-slate-300 p-2 text-center text-emerald-700">{safeHistory.finalResult || 'EM_CURSO'}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -424,7 +447,7 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
               {/* Observations */}
               <div className="text-xs text-slate-700 border border-slate-200 p-3 rounded-lg bg-slate-50 space-y-1">
                 <p className="font-bold text-slate-900">Observações Regimentais:</p>
-                <p>{studentHistory.observations} {customObservation}</p>
+                <p>{safeHistory.observations || 'Sem observações adicionais.'} {customObservation}</p>
                 <p className="text-[11px] text-slate-500">Escala de avaliação: 0,0 a 10,0. Média mínima para aprovação: 6,0. Frequência mínima obrigatória: 75%.</p>
               </div>
 
@@ -524,8 +547,8 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
                   <p className="text-slate-500 font-mono">RA: {selectedStudent?.enrollmentNumber} | CPF: {selectedStudent?.cpf}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-indigo-900">Média Geral: {studentHistory.generalAverage}</p>
-                  <p className="text-emerald-700 font-semibold">Frequência: {studentHistory.attendanceRate}%</p>
+                  <p className="font-bold text-indigo-900">Média Geral: {safeHistory.generalAverage ?? '-'}</p>
+                  <p className="text-emerald-700 font-semibold">Frequência: {safeHistory.attendanceRate ?? 100}%</p>
                 </div>
               </div>
 
@@ -543,18 +566,26 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {studentHistory.records.map((r) => (
-                    <tr key={r.id} className="border-b">
-                      <td className="p-2 border font-medium">{r.subjectName}</td>
-                      <td className="p-2 border text-center">{r.bimonthlyGrades.b1 ?? '-'}</td>
-                      <td className="p-2 border text-center">{r.bimonthlyGrades.b2 ?? '-'}</td>
-                      <td className="p-2 border text-center">{r.bimonthlyGrades.b3 ?? '-'}</td>
-                      <td className="p-2 border text-center">{r.bimonthlyGrades.b4 ?? '-'}</td>
-                      <td className="p-2 border text-center font-bold text-indigo-900">{r.finalGrade}</td>
-                      <td className="p-2 border text-center">{r.totalAbsences}</td>
-                      <td className="p-2 border text-center font-semibold text-emerald-700">{r.status}</td>
+                  {(safeHistory.records || []).length > 0 ? (
+                    safeHistory.records.map((r) => (
+                      <tr key={r.id} className="border-b">
+                        <td className="p-2 border font-medium">{r.subjectName}</td>
+                        <td className="p-2 border text-center">{r.bimonthlyGrades?.b1 ?? '-'}</td>
+                        <td className="p-2 border text-center">{r.bimonthlyGrades?.b2 ?? '-'}</td>
+                        <td className="p-2 border text-center">{r.bimonthlyGrades?.b3 ?? '-'}</td>
+                        <td className="p-2 border text-center">{r.bimonthlyGrades?.b4 ?? '-'}</td>
+                        <td className="p-2 border text-center font-bold text-indigo-900">{r.finalGrade ?? '-'}</td>
+                        <td className="p-2 border text-center">{r.totalAbsences ?? 0}</td>
+                        <td className="p-2 border text-center font-semibold text-emerald-700">{r.status || 'EM_ANDAMENTO'}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="p-4 text-center text-slate-500 italic">
+                        Nenhuma disciplina registrada no boletim deste estudante até o momento.
+                      </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
 
