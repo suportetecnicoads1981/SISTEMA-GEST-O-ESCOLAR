@@ -15,6 +15,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { DeveloperContact, SchoolSettings, UserAccount } from '../../types';
+import { notify } from '../../utils/dialogs';
 
 interface FeedbackSuggestionsModalProps {
   isOpen: boolean;
@@ -48,7 +49,7 @@ export const FeedbackSuggestionsModal: React.FC<FeedbackSuggestionsModalProps> =
   const handleSendToWhatsApp = (e: React.FormEvent) => {
     e.preventDefault();
     if (!description.trim()) {
-      alert('Por favor, informe a descrição da sua mensagem.');
+      notify('Por favor, informe a descrição da sua mensagem.');
       return;
     }
 

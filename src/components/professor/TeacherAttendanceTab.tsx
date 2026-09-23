@@ -27,6 +27,7 @@ import {
 } from '../../types';
 import { writeSafePrintDocument } from '../../utils/safeHtml';
 import { triggerAttendanceAlert } from '../../services/messageQueueService';
+import { promptDialog } from '../../utils/dialogs';
 
 interface TeacherAttendanceTabProps {
   teacherName: string;
@@ -584,11 +585,11 @@ export const TeacherAttendanceTab: React.FC<TeacherAttendanceTabProps> = ({
                         {/* JUSTIFICADA */}
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={async () => {
                             if (!isJustified) {
-                              const reason = prompt('Informe a justificativa da ausência (ex: Atestado Médico, Consulta, etc.):', 'Atestado Médico');
+                              const reason = await promptDialog('Informe a justificativa da ausência (ex: Atestado Médico, Consulta, etc.):', 'Atestado Médico');
                               if (reason !== null) {
-                                const cert = prompt('Número do protocolo ou CRM do atestado (opcional):', 'MED-2026');
+                                const cert = await promptDialog('Número do protocolo ou CRM do atestado (opcional):', 'MED-2026');
                                 handleSetJustification(student.id, reason, cert || undefined);
                               }
                             } else {

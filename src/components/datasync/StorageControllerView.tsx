@@ -19,6 +19,7 @@ import { StorageController } from '../../services/datasync/StorageController';
 import { StoredAsset } from '../../types/datasync';
 import { FormatBadge } from './FormatBadge';
 import { AuthAutomator } from '../../services/datasync/AuthAutomator';
+import { confirmDialog, notify } from '../../utils/dialogs';
 
 interface StorageControllerViewProps {
   assets: StoredAsset[];
@@ -42,7 +43,7 @@ export const StorageControllerView: React.FC<StorageControllerViewProps> = ({
   });
 
   const handleDelete = async (asset: StoredAsset) => {
-    if (!confirm(`Confirmar exclusão de '${asset.name}'? O arquivo físico no Supabase Storage será expurgado automaticamente via Edge Function.`)) {
+    if (!await confirmDialog(`Confirmar exclusão de '${asset.name}'? O arquivo físico no Supabase Storage será expurgado automaticamente via Edge Function.`)) {
       return;
     }
 
@@ -53,7 +54,7 @@ export const StorageControllerView: React.FC<StorageControllerViewProps> = ({
       setDeletionLog({ fileName: asset.name, path: res.deletedFile });
       onAssetDeleted?.(asset.id);
     } catch (err: any) {
-      alert('Erro ao excluir: ' + err.message);
+      notify('Erro ao excluir: ' + err.message);
     } finally {
       setIsDeletingId(null);
     }

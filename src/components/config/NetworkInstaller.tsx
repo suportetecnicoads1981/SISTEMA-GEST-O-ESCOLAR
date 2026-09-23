@@ -98,6 +98,7 @@ import { GoogleDriveConnectivityTester } from './GoogleDriveConnectivityTester';
 import { AppIntegrityChecker } from './AppIntegrityChecker';
 import { UninstallationModule } from './UninstallationModule';
 import { generateUpdateManualHtml } from '../../utils/updatePackageHelper';
+import { confirmDialog, notify } from '../../utils/dialogs';
 
 interface NetworkInstallerProps {
   onBack?: () => void;
@@ -361,9 +362,9 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
     setTimeout(() => setBackupSuccess(null), 4000);
   };
 
-  const handleRestoreFromSnapshot = (snapshot: AutoBackupSnapshot) => {
+  const handleRestoreFromSnapshot = async (snapshot: AutoBackupSnapshot) => {
     const dateStr = new Date(snapshot.createdAt).toLocaleString('pt-BR');
-    const confirm = window.confirm(
+    const confirmed = await confirmDialog(
       `ATENÇÃO: Deseja restaurar o sistema para a cópia de segurança de ${dateStr}?\n\n` +
       `• Motivo: ${snapshot.reason}\n` +
       `• Alunos salvos: ${snapshot.stats.studentsCount}\n` +
@@ -373,13 +374,13 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
       `Os dados atuais do sistema serão substituídos por esta cópia de segurança.`
     );
 
-    if (confirm) {
+    if (confirmed) {
       const ok = restoreAutoBackup(snapshot);
       if (ok) {
-        alert('Cópia de segurança restaurada com sucesso! Recarregando aplicação...');
+        notify('Cópia de segurança restaurada com sucesso! Recarregando aplicação...');
         window.location.reload();
       } else {
-        alert('Falha ao restaurar cópia de segurança.');
+        notify('Falha ao restaurar cópia de segurança.');
       }
     }
   };
@@ -408,10 +409,10 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
       try {
         const parsed = JSON.parse(event.target?.result as string);
         restoreBackup(parsed);
-        alert('Base de dados restaurada com sucesso! Recarregando sistema...');
+        notify('Base de dados restaurada com sucesso! Recarregando sistema...');
         window.location.reload();
       } catch {
-        alert('Arquivo de backup inválido.');
+        notify('Arquivo de backup inválido.');
       }
     };
     reader.readAsText(file);

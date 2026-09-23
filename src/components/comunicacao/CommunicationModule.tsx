@@ -1,3 +1,4 @@
+import { confirmDialog } from '../../utils/dialogs';
 import React, { useState } from 'react';
 import {
   Send,
@@ -55,6 +56,9 @@ interface CommunicationModuleProps {
   onBatchImportMessages?: (messages: CommunicationMessage[]) => void;
   onBack?: () => void;
   onNavigate?: (tab: string, payload?: any) => void;
+  /** Usuário logado: assina os comunicados e as confirmações de leitura. */
+  currentUserName?: string;
+  currentUserId?: string;
 }
 
 export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
@@ -70,6 +74,8 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
   onBatchImportMessages,
   onBack,
   onNavigate,
+  currentUserName: loggedUserName,
+  currentUserId: loggedUserId,
 }) => {
   // Navigation & filter state
   const [activeTab, setActiveTab] = useState<'FEED' | 'COMPOSE'>('FEED');
@@ -181,12 +187,8 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
       title,
       content,
       senderRole: currentRole,
-      senderName:
-        currentRole === 'ADMIN'
-          ? settings.principalName
-          : currentRole === 'TEACHER'
-          ? 'Prof. Rodrigo Peixoto'
-          : 'Carlos Eduardo (Secretaria)',
+      // Assinado por quem está logado (antes usava nomes fictícios).
+      senderName: currentUserName,
       senderTitle:
         currentRole === 'ADMIN'
           ? 'Diretoria Pedagógica'
@@ -342,24 +344,11 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
   const totalAttachments = messages.reduce((acc, m) => acc + m.attachments.length, 0);
   const totalConfirmations = messages.reduce((acc, m) => acc + m.readConfirmations.length, 0);
 
-  // User persona for read confirmation
-  const currentUserName =
-    currentRole === 'ADMIN'
-      ? 'Helena Vasconcelos (Diretoria)'
-      : currentRole === 'TEACHER'
-      ? 'Prof. Rodrigo Peixoto'
-      : currentRole === 'STUDENT'
-      ? 'Maria Clara Santos (3º Ano A)'
-      : 'Roberto Santos (Pai/Responsável)';
-
-  const currentUserId =
-    currentRole === 'ADMIN'
-      ? 'admin-01'
-      : currentRole === 'TEACHER'
-      ? 'teacher-01'
-      : currentRole === 'STUDENT'
-      ? 'std-001'
-      : 'parent-001';
+  // Usuário logado (antes eram personagens fictícios por perfil).
+  const roleLabel =
+    currentRole === 'ADMIN' ? 'Administração' : currentRole === 'TEACHER' ? 'Docente' : currentRole === 'STUDENT' ? 'Estudante' : 'Responsável';
+  const currentUserName = (loggedUserName || '').trim() || roleLabel;
+  const currentUserId = loggedUserId || `role-${currentRole.toLowerCase()}`;
 
   return (
     <div className="space-y-4">
@@ -683,7 +672,10 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
 
                         {/* Delete message button */}
                         <button
-                          onClick={() => onDeleteMessage(msg.id)}
+                          onClick={async () => {
+                            if (await confirmDialog(`Excluir o comunicado "${msg.title}"?`)) onDeleteMessage(msg.id);
+                          }}
+                          aria-label={`Excluir comunicado ${msg.title}`}
                           title="Excluir comunicado"
                           className="p-1 text-slate-400 hover:text-rose-600 rounded-md transition-colors cursor-pointer"
                         >

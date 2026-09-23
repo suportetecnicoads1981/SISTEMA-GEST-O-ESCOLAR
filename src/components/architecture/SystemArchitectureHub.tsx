@@ -49,6 +49,7 @@ import {
   Terminal,
   FileSpreadsheet,
 } from 'lucide-react';
+import { confirmDialog, notify } from '../../utils/dialogs';
 
 interface SystemArchitectureHubProps {
   onNavigateToTab?: (tabId: string) => void;
@@ -188,7 +189,7 @@ export const SystemArchitectureHub: React.FC<SystemArchitectureHubProps> = ({
 
   const handleSaveRequest = () => {
     if (!requestTitle.trim()) {
-      alert('Por favor, informe um título objetivo para a solicitação.');
+      notify('Por favor, informe um título objetivo para a solicitação.');
       return;
     }
 
@@ -216,8 +217,8 @@ export const SystemArchitectureHub: React.FC<SystemArchitectureHubProps> = ({
     setBacklog(getEngineeringRequests());
   };
 
-  const handleDeleteRequest = (id: string) => {
-    if (confirm('Deseja realmente remover esta solicitação do backlog?')) {
+  const handleDeleteRequest = async (id: string) => {
+    if (await confirmDialog('Deseja realmente remover esta solicitação do backlog?')) {
       deleteEngineeringRequest(id);
       setBacklog(getEngineeringRequests());
       if (viewingRequest?.id === id) {

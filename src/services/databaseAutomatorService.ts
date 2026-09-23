@@ -604,10 +604,10 @@ export class DatabaseAutomatorService {
       if (rawData) {
         try {
           const parsed = JSON.parse(rawData);
-          saveStoredData(parsed);
+          saveStoredData(parsed, { bulkReplace: true });
         } catch {
           const cleanData = getStoredData();
-          saveStoredData(cleanData);
+          saveStoredData(cleanData, { bulkReplace: true });
         }
       }
       const msg = 'LocalStorage purgado e saneado com integridade!';

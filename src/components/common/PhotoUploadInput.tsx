@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Camera, Upload, Trash2, User, Sparkles, Check, AlertCircle } from 'lucide-react';
+import { notify } from '../../utils/dialogs';
 
 interface PhotoUploadInputProps {
   photoUrl?: string;
@@ -36,7 +37,7 @@ export const PhotoUploadInput: React.FC<PhotoUploadInputProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('O arquivo selecionado é muito grande. Escolha uma imagem de até 5MB.');
+        notify('O arquivo selecionado é muito grande. Escolha uma imagem de até 5MB.');
         return;
       }
       const reader = new FileReader();
@@ -69,7 +70,7 @@ export const PhotoUploadInput: React.FC<PhotoUploadInputProps> = ({
         videoRef.current.play();
       }
     } catch (err) {
-      alert('Não foi possível acessar a câmera do dispositivo. Verifique as permissões de vídeo.');
+      notify('Não foi possível acessar a câmera do dispositivo. Verifique as permissões de vídeo.');
     }
   };
 

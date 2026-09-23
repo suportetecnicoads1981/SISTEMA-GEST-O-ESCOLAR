@@ -33,6 +33,7 @@ import { Question, Subject } from '../../types';
 import { QuestionModal } from './QuestionModal';
 import { QuestionImportModal } from './QuestionImportModal';
 import { triggerPrint } from '../../utils/printHelper';
+import { confirmDialog } from '../../utils/dialogs';
 
 interface QuestionBankProps {
   questions: Question[];
@@ -167,9 +168,9 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
     document.body.removeChild(link);
   };
 
-  const handleBatchDeleteSelected = () => {
+  const handleBatchDeleteSelected = async () => {
     if (
-      window.confirm(
+      await confirmDialog(
         `Deseja realmente excluir as ${selectedQuestionIds.length} questões selecionadas do banco?`
       )
     ) {
@@ -520,8 +521,8 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
                       <Edit2 className="h-3.5 w-3.5" />
                     </button>
                     <button
-                      onClick={() => {
-                        if (window.confirm(`Excluir questão ${q.code}?`)) {
+                      onClick={async () => {
+                        if (await confirmDialog(`Excluir questão ${q.code}?`)) {
                           onDeleteQuestion(q.id);
                         }
                       }}

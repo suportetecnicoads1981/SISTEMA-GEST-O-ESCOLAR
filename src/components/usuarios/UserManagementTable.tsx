@@ -18,6 +18,7 @@ import {
 import { UserAccount, UserRole, SchoolUnit, ROLES } from '../../types';
 import { RoleSelect } from './RoleSelect';
 import { SUPABASE_RBAC_SCHEMA_SQL } from '../../services/rbac/supabaseRbacSchema';
+import { confirmDialog, notify } from '../../utils/dialogs';
 
 interface UserManagementTableProps {
   users: UserAccount[];
@@ -54,22 +55,22 @@ export const UserManagementTable: React.FC<UserManagementTableProps> = ({
     onUpdateUsers(updatedUsers);
   };
 
-  const handleDeleteSingleUser = (targetUser: UserAccount) => {
+  const handleDeleteSingleUser = async (targetUser: UserAccount) => {
     if (targetUser.isMaster) {
-      alert('A conta de Administrador Mestre não pode ser excluída.');
+      notify('A conta de Administrador Mestre não pode ser excluída.');
       return;
     }
     if (targetUser.id === currentUser?.id) {
-      alert('Você não pode excluir a sua própria conta ativa no momento.');
+      notify('Você não pode excluir a sua própria conta ativa no momento.');
       return;
     }
-    if (confirm(`Excluir permanentemente o usuário "${targetUser.name}" (@${targetUser.login})?`)) {
+    if (await confirmDialog(`Excluir permanentemente o usuário "${targetUser.name}" (@${targetUser.login})?`)) {
       onUpdateUsers(users.filter((u) => u.id !== targetUser.id));
     }
   };
 
-  const handleDeleteAllUsers = () => {
-    if (confirm('Tem certeza de que deseja excluir TODOS os usuários cadastrados no sistema? Esta ação manterá apenas a conta do Administrador Mestre.')) {
+  const handleDeleteAllUsers = async () => {
+    if (await confirmDialog('Tem certeza de que deseja excluir TODOS os usuários cadastrados no sistema? Esta ação manterá apenas a conta do Administrador Mestre.')) {
       const masterUser = users.find((u) => u.isMaster || u.id === currentUser?.id) || currentUser;
       onUpdateUsers([masterUser]);
     }

@@ -25,6 +25,7 @@ import {
   SchoolSettings,
 } from '../../types';
 import { writeSafePrintDocument } from '../../utils/safeHtml';
+import { confirmDialog, notify } from '../../utils/dialogs';
 
 interface TeacherClassDiaryTabProps {
   teacherName: string;
@@ -141,7 +142,7 @@ export const TeacherClassDiaryTab: React.FC<TeacherClassDiaryTabProps> = ({
     if (!activeClass || !activeSubject) return;
 
     if (!contentTaught.trim()) {
-      alert('Por favor, informe o conteúdo programático ministrado na aula.');
+      notify('Por favor, informe o conteúdo programático ministrado na aula.');
       return;
     }
 
@@ -584,8 +585,8 @@ export const TeacherClassDiaryTab: React.FC<TeacherClassDiaryTabProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            if (confirm('Deseja realmente excluir este registro de aula?')) {
+                          onClick={async () => {
+                            if (await confirmDialog('Deseja realmente excluir este registro de aula?')) {
                               onDeleteLessonRegistry(lesson.id);
                             }
                           }}

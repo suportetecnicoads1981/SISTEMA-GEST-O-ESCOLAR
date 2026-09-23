@@ -51,6 +51,7 @@ import {
 import { UserManagementTable } from './UserManagementTable';
 import { hashPassword, PASSWORD_MASK } from '../../utils/passwordHasher';
 import { getSupabaseClient } from '../../services/datasync/supabaseClient';
+import { confirmDialog, notify } from '../../utils/dialogs';
 
 interface UserAccessControlProps {
   users: UserAccount[];
@@ -342,9 +343,9 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
     }));
   };
 
-  const handleQuickChangeUserSector = (user: UserAccount, newSector: UserSector) => {
+  const handleQuickChangeUserSector = async (user: UserAccount, newSector: UserSector) => {
     if (user.isMaster && newSector !== 'MASTER') {
-      if (!window.confirm('Deseja realmente remover o privilégio de Cadastro Mestre deste usuário?')) {
+      if (!await confirmDialog('Deseja realmente remover o privilégio de Cadastro Mestre deste usuário?')) {
         return;
       }
     }
@@ -373,7 +374,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
   const handleSaveUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.login.trim()) {
-      alert('Preencha o Nome e o Login do usuário.');
+      notify('Preencha o Nome e o Login do usuário.');
       return;
     }
 
@@ -451,7 +452,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
 
   const handleToggleUserActive = (user: UserAccount) => {
     if (user.isMaster) {
-      alert('O Cadastro Mestre não pode ser desativado por motivos de segurança.');
+      notify('O Cadastro Mestre não pode ser desativado por motivos de segurança.');
       return;
     }
     const updated = users.map((u) => (u.id === user.id ? { ...u, active: !u.active } : u));
@@ -463,12 +464,12 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
   const handleConfirmDeleteUser = () => {
     if (!deleteCandidateUser) return;
     if (deleteCandidateUser.isMaster) {
-      alert('O Cadastro Mestre não pode ser excluído.');
+      notify('O Cadastro Mestre não pode ser excluído.');
       setDeleteCandidateUser(null);
       return;
     }
     if (deleteCandidateUser.id === currentUser.id) {
-      alert('Você não pode excluir o próprio usuário com o qual está autenticado no momento.');
+      notify('Você não pode excluir o próprio usuário com o qual está autenticado no momento.');
       setDeleteCandidateUser(null);
       return;
     }

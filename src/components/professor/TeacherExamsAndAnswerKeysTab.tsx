@@ -43,6 +43,7 @@ import {
   generateComparativeAnswerKey,
   generateBatchPrintHtml,
 } from '../../utils/examBatchGenerator';
+import { notify } from '../../utils/dialogs';
 
 interface TeacherExamsAndAnswerKeysTabProps {
   teacherName: string;
@@ -197,7 +198,7 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
     if (!activeExam) return;
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      alert('Por favor, permita popups no navegador para emitir a impressão.');
+      notify('Por favor, permita popups no navegador para emitir a impressão.');
       return;
     }
 
@@ -265,7 +266,7 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
     }
 
     if (finalQuestionIds.length === 0) {
-      alert('Por favor, selecione ou crie ao menos 1 questão para a prova.');
+      notify('Por favor, selecione ou crie ao menos 1 questão para a prova.');
       return;
     }
 
@@ -861,7 +862,7 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
                   </label>
                   <input
                     type="number"
-                    step="0.5"
+                    step="any"
                     value={newPassingScore}
                     onChange={(e) => setNewPassingScore(Number(e.target.value))}
                     className="w-full text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"

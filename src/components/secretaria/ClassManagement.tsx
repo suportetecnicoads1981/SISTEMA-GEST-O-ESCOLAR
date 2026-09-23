@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { SchoolClass, Course, Subject, Student, SchoolUnit, STANDARDIZED_GRADE_LEVELS } from '../../types';
 import { PrintExportModal } from '../common/PrintExportModal';
+import { SubjectMatrixEditor } from './SubjectMatrixEditor';
 import {
   ConfigurablePrintModal,
   PrintColumnConfig,
@@ -34,6 +35,7 @@ import {
   SummaryMetricItem,
 } from '../common/ConfigurablePrintModal';
 import { triggerPrint, downloadPrintableHtml } from '../../utils/printHelper';
+import { confirmDialog } from '../../utils/dialogs';
 
 interface ClassManagementProps {
   classes: SchoolClass[];
@@ -43,6 +45,8 @@ interface ClassManagementProps {
   schoolUnits?: SchoolUnit[];
   onSaveClass: (cls: SchoolClass) => void;
   onDeleteClass: (id: string) => void;
+  onSaveSubject?: (subject: Subject) => void;
+  onDeleteSubject?: (id: string) => void;
   onBatchImportClasses?: (classes: SchoolClass[]) => void;
   onBack?: () => void;
   onNavigate?: (tab: string, payload?: any) => void;
@@ -56,6 +60,8 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
   schoolUnits = [],
   onSaveClass,
   onDeleteClass,
+  onSaveSubject,
+  onDeleteSubject,
   onBatchImportClasses,
   onBack,
   onNavigate,
@@ -485,13 +491,17 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => handleOpenEdit(cls)}
+                      title="Editar turma"
+                      aria-label={`Editar turma ${cls.name}`}
                       className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
                     >
                       <Edit2 className="h-4 w-4" />
                     </button>
                     <button
-                      onClick={() => {
-                        if (window.confirm(`Excluir a turma ${cls.name}?`)) {
+                      title="Excluir turma"
+                      aria-label={`Excluir turma ${cls.name}`}
+                      onClick={async () => {
+                        if (await confirmDialog(`Excluir a turma ${cls.name}?`)) {
                           onDeleteClass(cls.id);
                         }
                       }}
@@ -550,37 +560,8 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
         })}
       </div>
 
-      {/* Disciplines / Subjects Matrix Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
-        <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-          <BookOpen className="h-4 w-4 text-indigo-600" />
-          Matriz de Disciplinas e Carga Horária (BNCC & Itinerários)
-        </h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider">
-              <tr>
-                <th className="py-2.5 px-3">Código</th>
-                <th className="py-2.5 px-3">Disciplina</th>
-                <th className="py-2.5 px-3">Segmento</th>
-                <th className="py-2.5 px-3">Docente Responsável</th>
-                <th className="py-2.5 px-3 text-right">Carga Horária Anual</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {subjects.map((sub) => (
-                <tr key={sub.id} className="hover:bg-slate-50/60">
-                  <td className="py-2.5 px-3 font-mono font-semibold text-indigo-600">{sub.code}</td>
-                  <td className="py-2.5 px-3 font-bold text-slate-800">{sub.name}</td>
-                  <td className="py-2.5 px-3 text-slate-600">{sub.segment}</td>
-                  <td className="py-2.5 px-3 text-slate-600">{sub.teacherName}</td>
-                  <td className="py-2.5 px-3 text-right font-semibold text-slate-800">{sub.workloadHours} h/a</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Matriz de disciplinas (cadastrar, alterar e excluir) */}
+      <SubjectMatrixEditor subjects={subjects} onSaveSubject={onSaveSubject} onDeleteSubject={onDeleteSubject} />
 
       {/* Relatório de Turmas Modal */}
       {isReportModalOpen && (
