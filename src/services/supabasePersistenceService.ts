@@ -3,6 +3,7 @@ import { SupabaseDatabaseService } from './datasync/SupabaseDatabaseService';
 import type { AppStateData } from '../data/storage';
 import { DEFAULT_SCHOOL_SETTINGS } from '../data/defaultData';
 import { fromRemoteRow, mergeRemoteIntoLocal } from './datasync/supabaseRowMapper';
+import { withoutTombstones } from './datasync/deletionTracker';
 
 export class SupabasePersistenceService {
   private static isSubscribed = false;
@@ -89,7 +90,9 @@ export class SupabasePersistenceService {
         return null;
       }
 
-      const rowsOf = (res: { data: any[] | null; error: any }) => (res.error ? null : res.data);
+      // Linhas excluídas localmente (ainda não confirmadas na nuvem) não podem reaparecer.
+      const rowsOf = (res: { data: any[] | null; error: any }, table?: string) =>
+        res.error ? null : table ? withoutTombstones(table, res.data) ?? null : res.data;
       const withRoles = (row: Record<string, any>) => {
         const mapped = fromRemoteRow(row);
         mapped.targetRoles = Array.isArray(row.targetRoles)
@@ -112,7 +115,7 @@ export class SupabasePersistenceService {
       // campos e coleções que não existem na nuvem continuam como estão localmente.
       const freshData: AppStateData = {
         ...local,
-        students: mergeRemoteIntoLocal(local.students, rowsOf(studentsRes), (row) => {
+        students: mergeRemoteIntoLocal(local.students, rowsOf(studentsRes, 'students'), (row) => {
           const mapped = fromRemoteRow(row);
           if (row.registration_number) mapped.enrollmentNumber = row.registration_number;
           if (typeof row.has_aee === 'boolean') mapped.hasAEE = row.has_aee;
@@ -120,23 +123,23 @@ export class SupabasePersistenceService {
           delete mapped.hasAee;
           return mapped;
         }),
-        classes: mergeRemoteIntoLocal(local.classes, rowsOf(classesRes), (row) => {
+        classes: mergeRemoteIntoLocal(local.classes, rowsOf(classesRes, 'school_classes'), (row) => {
           const mapped = fromRemoteRow(row);
           if (row.capacity) mapped.maxCapacity = row.capacity;
           return mapped;
         }),
-        subjects: mergeRemoteIntoLocal(local.subjects, rowsOf(subjectsRes)),
-        courses: mergeRemoteIntoLocal(local.courses, rowsOf(coursesRes)),
-        questions: mergeRemoteIntoLocal(local.questions, rowsOf(questionsRes)),
-        exams: mergeRemoteIntoLocal(local.exams, rowsOf(examsRes)),
-        submissions: mergeRemoteIntoLocal(local.submissions, rowsOf(submissionsRes)),
-        attendanceSheets: mergeRemoteIntoLocal(local.attendanceSheets, rowsOf(attendanceRes)),
-        lessonRegistries: mergeRemoteIntoLocal(local.lessonRegistries, rowsOf(lessonsRes)),
-        classGradeSheets: mergeRemoteIntoLocal(local.classGradeSheets, rowsOf(gradeSheetsRes)),
-        academicHistories: mergeRemoteIntoLocal(local.academicHistories, rowsOf(historiesRes)),
-        schoolUnits: mergeRemoteIntoLocal(local.schoolUnits, rowsOf(unitsRes)),
-        communications: mergeRemoteIntoLocal(local.communications, rowsOf(commsRes), withRoles),
-        notifications: mergeRemoteIntoLocal(local.notifications, rowsOf(notifsRes), (row) => ({
+        subjects: mergeRemoteIntoLocal(local.subjects, rowsOf(subjectsRes, 'subjects')),
+        courses: mergeRemoteIntoLocal(local.courses, rowsOf(coursesRes, 'courses')),
+        questions: mergeRemoteIntoLocal(local.questions, rowsOf(questionsRes, 'questions')),
+        exams: mergeRemoteIntoLocal(local.exams, rowsOf(examsRes, 'exams')),
+        submissions: mergeRemoteIntoLocal(local.submissions, rowsOf(submissionsRes, 'exam_submissions')),
+        attendanceSheets: mergeRemoteIntoLocal(local.attendanceSheets, rowsOf(attendanceRes, 'attendance_sheets')),
+        lessonRegistries: mergeRemoteIntoLocal(local.lessonRegistries, rowsOf(lessonsRes, 'lesson_registries')),
+        classGradeSheets: mergeRemoteIntoLocal(local.classGradeSheets, rowsOf(gradeSheetsRes, 'class_grade_sheets')),
+        academicHistories: mergeRemoteIntoLocal(local.academicHistories, rowsOf(historiesRes, 'academic_histories')),
+        schoolUnits: mergeRemoteIntoLocal(local.schoolUnits, rowsOf(unitsRes, 'school_units')),
+        communications: mergeRemoteIntoLocal(local.communications, rowsOf(commsRes, 'communications'), withRoles),
+        notifications: mergeRemoteIntoLocal(local.notifications, rowsOf(notifsRes, 'notifications'), (row) => ({
           ...withRoles(row),
           read: Boolean(row.read),
         })),
@@ -148,7 +151,7 @@ export class SupabasePersistenceService {
         settings: remoteSettings
           ? { ...DEFAULT_SCHOOL_SETTINGS, ...(local.settings || {}), ...remoteSettings }
           : local.settings,
-        userAccounts: mergeRemoteIntoLocal(local.userAccounts, rowsOf(usersRes), (u) => {
+        userAccounts: mergeRemoteIntoLocal(local.userAccounts, rowsOf(usersRes, 'user_accounts'), (u) => {
           // A tabela remota não guarda senha nem a marca de Master: esses campos são
           // preservados da cópia local. Sem isso, cada sincronização apagava as senhas.
           const localAcc = localAccountsById.get(u.id);

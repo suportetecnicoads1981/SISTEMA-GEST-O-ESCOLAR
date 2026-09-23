@@ -140,7 +140,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
         enrollmentNumber: `MAT-${year}-${randNum}`,
         cpf: '',
         rg: '',
-        birthDate: '2008-05-15',
+        birthDate: '',
         gender: 'F',
         colorRace: 'PARDO',
         schoolUnitId: schoolUnits[0]?.id || '',
@@ -150,11 +150,11 @@ export const StudentModal: React.FC<StudentModalProps> = ({
         guardianPhone: '',
         guardianEmail: '',
         address: '',
-        city: 'São Paulo',
-        state: 'SP',
+        city: '',
+        state: '',
         zipCode: '',
-        courseId: courses[0]?.id || '',
-        classId: classes[0]?.id || '',
+        courseId: '',
+        classId: '',
         status: 'ACTIVE',
         cadastralStatus: 'OK',
         entryDate: new Date().toISOString().split('T')[0],
@@ -179,7 +179,11 @@ export const StudentModal: React.FC<StudentModalProps> = ({
       });
     }
     setError('');
-  }, [studentToEdit, isOpen, classes, courses, schoolUnits]);
+    // Só reinicia o formulário ao abrir o modal ou trocar de aluno. Antes as listas
+    // (turmas, cursos, unidades) também eram dependências: como o componente pai cria
+    // arrays novos a cada renderização, o formulário era apagado enquanto se digitava.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentToEdit?.id, isOpen]);
 
   if (!isOpen) return null;
 
@@ -268,25 +272,27 @@ export const StudentModal: React.FC<StudentModalProps> = ({
       enrollmentNumber: formData.enrollmentNumber.trim(),
       cpf: formData.cpf.trim(),
       rg: formData.rg?.trim() || '',
-      birthDate: formData.birthDate || '2008-01-01',
+      birthDate: formData.birthDate || '',
       gender: (formData.gender as 'M' | 'F' | 'OTHER') || 'F',
       colorRace: (formData.colorRace as StudentColorRace) || 'PARDO',
       schoolUnitId: formData.schoolUnitId || schoolUnits[0]?.id || '',
-      email: formData.email?.trim() || `${formData.name.toLowerCase().replace(/\s+/g, '.')}@aluno.escola.br`,
+      email: formData.email?.trim() || '',
       phone: formData.phone?.trim() || '',
-      guardianName: formData.guardianName?.trim() || 'Responsável Legal',
+      guardianName: formData.guardianName?.trim() || '',
       guardianPhone: formData.guardianPhone?.trim() || '',
       guardianEmail: formData.guardianEmail?.trim() || '',
       address: formData.address?.trim() || '',
-      city: formData.city?.trim() || 'São Paulo',
-      state: formData.state?.trim() || 'SP',
+      city: formData.city?.trim() || '',
+      state: formData.state?.trim() || '',
       zipCode: formData.zipCode?.trim() || '',
-      courseId: formData.courseId || courses[0]?.id || '',
-      classId: formData.classId || classes[0]?.id || '',
+      // Sem turma/curso escolhidos o aluno fica "sem turma" (antes ia para a primeira da lista).
+      courseId: formData.courseId || '',
+      classId: formData.classId || '',
       status: (formData.status as StudentStatus) || 'ACTIVE',
       cadastralStatus: (formData.cadastralStatus as CadastralStatus) || 'OK',
       entryDate: formData.entryDate || new Date().toISOString().split('T')[0],
-      photoUrl: formData.photoUrl || `https://images.unsplash.com/photo-${formData.gender === 'M' ? '1500648767791-00dcc994a43e' : '1534528741775-53994a69daeb'}?w=150&auto=format&fit=crop&q=80`,
+      // Sem foto enviada fica vazio (antes usava uma foto de banco de imagens de outra pessoa).
+      photoUrl: formData.photoUrl || '',
       observations: formData.observations?.trim() || '',
       medicalObservations: formData.medicalObservations?.trim() || '',
       cidCodes: formData.cidCodes || [],
@@ -842,6 +848,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
                 onChange={(e) => setFormData({ ...formData, classId: e.target.value })}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               >
+                <option value="">Sem turma (definir depois)</option>
                 {classes.map((cls) => (
                   <option key={cls.id} value={cls.id}>
                     {cls.name} ({cls.shift})
@@ -859,6 +866,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
                 onChange={(e) => setFormData({ ...formData, courseId: e.target.value })}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               >
+                <option value="">Selecione o curso / nível</option>
                 {courses.map((crs) => (
                   <option key={crs.id} value={crs.id}>
                     {crs.name}

@@ -112,12 +112,12 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
         municipalSecretaryCnpj: unitToEdit.municipalSecretaryCnpj || '30.676.114/0001-17',
       });
     } else {
-      const codeNum = Math.floor(10000000 + Math.random() * 90000000);
       const linkNum = Math.floor(100 + Math.random() * 900);
       setFormData({
         name: '',
         tradeName: '',
-        inepCode: codeNum.toString(),
+        // O INEP é o código oficial do MEC: nunca gerar um valor aleatório.
+        inepCode: '',
         cnpjOrDecree: '',
         type: 'ESCOLA_POLO',
         locationZone: 'ZONA_URBANA',
@@ -129,9 +129,9 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
         directorName: '',
         coordinatorName: '',
         secretaryName: '',
-        phone: '(94) 98435-8694',
+        phone: '',
         email: '',
-        totalClassrooms: 8,
+        totalClassrooms: 0,
         totalStudents: 0,
         totalTeachers: 0,
         totalClasses: 0,
