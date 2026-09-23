@@ -5,6 +5,23 @@ import { DEFAULT_ROLE_PREFERENCES, DEFAULT_SCHOOL_SETTINGS, DEFAULT_USER_ACCOUNT
 
 export class SupabasePersistenceService {
   private static isSubscribed = false;
+
+  /** Contas de usuário gravadas localmente (mesma chave usada por storage.ts). */
+  private static readLocalAccounts(): Map<string, any> {
+    const map = new Map<string, any>();
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('sucessoedu_master_store_v5') : null;
+      const accounts = raw ? JSON.parse(raw)?.userAccounts : null;
+      if (Array.isArray(accounts)) {
+        for (const acc of accounts) {
+          if (acc && acc.id) map.set(acc.id, acc);
+        }
+      }
+    } catch {
+      // armazenamento local indisponível ou corrompido
+    }
+    return map;
+  }
   private static readonly SAVE_DEBOUNCE_MS = 1500;
   private static readonly REALTIME_DEBOUNCE_MS = 2000;
   private static pendingSave: Promise<void> | null = null;
@@ -18,6 +35,7 @@ export class SupabasePersistenceService {
   public static async fetchAppStateFromSupabase(): Promise<AppStateData | null> {
     try {
       const supabase = getSupabaseClient();
+      const localAccountsById = SupabasePersistenceService.readLocalAccounts();
       
       const [
         studentsRes,
@@ -123,10 +141,20 @@ export class SupabasePersistenceService {
           };
         }),
         userAccounts: (usersRes.data && usersRes.data.length > 0)
-          ? usersRes.data.map((u: any) => ({
-              ...u,
-              role: (u.role && ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'].includes(u.role)) ? u.role : 'ADMIN',
-            }))
+          ? usersRes.data.map((u: any) => {
+              // A tabela remota não guarda senha nem a marca de Master: esses campos são
+              // preservados da cópia local. Sem isso, cada sincronização apagava as senhas.
+              const local = localAccountsById.get(u.id);
+              return {
+                ...local,
+                ...u,
+                sectorTitle: u.sectorTitle || u.sector_title || local?.sectorTitle || '',
+                password: local?.password,
+                isMaster: Boolean(local?.isMaster),
+                // Papel desconhecido recebe o menor privilégio (antes virava ADMIN).
+                role: (u.role && ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'].includes(u.role)) ? u.role : 'STUDENT',
+              };
+            })
           : DEFAULT_USER_ACCOUNTS,
         developerContact: undefined,
         bnccSkills: [],

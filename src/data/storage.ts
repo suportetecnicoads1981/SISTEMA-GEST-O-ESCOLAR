@@ -628,8 +628,9 @@ export function getStoredData(): AppStateData {
 /**
  * Persists entire master application state
  */
-export function saveStoredData(data: AppStateData): void {
+export function saveStoredData(data: AppStateData, options?: { skipCloudSync?: boolean }): void {
   safeLocalStorageSet(KEYS.DATA, JSON.stringify(data));
+  if (options?.skipCloudSync) return;
   SupabasePersistenceService.saveAppStateToSupabase(data).catch(() => {});
 }
 

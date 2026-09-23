@@ -49,6 +49,7 @@ import {
   SecurityAuditLog,
 } from '../../types';
 import { UserManagementTable } from './UserManagementTable';
+import { hashPassword, PASSWORD_MASK } from '../../utils/passwordHasher';
 
 interface UserAccessControlProps {
   users: UserAccount[];
@@ -311,7 +312,8 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
       id: user.id,
       name: user.name,
       login: user.login,
-      password: user.password || '••••••••',
+      // A senha armazenada é um hash e nunca é exibida; campo vazio mantém a senha atual.
+      password: '',
       email: user.email,
       phone: user.phone || '',
       sector: user.sector,
@@ -380,7 +382,9 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
       id: formData.id,
       name: formData.name.trim(),
       login: formData.login.trim(),
-      password: formData.password || undefined,
+      password: formData.password && formData.password !== PASSWORD_MASK
+        ? hashPassword(formData.password)
+        : editingUser?.password,
       email: formData.email.trim(),
       phone: formData.phone.trim(),
       role: secInfo.defaultRole,
@@ -1272,7 +1276,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                       type={showPassword ? 'text' : 'password'}
                       value={formData.password || ''}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      placeholder="Senha do usuário..."
+                      placeholder={editingUser ? 'Deixe em branco para manter a senha atual' : 'Senha do usuário...'}
                       className="w-full pl-3 pr-16 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono"
                     />
                     <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">

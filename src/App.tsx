@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import {
   Student,
   SchoolClass,
@@ -105,14 +105,29 @@ import { AdminTIHub } from './components/admin/AdminTIHub';
 
 export default function App() {
   const [data, setData] = useState(() => getStoredData());
+  // Estado que acabou de chegar do Supabase: é gravado apenas localmente, sem ser
+  // reenviado à nuvem (evita o ciclo upsert → evento realtime → recarga → upsert).
+  const remoteOriginDataRef = useRef<unknown>(null);
   const [activeTab, setActiveTab] = useState('MAIN_DASHBOARD');
   const [openTabs, setOpenTabs] = useState<string[]>(['MAIN_DASHBOARD']);
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     try {
       const session = localStorage.getItem('sucessoedu_auth_session');
-      return session === 'true';
+      // A sessão só é restaurada se a conta que fez login ainda existir e estiver ativa;
+      // antes, uma conta removida caía no usuário Master padrão.
+      const savedUserId = localStorage.getItem('sucessoedu_logged_user_id');
+      const account = (data.userAccounts || []).find((u) => u.id === savedUserId);
+      return session === 'true' && Boolean(account) && account?.active !== false;
     } catch {
       return false;
+    }
+  });
+  // Conta que efetivamente se autenticou (a troca de operador no cabeçalho não altera este valor).
+  const [authenticatedUserId, setAuthenticatedUserId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('sucessoedu_logged_user_id');
+    } catch {
+      return null;
     }
   });
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
@@ -195,9 +210,40 @@ export default function App() {
     } catch {}
     return defaultMasterUser;
   });
+  // Papel desconhecido recebe o menor privilégio (antes caía em ADMIN).
   const currentRole: UserRole = (currentUser?.role && ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'].includes(currentUser.role))
     ? (currentUser.role as UserRole)
-    : 'ADMIN';
+    : 'STUDENT';
+
+  const authenticatedAccount = (data.userAccounts || []).find((u) => u.id === authenticatedUserId);
+  // Somente o Administrador Master autenticado pode operar como outro usuário.
+  const canSwitchOperator = Boolean(authenticatedAccount?.isMaster);
+
+  const switchOperatorIfAllowed = (target: UserAccount): boolean => {
+    if (target.id === authenticatedUserId || canSwitchOperator) {
+      setCurrentUser(target);
+      return true;
+    }
+    triggerPushNotification(
+      '🔒 Troca de operador bloqueada',
+      'Somente o Administrador Master pode operar como outro usuário. Encerre a sessão e entre com a conta desejada.'
+    );
+    return false;
+  };
+
+  // Grava o hash da senha (primeiro acesso ou conversão de senha legada em texto puro).
+  const handlePasswordUpdate = (user: UserAccount, passwordHash: string) => {
+    setData((prev) => {
+      const accounts = prev.userAccounts || [];
+      const exists = accounts.some((u) => u.id === user.id);
+      return {
+        ...prev,
+        userAccounts: exists
+          ? accounts.map((u) => (u.id === user.id ? { ...u, password: passwordHash } : u))
+          : [...accounts, { ...user, password: passwordHash }],
+      };
+    });
+  };
 
   // Sub-navigation state for document issuance and exam taking
   const [documentSelectedStudentId, setDocumentSelectedStudentId] = useState<string | undefined>();
@@ -213,10 +259,16 @@ export default function App() {
   // Question Bank to Exam Builder bridging state
   const [preselectedQuestionIdsForExam, setPreselectedQuestionIdsForExam] = useState<string[]>([]);
 
-  // Sync to storage on data change & Supabase Batched Queue Upsert
+  // Persiste qualquer alteração do estado. Antes a gravação dependia apenas de
+  // alunos/provas/notificações, e mudanças em turmas, usuários, senhas ou
+  // configurações podiam se perder ao recarregar a página.
   useEffect(() => {
-    saveStoredData(data);
-    
+    saveStoredData(data, { skipCloudSync: data === remoteOriginDataRef.current });
+  }, [data]);
+
+  // Supabase Batched Queue Upsert
+  useEffect(() => {
+    if (data === remoteOriginDataRef.current) return;
     function syncTablesToSupabase() {
       try {
         if (data.students && data.students.length > 0) {
@@ -246,7 +298,7 @@ export default function App() {
           supabase.from('notifications').select('*'),
         ]);
 
-        setData(prev => ({
+        setData(prev => (remoteOriginDataRef.current = {
           ...prev,
           students: studentsRes.data !== null && Array.isArray(studentsRes.data) ? studentsRes.data : prev.students,
           exams: examsRes.data !== null && Array.isArray(examsRes.data) ? examsRes.data : prev.exams,
@@ -273,12 +325,14 @@ export default function App() {
   useEffect(() => {
     const handleDbChange = (e: any) => {
       if (e.detail) {
-        setData({
+        const nextData = {
           ...e.detail,
           rolePreferences: (e.detail?.rolePreferences && typeof e.detail.rolePreferences === 'object' && e.detail.rolePreferences?.ADMIN)
             ? { ...DEFAULT_ROLE_PREFERENCES, ...e.detail.rolePreferences }
             : DEFAULT_ROLE_PREFERENCES,
-        });
+        };
+        remoteOriginDataRef.current = nextData;
+        setData(nextData);
       } else {
         setData(getStoredData());
       }
@@ -391,7 +445,7 @@ export default function App() {
   };
 
   const handleSwitchCurrentUser = (user: UserAccount) => {
-    setCurrentUser(user);
+    if (!switchOperatorIfAllowed(user)) return;
     triggerPushNotification(
       '👤 Sessão Alternada',
       `Você agora está operando como: ${user.name} (${user.sector})`
@@ -459,6 +513,7 @@ export default function App() {
       localStorage.removeItem('sucessoedu_auth_session');
       localStorage.removeItem('sucessoedu_logged_user_id');
     } catch {}
+    setAuthenticatedUserId(null);
     setIsAuthenticated(false);
     setOpenTabs(['MAIN_DASHBOARD']);
     triggerPushNotification(
@@ -1330,8 +1385,10 @@ export default function App() {
         userAccounts={data.userAccounts || []}
         schoolUnits={data.schoolUnits || []}
         systemVersion={data.settings?.systemVersion || 'v5.4.0-ENTERPRISE'}
+        onPasswordUpdate={handlePasswordUpdate}
         onLoginSuccess={(user) => {
           setCurrentUser(user);
+          setAuthenticatedUserId(user.id);
           setIsAuthenticated(true);
           setOpenTabs(['MAIN_DASHBOARD']);
           try {
@@ -1405,7 +1462,7 @@ export default function App() {
         onChangeRole={(role) => {
           const matchingAccount = data.userAccounts?.find((u) => u.role === role);
           if (matchingAccount) {
-            setCurrentUser(matchingAccount);
+            switchOperatorIfAllowed(matchingAccount);
           }
         }}
         userAccounts={data.userAccounts || []}
@@ -1961,7 +2018,7 @@ export default function App() {
           onChangeRole={(role) => {
             const matchingAccount = data?.userAccounts?.find((u) => u.role === role);
             if (matchingAccount) {
-              setCurrentUser(matchingAccount);
+              switchOperatorIfAllowed(matchingAccount);
             }
           }}
           preferences={

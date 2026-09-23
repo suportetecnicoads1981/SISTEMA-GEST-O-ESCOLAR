@@ -32,11 +32,20 @@ import {
 } from 'lucide-react';
 import { UserAccount, SchoolUnit, UserRole, UserSector } from '../../types';
 import { getLatestAutoBackup } from '../../data/storage';
+import {
+  hashPassword,
+  verifyPassword,
+  hasPasswordDefined,
+  isPasswordHash,
+  MIN_PASSWORD_LENGTH,
+} from '../../utils/passwordHasher';
 
 interface LoginScreenProps {
   userAccounts: UserAccount[];
   schoolUnits: SchoolUnit[];
   onLoginSuccess: (user: UserAccount) => void;
+  /** Grava o hash da senha da conta (primeiro acesso ou conversão de senha legada). */
+  onPasswordUpdate?: (user: UserAccount, passwordHash: string) => void;
   systemVersion?: string;
   companyLogoUrl?: string;
 }
@@ -45,11 +54,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   userAccounts,
   schoolUnits,
   onLoginSuccess,
+  onPasswordUpdate,
   systemVersion = 'v5.4.0-ENTERPRISE',
   companyLogoUrl,
 }) => {
   const [username, setUsername] = useState('master');
-  const [password, setPassword] = useState('••••••••');
+  const [password, setPassword] = useState('');
+  // Conta sem senha definida: exige cadastrar uma senha antes do primeiro acesso.
+  const [firstAccessUser, setFirstAccessUser] = useState<UserAccount | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [selectedUnitId, setSelectedUnitId] = useState('unit-sede');
   const [errorMsg, setErrorMsg] = useState('');
@@ -151,20 +165,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const handleQuickSelectUser = (user: UserAccount) => {
     setSelectedUserForLogin(user);
     setUsername(user.login);
-    setPassword('••••••••');
+    setPassword('');
+    setFirstAccessUser(null);
     if (user.schoolUnitId) {
       setSelectedUnitId(user.schoolUnitId);
     }
     setErrorMsg('');
   };
 
+  // "Acessar" na lista de usuários apenas seleciona o perfil: a senha é sempre exigida.
   const handleDirectAccessWithUser = (user: UserAccount) => {
-    setIsLoading(true);
-    setErrorMsg('');
-    setTimeout(() => {
-      setIsLoading(false);
-      onLoginSuccess(user);
-    }, 450);
+    handleQuickSelectUser(user);
+    setActiveTabMode('FORM');
   };
 
   const handleLoginSubmit = (e: React.FormEvent) => {
@@ -174,7 +186,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
     setTimeout(() => {
       const cleanUser = (username || '').trim().toLowerCase();
-      const match = userAccounts.find(
+      let match = userAccounts.find(
         (u) =>
           u &&
           ((u.login && u.login.toLowerCase() === cleanUser) ||
@@ -182,12 +194,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           u.active !== false
       );
 
-      if (match) {
-        setIsLoading(false);
-        onLoginSuccess(match);
-      } else if (cleanUser === 'master' || cleanUser === 'admin' || cleanUser === 'suportetecnicoads@gmail.com') {
-        // Fallback for default master administrator
-        const fallbackMaster = userAccounts[0] || {
+      const isMasterAlias = cleanUser === 'master' || cleanUser === 'admin' || cleanUser === 'suportetecnicoads@gmail.com';
+
+      // Atalhos "master"/"admin" apontam para a conta Master cadastrada (senha continua obrigatória).
+      if (!match && isMasterAlias) {
+        match = userAccounts.find((u) => u && u.isMaster && u.active !== false);
+      }
+
+      // Base sem nenhuma conta cadastrada: permite criar o administrador master
+      // (a senha será definida no primeiro acesso logo abaixo).
+      if (!match && userAccounts.length === 0 && isMasterAlias) {
+        match = {
           id: 'usr-master-001',
           name: 'Administrador Master ADS',
           login: 'master',
@@ -200,13 +217,63 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           createdAt: new Date().toISOString(),
           permissions: {} as any,
         };
-        setIsLoading(false);
-        onLoginSuccess(fallbackMaster);
-      } else {
+      }
+
+      if (!match) {
         setIsLoading(false);
         setErrorMsg('Credenciais inválidas ou usuário inativo no banco de dados.');
+        return;
       }
-    }, 500);
+
+      if (!hasPasswordDefined(match.password)) {
+        setIsLoading(false);
+        setFirstAccessUser(match);
+        setNewPassword('');
+        setConfirmNewPassword('');
+        return;
+      }
+
+      if (!verifyPassword(match.password, password)) {
+        setIsLoading(false);
+        setErrorMsg('Credenciais inválidas ou usuário inativo no banco de dados.');
+        return;
+      }
+
+      // Senha antiga gravada em texto puro: converte para hash no login.
+      if (!isPasswordHash(match.password) && onPasswordUpdate) {
+        onPasswordUpdate(match, hashPassword(password));
+      }
+
+      setIsLoading(false);
+      setPassword('');
+      onLoginSuccess(match);
+    }, 400);
+  };
+
+  const handleFirstAccessSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!firstAccessUser) return;
+    setErrorMsg('');
+
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      setErrorMsg(`A senha deve ter pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`);
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setErrorMsg('As senhas digitadas não conferem.');
+      return;
+    }
+
+    const passwordHash = hashPassword(newPassword);
+    const userWithPassword: UserAccount = { ...firstAccessUser, password: passwordHash };
+    if (onPasswordUpdate) {
+      onPasswordUpdate(userWithPassword, passwordHash);
+    }
+    setFirstAccessUser(null);
+    setNewPassword('');
+    setConfirmNewPassword('');
+    setPassword('');
+    onLoginSuccess(userWithPassword);
   };
 
   return (
@@ -423,7 +490,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             )}
 
             {/* MODE 1: SEARCH & BROWSE USERS & LEVELS */}
-            {activeTabMode === 'SEARCH_USERS' && (
+            {activeTabMode === 'SEARCH_USERS' && !firstAccessUser && (
               <div className="space-y-4">
                 {/* Search & Sector Filters */}
                 <div className="space-y-3">
@@ -575,8 +642,63 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               </div>
             )}
 
+            {/* PRIMEIRO ACESSO: cadastro obrigatório de senha */}
+            {firstAccessUser && (
+              <form onSubmit={handleFirstAccessSubmit} className="space-y-4">
+                <div className="p-3 rounded-xl bg-amber-950/50 border border-amber-500/40 text-xs text-amber-200 flex items-start gap-2">
+                  <Key className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                  <span>
+                    Primeiro acesso de <strong>{firstAccessUser.name}</strong>. Esta conta ainda não possui senha:
+                    cadastre uma senha pessoal (mínimo de {MIN_PASSWORD_LENGTH} caracteres) para continuar.
+                  </span>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Nova senha</label>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    autoFocus
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">Confirmar nova senha</label>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    autoComplete="new-password"
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700 text-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden transition-all"
+                  />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFirstAccessUser(null);
+                      setErrorMsg('');
+                    }}
+                    className="px-4 py-3 rounded-xl bg-slate-700/80 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-3 px-4 rounded-xl bg-linear-to-r from-indigo-600 via-indigo-500 to-sky-600 hover:from-indigo-500 hover:to-sky-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span>Definir senha e entrar</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </form>
+            )}
+
             {/* MODE 2: TRADITIONAL LOGIN FORM */}
-            {activeTabMode === 'FORM' && (
+            {activeTabMode === 'FORM' && !firstAccessUser && (
               <form onSubmit={handleLoginSubmit} className="space-y-4">
                 {selectedUserForLogin && (
                   <div className="p-3 rounded-xl bg-indigo-950/60 border border-indigo-500/40 text-xs text-indigo-200 flex items-center justify-between">

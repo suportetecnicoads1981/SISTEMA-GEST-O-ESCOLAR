@@ -13,6 +13,35 @@ const PORT = 3000;
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Limite simples de requisições por IP (em memória). Usado nas rotas que chamam a
+// API paga do Gemini: sem ele qualquer pessoa na rede podia esgotar a cota.
+function createRateLimiter(maxRequests: number, windowMs: number) {
+  const hits = new Map<string, { count: number; resetAt: number }>();
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const now = Date.now();
+    const key = req.ip || req.socket.remoteAddress || 'desconhecido';
+    const entry = hits.get(key);
+    if (!entry || entry.resetAt <= now) {
+      hits.set(key, { count: 1, resetAt: now + windowMs });
+      if (hits.size > 10000) {
+        for (const [k, v] of hits) if (v.resetAt <= now) hits.delete(k);
+      }
+      return next();
+    }
+    entry.count += 1;
+    if (entry.count > maxRequests) {
+      res.setHeader('Retry-After', String(Math.ceil((entry.resetAt - now) / 1000)));
+      return res.status(429).json({
+        success: false,
+        error: 'Muitas requisições em pouco tempo. Aguarde um minuto e tente novamente.',
+      });
+    }
+    return next();
+  };
+}
+
+app.use('/api/ai', createRateLimiter(20, 60 * 1000));
+
 // Helper to get local network IP addresses
 function getLocalNetworkAddresses(): { name: string; address: string; family: string }[] {
   const interfaces = os.networkInterfaces();
@@ -673,9 +702,20 @@ arquivos na pasta "Atualizações e melhorias".
 
 // POST /api/updates/publish - Publish a new version to Cloud Storage
 app.post('/api/updates/publish', (req, res) => {
-  const { version, title, summary, description, severity, sizeFormatted, improvements, sha256Checksum, author } = req.body;
-  if (!version || !title) {
+  const { version, title, summary, description, severity, sizeFormatted, improvements, sha256Checksum, author } = req.body || {};
+  if (typeof version !== 'string' || typeof title !== 'string' || !version.trim() || !title.trim()) {
     return res.status(400).json({ error: 'Versão e título são obrigatórios.' });
+  }
+  // Limites de tamanho: evitam textos gigantes e crescimento ilimitado da lista em memória.
+  const optionalTexts = { summary, description, severity, sizeFormatted, sha256Checksum, author };
+  const invalidText = Object.entries(optionalTexts).find(
+    ([, v]) => v !== undefined && (typeof v !== 'string' || v.length > 5000)
+  );
+  if (version.length > 50 || title.length > 200 || invalidText) {
+    return res.status(400).json({ error: 'Campos do pacote inválidos ou longos demais.' });
+  }
+  if (improvements !== undefined && (!Array.isArray(improvements) || improvements.length > 200)) {
+    return res.status(400).json({ error: 'Lista de melhorias inválida.' });
   }
 
   const newPkg = {
@@ -699,6 +739,9 @@ app.post('/api/updates/publish', (req, res) => {
     p.isLatest = false;
   });
   CLOUD_UPDATE_REPOSITORY.unshift(newPkg);
+  if (CLOUD_UPDATE_REPOSITORY.length > 100) {
+    CLOUD_UPDATE_REPOSITORY.length = 100;
+  }
 
   res.json({
     success: true,
