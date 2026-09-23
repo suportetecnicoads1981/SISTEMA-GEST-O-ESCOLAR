@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { confirmNetworkRestore } from '../../services/offline/networkRestore';
 import {
   Sparkles,
   DownloadCloud,
@@ -1456,8 +1457,10 @@ pause
   };
 
   // Restore a backup snapshot
-  const handleConfirmRestore = (snapshot: AutoBackupSnapshot) => {
-    const success = restoreAutoBackup(snapshot);
+  const handleConfirmRestore = async (snapshot: AutoBackupSnapshot) => {
+    const scope = await confirmNetworkRestore();
+    if (!scope) return;
+    const success = restoreAutoBackup(snapshot, scope);
     if (success) {
       logSecurityAudit(
         'EDITAR_REGISTRO',

@@ -105,6 +105,8 @@ import { DebugFlowHub } from './components/debugflow/DebugFlowHub';
 import { AdminTIHub } from './components/admin/AdminTIHub';
 import { isTabAvailable } from './config/features';
 import { notify } from './utils/dialogs';
+import { getLocalServerInfo } from './services/offline/localServerSync';
+import { runCloudSyncNow } from './services/offline/cloudAutoSync';
 
 export default function App() {
   const [data, setData] = useState(() => getStoredData());
@@ -273,6 +275,8 @@ export default function App() {
   // Supabase Batched Queue Upsert
   useEffect(() => {
     if (data === remoteOriginDataRef.current) return;
+    // Servidor Remoto (escola): nada vai direto à nuvem; o envio é feito pelo lote.
+    if (getLocalServerInfo()?.role === 'REMOTO') return;
     function syncTablesToSupabase() {
       try {
         if (data.students && data.students.length > 0) {
@@ -295,6 +299,12 @@ export default function App() {
   // inicial já é feita por getStoredData). A mesclagem é não destrutiva.
   useEffect(() => {
     const loadFromCloud = async () => {
+      // Rede local (Servidor Remoto ou Sede): o envio/recebimento da nuvem segue a ordem
+      // segura do cloudAutoSync (primeiro envia, depois recebe), nunca a carga direta.
+      if (getLocalServerInfo()) {
+        runCloudSyncNow(true).catch(() => {});
+        return;
+      }
       const remote = await SupabasePersistenceService.fetchAppStateFromSupabase();
       if (remote) {
         window.dispatchEvent(new CustomEvent('sucessoedu_db_changed', { detail: remote }));
