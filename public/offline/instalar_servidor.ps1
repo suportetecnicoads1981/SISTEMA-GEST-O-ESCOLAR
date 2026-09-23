@@ -88,8 +88,14 @@ for ($i = 0; $i -lt 20; $i++) {
 if ($healthy) { Ok 'Servidor funcionando' } else { Warn ('O servidor nao respondeu. Veja o arquivo ' + (Join-Path $Dest 'data\servidor.log')) }
 
 Step 'Criando o atalho na Area de Trabalho'
-& (Join-Path $Dest 'criar_atalho.ps1') -Url ('http://localhost:' + $Port + $KeyQuery) -AllUsers
-Ok 'Atalho "SucessoEdu Gestao Educacional" criado'
+try {
+    & (Join-Path $Dest 'criar_atalho.ps1') -Url ('http://localhost:' + $Port + $KeyQuery) -AllUsers
+    Ok 'Atalho "SucessoEdu Gestao Educacional" criado'
+} catch {
+    # O atalho nao impede o funcionamento do servidor.
+    Warn ('Nao foi possivel criar o atalho: ' + $_.Exception.Message)
+    Warn ('Abra no navegador: http://localhost:' + $Port + $KeyQuery)
+}
 
 $ips = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
     Where-Object { $_.IPAddress -notmatch '^(127\.|169\.254\.)' -and $_.InterfaceAlias -notmatch 'Loopback|vEthernet|VirtualBox|VMware|WSL|Bluetooth' } |
