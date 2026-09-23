@@ -48,6 +48,8 @@ import {
 } from 'lucide-react';
 import { NetworkConfig, SystemBackup, AutoBackupSnapshot } from '../../types';
 import { UpdateTutorialGuide } from './UpdateTutorialGuide';
+import { OfflineInstallCard } from '../offline/OfflineInstallCard';
+import { confirmNetworkRestore } from '../../services/offline/networkRestore';
 import {
   createBackup,
   restoreBackup,
@@ -374,8 +376,9 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
       `Os dados atuais do sistema serão substituídos por esta cópia de segurança.`
     );
 
-    if (confirmed) {
-      const ok = restoreAutoBackup(snapshot);
+    const scope = confirmed ? await confirmNetworkRestore() : null;
+    if (confirmed && scope) {
+      const ok = restoreAutoBackup(snapshot, scope);
       if (ok) {
         notify('Cópia de segurança restaurada com sucesso! Recarregando aplicação...');
         window.location.reload();
@@ -405,10 +408,12 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const parsed = JSON.parse(event.target?.result as string);
-        restoreBackup(parsed);
+        const scope = await confirmNetworkRestore();
+        if (!scope) return;
+        restoreBackup(parsed, scope);
         notify('Base de dados restaurada com sucesso! Recarregando sistema...');
         window.location.reload();
       } catch {
@@ -471,6 +476,14 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
             </button>
           </div>
         )}
+      </div>
+
+      {/* Instalação sem internet (Servidor Remoto / Sede / Estações) com o sistema real */}
+      <OfflineInstallCard key={schoolName} schoolName={schoolName} />
+
+      <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900">
+        <strong>Instaladores da versão anterior (abaixo):</strong> instalam um aplicativo simplificado em que cada computador guarda os próprios dados.
+        Para escolas sem internet com banco único e envio de lote à Sede, use o pacote do Servidor Remoto acima.
       </div>
 
       {/* Destaque OmniDeploy Google Material Design 3 */}

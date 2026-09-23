@@ -1,11 +1,45 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import { defineConfig } from 'vite';
+import fs from 'fs';
+import { defineConfig, type Plugin } from 'vite';
+
+/**
+ * Gera dist/offline-manifest.json com a lista de arquivos do sistema compilado.
+ * O módulo "Instaladores" usa essa lista para montar o pacote do Servidor Remoto /
+ * Sede com o sistema real (o mesmo publicado na nuvem), para uso sem internet.
+ */
+function offlineManifest(): Plugin {
+  let outDir = 'dist';
+  return {
+    name: 'sucessoedu-offline-manifest',
+    apply: 'build',
+    configResolved(config) {
+      outDir = path.resolve(config.root, config.build.outDir);
+    },
+    closeBundle() {
+      const files: string[] = [];
+      const walk = (dir: string) => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          const full = path.join(dir, entry.name);
+          if (entry.isDirectory()) walk(full);
+          else files.push(path.relative(outDir, full).split(path.sep).join('/'));
+        }
+      };
+      walk(outDir);
+      const appFiles = files.filter((f) => !f.startsWith('offline/') && f !== 'offline-manifest.json').sort();
+      const scripts = files.filter((f) => f.startsWith('offline/')).map((f) => f.slice('offline/'.length)).sort();
+      fs.writeFileSync(
+        path.join(outDir, 'offline-manifest.json'),
+        JSON.stringify({ builtAt: new Date().toISOString(), files: appFiles, scripts }, null, 2)
+      );
+    },
+  };
+}
 
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), offlineManifest()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

@@ -41,6 +41,9 @@ import {
 } from '../types';
 import { SupabasePersistenceService } from '../services/supabasePersistenceService';
 import { recordDeletions, clearRecreated, PENDING_DELETES_KEY } from '../services/datasync/deletionTracker';
+import { enqueueLocalChanges, enqueueFullReplace, isLocalServerMode, getLocalServerInfo } from '../services/offline/localServerSync';
+import { loteDeletionsBetween } from '../services/offline/batchPacket';
+import { recordLoteDeletions } from '../services/offline/loteDeletions';
 import {
   DEFAULT_STUDENTS,
   DEFAULT_CLASSES,
@@ -531,7 +534,9 @@ export function isDatabaseClean(data?: AppStateData): boolean {
  * Loads entire master application state from local storage or seeds with clean or default mock data
  */
 export function getStoredData(): AppStateData {
-  if (typeof window !== 'undefined' && !(window as any).__sucessoedu_supabase_realtime_initialized) {
+  // Com servidor da rede local (Servidor Remoto / Sede), os dados vêm dele; a nuvem
+  // é tratada pelo envio automático (cloudAutoSync), não por esta carga inicial.
+  if (typeof window !== 'undefined' && !(window as any).__sucessoedu_supabase_realtime_initialized && !isLocalServerMode()) {
     (window as any).__sucessoedu_supabase_realtime_initialized = true;
     SupabasePersistenceService.initRealtimeSync((freshData) => {
       safeLocalStorageSet(KEYS.DATA, JSON.stringify(freshData));
@@ -675,22 +680,46 @@ export function applyProductionStartOnce(): boolean {
  */
 export function saveStoredData(
   data: AppStateData,
-  options?: { skipCloudSync?: boolean; bulkReplace?: boolean }
+  options?: { skipCloudSync?: boolean; bulkReplace?: boolean; authoritative?: boolean }
 ): void {
   // Exclusões feitas nas telas precisam ser enviadas à nuvem (ver deletionTracker).
   // Substituições completas (limpar base, restaurar backup, dados vindos da nuvem)
   // não geram exclusões remotas.
   if (!options?.skipCloudSync && !options?.bulkReplace) {
+    let previous: any = null;
     try {
       const previousRaw = localStorage.getItem(KEYS.DATA);
-      if (previousRaw) recordDeletions(JSON.parse(previousRaw), data);
+      previous = previousRaw ? JSON.parse(previousRaw) : null;
+      if (previous) recordDeletions(previous, data);
       clearRecreated(data);
     } catch {
       /* estado anterior ilegível: nada a propagar */
     }
+    // Servidor da rede local: envia só o que mudou nesta gravação.
+    try {
+      enqueueLocalChanges(previous, data as any);
+    } catch (err) {
+      console.warn('[SucessoEdu] Falha ao preparar envio ao servidor local:', err);
+    }
+    // Exclusões escolares também viajam no lote para a Sede.
+    try {
+      recordLoteDeletions(loteDeletionsBetween(previous, data as any));
+    } catch {
+      /* não impede a gravação */
+    }
+  } else if (options?.authoritative) {
+    // Ação explícita do usuário (restaurar backup, limpar base): vale para toda a rede local.
+    try {
+      enqueueFullReplace(data as any);
+    } catch (err) {
+      console.warn('[SucessoEdu] Falha ao preparar substituição no servidor local:', err);
+    }
   }
   safeLocalStorageSet(KEYS.DATA, JSON.stringify(data));
   if (options?.skipCloudSync) return;
+  // Servidor Remoto (escola): a nuvem recebe somente o lote da escola (cloudAutoSync),
+  // nunca a base inteira desta estação (evita sobrescrever configurações e contas da rede).
+  if (getLocalServerInfo()?.role === 'REMOTO') return;
   SupabasePersistenceService.saveAppStateToSupabase(data).catch(() => {});
 }
 
@@ -1025,7 +1054,7 @@ export function createBackup(): SystemBackup {
 /**
  * Restores entire system state from a backup object
  */
-export function restoreBackup(backup: SystemBackup): void {
+export function restoreBackup(backup: SystemBackup, opts?: { network?: boolean }): void {
   if (backup && backup.data) {
     saveStoredData({
       students: backup.data.students || [],
@@ -1059,7 +1088,7 @@ export function restoreBackup(backup: SystemBackup): void {
       whatsappLogs: (backup.data as any).whatsappLogs || DEFAULT_WHATSAPP_LOGS,
       systemUpdates: (backup.data as any).systemUpdates || DEFAULT_SYSTEM_UPDATES,
       auditLogs: (backup.data as any).auditLogs || DEFAULT_AUDIT_LOGS,
-    }, { bulkReplace: true });
+    }, { bulkReplace: true, authoritative: !!opts?.network });
   }
 }
 
@@ -1239,7 +1268,7 @@ export function getAutoBackupHistory(): AutoBackupSnapshot[] {
 /**
  * Restaura o estado da base a partir de uma cópia de segurança automática
  */
-export function restoreAutoBackup(snapshotOrId?: AutoBackupSnapshot | string): boolean {
+export function restoreAutoBackup(snapshotOrId?: AutoBackupSnapshot | string, opts?: { network?: boolean }): boolean {
   try {
     let targetSnapshot: AutoBackupSnapshot | null = null;
     if (typeof snapshotOrId === 'object' && snapshotOrId?.data) {
@@ -1275,7 +1304,7 @@ export function restoreAutoBackup(snapshotOrId?: AutoBackupSnapshot | string): b
       createdAt: targetSnapshot.createdAt,
       exportedBy: `Restauração de Cópia Automática (${targetSnapshot.operatorName})`,
       data: dataToRestore,
-    });
+    }, opts);
     return true;
   } catch (err) {
     console.error('Erro ao restaurar cópia de segurança automática:', err);

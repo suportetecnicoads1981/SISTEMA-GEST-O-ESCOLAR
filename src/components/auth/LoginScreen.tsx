@@ -1,3 +1,4 @@
+import { isCloudReachable } from '../../services/offline/connectivity';
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   GraduationCap,
@@ -187,6 +188,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
    */
   const trySupabaseSignIn = async (email: string, pwd: string) => {
     if (!email || !pwd || (typeof navigator !== 'undefined' && navigator.onLine === false)) return null;
+    // Rede local sem internet (escola rural): não espera o tempo máximo a cada tentativa.
+    if (!(await isCloudReachable(2500))) return null;
     try {
       const attempt = getSupabaseClient().auth.signInWithPassword({ email, password: pwd });
       const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000));

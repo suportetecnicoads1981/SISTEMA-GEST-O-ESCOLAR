@@ -58,6 +58,7 @@ import {
   generateMunicipalSyncPacket,
   mergeMunicipalSyncPacket,
   safeLocalStorageSet,
+  getStoredData,
 } from '../../data/storage';
 import { DEFAULT_MUNICIPAL_SECRETARY } from '../../data/defaultData';
 import { getSupabaseClient } from '../../services/supabaseClient';
@@ -66,6 +67,9 @@ import { SchoolUnitModal } from './SchoolUnitModal';
 import { MunicipalSecretaryModal } from './MunicipalSecretaryModal';
 import { MunicipalLinkageCertificateModal } from './MunicipalLinkageCertificateModal';
 import { confirmDialog, notify } from '../../utils/dialogs';
+import { parseLoteFile, ParsedLote, LoteMergeReport, LOTE_LABELS, LOTE_KEYS, isOlderThanLastImport } from '../../services/offline/batchPacket';
+import { generateLote, downloadLote, importLote } from '../../services/offline/loteService';
+import { getLocalServerInfo } from '../../services/offline/localServerSync';
 
 interface MunicipalSyncModuleProps {
   schoolUnits?: SchoolUnit[];
@@ -221,12 +225,14 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
   const [selectedUnitForExportId, setSelectedUnitForExportId] = useState<string>(
     schoolUnits[1]?.id || schoolUnits[0]?.id || ''
   );
-  const [operatorName, setOperatorName] = useState<string>('Carlos Eduardo Nogueira (Técnico SME)');
+  const [operatorName, setOperatorName] = useState<string>('');
   const [exportFeedback, setExportFeedback] = useState<string | null>(null);
 
   // Central Import states
   const [importFileContent, setImportFileContent] = useState<string>('');
-  const [parsedPacket, setParsedPacket] = useState<MunicipalSyncPacket | null>(null);
+  const [parsedPacket, setParsedPacket] = useState<ParsedLote | null>(null);
+  const [mergeReport, setMergeReport] = useState<LoteMergeReport | null>(null);
+  const [isGeneratingLote, setIsGeneratingLote] = useState<boolean>(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccessMessage, setImportSuccessMessage] = useState<string | null>(null);
   const [isProcessingMerge, setIsProcessingMerge] = useState<boolean>(false);
@@ -480,102 +486,102 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
     });
   }, [schoolUnits, searchTerm, zoneFilter]);
 
-  // Selected unit object for export
-  const currentExportUnit = useMemo(() => {
-    return (
-      schoolUnits.find((u) => u.id === selectedUnitForExportId) ||
-      schoolUnits[0] || {
-        id: 'unit-sat-1',
-        name: 'E.M. Paulo Freire (Unidade Satélite Norte)',
-        inepCode: '35129921',
-        type: 'ESCOLA_SATELITE' as const,
-        locationZone: 'ZONA_URBANA' as const,
-        district: 'Bairro Esperança',
-        address: 'Rua das Flores, 420',
-        directorName: 'Prof. Marcos Vinicius Alencar',
-        phone: '(11) 3456-1122',
-        email: 'escola.paulofreire@sme.sp.gov.br',
-        totalStudents: 310,
-        totalTeachers: 22,
-        totalClasses: 10,
-        syncStatus: 'SINCRONIZADO' as const,
-        hasInternet: false,
-      }
-    );
+  // Unidade que gera o lote (sem unidade cadastrada não há lote: nada de unidade fictícia).
+  const currentExportUnit = useMemo<SchoolUnit | null>(() => {
+    return schoolUnits.find((u) => u.id === selectedUnitForExportId) || schoolUnits[0] || null;
   }, [schoolUnits, selectedUnitForExportId]);
 
-  // Handle file upload
+  // Leitura do lote (.edusync): valida formato e integridade SHA-256 antes de mostrar a prévia.
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
 
     setImportError(null);
     setImportSuccessMessage(null);
+    setMergeReport(null);
 
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const text = event.target?.result as string;
         setImportFileContent(text);
-        const parsed = JSON.parse(text) as MunicipalSyncPacket;
-
-        if (!parsed.packetId || !parsed.schoolUnit || !parsed.data) {
-          throw new Error('O arquivo selecionado não é um pacote de sincronização EduGestão (.edusync / .json) válido.');
-        }
-
-        setParsedPacket(parsed);
+        setParsedPacket(parseLoteFile(text));
       } catch (err: any) {
         setImportError(err.message || 'Arquivo corrompido ou formato incompatível.');
         setParsedPacket(null);
       }
     };
+    reader.onerror = () => setImportError('Não foi possível ler o arquivo selecionado.');
     reader.readAsText(file);
   };
 
-  // Handle Export Sync Packet
-  const handleGenerateAndDownloadPacket = () => {
+  // Gera o lote da escola (Servidor Remoto) para levar à Sede.
+  const handleGenerateAndDownloadPacket = async () => {
+    if (!currentExportUnit) {
+      notify('Cadastre a unidade escolar (aba Escolas) antes de gerar o lote. Use o mesmo código INEP cadastrado na Sede.');
+      return;
+    }
+    if (!operatorName.trim()) {
+      notify('Informe o nome do responsável pelo lote.');
+      return;
+    }
+    setIsGeneratingLote(true);
     try {
-      const packet = generateMunicipalSyncPacket(currentExportUnit, operatorName);
-      const jsonStr = JSON.stringify(packet, null, 2);
-      const blob = new Blob([jsonStr], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `SYNC_${currentExportUnit.inepCode}_${currentExportUnit.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.edusync`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
+      const packet = await generateLote(currentExportUnit as any, operatorName.trim());
+      const fileName = downloadLote(packet);
+      const c = packet.counts;
       setExportFeedback(
-        `Pacote ${packet.packetId} gerado e baixado com sucesso! Salve no Pendrive para entrega na Secretaria de Educação.`
+        `Lote gerado: ${fileName}. Contém ${c.students || 0} aluno(s), ${c.classes || 0} turma(s), ${c.classGradeSheets || 0} planilha(s) de notas, ` +
+          `${c.attendanceSheets || 0} registro(s) de frequência, ${c.lessonRegistries || 0} aula(s) no diário e ${c.deletions || 0} exclusão(ões). ` +
+          'Leve o arquivo à Sede (pendrive, e-mail ou WhatsApp) e importe na Central de Unificação.'
       );
-      setTimeout(() => setExportFeedback(null), 5000);
+      setTimeout(() => setExportFeedback(null), 20000);
     } catch (err: any) {
-      notify(`Erro ao exportar: ${err.message}`);
+      notify(`Erro ao gerar o lote: ${err?.message || err}`);
+    } finally {
+      setIsGeneratingLote(false);
     }
   };
 
-  // Handle Merge packet into central database
-  const handleExecuteMerge = () => {
+  // Mescla o lote na base da Sede (nunca apaga dados de outras escolas).
+  const handleExecuteMerge = async () => {
     if (!parsedPacket) return;
-
+    if (parsedPacket.legacy) {
+      const ok = await confirmDialog(
+        'Este arquivo está no formato antigo, sem verificação de integridade e sem notas, frequência e diário. Deseja importar mesmo assim?',
+        { title: 'Lote no formato antigo', confirmLabel: 'Importar mesmo assim' }
+      );
+      if (!ok) return;
+    }
+    const olderThan = isOlderThanLastImport(getStoredData() as any, parsedPacket.packet);
+    if (olderThan) {
+      const ok = await confirmDialog(
+        `Este lote foi gerado em ${new Date(parsedPacket.packet.createdAt).toLocaleString('pt-BR')}, antes do último lote já importado desta escola (${new Date(olderThan).toLocaleString('pt-BR')}). ` +
+          'Importá-lo pode desfazer notas e cadastros mais recentes. Deseja importar mesmo assim?',
+        { title: 'Lote mais antigo', confirmLabel: 'Importar mesmo assim', tone: 'danger' }
+      );
+      if (!ok) return;
+    }
     setIsProcessingMerge(true);
-    setTimeout(() => {
-      const result = mergeMunicipalSyncPacket(parsedPacket, operatorName);
+    try {
+      const report = importLote(parsedPacket.packet, operatorName.trim() || 'Não informado');
+      setMergeReport(report);
+      const added = Object.values(report.added).reduce((a, b) => a + b, 0);
+      const updated = Object.values(report.updated).reduce((a, b) => a + b, 0);
+      setImportSuccessMessage(
+        `Lote de ${report.unitName} importado: ${added} registro(s) novo(s), ${updated} atualizado(s), ${report.deleted} exclusão(ões)` +
+          (report.conflicts.length ? ` e ${report.conflicts.length} conflito(s) ignorado(s) (registros de outra unidade).` : '.') +
+          (getLocalServerInfo()?.role === 'SEDE' ? ' Os dados foram gravados no Servidor da Sede.' : '')
+      );
+      setParsedPacket(null);
+      setImportFileContent('');
+      if (onRefreshData) onRefreshData();
+    } catch (err: any) {
+      setImportError(`Falha ao importar o lote: ${err?.message || err}`);
+    } finally {
       setIsProcessingMerge(false);
-
-      if (result.success) {
-        setImportSuccessMessage(
-          `Unificação concluída com sucesso! ${result?.log?.recordsMerged?.students ?? 0} novos alunos e ${result?.log?.recordsMerged?.submissions ?? 0} registros de provas foram consolidados na base municipal.`
-        );
-        setParsedPacket(null);
-        setImportFileContent('');
-        if (onRefreshData) onRefreshData();
-      } else {
-        setImportError(result.error || 'Falha ao mesclar informações.');
-      }
-    }, 800);
+    }
   };
 
   // -------------------------------------------------------------
@@ -663,7 +669,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                 : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
             }`}
           >
-            Exportar Polo (.edusync)
+            Exportar Lote (Servidor Remoto)
           </button>
           <button
             onClick={() => setActiveSubTab('CENTRAL_IMPORT')}
@@ -673,7 +679,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                 : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
             }`}
           >
-            Importar Sede
+            Importar Lotes (Sede)
           </button>
           <button
             onClick={() => setActiveSubTab('CENSUS_REPORT')}
@@ -739,7 +745,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
               className="px-3.5 py-2 bg-white/20 hover:bg-white/30 text-white font-bold text-xs rounded-xl border border-white/20 transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <Download className="h-4 w-4" />
-              <span>Exportar Polo (.edusync)</span>
+              <span>Exportar Lote (Servidor Remoto)</span>
             </button>
             <button
               onClick={() => setActiveSubTab('CENTRAL_IMPORT')}
@@ -1640,6 +1646,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                 <input
                   type="text"
                   value={operatorName}
+                  placeholder="Ex.: Maria Souza (secretária escolar)"
                   onChange={(e) => setOperatorName(e.target.value)}
                   className="w-full text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
                 />
@@ -1670,13 +1677,24 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                 </div>
               </div>
 
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                O lote leva também notas, frequência, diário de classe, históricos, planos de aula, disciplinas e as exclusões feitas na escola.
+                Contas de usuário e senhas não vão no arquivo.
+              </p>
+
               <button
                 onClick={handleGenerateAndDownloadPacket}
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                disabled={isGeneratingLote || !currentExportUnit}
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
-                <Download className="h-4 w-4" />
-                <span>Gerar e Baixar Pacote (.edusync)</span>
+                {isGeneratingLote ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                <span>Gerar Lote para a Sede (.edusync)</span>
               </button>
+              {!currentExportUnit && (
+                <p className="text-[11px] font-semibold text-rose-600">
+                  Nenhuma unidade escolar cadastrada. Cadastre a escola na aba Escolas (com o mesmo INEP usado na Sede).
+                </p>
+              )}
             </div>
 
             {/* Instruction Card */}
@@ -1690,10 +1708,10 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                   1. Conecte um Pendrive na porta USB deste computador.
                 </p>
                 <p className="text-xs text-indigo-800 leading-relaxed">
-                  2. Clique em <strong>"Gerar e Baixar Pacote (.edusync)"</strong> e salve o arquivo diretamente no pendrive.
+                  2. Clique em <strong>"Gerar Lote para a Sede (.edusync)"</strong> e salve o arquivo diretamente no pendrive.
                 </p>
                 <p className="text-xs text-indigo-800 leading-relaxed">
-                  3. O arquivo possui assinatura digital e código de integridade SHA-256 para evitar adulterações.
+                  3. O arquivo leva um código de integridade SHA-256: se for alterado ou corrompido no caminho, a Sede recusa a importação.
                 </p>
                 <p className="text-xs text-indigo-800 leading-relaxed">
                   4. Na Secretaria Municipal de Educação, conecte o pendrive e use a aba <strong>"Central de Unificação SME"</strong> para mesclar os dados na base central.
@@ -1702,7 +1720,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
 
               <div className="p-3 bg-white rounded-xl border border-indigo-100 text-[11px] text-slate-600 flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
-                <span>Garantia de não-duplicação de cadastros pelo CPF e número de matrícula.</span>
+                <span>Pode gerar e importar o lote quantas vezes quiser: a Sede atualiza os mesmos registros, sem duplicar.</span>
               </div>
             </div>
           </div>
@@ -1765,57 +1783,48 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
             </label>
           </div>
 
-          {/* Preview of Parsed Packet */}
+          {/* Prévia do lote */}
           {parsedPacket && (
             <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                    Pacote Autêntico Detectado
+                  <span
+                    className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
+                      parsedPacket.integrity === 'ok' ? 'text-emerald-700 bg-emerald-100' : 'text-amber-800 bg-amber-100'
+                    }`}
+                  >
+                    {parsedPacket.integrity === 'ok' ? 'Integridade verificada (SHA-256)' : 'Formato antigo, sem verificação'}
                   </span>
-                  <h4 className="font-bold text-slate-900 text-sm mt-1">
-                    {parsedPacket.schoolUnit.name}
-                  </h4>
+                  <h4 className="font-bold text-slate-900 text-sm mt-1">{parsedPacket.packet.schoolUnit.name}</h4>
                   <p className="text-xs text-slate-500 font-mono">
-                    INEP: {parsedPacket.schoolUnit.inepCode} • Gerado em:{' '}
-                    {new Date(parsedPacket.exportedAt).toLocaleString('pt-BR')}
+                    INEP: {parsedPacket.packet.schoolUnit.inepCode || '—'} • Gerado em:{' '}
+                    {new Date(parsedPacket.packet.createdAt).toLocaleString('pt-BR')} • Responsável: {parsedPacket.packet.origin?.operatorName}
                   </p>
                 </div>
-
-                <div className="text-right text-xs">
-                  <span className="text-slate-400 block text-[10px]">Checksum de Segurança:</span>
-                  <span className="font-mono text-slate-700 font-semibold">
-                    {parsedPacket.checksum.slice(0, 16)}...
-                  </span>
-                </div>
+                {parsedPacket.packet.sha256 && (
+                  <div className="text-right text-xs">
+                    <span className="text-slate-400 block text-[10px]">SHA-256:</span>
+                    <span className="font-mono text-slate-700 font-semibold">{parsedPacket.packet.sha256.slice(0, 16)}...</span>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                {LOTE_KEYS.filter((k) => (parsedPacket.packet.counts?.[k] ?? 0) > 0).map((k) => (
+                  <div key={k} className="p-3 bg-white rounded-xl border border-slate-200">
+                    <span className="text-[10px] text-slate-400 block font-bold">{LOTE_LABELS[k] || k}</span>
+                    <span className="text-lg font-black text-slate-800">{parsedPacket.packet.counts[k]}</span>
+                  </div>
+                ))}
                 <div className="p-3 bg-white rounded-xl border border-slate-200">
-                  <span className="text-[10px] text-slate-400 block font-bold">Estudantes</span>
-                  <span className="text-lg font-black text-slate-800">
-                    {parsedPacket?.summary?.studentsCount ?? 0}
-                  </span>
-                </div>
-                <div className="p-3 bg-white rounded-xl border border-slate-200">
-                  <span className="text-[10px] text-slate-400 block font-bold">Turmas</span>
-                  <span className="text-lg font-black text-slate-800">
-                    {parsedPacket?.summary?.classesCount ?? 0}
-                  </span>
-                </div>
-                <div className="p-3 bg-white rounded-xl border border-slate-200">
-                  <span className="text-[10px] text-slate-400 block font-bold">Provas</span>
-                  <span className="text-lg font-black text-slate-800">
-                    {parsedPacket?.summary?.examsCount ?? 0}
-                  </span>
-                </div>
-                <div className="p-3 bg-white rounded-xl border border-slate-200">
-                  <span className="text-[10px] text-slate-400 block font-bold">Gabaritos Enviados</span>
-                  <span className="text-lg font-black text-slate-800">
-                    {parsedPacket?.summary?.submissionsCount ?? 0}
-                  </span>
+                  <span className="text-[10px] text-slate-400 block font-bold">Exclusões</span>
+                  <span className="text-lg font-black text-slate-800">{parsedPacket.packet.counts?.deletions ?? 0}</span>
                 </div>
               </div>
+
+              <p className="text-[11px] text-slate-500">
+                A importação mescla os dados: registros novos entram, os já existentes desta escola são atualizados e dados de outras escolas não são alterados.
+              </p>
 
               <div className="pt-2 flex justify-end gap-2">
                 <button
@@ -1829,14 +1838,56 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                   disabled={isProcessingMerge}
                   className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  {isProcessingMerge ? (
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4" />
-                  )}
-                  <span>Unificar na Base Central Municipal</span>
+                  {isProcessingMerge ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                  <span>Importar Lote na Base da Sede</span>
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Relatório da última importação */}
+          {mergeReport && (
+            <div className="p-5 bg-white rounded-2xl border border-emerald-200 space-y-3" data-testid="lote-merge-report">
+              <h4 className="text-sm font-bold text-slate-900">Relatório da importação: {mergeReport.unitName}</h4>
+              {mergeReport.unitCreated && (
+                <p className="text-xs text-amber-700">
+                  A unidade não existia na Sede e foi cadastrada agora. Confira o cadastro dela na aba Escolas.
+                </p>
+              )}
+              {mergeReport.alreadyImportedAt && (
+                <p className="text-xs text-slate-500">
+                  Este lote já havia sido importado em {new Date(mergeReport.alreadyImportedAt).toLocaleString('pt-BR')}; os registros foram apenas conferidos.
+                </p>
+              )}
+              <table className="w-full text-xs">
+                <thead className="text-slate-500">
+                  <tr>
+                    <th className="text-left py-1">Dados</th>
+                    <th className="text-right py-1">Novos</th>
+                    <th className="text-right py-1">Atualizados</th>
+                    <th className="text-right py-1">Sem mudança</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {LOTE_KEYS.filter((k) => mergeReport.added[k] || mergeReport.updated[k] || mergeReport.unchanged[k]).map((k) => (
+                    <tr key={k} className="border-t border-slate-100">
+                      <td className="py-1">{LOTE_LABELS[k] || k}</td>
+                      <td className="py-1 text-right font-bold">{mergeReport.added[k] || 0}</td>
+                      <td className="py-1 text-right">{mergeReport.updated[k] || 0}</td>
+                      <td className="py-1 text-right text-slate-400">{mergeReport.unchanged[k] || 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="text-xs text-slate-600">
+                Exclusões aplicadas: <strong>{mergeReport.deleted}</strong>
+                {mergeReport.catalogKept > 0 && <> • Cadastros compartilhados já existentes mantidos: {mergeReport.catalogKept}</>}
+              </p>
+              {mergeReport.conflicts.length > 0 && (
+                <p className="text-xs text-rose-700">
+                  {mergeReport.conflicts.length} registro(s) ignorado(s) porque pertencem a outra unidade escolar na Sede.
+                </p>
+              )}
             </div>
           )}
         </div>
