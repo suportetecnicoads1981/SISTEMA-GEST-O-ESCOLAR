@@ -35,6 +35,7 @@ import {
   isDatabaseClean,
   CleanInstallationOptions,
 } from '../../data/storage';
+import { confirmDialog } from '../../utils/dialogs';
 
 interface UninstallationModuleProps {
   serverPort: number;
@@ -127,8 +128,8 @@ export const UninstallationModule: React.FC<UninstallationModuleProps> = ({
     setTimeout(() => setCleanNotification(null), 6000);
   };
 
-  const handleRestoreDemoData = () => {
-    if (window.confirm('Deseja restaurar a base demonstrativa com dados simulados de alunos, turmas e notas?')) {
+  const handleRestoreDemoData = async () => {
+    if (await confirmDialog('Deseja restaurar a base demonstrativa com dados simulados de alunos, turmas e notas?')) {
       const demoState = resetToDemoDatabase();
       setCurrentData(demoState);
       if (onResetToDemoDatabase) {

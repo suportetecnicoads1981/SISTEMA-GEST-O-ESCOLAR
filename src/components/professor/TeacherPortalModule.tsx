@@ -123,19 +123,13 @@ export const TeacherPortalModule: React.FC<TeacherPortalModuleProps> = ({
     exams.forEach((e) => {
       if (e.teacherName) set.add(e.teacherName);
     });
-    // Defaults if empty
-    if (set.size === 0) {
-      set.add('Prof. Rodrigo Peixoto');
-      set.add('Profa. Mariana Albuquerque');
-      set.add('Prof. Marcos Vinicius Silva');
-      set.add('Profa. Camila Guimarães');
-    }
+    // Sem professores cadastrados a lista fica vazia (antes trazia nomes fictícios).
     return Array.from(set);
   }, [currentUserTeacherName, subjects, lessonRegistries, exams]);
 
   // Active Teacher State
   const [activeTeacherName, setActiveTeacherName] = useState<string>(() => {
-    return currentUserTeacherName || availableTeachers[0] || 'Prof. Rodrigo Peixoto';
+    return currentUserTeacherName || availableTeachers[0] || '';
   });
 
   // Current Sub Tab

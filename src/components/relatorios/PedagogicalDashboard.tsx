@@ -78,6 +78,7 @@ import {
   AppliedFilterItem,
   SummaryMetricItem,
 } from '../common/ConfigurablePrintModal';
+import { confirmDialog } from '../../utils/dialogs';
 
 interface PedagogicalDashboardProps {
   exams: Exam[];
@@ -1443,11 +1444,11 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
 
             <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
               <button
-                onClick={() => {
+                onClick={async () => {
                   try {
                     const isLocked = localStorage.getItem('sucessoedu_layout_lock') === 'true';
                     if (isLocked) {
-                      const confirmReset = window.confirm(
+                      const confirmReset = await confirmDialog(
                         'AVISO DE PROTEÇÃO DE LAYOUT DO SUCESSOEDU:\n\n' +
                         'Uma instalação prévia do sistema foi detectada e a proteção do layout está ATIVA para impedir a perda das customizações da escola.\n\n' +
                         'Tem certeza de que deseja sobrescrever o layout atual e restaurar a configuração de fábrica?'

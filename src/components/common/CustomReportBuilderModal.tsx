@@ -46,6 +46,7 @@ import {
   CustomReportConfig,
   CustomReportTemplate,
 } from '../../types';
+import { notify } from '../../utils/dialogs';
 
 interface CustomReportBuilderModalProps {
   isOpen: boolean;
@@ -569,7 +570,7 @@ export const CustomReportBuilderModal: React.FC<CustomReportBuilderModalProps> =
   // Salvar modelo favorito
   const handleSaveTemplate = () => {
     if (!templateName.trim()) {
-      alert('Por favor, informe um nome para o modelo de relatório.');
+      notify('Por favor, informe um nome para o modelo de relatório.');
       return;
     }
 

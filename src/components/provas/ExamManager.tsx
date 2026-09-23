@@ -36,6 +36,7 @@ import {
 } from '../../types';
 import { ExamBuilderModal } from './ExamBuilderModal';
 import { ExamAnswerKeyModal } from './ExamAnswerKeyModal';
+import { confirmDialog } from '../../utils/dialogs';
 
 interface ExamManagerProps {
   exams: Exam[];
@@ -434,8 +435,8 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
                         <Edit2 className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (window.confirm(`Deseja excluir a prova "${exam.title}"?`)) {
+                        onClick={async () => {
+                          if (await confirmDialog(`Deseja excluir a prova "${exam.title}"?`)) {
                             onDeleteExam(exam.id);
                           }
                         }}

@@ -16,59 +16,29 @@ export function isOwnApiUrl(rawUrl: string, origin: string): boolean {
  * (login só local/offline), a chamada segue sem token, como antes.
  */
 export function installApiAuthFetch(): void {
-  try {
-    if (typeof window === 'undefined' || typeof window.fetch !== 'function') return;
-    if ((window.fetch as any).__sucessoEduAuth) return;
+  if (typeof window === 'undefined' || typeof window.fetch !== 'function') return;
+  if ((window.fetch as any).__sucessoEduAuth) return;
 
-    const originalFetch = window.fetch.bind(window);
+  const originalFetch = window.fetch.bind(window);
 
-    const wrapped = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-      try {
-        const rawUrl = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-        if (!isOwnApiUrl(rawUrl, window.location.origin)) return originalFetch(input, init);
+  const wrapped = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const rawUrl = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    if (!isOwnApiUrl(rawUrl, window.location.origin)) return originalFetch(input, init);
 
-        let token: string | undefined;
-        try {
-          const { data } = await getSupabaseClient().auth.getSession();
-          token = data.session?.access_token;
-        } catch {
-          /* sem sessão na nuvem */
-        }
-        if (!token) return originalFetch(input, init);
-
-        const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
-        if (!headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
-        if (input instanceof Request) return originalFetch(new Request(input, { ...init, headers }));
-        return originalFetch(input, { ...init, headers });
-      } catch {
-        return originalFetch(input, init);
-      }
-    };
-    (wrapped as any).__sucessoEduAuth = true;
-
+    let token: string | undefined;
     try {
-      Object.defineProperty(window, 'fetch', {
-        value: wrapped,
-        writable: true,
-        configurable: true,
-        enumerable: true,
-      });
+      const { data } = await getSupabaseClient().auth.getSession();
+      token = data.session?.access_token;
     } catch {
-      try {
-        window.fetch = wrapped as typeof window.fetch;
-      } catch {
-        try {
-          Object.defineProperty(globalThis, 'fetch', {
-            value: wrapped,
-            writable: true,
-            configurable: true,
-          });
-        } catch (e) {
-          console.warn('[SucessoEdu] Não foi possível sobrepor fetch global:', e);
-        }
-      }
+      /* sem sessão na nuvem */
     }
-  } catch (err) {
-    console.warn('[SucessoEdu] Erro ao instalar interceptador de fetch:', err);
-  }
+    if (!token) return originalFetch(input, init);
+
+    const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
+    if (!headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
+    if (input instanceof Request) return originalFetch(new Request(input, { ...init, headers }));
+    return originalFetch(input, { ...init, headers });
+  };
+  (wrapped as any).__sucessoEduAuth = true;
+  window.fetch = wrapped as typeof window.fetch;
 }

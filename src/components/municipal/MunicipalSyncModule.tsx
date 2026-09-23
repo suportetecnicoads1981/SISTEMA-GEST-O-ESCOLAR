@@ -65,6 +65,7 @@ import { SupabasePersistenceService } from '../../services/supabasePersistenceSe
 import { SchoolUnitModal } from './SchoolUnitModal';
 import { MunicipalSecretaryModal } from './MunicipalSecretaryModal';
 import { MunicipalLinkageCertificateModal } from './MunicipalLinkageCertificateModal';
+import { confirmDialog, notify } from '../../utils/dialogs';
 
 interface MunicipalSyncModuleProps {
   schoolUnits?: SchoolUnit[];
@@ -379,9 +380,24 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
     setSchoolUnitToEdit(null);
   };
 
-  const handleDeleteSchoolUnit = (id: string) => {
+  const handleDeleteSchoolUnit = async (id: string) => {
     if (!onUpdateSchoolUnits) return;
-    if (window.confirm('Tem certeza que deseja remover esta unidade escolar da rede municipal?')) {
+    const unit = schoolUnits.find((u) => u.id === id);
+    // Integridade: não deixar alunos ou turmas apontando para uma escola que não existe mais.
+    const linkedStudents = (students || []).filter((st: any) => st?.schoolUnitId === id).length;
+    const linkedClasses = (classes || []).filter((c: any) => c?.schoolUnitId === id).length;
+    if (linkedStudents || linkedClasses) {
+      notify(
+        `Não é possível remover "${unit?.name || 'esta unidade'}": ela tem ${linkedStudents} aluno(s) e ${linkedClasses} turma(s) vinculados. ` +
+          'Transfira-os para outra unidade antes de remover.'
+      );
+      return;
+    }
+    const message =
+      unit?.type === 'SEDE_CENTRAL'
+        ? `"${unit.name}" é a SEDE CENTRAL da rede. Tem certeza que deseja removê-la?`
+        : 'Tem certeza que deseja remover esta unidade escolar da rede municipal?';
+    if (await confirmDialog(message)) {
       const updated = schoolUnits.filter((u) => u.id !== id);
       onUpdateSchoolUnits(updated);
     }
@@ -423,7 +439,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
       linkageDate: u.linkageDate || new Date().toISOString(),
     }));
     onUpdateSchoolUnits(updated);
-    alert(
+    notify(
       `Sucesso! Todas as ${updated.length} unidades escolares foram formalmente vinculadas à ${activeSecretary.name} (CNPJ ${activeSecretary.cnpj} - ${activeSecretary.city}/${activeSecretary.state}).`
     );
   };
@@ -536,7 +552,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
       );
       setTimeout(() => setExportFeedback(null), 5000);
     } catch (err: any) {
-      alert(`Erro ao exportar: ${err.message}`);
+      notify(`Erro ao exportar: ${err.message}`);
     }
   };
 
@@ -1107,18 +1123,18 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                         onClick={() => handleOpenEditSchoolUnit(unit)}
                         className="p-1 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
                         title="Editar Unidade Escolar"
+                        aria-label={`Editar unidade ${unit.name}`}
                       >
                         <Edit2 className="h-3.5 w-3.5" />
                       </button>
-                      {unit.type !== 'SEDE_CENTRAL' && (
-                        <button
-                          onClick={() => handleDeleteSchoolUnit(unit.id)}
-                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                          title="Remover Unidade"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleDeleteSchoolUnit(unit.id)}
+                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        title="Remover Unidade"
+                        aria-label={`Remover unidade ${unit.name}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </div>
 

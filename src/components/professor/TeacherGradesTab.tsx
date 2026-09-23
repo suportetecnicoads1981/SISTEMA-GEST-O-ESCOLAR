@@ -542,7 +542,7 @@ export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
               <span className="text-slate-500 font-medium">Nota de Corte:</span>
               <input
                 type="number"
-                step="0.5"
+                step="any"
                 min="0"
                 max="10"
                 value={passingScore}
@@ -610,7 +610,7 @@ export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
                     <td className="py-2.5 px-3 text-center">
                       <input
                         type="number"
-                        step="0.1"
+                        step="any"
                         min="0"
                         max="10"
                         placeholder="0.0"
@@ -630,7 +630,7 @@ export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
                     <td className="py-2.5 px-3 text-center">
                       <input
                         type="number"
-                        step="0.1"
+                        step="any"
                         min="0"
                         max="10"
                         placeholder="0.0"
@@ -650,7 +650,7 @@ export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
                     <td className="py-2.5 px-3 text-center">
                       <input
                         type="number"
-                        step="0.1"
+                        step="any"
                         min="0"
                         max="10"
                         placeholder="0.0"
@@ -670,7 +670,7 @@ export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
                     <td className="py-2.5 px-3 text-center">
                       <input
                         type="number"
-                        step="0.1"
+                        step="any"
                         min="0"
                         max="10"
                         placeholder="0.0"
@@ -690,7 +690,7 @@ export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
                     <td className="py-2.5 px-3 text-center">
                       <input
                         type="number"
-                        step="0.1"
+                        step="any"
                         min="0"
                         max="10"
                         placeholder="0.0"

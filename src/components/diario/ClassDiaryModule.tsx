@@ -44,6 +44,7 @@ import {
   AttendanceStatus,
 } from '../../types';
 import { PrintExportModal, ColumnDefinition } from '../common/PrintExportModal';
+import { confirmDialog, notify } from '../../utils/dialogs';
 
 interface ClassDiaryModuleProps {
   students: Student[];
@@ -65,6 +66,8 @@ interface ClassDiaryModuleProps {
   onAddBnccSkill: (skill: BnccSkill) => void;
   onBack?: () => void;
   onNavigate?: (tab: string, payload?: any) => void;
+  /** Nome do professor logado (preenche o campo de docente). */
+  currentUserName?: string;
 }
 
 // Regulamento padrão (fallback nacional/LDB) usado quando ainda não há nenhuma
@@ -90,6 +93,7 @@ const DEFAULT_STATE_REGULATION: StateEducationRegulation = {
 };
 
 export function ClassDiaryModule({
+  currentUserName,
   students = [],
   classes = [],
   subjects = [],
@@ -119,7 +123,8 @@ export function ClassDiaryModule({
   const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [selectedTerm, setSelectedTerm] = useState<string>('3º Bimestre');
   const [lessonNumber, setLessonNumber] = useState<number>(1);
-  const [teacherNameInput, setTeacherNameInput] = useState<string>('Prof. Rodrigo Peixoto');
+  // Antes vinha preenchido com um professor fictício.
+  const [teacherNameInput, setTeacherNameInput] = useState<string>(currentUserName || '');
 
   // Attendance Form State
   const activeClass = useMemo(() => (classes || []).find((c) => c?.id === selectedClassId), [classes, selectedClassId]);
@@ -290,7 +295,7 @@ export function ClassDiaryModule({
 
   const handleSaveLesson = () => {
     if (!lessonContentInput.trim()) {
-      alert('Por favor, informe o conteúdo programático ministrado.');
+      notify('Por favor, informe o conteúdo programático ministrado.');
       return;
     }
 
@@ -348,12 +353,12 @@ export function ClassDiaryModule({
           onImportStateRegulation?.(regToSave);
           onSelectActiveStateRegulation?.(regToSave.stateCode);
           setShowImportRegulationModal(false);
-          alert(`Normativa estadual "${regToSave.regulationTitle}" importada com sucesso!`);
+          notify(`Normativa estadual "${regToSave.regulationTitle}" importada com sucesso!`);
         } else {
-          alert('Arquivo JSON inválido. Verifique a estrutura da normativa.');
+          notify('Arquivo JSON inválido. Verifique a estrutura da normativa.');
         }
       } catch (err) {
-        alert('Erro ao processar arquivo JSON da normativa.');
+        notify('Erro ao processar arquivo JSON da normativa.');
       }
     };
     reader.readAsText(file);
@@ -1159,8 +1164,8 @@ export function ClassDiaryModule({
                         <span>•</span>
                         <button
                           type="button"
-                          onClick={() => {
-                            if (confirm('Deseja excluir este registro de aula?')) {
+                          onClick={async () => {
+                            if (await confirmDialog('Deseja excluir este registro de aula?')) {
                               onDeleteLessonRegistry(lesson.id);
                             }
                           }}
@@ -1531,7 +1536,7 @@ export function ClassDiaryModule({
                     onClick={() => {
                       onUpdateStateRegulation(editingRegulation);
                       setEditingRegulation(null);
-                      alert('Parâmetros da normativa atualizados com sucesso!');
+                      notify('Parâmetros da normativa atualizados com sucesso!');
                     }}
                     className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold cursor-pointer"
                   >

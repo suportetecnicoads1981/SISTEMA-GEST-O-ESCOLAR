@@ -67,6 +67,7 @@ import { CadastralPendingCensusDashbox } from '../dashboard/CadastralPendingCens
 import { PredictiveAlertsModal } from './PredictiveAlertsModal';
 import { computePredictiveAlerts } from '../../utils/predictiveAlertsEngine';
 import { AttendanceSheet, ClassGradeSheet, NotificationItem } from '../../types';
+import { confirmDialog } from '../../utils/dialogs';
 
 interface StudentListProps {
   students: Student[];
@@ -1943,18 +1944,27 @@ export const StudentList: React.FC<StudentListProps> = ({
                       {/* Student Identity */}
                       <td className="py-2.5 px-4">
                         <div className="flex items-center gap-3">
-                          <img
-                            src={student.photoUrl}
-                            alt={student.name}
-                            referrerPolicy="no-referrer"
-                            className="h-8 w-8 rounded-full object-cover border border-slate-200 shrink-0"
-                          />
+                          {student.photoUrl ? (
+                            <img
+                              src={student.photoUrl}
+                              alt={student.name}
+                              referrerPolicy="no-referrer"
+                              className="h-8 w-8 rounded-full object-cover border border-slate-200 shrink-0"
+                            />
+                          ) : (
+                            <div
+                              aria-hidden="true"
+                              className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 shrink-0 flex items-center justify-center text-[11px] font-bold"
+                            >
+                              {(student.name || '?').trim().charAt(0).toUpperCase()}
+                            </div>
+                          )}
                           <div className="min-w-0">
                             <p className="font-bold text-slate-800 truncate">{student.name}</p>
                             <p className="text-[10px] text-slate-400 flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
                               Nascimento:{' '}
-                              {new Date(student.birthDate).toLocaleDateString('pt-BR')}
+                              {student.birthDate ? new Date(student.birthDate + (student.birthDate.length === 10 ? 'T00:00:00' : '')).toLocaleDateString('pt-BR') : '—'}
                             </p>
                           </div>
                         </div>
@@ -2091,9 +2101,9 @@ export const StudentList: React.FC<StudentListProps> = ({
                           </button>
 
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               if (
-                                window.confirm(
+                                await confirmDialog(
                                   `Deseja realmente remover a matrícula de ${student.name}?`
                                 )
                               ) {

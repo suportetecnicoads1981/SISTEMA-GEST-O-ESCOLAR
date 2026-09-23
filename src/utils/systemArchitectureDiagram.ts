@@ -1,3 +1,4 @@
+import { notify } from './dialogs';
 /**
  * SUCESSOEDU GESTÃO EDUCACIONAL - DIAGRAMA E ARQUITETURA DE MÓDULOS DO SISTEMA
  * Mapeamento canônico e detalhado de todos os 12 módulos do ecossistema SucessoEdu.
@@ -1387,7 +1388,7 @@ export function generateArchitectureDiagramHtml(
         <button class="action-btn" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
         <button class="action-btn" onclick="downloadJson()">💾 Exportar JSON</button>
         <button class="action-btn" onclick="downloadMarkdown()">📄 Exportar Markdown</button>
-        <button class="action-btn primary" onclick="alert('Este diagrama já está configurado para envio automatizado para a pasta na nuvem!')">☁️ Nuvem SucessoEdu</button>
+        <button class="action-btn primary" onclick="notify('Este diagrama já está configurado para envio automatizado para a pasta na nuvem!')">☁️ Nuvem SucessoEdu</button>
       </div>
     </div>
 

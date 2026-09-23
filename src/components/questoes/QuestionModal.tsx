@@ -122,7 +122,9 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
       setRawKeywords('');
     }
     setError('');
-  }, [questionToEdit, isOpen, subjectList]);
+    // Reinicia só ao abrir ou trocar de questão (a lista de disciplinas é recriada a cada renderização).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questionToEdit?.id, isOpen]);
 
   const filteredBnccSkills = useMemo(() => {
     const q = (bnccSearch || '').toLowerCase().trim();

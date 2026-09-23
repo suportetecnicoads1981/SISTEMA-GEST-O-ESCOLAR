@@ -123,7 +123,9 @@ export const ExamBuilderModal: React.FC<ExamBuilderModalProps> = ({
       setSelectedQuestions(defaultQs);
     }
     setError('');
-  }, [examToEdit, isOpen, subjects, classes, questions, initialQuestionIds]);
+    // Reinicia só ao abrir ou trocar de prova: listas recriadas pelo componente pai apagavam o que foi digitado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [examToEdit?.id, isOpen]);
 
   if (!isOpen) return null;
 
@@ -361,7 +363,7 @@ export const ExamBuilderModal: React.FC<ExamBuilderModalProps> = ({
                 <label className="block font-medium text-slate-600 mb-1">Nota Total da Prova</label>
                 <input
                   type="number"
-                  step="0.5"
+                  step="any"
                   value={formData.totalPoints || 10.0}
                   onChange={(e) => setFormData({ ...formData, totalPoints: Number(e.target.value) })}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-bold"
@@ -372,7 +374,7 @@ export const ExamBuilderModal: React.FC<ExamBuilderModalProps> = ({
                 <label className="block font-medium text-slate-600 mb-1">Nota de Corte / Média</label>
                 <input
                   type="number"
-                  step="0.5"
+                  step="any"
                   value={formData.passingScore || 6.0}
                   onChange={(e) => setFormData({ ...formData, passingScore: Number(e.target.value) })}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold text-emerald-700"
@@ -530,9 +532,8 @@ export const ExamBuilderModal: React.FC<ExamBuilderModalProps> = ({
                         <span className="text-[10px] text-slate-500 font-medium">Pontos:</span>
                         <input
                           type="number"
-                          step="0.25"
-                          min="0.1"
-                          max="10"
+                          step="any"
+                          min="0"
                           value={selectedConfig?.points || 2.5}
                           onChange={(e) =>
                             handleQuestionPointChange(q.id, Number(e.target.value))

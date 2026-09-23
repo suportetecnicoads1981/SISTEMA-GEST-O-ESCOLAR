@@ -1210,12 +1210,21 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
                       {/* Nome e Identificação */}
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
-                          <img
-                            src={student.photoUrl}
-                            alt={student.name}
-                            referrerPolicy="no-referrer"
-                            className="h-8 w-8 rounded-full object-cover border border-slate-200 shrink-0"
-                          />
+                          {student.photoUrl ? (
+                            <img
+                              src={student.photoUrl}
+                              alt={student.name}
+                              referrerPolicy="no-referrer"
+                              className="h-8 w-8 rounded-full object-cover border border-slate-200 shrink-0"
+                            />
+                          ) : (
+                            <div
+                              aria-hidden="true"
+                              className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 shrink-0 flex items-center justify-center text-[11px] font-bold"
+                            >
+                              {(student.name || '?').trim().charAt(0).toUpperCase()}
+                            </div>
+                          )}
                           <div className="min-w-0">
                             <p className="font-bold text-slate-900 truncate">{student.name}</p>
                             <p className="text-[10px] text-slate-500 font-mono">

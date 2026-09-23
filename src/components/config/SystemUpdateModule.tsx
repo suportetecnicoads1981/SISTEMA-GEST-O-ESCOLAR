@@ -106,6 +106,7 @@ import {
   getStoredData,
   downloadBackupJsonFile,
 } from '../../data/storage';
+import { notify } from '../../utils/dialogs';
 
 interface SystemUpdateModuleProps {
   currentVersion: string;
@@ -1569,7 +1570,7 @@ pause
   // Handle publishing a new package to Google Drive (Com Pacote ZIP do Sistema Completo e Módulos Separados)
   const handlePublishNewPackage = async () => {
     if (!newVersionTitle.trim() || !newVersionNumber.trim()) {
-      alert('Por favor, informe a versão e o título do pacote.');
+      notify('Por favor, informe a versão e o título do pacote.');
       return;
     }
 

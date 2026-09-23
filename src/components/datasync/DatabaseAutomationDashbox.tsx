@@ -31,6 +31,7 @@ import {
 } from '../../services/databaseAutomatorService';
 import { RelationalIntegrityService } from '../../services/relationalIntegrityService';
 import { getStoredData } from '../../data/storage';
+import { confirmDialog, notify } from '../../utils/dialogs';
 
 export const DatabaseAutomationDashbox: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
@@ -93,7 +94,7 @@ export const DatabaseAutomationDashbox: React.FC = () => {
       setCurrentScore(result.healthScoreAfter);
       setRepairHistory(DatabaseAutomatorService.getRepairHistory());
     } catch (err: any) {
-      alert('Erro na automação do banco de dados: ' + err.message);
+      notify('Erro na automação do banco de dados: ' + err.message);
     } finally {
       setIsRunning(false);
     }
@@ -124,14 +125,14 @@ export const DatabaseAutomationDashbox: React.FC = () => {
       setRepairHistory(DatabaseAutomatorService.getRepairHistory());
       setTimeout(() => setFeedbackMsg(null), 4000);
     } catch (err: any) {
-      alert('Erro ao executar reparo: ' + err.message);
+      notify('Erro ao executar reparo: ' + err.message);
     } finally {
       setIsRunning(false);
     }
   };
 
-  const handleClearHistory = () => {
-    if (confirm('Deseja realmente limpar todo o histórico de reparos e auditoria de TI?')) {
+  const handleClearHistory = async () => {
+    if (await confirmDialog('Deseja realmente limpar todo o histórico de reparos e auditoria de TI?')) {
       DatabaseAutomatorService.clearRepairHistory();
       setRepairHistory([]);
     }

@@ -22,6 +22,7 @@ import {
   BnccSkill,
   SchoolSettings,
 } from '../../types';
+import { confirmDialog } from '../../utils/dialogs';
 
 interface TeacherLessonPlanningTabProps {
   teacherName: string;
@@ -322,8 +323,8 @@ export const TeacherLessonPlanningTab: React.FC<TeacherLessonPlanningTabProps> =
                         <Edit2 className="h-3.5 w-3.5" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (confirm('Deseja excluir este plano de ensino?')) {
+                        onClick={async () => {
+                          if (await confirmDialog('Deseja excluir este plano de ensino?')) {
                             onDeleteLessonPlan(plan.id);
                           }
                         }}

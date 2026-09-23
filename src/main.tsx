@@ -4,7 +4,7 @@ import App from './App.tsx';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { AuthProvider } from './contexts/AuthContext';
 import { AuthBarrier } from './components/auth/AuthBarrier';
-import { sanitizeLegacyLocalStorage } from './data/storage';
+import { sanitizeLegacyLocalStorage, applyProductionStartOnce } from './data/storage';
 import './index.css';
 import { installApiAuthFetch } from './utils/apiAuthFetch';
 
@@ -15,6 +15,8 @@ installApiAuthFetch();
 try {
   // Se o storage tiver formato legado com rolePreferences inconsistente, higieniza imediatamente
   sanitizeLegacyLocalStorage();
+  // Uma única vez por computador: remove os dados de demonstração locais (com backup antes).
+  applyProductionStartOnce();
 } catch (err) {
   console.warn('[SucessoEdu] Erro não impeditivo no saneamento inicial:', err);
 }

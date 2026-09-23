@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { FullStackArchiver } from '../../services/debugflow/fullStackArchiver';
 import { FullStackBackupMetadata } from '../../types/supabaseSchema';
+import { notify } from '../../utils/dialogs';
 
 export const GlobalBackupManager: React.FC = () => {
   const [backups, setBackups] = useState<FullStackBackupMetadata[]>(() =>
@@ -45,7 +46,7 @@ export const GlobalBackupManager: React.FC = () => {
       FullStackArchiver.triggerDownload(blob, metadata.packageFileName);
     } catch (err: any) {
       console.error('Falha na geração do backup:', err);
-      alert(`Erro ao gerar backup: ${err.message}`);
+      notify(`Erro ao gerar backup: ${err.message}`);
     } finally {
       setIsGenerating(false);
     }

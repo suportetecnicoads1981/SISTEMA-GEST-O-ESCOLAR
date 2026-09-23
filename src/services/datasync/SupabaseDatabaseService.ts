@@ -5,6 +5,7 @@
  * Anon Key: sb_publishable_MdH_s87GSHw3HXEShUwy4Q_1JVMunnu
  */
 
+import { flushPendingDeletes } from './deletionTracker';
 import { getSupabaseClient, SUPABASE_CONFIG } from './supabaseClient';
 import { getStoredData, AppStateData } from '../../data/storage';
 import { toRemoteRow, SUPABASE_TABLE_COLUMNS, ADMIN_ONLY_TABLES } from './supabaseRowMapper';
@@ -961,6 +962,14 @@ END $$;
       }];
     }
     const isAdmin = String(session.user?.app_metadata?.role || '').toUpperCase() === 'ADMIN';
+
+    // Exclusões feitas nas telas vão antes dos upserts, para não haver mistura de estados.
+    try {
+      const { deleted, failed } = await flushPendingDeletes(getSupabaseClient() as any, isAdmin);
+      if (deleted || failed) console.info(`[SucessoEdu] Exclusões enviadas à nuvem: ${deleted} ok, ${failed} com falha.`);
+    } catch (err) {
+      console.warn('[SucessoEdu] Não foi possível enviar exclusões pendentes:', err);
+    }
 
     const stored = getStoredData();
     const results: SupabaseSyncResult[] = [];

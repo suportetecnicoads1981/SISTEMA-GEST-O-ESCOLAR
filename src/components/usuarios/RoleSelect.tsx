@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Shield, ChevronDown, Check, AlertTriangle, Loader2 } from 'lucide-react';
 import { UserRole, ROLES } from '../../types';
 import { getSupabaseClient } from '../../services/datasync/supabaseClient';
+import { notify } from '../../utils/dialogs';
 
 interface RoleSelectProps {
   userId: string;
@@ -98,13 +99,13 @@ export const RoleSelect: React.FC<RoleSelectProps> = ({
           setToastMessage(null);
         }, 5000);
       } else {
-        alert(result.error || 'Erro ao alterar privilégios do usuário.');
+        notify(result.error || 'Erro ao alterar privilégios do usuário.');
       }
     } catch (err: any) {
       console.error('[RoleSelect] Erro na requisição:', err);
       // Sem conexão com o servidor a alteração NÃO foi aplicada; antes a tela
       // exibia sucesso e mostrava uma role que o usuário de fato não possuía.
-      alert('Não foi possível contatar o servidor. A permissão do usuário não foi alterada.');
+      notify('Não foi possível contatar o servidor. A permissão do usuário não foi alterada.');
     } finally {
       setIsUpdating(false);
       setPendingRole(null);

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { MunicipalSecretaryInfo } from '../../types';
 import { DEFAULT_MUNICIPAL_SECRETARY } from '../../data/defaultData';
+import { confirmDialog, notify } from '../../utils/dialogs';
 
 interface MunicipalSecretaryModalProps {
   isOpen: boolean;
@@ -60,12 +61,12 @@ export const MunicipalSecretaryModal: React.FC<MunicipalSecretaryModalProps> = (
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Por favor, selecione um arquivo de imagem válido (PNG, JPG, SVG ou WebP).');
+      notify('Por favor, selecione um arquivo de imagem válido (PNG, JPG, SVG ou WebP).');
       return;
     }
 
     if (file.size > 3 * 1024 * 1024) {
-      alert('O tamanho da imagem não deve exceder 3MB.');
+      notify('O tamanho da imagem não deve exceder 3MB.');
       return;
     }
 
@@ -80,9 +81,9 @@ export const MunicipalSecretaryModal: React.FC<MunicipalSecretaryModalProps> = (
     reader.readAsDataURL(file);
   };
 
-  const handleRestoreOfficial = () => {
+  const handleRestoreOfficial = async () => {
     if (
-      window.confirm(
+      await confirmDialog(
         'Deseja restaurar os dados oficiais da Secretaria Municipal de Educação – SEMED (Cumaru do Norte/PA)?'
       )
     ) {

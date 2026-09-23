@@ -23,6 +23,7 @@ import { AuthAutomator } from '../../services/datasync/AuthAutomator';
 import { RelationalIntegrityService } from '../../services/relationalIntegrityService';
 import { SupabaseDatabaseService } from '../../services/datasync/SupabaseDatabaseService';
 import { getStoredData } from '../../data/storage';
+import { notify } from '../../utils/dialogs';
 
 interface SQLArchitectProps {
   onBackupGenerated?: (backup: BackupZipRecord) => void;
@@ -64,7 +65,7 @@ export const SQLArchitect: React.FC<SQLArchitectProps> = ({ onBackupGenerated })
       onBackupGenerated?.(backup);
       AuthAutomator.recordAuditLog('BACKUP_TRIGGERED', 'SUCCESS');
     } catch (err: any) {
-      alert('Falha ao gerar o arquivo ZIP: ' + err.message);
+      notify('Falha ao gerar o arquivo ZIP: ' + err.message);
     } finally {
       setIsGeneratingZip(false);
     }

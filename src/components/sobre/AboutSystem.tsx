@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { SchoolSettings, DeveloperContact } from '../../types';
 import { DEFAULT_SCHOOL_SETTINGS } from '../../data/defaultData';
+import { notify } from '../../utils/dialogs';
 
 const DEFAULT_DEVELOPER_CONTACT: DeveloperContact = {
   name: 'Equipe SucessoEdu',
@@ -94,7 +95,7 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 3.5 * 1024 * 1024) {
-        alert('O arquivo selecionado é maior que 3.5MB. Por favor, utilize uma imagem mais leve.');
+        notify('O arquivo selecionado é maior que 3.5MB. Por favor, utilize uma imagem mais leve.');
         return;
       }
       const reader = new FileReader();
