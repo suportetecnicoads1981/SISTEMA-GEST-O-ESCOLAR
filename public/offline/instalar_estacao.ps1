@@ -82,7 +82,12 @@ while (-not (Test-Key $Key)) {
 }
 $shortcutUrl = $url
 if ($Key) { $shortcutUrl = $url + '/?chave=' + $Key }
-& (Join-Path $Here 'criar_atalho.ps1') -Url $shortcutUrl
+try {
+    & (Join-Path $Here 'criar_atalho.ps1') -Url $shortcutUrl
+} catch {
+    Write-Host ('Nao foi possivel criar o atalho: ' + $_.Exception.Message) -ForegroundColor Yellow
+    Write-Host ('Abra no navegador: ' + $shortcutUrl) -ForegroundColor Yellow
+}
 Write-Host ''
 Write-Host 'Pronto! Use o atalho "SucessoEdu Gestao Educacional" na Area de Trabalho.' -ForegroundColor Green
 Write-Host 'Cada pessoa entra com o proprio usuario e senha.'
