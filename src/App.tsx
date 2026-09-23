@@ -680,10 +680,46 @@ export default function App() {
   };
 
   const handleDeleteClass = (id: string) => {
+    // Integridade: alunos matriculados não podem ficar apontando para uma turma inexistente.
+    const linked = (data.students || []).filter((st) => st.classId === id).length;
+    if (linked > 0) {
+      const cls = (data.classes || []).find((c) => c.id === id);
+      window.alert(
+        `Não é possível excluir "${cls?.name || 'esta turma'}": há ${linked} aluno(s) matriculado(s) nela. ` +
+          'Transfira os alunos para outra turma antes de excluir.'
+      );
+      return;
+    }
     setData((prev) => ({
       ...prev,
       classes: prev.classes.filter((c) => c.id !== id),
     }));
+  };
+
+  // Disciplinas (matriz curricular)
+  const handleSaveSubject = (subject: Subject) => {
+    setData((prev) => {
+      const list = prev.subjects || [];
+      const exists = list.some((s) => s.id === subject.id);
+      return { ...prev, subjects: exists ? list.map((s) => (s.id === subject.id ? subject : s)) : [...list, subject] };
+    });
+    triggerPushNotification('📚 Disciplina salva', `"${subject.name}" atualizada na matriz curricular.`);
+  };
+
+  const handleDeleteSubject = (id: string) => {
+    const subject = (data.subjects || []).find((s) => s.id === id);
+    // Integridade: disciplina com frequência, diário ou notas lançadas não pode sumir.
+    const inUse =
+      (data.attendanceSheets || []).some((a: any) => a?.subjectId === id) ||
+      (data.lessonRegistries || []).some((l: any) => l?.subjectId === id) ||
+      (data.classGradeSheets || []).some((g: any) => g?.subjectId === id);
+    if (inUse) {
+      window.alert(
+        `Não é possível excluir "${subject?.name || 'esta disciplina'}": já existem frequências, aulas ou notas lançadas nela.`
+      );
+      return;
+    }
+    setData((prev) => ({ ...prev, subjects: (prev.subjects || []).filter((s) => s.id !== id) }));
   };
 
   const handleSaveSchoolUnit = (unit: SchoolUnit) => {
@@ -1575,6 +1611,7 @@ export default function App() {
               <StudentList
                 students={data.students}
                 classes={data.classes}
+                courses={data.courses || []}
                 schoolUnits={data.schoolUnits || []}
                 histories={data.academicHistories || []}
                 attendanceSheets={data.attendanceSheets || []}
@@ -1639,6 +1676,8 @@ export default function App() {
                 schoolUnits={data.schoolUnits || []}
                 onSaveClass={handleSaveClass}
                 onDeleteClass={handleDeleteClass}
+                onSaveSubject={handleSaveSubject}
+                onDeleteSubject={handleDeleteSubject}
                 onBack={() => handleNavigate('MAIN_DASHBOARD')}
                 onNavigate={handleNavigate}
               />

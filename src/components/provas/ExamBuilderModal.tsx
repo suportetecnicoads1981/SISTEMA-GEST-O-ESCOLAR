@@ -123,7 +123,9 @@ export const ExamBuilderModal: React.FC<ExamBuilderModalProps> = ({
       setSelectedQuestions(defaultQs);
     }
     setError('');
-  }, [examToEdit, isOpen, subjects, classes, questions, initialQuestionIds]);
+    // Reinicia só ao abrir ou trocar de prova: listas recriadas pelo componente pai apagavam o que foi digitado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [examToEdit?.id, isOpen]);
 
   if (!isOpen) return null;
 
