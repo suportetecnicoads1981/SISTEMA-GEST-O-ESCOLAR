@@ -25,6 +25,7 @@ import {
   AttendanceStatus,
   SchoolSettings,
 } from '../../types';
+import { writeSafePrintDocument } from '../../utils/safeHtml';
 import { triggerAttendanceAlert } from '../../services/messageQueueService';
 
 interface TeacherAttendanceTabProps {
@@ -237,7 +238,7 @@ export const TeacherAttendanceTab: React.FC<TeacherAttendanceTabProps> = ({
 
     const dateFormatted = new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR');
 
-    printWindow.document.write(`
+    writeSafePrintDocument(printWindow, `
       <!DOCTYPE html>
       <html lang="pt-BR">
       <head>
@@ -349,7 +350,6 @@ export const TeacherAttendanceTab: React.FC<TeacherAttendanceTabProps> = ({
       </body>
       </html>
     `);
-    printWindow.document.close();
   };
 
   return (

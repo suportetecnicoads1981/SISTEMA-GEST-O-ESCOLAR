@@ -103,6 +103,7 @@ import { InstalaFlowHub } from './components/instalaflow/InstalaFlowHub';
 import { DataSyncProHub } from './components/datasync/DataSyncProHub';
 import { DebugFlowHub } from './components/debugflow/DebugFlowHub';
 import { AdminTIHub } from './components/admin/AdminTIHub';
+import { isTabAvailable } from './config/features';
 
 export default function App() {
   const [data, setData] = useState(() => getStoredData());
@@ -1304,6 +1305,14 @@ export default function App() {
     }
     if (payload?.examId) {
       setActiveExamIdForTaking(payload.examId);
+    }
+
+    if (!isTabAvailable(target)) {
+      triggerPushNotification(
+        '🧪 Módulo experimental',
+        'Este painel é demonstrativo e está oculto nesta instalação. Ative VITE_SHOW_EXPERIMENTAL_MODULES para exibi-lo.'
+      );
+      return;
     }
 
     if (target === 'FEEDBACK' || target === 'FEEDBACK_MODAL' || target === 'SUGESTOES') {

@@ -24,6 +24,7 @@ import {
   BnccSkill,
   SchoolSettings,
 } from '../../types';
+import { writeSafePrintDocument } from '../../utils/safeHtml';
 
 interface TeacherClassDiaryTabProps {
   teacherName: string;
@@ -176,7 +177,7 @@ export const TeacherClassDiaryTab: React.FC<TeacherClassDiaryTabProps> = ({
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    printWindow.document.write(`
+    writeSafePrintDocument(printWindow, `
       <!DOCTYPE html>
       <html lang="pt-BR">
       <head>
@@ -274,7 +275,6 @@ export const TeacherClassDiaryTab: React.FC<TeacherClassDiaryTabProps> = ({
       </body>
       </html>
     `);
-    printWindow.document.close();
   };
 
   return (

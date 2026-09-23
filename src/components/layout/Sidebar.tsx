@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { isTabAvailable } from '../../config/features';
 import {
   Users,
   Layers,
@@ -374,7 +375,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   const filteredSections = menuSections
-    .map((section) => {
+    .map((rawSection) => {
+      // Módulos experimentais ficam fora do menu por padrão (ver src/config/features.ts).
+      const section = { ...rawSection, items: rawSection.items.filter((item) => isTabAvailable(item.id)) };
+      if (section.items.length === 0) return null;
       if (!searchFilter.trim()) return section;
       const q = searchFilter.toLowerCase().trim();
       const items = section.items.filter(

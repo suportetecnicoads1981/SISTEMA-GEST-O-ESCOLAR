@@ -35,6 +35,7 @@ import {
   ExamSubmission,
   SchoolSettings,
 } from '../../types';
+import { writeSafePrintDocument } from '../../utils/safeHtml';
 import {
   ExamModelVariant,
   ExamBatchConfig,
@@ -217,8 +218,7 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
       timeLimitMinutes: activeExam.timeLimitMinutes,
     });
 
-    printWindow.document.write(html);
-    printWindow.document.close();
+    writeSafePrintDocument(printWindow, html);
   };
 
   // Impressão Exclusiva do Modelo Ativo

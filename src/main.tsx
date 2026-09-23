@@ -6,6 +6,10 @@ import { AuthProvider } from './contexts/AuthContext';
 import { AuthBarrier } from './components/auth/AuthBarrier';
 import { sanitizeLegacyLocalStorage } from './data/storage';
 import './index.css';
+import { installApiAuthFetch } from './utils/apiAuthFetch';
+
+// Envia o token da sessão da nuvem nas chamadas à API do servidor (/api/...).
+installApiAuthFetch();
 
 // Saneamento preventivo síncrono antes do primeiro ciclo de renderização
 try {
