@@ -2,6 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import fs from 'fs';
+import { createHash } from 'crypto';
 import { defineConfig, type Plugin } from 'vite';
 
 /**
@@ -29,9 +30,16 @@ function offlineManifest(): Plugin {
       walk(outDir);
       const appFiles = files.filter((f) => !f.startsWith('offline/') && f !== 'offline-manifest.json').sort();
       const scripts = files.filter((f) => f.startsWith('offline/')).map((f) => f.slice('offline/'.length)).sort();
+      // SHA-256 de cada arquivo: os servidores locais só aplicam uma atualização
+      // depois de conferir, um por um, que os arquivos baixados são exatamente estes.
+      const sha = (rel: string) => createHash('sha256').update(fs.readFileSync(path.join(outDir, rel))).digest('hex');
+      const hashes: Record<string, string> = {};
+      for (const f of appFiles) hashes[f] = sha(f);
+      const scriptHashes: Record<string, string> = {};
+      for (const f of scripts) scriptHashes[f] = sha('offline/' + f);
       fs.writeFileSync(
         path.join(outDir, 'offline-manifest.json'),
-        JSON.stringify({ builtAt: new Date().toISOString(), files: appFiles, scripts }, null, 2)
+        JSON.stringify({ format: 2, builtAt: new Date().toISOString(), files: appFiles, hashes, scripts, scriptHashes }, null, 2)
       );
     },
   };

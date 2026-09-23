@@ -68,6 +68,17 @@ $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccou
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null
 Ok 'Inicializacao automatica configurada'
 
+Step 'Configurando a verificacao de atualizacoes (so baixa e confere; o administrador aprova no sistema)'
+try {
+    $upd = Join-Path $Dest 'atualizador_sucessoedu.ps1'
+    $uAction = New-ScheduledTaskAction -Execute $ps -Argument ('-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $upd + '"') -WorkingDirectory $Dest
+    $uT1 = New-ScheduledTaskTrigger -Once -At ((Get-Date).Date.AddHours(2)) -RepetitionInterval (New-TimeSpan -Hours 6) -RepetitionDuration (New-TimeSpan -Days 3650)
+    $uT2 = New-ScheduledTaskTrigger -AtStartup
+    $uSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 2)
+    Register-ScheduledTask -TaskName 'SucessoEdu Atualizador' -Action $uAction -Trigger @($uT1, $uT2) -Settings $uSettings -Principal $principal -Force | Out-Null
+    Ok 'Verificacao de atualizacoes a cada 6 horas (quando houver internet)'
+} catch { Warn ('Verificacao automatica de atualizacoes nao configurada: ' + $_.Exception.Message) }
+
 Step 'Evitando que o computador servidor entre em suspensao na tomada'
 $ErrorActionPreference = 'Continue'
 cmd /c "powercfg /change standby-timeout-ac 0 >nul 2>&1"

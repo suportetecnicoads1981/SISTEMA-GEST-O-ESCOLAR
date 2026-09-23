@@ -49,6 +49,7 @@ import {
 import { NetworkConfig, SystemBackup, AutoBackupSnapshot } from '../../types';
 import { UpdateTutorialGuide } from './UpdateTutorialGuide';
 import { OfflineInstallCard } from '../offline/OfflineInstallCard';
+import { ServerUpdateCard } from '../offline/ServerUpdateCard';
 import { confirmNetworkRestore } from '../../services/offline/networkRestore';
 import {
   createBackup,
@@ -105,9 +106,12 @@ import { confirmDialog, notify } from '../../utils/dialogs';
 interface NetworkInstallerProps {
   onBack?: () => void;
   onNavigate?: (tab: string, payload?: any) => void;
+  /** Aplicar/desfazer atualização do servidor é exclusivo do administrador. */
+  isAdmin?: boolean;
 }
 
 export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
+  isAdmin,
   onBack,
   onNavigate,
 }) => {
@@ -479,6 +483,7 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
       </div>
 
       {/* Instalação sem internet (Servidor Remoto / Sede / Estações) com o sistema real */}
+      <ServerUpdateCard isAdmin={isAdmin !== false} />
       <OfflineInstallCard key={schoolName} schoolName={schoolName} />
 
       <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900">

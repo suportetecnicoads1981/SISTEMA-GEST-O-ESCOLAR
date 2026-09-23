@@ -1998,6 +1998,7 @@ export default function App() {
               <NetworkInstaller
                 onBack={handleGoBack}
                 onNavigate={handleNavigate}
+                isAdmin={currentRole === 'ADMIN'}
               />
             )}
 

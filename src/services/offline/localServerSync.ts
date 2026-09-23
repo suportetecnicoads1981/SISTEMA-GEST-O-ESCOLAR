@@ -25,6 +25,8 @@ export interface LocalServerInfo {
   role: LocalServerRole;
   serverName: string;
   version: number;
+  /** Versão do sistema que esta página carregou (data da compilação). */
+  appBuiltAt?: string;
 }
 
 export interface LocalServerStatus {
@@ -34,6 +36,8 @@ export interface LocalServerStatus {
   pending: number;
   lastSyncAt?: string;
   message?: string;
+  /** O servidor recebeu uma versão nova do sistema depois que esta página abriu. */
+  newAppVersion?: boolean;
 }
 
 interface QueuedOp {
@@ -247,7 +251,12 @@ export async function detectLocalServer(timeoutMs = 1500): Promise<LocalServerIn
     const { status: code, body } = await call('/health', {}, timeoutMs);
     if (code !== 200 || !body || body.app !== 'sucessoedu-local') return null;
     const role: LocalServerRole = body.role === 'SEDE' ? 'SEDE' : 'REMOTO';
-    return { role, serverName: String(body.serverName || (role === 'SEDE' ? 'Servidor da Sede' : 'Servidor Remoto')), version: Number(body.version) || 0 };
+    return {
+      role,
+      serverName: String(body.serverName || (role === 'SEDE' ? 'Servidor da Sede' : 'Servidor Remoto')),
+      version: Number(body.version) || 0,
+      appBuiltAt: typeof body.appBuiltAt === 'string' ? body.appBuiltAt : '',
+    };
   } catch {
     return null;
   }
@@ -460,6 +469,10 @@ export async function pullFromLocalServer(): Promise<void> {
     const v = await call('/version', {}, 4000);
     if (v.status !== 200 || !v.body) throw new Error(`HTTP ${v.status}`);
     const serverVersion = Number(v.body.version) || 0;
+    const serverApp = typeof v.body.appBuiltAt === 'string' ? v.body.appBuiltAt : '';
+    if (info && serverApp && info.appBuiltAt && serverApp !== info.appBuiltAt && !status.newAppVersion) {
+      setStatus({ newAppVersion: true });
+    }
     if (serverVersion !== lastVersion()) {
       const s = await call('/store', {}, 15000);
       // Descarta a leitura se esta estação gravou/recebeu algo enquanto ela acontecia.
@@ -496,3 +509,40 @@ export function __resetLocalServerForTests() {
 export function __setLocalServerInfoForTests(value: LocalServerInfo | null) {
   info = value;
 }
+
+
+// ---------------------------------------------------------------------------
+// Atualização do sistema no servidor (só o administrador aplica)
+// ---------------------------------------------------------------------------
+
+export interface ServerUpdateInfo {
+  current: string;
+  ready: string;
+  previous: string;
+  hasPrevious: boolean;
+  updateUrl: string;
+  status: null | {
+    state?: 'sem-endereco' | 'sem-internet' | 'atualizado' | 'baixando' | 'pronta' | 'erro' | 'aplicada' | 'revertida';
+    message?: string;
+    checkedAt?: string;
+    available?: string;
+    scriptsChanged?: string[];
+  };
+}
+
+export async function getServerUpdateInfo(): Promise<ServerUpdateInfo | null> {
+  if (!info) return null;
+  const r = await call<ServerUpdateInfo>('/update', {}, 8000);
+  return r.status === 200 ? r.body : null;
+}
+
+async function postUpdate(path: string, body?: any): Promise<{ ok: boolean; message: string }> {
+  const r = await call<any>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }, 60000);
+  if (r.status === 202) return { ok: true, message: 'Verificação iniciada.' };
+  return { ok: r.status === 200 && r.body?.ok !== false, message: r.body?.message || `HTTP ${r.status}` };
+}
+
+export const checkServerUpdate = () => postUpdate('/update/check');
+export const applyServerUpdate = () => postUpdate('/update/apply');
+export const rollbackServerUpdate = () => postUpdate('/update/rollback');
+export const setServerUpdateUrl = (updateUrl: string) => postUpdate('/update/config', { updateUrl });

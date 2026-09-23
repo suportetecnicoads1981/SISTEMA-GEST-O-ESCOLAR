@@ -10,9 +10,23 @@ import JSZip from 'jszip';
 import type { LocalServerRole } from './localServerSync';
 
 export interface OfflineManifest {
+  format?: number;
   builtAt: string;
   files: string[];
+  hashes?: Record<string, string>;
   scripts: string[];
+  scriptHashes?: Record<string, string>;
+}
+
+/** Endereço oficial para os servidores buscarem atualizações (somente o sistema publicado em https). */
+export function officialUpdateUrl(): string {
+  try {
+    const { protocol, origin, hostname } = window.location;
+    if (protocol !== 'https:' || hostname === 'localhost') return '';
+    return origin;
+  } catch {
+    return '';
+  }
 }
 
 export interface ServerPackageOptions {
@@ -23,7 +37,7 @@ export interface ServerPackageOptions {
   onProgress?: (done: number, total: number) => void;
 }
 
-const SERVER_SCRIPTS = ['servidor_sucessoedu.ps1', 'instalar_servidor.ps1', 'criar_atalho.ps1', 'INSTALAR_SERVIDOR.bat', 'PARAR_SERVIDOR.bat', 'INICIAR_SERVIDOR.bat'];
+const SERVER_SCRIPTS = ['servidor_sucessoedu.ps1', 'atualizador_sucessoedu.ps1', 'instalar_servidor.ps1', 'criar_atalho.ps1', 'INSTALAR_SERVIDOR.bat', 'PARAR_SERVIDOR.bat', 'INICIAR_SERVIDOR.bat'];
 const STATION_SCRIPTS = ['instalar_estacao.ps1', 'criar_atalho.ps1', 'INSTALAR_ESTACAO.bat'];
 
 const crlf = (text: string) => text.replace(/\r?\n/g, '\r\n');
@@ -114,8 +128,10 @@ function readmeServer(opts: ServerPackageOptions): string {
     ' - Cópias automáticas: C:\\SucessoEdu\\data\\historico (últimas 60)',
     ' - Copie a pasta C:\\SucessoEdu\\data para um pendrive periodicamente.',
     '',
-    'ATUALIZAR O SISTEMA: gere um novo pacote e rode INSTALAR_SERVIDOR.bat de novo.',
-    'O banco de dados é preservado.',
+    'ATUALIZAÇÕES (com internet): o servidor verifica a cada 6 horas, baixa a versão nova',
+    'e confere cada arquivo (SHA-256). Ela só é aplicada quando o administrador aprovar em',
+    'Instaladores & Backup > Atualização do servidor. A versão anterior fica guardada para voltar.',
+    'Sem internet: gere um novo pacote e rode INSTALAR_SERVIDOR.bat de novo (o banco é preservado).',
     '',
     'PARAR / INICIAR: PARAR_SERVIDOR.bat e INICIAR_SERVIDOR.bat (em C:\\SucessoEdu).'
   );
@@ -139,10 +155,19 @@ export async function buildServerPackage(opts: ServerPackageOptions): Promise<{ 
     root.file(script, crlf(await fetchText(`/offline/${script}`)));
     opts.onProgress?.(++done, total);
   }
+  // Versão instalada (o atualizador compara com a versão publicada).
+  root.file('app/versao_app.json', JSON.stringify({ builtAt: manifest.builtAt, files: manifest.files, hashes: manifest.hashes || {} }, null, 2));
   root.file(
     'config.json',
     JSON.stringify(
-      { role: opts.role, serverName: opts.serverName.trim() || 'Servidor SucessoEdu', port: opts.port, accessKey: opts.accessKey, builtAt: manifest.builtAt },
+      {
+        role: opts.role,
+        serverName: opts.serverName.trim() || 'Servidor SucessoEdu',
+        port: opts.port,
+        accessKey: opts.accessKey,
+        builtAt: manifest.builtAt,
+        updateUrl: officialUpdateUrl(),
+      },
       null,
       2
     )

@@ -48,6 +48,35 @@ export const LocalNetworkStatusBadge: React.FC = () => {
   };
 
   return (
+    <>
+    {local.newAppVersion && (
+      <div
+        role="status"
+        data-testid="new-app-version"
+        style={{
+          position: 'fixed',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          top: 12,
+          zIndex: 2147482001,
+          background: '#4f46e5',
+          color: '#fff',
+          borderRadius: 12,
+          padding: '10px 14px',
+          fontFamily: 'Inter, system-ui, sans-serif',
+          fontSize: 13,
+          boxShadow: '0 10px 25px rgba(0,0,0,0.25)',
+          display: 'flex',
+          gap: 12,
+          alignItems: 'center',
+        }}
+      >
+        <span>Uma nova versão do sistema foi instalada no servidor. Salve o que estiver fazendo e recarregue.</span>
+        <button type="button" onClick={() => window.location.reload()} style={btn('#16a34a')}>
+          Recarregar agora
+        </button>
+      </div>
+    )}
     <div
       data-testid="local-network-status"
       style={{ position: 'fixed', left: 12, bottom: 12, zIndex: 2147482000, fontFamily: 'Inter, system-ui, sans-serif' }}
@@ -123,6 +152,7 @@ export const LocalNetworkStatusBadge: React.FC = () => {
         {label}
       </button>
     </div>
+    </>
   );
 };
 
