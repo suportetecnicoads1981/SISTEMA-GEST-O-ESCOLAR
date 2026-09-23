@@ -5,6 +5,12 @@ import { DEFAULT_ROLE_PREFERENCES, DEFAULT_SCHOOL_SETTINGS, DEFAULT_USER_ACCOUNT
 
 export class SupabasePersistenceService {
   private static isSubscribed = false;
+  private static readonly SAVE_DEBOUNCE_MS = 1500;
+  private static readonly REALTIME_DEBOUNCE_MS = 2000;
+  private static pendingSave: Promise<void> | null = null;
+  private static isSyncing = false;
+  private static resyncRequested = false;
+  private static realtimeRefetchTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * Fetch all app state entities from Supabase PostgreSQL tables and map to AppStateData
@@ -164,11 +170,41 @@ export class SupabasePersistenceService {
   /**
    * Save app state to Supabase PostgreSQL database
    */
-  public static async saveAppStateToSupabase(data: AppStateData): Promise<void> {
+  public static saveAppStateToSupabase(_data?: AppStateData): Promise<void> {
+    // Cada gravação local dispara uma sincronização completa de todas as tabelas.
+    // Várias gravações seguidas (ex.: ao abrir módulos) geravam dezenas de upserts
+    // simultâneos (ERR_INSUFFICIENT_RESOURCES). Aqui as chamadas são agrupadas:
+    // aguarda-se um intervalo curto e executa-se uma única sincronização por vez,
+    // sempre lendo o estado mais recente do localStorage.
+    if (!this.pendingSave) {
+      this.pendingSave = new Promise<void>((resolve) => {
+        setTimeout(async () => {
+          this.pendingSave = null;
+          await this.runSync();
+          resolve();
+        }, SupabasePersistenceService.SAVE_DEBOUNCE_MS);
+      });
+    }
+    return this.pendingSave;
+  }
+
+  private static async runSync(): Promise<void> {
+    if (this.isSyncing) {
+      // Já existe uma sincronização em andamento: agenda mais uma ao final dela.
+      this.resyncRequested = true;
+      return;
+    }
+    this.isSyncing = true;
     try {
       await SupabaseDatabaseService.syncAllEntitiesToSupabase();
     } catch (err) {
       console.warn('Failed to push state to Supabase:', err);
+    } finally {
+      this.isSyncing = false;
+      if (this.resyncRequested) {
+        this.resyncRequested = false;
+        this.saveAppStateToSupabase().catch(() => {});
+      }
     }
   }
 
@@ -184,12 +220,18 @@ export class SupabasePersistenceService {
         .on(
           'postgres_changes',
           { event: '*', schema: 'public' },
-          async (payload) => {
+          (payload) => {
             console.log('🔄 [Supabase Realtime] Change detected in table:', payload.table);
-            const fresh = await this.fetchAppStateFromSupabase();
-            if (fresh) {
-              onUpdate(fresh);
-            }
+            // Um upsert em lote gera um evento por linha; sem agrupamento cada evento
+            // recarregava todas as tabelas. Recarrega uma única vez após a rajada.
+            if (this.realtimeRefetchTimer) clearTimeout(this.realtimeRefetchTimer);
+            this.realtimeRefetchTimer = setTimeout(async () => {
+              this.realtimeRefetchTimer = null;
+              const fresh = await this.fetchAppStateFromSupabase();
+              if (fresh) {
+                onUpdate(fresh);
+              }
+            }, SupabasePersistenceService.REALTIME_DEBOUNCE_MS);
           }
         )
         .subscribe((status) => {

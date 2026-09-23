@@ -1,23 +1,10 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-
-const supabaseUrl = (typeof import.meta !== 'undefined' && (import.meta as any)?.env?.VITE_SUPABASE_URL) || 'https://cdxvhxqpixtbycghfsre.supabase.co';
-const supabaseAnonKey = (typeof import.meta !== 'undefined' && (import.meta as any)?.env?.VITE_SUPABASE_ANON_KEY) || 'sb_publishable_MdH_s87GSHw3HXEShUwy4Q_1JVMunnu';
+// Reutiliza a instância única do cliente Supabase. Criar um segundo cliente
+// com a mesma chave de armazenamento gerava o aviso "Multiple GoTrueClient
+// instances detected" e podia causar comportamento indefinido na sessão.
+export { getSupabaseClient } from './datasync/supabaseClient';
+import { SUPABASE_CONFIG as DATASYNC_CONFIG } from './datasync/supabaseClient';
 
 export const SUPABASE_CONFIG = {
-  url: supabaseUrl,
-  anonKey: supabaseAnonKey,
+  url: DATASYNC_CONFIG.projectUrl,
+  anonKey: DATASYNC_CONFIG.anonKey,
 };
-
-let supabaseInstance: SupabaseClient | null = null;
-
-export function getSupabaseClient(): SupabaseClient {
-  if (!supabaseInstance) {
-    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-      },
-    });
-  }
-  return supabaseInstance;
-}

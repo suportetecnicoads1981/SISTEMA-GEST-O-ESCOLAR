@@ -1265,10 +1265,17 @@ const CANONICAL_NEXUS_FILES = [
 ];
 
 function getNexusRootDir(customPath?: string): string {
-  if (customPath && customPath.startsWith('/') && !customPath.includes('..')) {
-    return customPath;
+  // O diretório vem do corpo da requisição (sem autenticação). Antes, qualquer
+  // caminho absoluto era aceito, permitindo criar/sobrescrever arquivos em
+  // qualquer pasta do servidor. Agora só são aceitos caminhos dentro de nexus_root.
+  const baseDir = path.join(process.cwd(), 'nexus_root');
+  if (typeof customPath === 'string' && path.isAbsolute(customPath)) {
+    const resolved = path.resolve(customPath);
+    if (resolved === baseDir || resolved.startsWith(baseDir + path.sep)) {
+      return resolved;
+    }
   }
-  return path.join(process.cwd(), 'nexus_root');
+  return baseDir;
 }
 
 // Armazenamento em memória/disco para instalações e logs de erro persistentes
@@ -2262,15 +2269,22 @@ app.get('/api/nexusinstall/network/detect', async (req, res) => {
 // Endpoint: Gravação de configuração persistida no Secret Manager
 app.post('/api/nexusinstall/network/save-secret', (req, res) => {
   try {
-    const { port, ip } = req.body;
-    const envContent = `PORT=${port}\nHOST_IP=${ip}\nHOSTNAME=${os.hostname()}\nALLOCATED_AT=${new Date().toISOString()}\nSECRET_SYNC=true\n`;
+    const { port, ip } = req.body || {};
+    const portNum = Number(port);
+    if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) {
+      return res.status(400).json({ success: false, error: 'Porta inválida (use um número entre 1 e 65535).' });
+    }
+    if (typeof ip !== 'string' || net.isIP(ip) === 0) {
+      return res.status(400).json({ success: false, error: 'Endereço IP inválido.' });
+    }
+    const envContent = `PORT=${portNum}\nHOST_IP=${ip}\nHOSTNAME=${os.hostname()}\nALLOCATED_AT=${new Date().toISOString()}\nSECRET_SYNC=true\n`;
     fs.writeFileSync(path.join(process.cwd(), '.nexus-runtime.env'), envContent, 'utf-8');
 
     res.json({
       success: true,
       secretId: 'projects/sucessoedu-hub/secrets/NEXUS_RUNTIME_NETWORK',
       version: '1',
-      stored: { port, ip },
+      stored: { port: portNum, ip },
       updatedAt: new Date().toISOString()
     });
   } catch (err: any) {
@@ -2694,6 +2708,21 @@ app.post('/api/update-user-role', async (req, res) => {
           persistSession: false,
         },
       });
+
+      // Somente um ADMIN autenticado pode alterar privilégios. Sem esta checagem,
+      // qualquer pessoa na rede podia se promover a ADMIN com uma simples requisição.
+      const authHeader = req.headers.authorization || '';
+      const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+      if (!accessToken) {
+        return res.status(401).json({ success: false, error: 'Autenticação obrigatória para alterar privilégios.' });
+      }
+      const { data: callerData, error: callerError } = await supabaseAdmin.auth.getUser(accessToken);
+      if (callerError || !callerData?.user) {
+        return res.status(401).json({ success: false, error: 'Sessão inválida ou expirada. Faça login novamente.' });
+      }
+      if (String(callerData.user.app_metadata?.role || '').toUpperCase() !== 'ADMIN') {
+        return res.status(403).json({ success: false, error: 'Apenas administradores podem alterar privilégios de usuários.' });
+      }
 
       // 1. Atualizar app_metadata com a nova role
       const { data: updateData, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(

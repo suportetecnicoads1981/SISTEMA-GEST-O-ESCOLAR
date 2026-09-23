@@ -551,13 +551,16 @@ export function getStoredData(): AppStateData {
       state: 'PA',
       adminEmail: 'suportetecnicoads@gmail.com',
     });
-    saveStoredData(clean);
+    // As flags precisam ser gravadas ANTES de saveStoredData: a sincronização
+    // com o Supabase chama getStoredData() novamente e, sem a flag, entraria
+    // em recursão infinita (RangeError: Maximum call stack size exceeded).
     try {
       localStorage.setItem(CLEAN_SECRETARIA_ONLY_FLAG, 'true');
       localStorage.setItem('sucessoedu_clean_install', 'true');
       localStorage.setItem('sucessoedu_database_mode', 'CLEAN');
       localStorage.setItem('sucessoedu_logged_user_id', 'user-master-01');
     } catch {}
+    saveStoredData(clean);
     return clean;
   }
 
@@ -568,10 +571,10 @@ export function getStoredData(): AppStateData {
   const raw = localStorage.getItem(KEYS.DATA);
   if (!raw) {
     const clean = getCleanDatabase();
-    saveStoredData(clean);
     try {
       localStorage.setItem(CLEAN_SECRETARIA_ONLY_FLAG, 'true');
     } catch {}
+    saveStoredData(clean);
     return clean;
   }
 
