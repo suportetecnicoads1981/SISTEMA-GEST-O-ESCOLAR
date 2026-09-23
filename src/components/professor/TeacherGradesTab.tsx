@@ -24,6 +24,7 @@ import {
   StudentBimonthlyGradeEntry,
   SchoolSettings,
 } from '../../types';
+import { writeSafePrintDocument } from '../../utils/safeHtml';
 import { triggerGradePublished } from '../../services/messageQueueService';
 
 interface TeacherGradesTabProps {
@@ -310,7 +311,7 @@ export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    printWindow.document.write(`
+    writeSafePrintDocument(printWindow, `
       <!DOCTYPE html>
       <html lang="pt-BR">
       <head>
@@ -441,7 +442,6 @@ export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
       </body>
       </html>
     `);
-    printWindow.document.close();
   };
 
   return (

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { isTabAvailable } from '../../config/features';
 import {
   ShieldCheck,
   ShieldAlert,
@@ -108,7 +109,7 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
     }
   };
 
-  const modules = [
+  const allModules = [
     // 1. Provisionamento & Deploy
     {
       id: 'OMNI_DEPLOY',
@@ -303,6 +304,8 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
       shortcut: 'Alt + A',
     },
   ];
+  // Módulos experimentais ficam ocultos por padrão (ver src/config/features.ts).
+  const modules = allModules.filter((m) => isTabAvailable(m.id));
 
   const filteredModules = modules.filter((m) => {
     if (!m) return false;

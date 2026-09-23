@@ -1,3 +1,4 @@
+import { sanitizeHtmlFragment } from './safeHtml';
 /**
  * Utilitário centralizado e robusto para Impressão e Pré-visualização Oficial no SucessoEdu.
  * Garante compatibilidade total em iframes, navegadores móveis e sandboxes.
@@ -341,6 +342,8 @@ export function triggerPrint(
     } else if (targetElementOrHtml instanceof HTMLElement) {
       contentHtml = targetElementOrHtml.innerHTML;
     }
+    // Remove qualquer código executável vindo dos dados antes de montar a impressão.
+    contentHtml = sanitizeHtmlFragment(contentHtml);
 
     if (contentHtml.trim()) {
       // 1. Tenta popup em nova janela

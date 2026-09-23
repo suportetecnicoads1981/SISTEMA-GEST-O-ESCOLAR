@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { isTabAvailable } from '../../config/features';
 import {
   GraduationCap,
   Minus,
@@ -289,6 +290,7 @@ export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
                     <Sliders className="w-3.5 h-3.5 text-slate-400" />
                     <span>Central de TI &amp; Servidor</span>
                   </button>
+                  {isTabAvailable('INSTALAFLOW') && (
                   <button
                     onClick={() => {
                       onNavigate('INSTALAFLOW');
@@ -299,6 +301,7 @@ export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
                     <Server className="w-3.5 h-3.5 text-indigo-400" />
                     <span>InstalaFlow Híbrido</span>
                   </button>
+                  )}
                   <button
                     onClick={() => {
                       onNavigate('DATASYNC_PRO');

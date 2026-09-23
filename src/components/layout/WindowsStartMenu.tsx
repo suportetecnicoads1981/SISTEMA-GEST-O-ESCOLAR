@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { isTabAvailable } from '../../config/features';
 import {
   LayoutDashboard,
   Users,
@@ -134,15 +135,16 @@ export const WindowsStartMenu: React.FC<WindowsStartMenuProps> = ({
   ];
 
   // Filtro de busca estilo Windows Search
+  const availableApps = pinnedApps.filter((app) => isTabAvailable(app.id));
   const filteredApps = searchQuery.trim()
-    ? pinnedApps.filter(
+    ? availableApps.filter(
         (app) =>
           app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           app.desc.toLowerCase().includes(searchQuery.toLowerCase()) ||
           app.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
           app.group.toLowerCase().includes(searchQuery.toLowerCase())
       )
-    : pinnedApps;
+    : availableApps;
 
   const handleAppClick = (tabId: string) => {
     onNavigate(tabId);

@@ -7,12 +7,85 @@ import crypto from 'crypto';
 import net from 'net';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import {
+  classifyApiRoute,
+  isRoleAllowed,
+  extractBearerToken,
+} from './src/server/apiAccess.ts';
 
 const app = express();
-const PORT = 3000;
+// Respeita a porta do ambiente (Cloud Run / AI Studio / instalação local).
+const PORT = Number(process.env.PORT) || 3000;
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.disable('x-powered-by');
+
+// O backup completo de uma estação pode ser grande; as demais rotas aceitam até 10 MB.
+app.use('/api/sync/station', express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
+// ============================================================================
+// CONTROLE DE ACESSO DA API
+// As regras ficam em src/server/apiAccess.ts. Rotas administrativas (atualizações,
+// Nexus, CleanSlate, InstalaFlow, NexusBuild, status do ambiente) exigem login na
+// nuvem com perfil ADMIN; a IA exige ADMIN ou TEACHER. Rotas não listadas exigem
+// ADMIN (falha fechada). Antes, qualquer pessoa na rede podia chamá-las.
+// ============================================================================
+const SUPABASE_URL_SERVER = (
+  process.env.VITE_SUPABASE_URL ||
+  process.env.SUPABASE_URL ||
+  'https://cdxvhxqpixtbycghfsre.supabase.co'
+)
+  .replace(/\/rest\/v1\/?$/, '')
+  .replace(/\/$/, '');
+const SUPABASE_ANON_KEY_SERVER =
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
+  'sb_publishable_MdH_s87GSHw3HXEShUwy4Q_1JVMunnu';
+const supabaseTokenVerifier = createSupabaseClient(SUPABASE_URL_SERVER, SUPABASE_ANON_KEY_SERVER, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+
+app.use('/api', async (req, res, next) => {
+  const level = classifyApiRoute(req.method, req.baseUrl + req.path);
+  if (level === 'public' || level === 'self') return next();
+
+  const token = extractBearerToken(req.headers.authorization);
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      error: 'Esta função exige login na nuvem. Saia e entre novamente com sua conta.',
+    });
+  }
+
+  try {
+    const { data, error } = await supabaseTokenVerifier.auth.getUser(token);
+    if (error || !data?.user) {
+      return res.status(401).json({ success: false, error: 'Sessão inválida ou expirada. Faça login novamente.' });
+    }
+    const role = String(data.user.app_metadata?.role || '').toUpperCase();
+    if (!isRoleAllowed(level, role)) {
+      return res.status(403).json({
+        success: false,
+        error: level === 'staff' ? 'Função disponível apenas para a equipe escolar.' : 'Acesso restrito ao administrador.',
+      });
+    }
+    res.locals.authUser = { id: data.user.id, email: data.user.email, role };
+    return next();
+  } catch {
+    return res.status(503).json({
+      success: false,
+      error: 'Não foi possível validar a sessão agora (sem conexão com a nuvem). Tente novamente.',
+    });
+  }
+});
 
 // Limite simples de requisições por IP (em memória). Usado nas rotas que chamam a
 // API paga do Gemini: sem ele qualquer pessoa na rede podia esgotar a cota.
@@ -2899,6 +2972,23 @@ app.post('/api/update-user-role', async (req, res) => {
     console.error('[RBAC] Erro interno:', err);
     res.status(500).json({ success: false, error: err?.message || 'Erro interno ao processar atualização de privilégios.' });
   }
+});
+
+// Rota /api inexistente: responde JSON em vez de cair no index.html do SPA.
+app.use('/api', (_req, res) => {
+  res.status(404).json({ success: false, error: 'Rota não encontrada.' });
+});
+
+// Tratador final: não expõe detalhes internos (stack/mensagens) ao cliente.
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({ success: false, error: 'Conteúdo enviado é grande demais.' });
+  }
+  if (err?.type === 'entity.parse.failed') {
+    return res.status(400).json({ success: false, error: 'JSON inválido.' });
+  }
+  console.error('[SucessoEdu] Erro não tratado:', err);
+  res.status(500).json({ success: false, error: 'Erro interno do servidor.' });
 });
 
 async function startServer() {
