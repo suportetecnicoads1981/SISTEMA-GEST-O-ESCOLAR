@@ -821,6 +821,8 @@ export interface SchoolUnit {
   cadastralStatus?: CadastralStatus; // 'OK' | 'INCOMPLETE' | 'PENDING_DOCS'
   pendingFields?: string[]; // Lista de pendências para complementação cadastral
   createdViaImport?: boolean; // Se foi cadastrada automaticamente via importação de planilha
+  isAnnex?: boolean; // Escola anexa (extensão) vinculada a uma escola principal
+  parentUnitId?: string; // Escola principal da qual esta é anexa
   importSourceFileName?: string;
 
   // Identidade Visual & Logotipos da Unidade Escolar

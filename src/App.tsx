@@ -644,20 +644,21 @@ export default function App() {
         }
       });
 
-      // Atualiza turmas se explicitClasses foram criadas
-      const existingClasses = prev.classes || [];
-      const newClasses: SchoolClass[] = [];
-      if (explicitClasses && explicitClasses.length > 0) {
-        explicitClasses.forEach((cls) => {
-          if (!existingClasses.some((ec) => ec.id === cls.id)) {
-            newClasses.push(cls);
-          }
-        });
-      }
+      // Turmas: as novas são incluídas e as existentes (mesmo id) são atualizadas (ex: nome ajustado)
+      const classById = new Map((explicitClasses || []).filter(Boolean).map((c) => [c.id, c]));
+      const existingClasses = (prev.classes || []).map((c) => classById.get(c.id) || c);
+      const newClasses = Array.from(classById.values()).filter(
+        (c) => !(prev.classes || []).some((ec) => ec.id === c.id)
+      );
+
+      // Alunos: quem já existe (mesmo id, reconhecido na importação) é atualizado; os demais são incluídos
+      const importedById = new Map(imported.filter(Boolean).map((s) => [s.id, s]));
+      const updatedStudents = (prev.students || []).map((s) => importedById.get(s.id) || s);
+      const addedStudents = imported.filter((s) => s && !(prev.students || []).some((ps) => ps.id === s.id));
 
       return {
         ...prev,
-        students: [...imported, ...prev.students],
+        students: [...addedStudents, ...updatedStudents],
         schoolUnits: [...existingUnits, ...newUnits],
         classes: [...existingClasses, ...newClasses],
       };
@@ -2152,6 +2153,7 @@ export default function App() {
         classes={data?.classes || []}
         schoolUnits={data?.schoolUnits || []}
         studentsCount={data?.students?.length || 0}
+        existingStudents={data?.students || []}
         onImportStudents={handleBatchImportStudents}
         onUpdateStudent={handleSaveStudent}
         onNavigateToPendencias={() => {
