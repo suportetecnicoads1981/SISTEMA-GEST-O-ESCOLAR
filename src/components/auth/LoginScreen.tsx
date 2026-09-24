@@ -18,6 +18,8 @@ import {
   Users,
   ShieldAlert,
   Key,
+  LogOut,
+  X,
   Laptop,
   Check,
   Briefcase,
@@ -174,6 +176,24 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       setSelectedUnitId(user.schoolUnitId);
     }
     setErrorMsg('');
+  };
+
+  /** Sair/Fechar: cancela o primeiro acesso e limpa a tela; no aplicativo instalado também fecha a janela. */
+  const handleExitLogin = () => {
+    setFirstAccessUser(null);
+    setSelectedUserForLogin(null);
+    setUsername('');
+    setPassword('');
+    setNewPassword('');
+    setConfirmNewPassword('');
+    setErrorMsg('');
+    setActiveTabMode('SEARCH_USERS');
+    try {
+      // Só fecha janelas abertas pelo atalho/aplicativo; no navegador comum nada acontece.
+      window.close();
+    } catch {
+      /* janela não pode ser fechada por script */
+    }
   };
 
   // "Acessar" na lista de usuários apenas seleciona o perfil: a senha é sempre exigida.
@@ -359,6 +379,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       <div className="absolute top-[-15%] left-[-10%] w-[550px] h-[550px] bg-indigo-600/20 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute bottom-[-15%] right-[-10%] w-[550px] h-[550px] bg-sky-600/15 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute top-[30%] right-[15%] w-[400px] h-[400px] bg-purple-600/10 rounded-full blur-[130px] pointer-events-none" />
+
+      <button
+        type="button"
+        onClick={handleExitLogin}
+        className="absolute top-3 right-3 sm:top-5 sm:right-5 z-20 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-rose-600 border border-slate-700 hover:border-rose-500 text-slate-300 hover:text-white text-xs font-semibold transition-all cursor-pointer"
+        title="Sair / Fechar"
+      >
+        <X className="h-4 w-4" />
+        <span className="hidden sm:inline">Fechar</span>
+      </button>
 
       <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 rounded-3xl bg-slate-900/85 border border-slate-800/80 shadow-2xl backdrop-blur-2xl overflow-hidden z-10">
         
@@ -762,6 +792,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     className="px-4 py-3 rounded-xl bg-slate-700/80 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
                   >
                     Voltar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExitLogin}
+                    className="px-4 py-3 rounded-xl bg-rose-600/20 hover:bg-rose-600 border border-rose-500/40 text-rose-200 hover:text-white text-xs font-semibold cursor-pointer flex items-center gap-1.5"
+                    title="Cancelar o primeiro acesso e sair"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sair
                   </button>
                   <button
                     type="submit"

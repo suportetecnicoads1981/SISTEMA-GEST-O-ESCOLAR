@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { FlexChart } from '../common/FlexChart';
 import {
   BarChart3,
   TrendingUp,
@@ -888,47 +889,21 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
                 </div>
               </div>
 
-              <div className="h-44 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={evolutionData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={theme === 'DARK' ? '#334155' : '#f1f5f9'} />
-                    <XAxis
-                      dataKey="name"
-                      tick={{ fontSize: 10, fill: theme === 'DARK' ? '#94a3b8' : '#64748b' }}
-                    />
-                    <YAxis
-                      domain={[0, 10]}
-                      tick={{ fontSize: 10, fill: theme === 'DARK' ? '#94a3b8' : '#64748b' }}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: theme === 'DARK' ? '#0f172a' : '#ffffff',
-                        borderRadius: '8px',
-                        border: '1px solid #e2e8f0',
-                        fontSize: '11px',
-                        color: theme === 'DARK' ? '#f8fafc' : '#0f172a',
-                      }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="media"
-                      name="Média Obtida"
-                      stroke="#4f46e5"
-                      strokeWidth={3}
-                      dot={{ r: 4, fill: '#4f46e5' }}
-                      activeDot={{ r: 6 }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="meta"
-                      name="Corte Mínimo"
-                      stroke="#ef4444"
-                      strokeDasharray="4 4"
-                      strokeWidth={2}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              <FlexChart
+                storageKey="pedagogico-evolucao"
+                title="Evolução de Desempenho Pedagógico"
+                data={evolutionData}
+                xKey="name"
+                series={[
+                  { key: 'media', name: 'Média Obtida', color: '#4f46e5' },
+                  { key: 'meta', name: 'Corte Mínimo', color: '#ef4444', dashed: true },
+                ]}
+                defaultType="line"
+                allowedTypes={['line', 'bar', 'area', 'barH', 'radar']}
+                yDomain={[0, 10]}
+                height={190}
+                dark={theme === 'DARK'}
+              />
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-8 border-t border-slate-100 dark:border-slate-800 pt-3">
@@ -1043,31 +1018,22 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
               <span className="text-[10px] text-slate-400">Verde: Acertos | Vermelho: Erros</span>
             </div>
 
-            <div className="h-48 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={questionAccuracyData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={theme === 'DARK' ? '#334155' : '#f1f5f9'} />
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fontSize: 10, fill: theme === 'DARK' ? '#94a3b8' : '#64748b' }}
-                  />
-                  <YAxis
-                    domain={[0, 100]}
-                    tick={{ fontSize: 10, fill: theme === 'DARK' ? '#94a3b8' : '#64748b' }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: theme === 'DARK' ? '#0f172a' : '#ffffff',
-                      borderRadius: '8px',
-                      border: '1px solid #e2e8f0',
-                      fontSize: '11px',
-                    }}
-                  />
-                  <Bar dataKey="acerto" name="% Acerto" fill="#10b981" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="erro" name="% Erro" fill="#f87171" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <FlexChart
+              storageKey="pedagogico-acertos-questao"
+              title="Taxa de Acertos por Questão"
+              data={questionAccuracyData}
+              xKey="name"
+              series={[
+                { key: 'acerto', name: '% Acerto', color: '#10b981' },
+                { key: 'erro', name: '% Erro', color: '#f87171' },
+              ]}
+              defaultType="bar"
+              allowedTypes={['bar', 'barH', 'line', 'area', 'radar']}
+              yDomain={[0, 100]}
+              unit="%"
+              height={210}
+              dark={theme === 'DARK'}
+            />
           </div>
         )}
 
@@ -1085,32 +1051,19 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
             </div>
 
             <div className="grid grid-cols-2 items-center gap-2">
-              <div className="h-40 w-full flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={distributionData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={35}
-                      outerRadius={60}
-                      paddingAngle={4}
-                      dataKey="value"
-                    >
-                      {distributionData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: theme === 'DARK' ? '#0f172a' : '#ffffff',
-                        borderRadius: '8px',
-                        border: '1px solid #e2e8f0',
-                        fontSize: '11px',
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+              <div className="w-full">
+                <FlexChart
+                  storageKey="pedagogico-faixas"
+                  title="Distribuição por Faixa de Desempenho"
+                  data={distributionData}
+                  xKey="name"
+                  series={[{ key: 'value', name: 'Alunos' }]}
+                  colorKey="color"
+                  defaultType="pie"
+                  allowedTypes={['pie', 'bar', 'barH']}
+                  height={170}
+                  dark={theme === 'DARK'}
+                />
               </div>
 
               <div className="space-y-1.5 text-xs">

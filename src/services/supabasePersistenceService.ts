@@ -5,6 +5,18 @@ import { DEFAULT_SCHOOL_SETTINGS } from '../data/defaultData';
 import { fromRemoteRow, mergeRemoteIntoLocal } from './datasync/supabaseRowMapper';
 import { withoutTombstones } from './datasync/deletionTracker';
 
+/** Mantém uma habilidade por código (a primeira encontrada). */
+function dedupeSkillsByCode<T extends { code?: string }>(list: T[]): T[] {
+  const seen = new Set<string>();
+  return (list || []).filter((s) => {
+    const code = String(s?.code || '').toUpperCase();
+    if (!code) return true;
+    if (seen.has(code)) return false;
+    seen.add(code);
+    return true;
+  });
+}
+
 export class SupabasePersistenceService {
   private static isSubscribed = false;
 
@@ -65,6 +77,8 @@ export class SupabasePersistenceService {
         notifsRes,
         settingsRes,
         updatesRes,
+        bnccSkillsRes,
+        bnccAssessRes,
       ] = await Promise.all([
         supabase.from('students').select('*'),
         supabase.from('school_classes').select('*'),
@@ -83,6 +97,8 @@ export class SupabasePersistenceService {
         supabase.from('notifications').select('*'),
         supabase.from('school_settings').select('*'),
         supabase.from('system_updates').select('*'),
+        supabase.from('bncc_skills').select('*'),
+        supabase.from('bncc_skill_assessments').select('*'),
       ]);
 
       if (studentsRes.error && classesRes.error) {
@@ -135,6 +151,23 @@ export class SupabasePersistenceService {
         submissions: mergeRemoteIntoLocal(local.submissions, rowsOf(submissionsRes, 'exam_submissions')),
         attendanceSheets: mergeRemoteIntoLocal(local.attendanceSheets, rowsOf(attendanceRes, 'attendance_sheets')),
         lessonRegistries: mergeRemoteIntoLocal(local.lessonRegistries, rowsOf(lessonsRes, 'lesson_registries')),
+        // Catálogo BNCC: mescla por id e mantém uma habilidade por código
+        bnccSkills: dedupeSkillsByCode(
+          mergeRemoteIntoLocal(local.bnccSkills, rowsOf(bnccSkillsRes, 'bncc_skills'), (row) => {
+            const m = fromRemoteRow(row);
+            delete m.createdAt;
+            delete m.updatedAt;
+            return m;
+          })
+        ),
+        bnccAssessments: mergeRemoteIntoLocal(local.bnccAssessments, rowsOf(bnccAssessRes, 'bncc_skill_assessments'), (row) => {
+          const m = fromRemoteRow(row);
+          m.level = Number(row.level);
+          m.term = Number(row.term);
+          m.schoolYear = Number(row.school_year);
+          delete m.createdAt;
+          return m;
+        }) as any,
         classGradeSheets: mergeRemoteIntoLocal(local.classGradeSheets, rowsOf(gradeSheetsRes, 'class_grade_sheets')),
         academicHistories: mergeRemoteIntoLocal(local.academicHistories, rowsOf(historiesRes, 'academic_histories')),
         schoolUnits: mergeRemoteIntoLocal(local.schoolUnits, rowsOf(unitsRes, 'school_units')),

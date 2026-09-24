@@ -11,6 +11,8 @@
 /** Colunas reais de cada tabela (espelha o esquema public do projeto Supabase). */
 export const SUPABASE_TABLE_COLUMNS: Record<string, string[]> = {
   academic_histories: ['id', 'student_id', 'school_year', 'grade_level', 'school_name', 'records', 'general_average', 'attendance_rate', 'final_result', 'observations', 'created_at', 'updated_at'],
+  bncc_skills: ['id', 'code', 'education_level', 'segment', 'subject', 'field_of_experience', 'knowledge_object', 'description', 'tags', 'created_at', 'updated_at'],
+  bncc_skill_assessments: ['id', 'student_id', 'class_id', 'school_unit_id', 'skill_code', 'subject', 'school_year', 'term', 'level', 'notes', 'teacher_name', 'created_at', 'updated_at'],
   attendance_sheets: ['id', 'date', 'class_id', 'class_name', 'subject_id', 'subject_name', 'teacher_name', 'lesson_number', 'term', 'entries', 'total_students', 'total_present', 'total_absent', 'total_justified', 'attendance_rate', 'created_at', 'updated_at'],
   class_grade_sheets: ['id', 'class_id', 'class_name', 'subject_id', 'subject_name', 'school_year', 'term', 'grades', 'average_score', 'created_at', 'updated_at'],
   communications: ['id', 'title', 'content', 'sender_role', 'sender_name', 'recipient_type', 'priority', 'category', 'status', 'read_confirmations', 'created_at', 'updated_at', 'senderRole', 'target_roles', 'targetRoles'],
@@ -36,6 +38,8 @@ export const SUPABASE_TABLE_COLUMNS: Record<string, string[]> = {
 export const SUPABASE_REQUIRED_COLUMNS: Record<string, string[]> = {
   academic_histories: ['student_id'],
   attendance_sheets: ['class_id'],
+  bncc_skills: ['code', 'description'],
+  bncc_skill_assessments: ['student_id', 'skill_code', 'school_year', 'term', 'level'],
   class_grade_sheets: ['class_id'],
   communications: ['content', 'sender_name', 'title'],
   courses: ['segment', 'name'],

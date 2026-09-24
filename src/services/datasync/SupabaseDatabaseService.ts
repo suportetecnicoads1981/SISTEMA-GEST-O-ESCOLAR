@@ -86,6 +86,20 @@ export const ECOSYSTEM_TABLES: TableDefinitionMeta[] = [
     localKey: 'lessonRegistries',
   },
   {
+    tableName: 'bncc_skill_assessments',
+    displayName: 'Habilidades BNCC (lançamentos)',
+    category: 'PEDAGOGICAL',
+    description: 'Nível de desenvolvimento de cada habilidade da BNCC por aluno e bimestre.',
+    localKey: 'bnccAssessments',
+  },
+  {
+    tableName: 'bncc_skills',
+    displayName: 'Catálogo de Habilidades BNCC',
+    category: 'PEDAGOGICAL',
+    description: 'Códigos, anos, componentes e descrições das habilidades usadas nos lançamentos.',
+    localKey: 'bnccSkills',
+  },
+  {
     tableName: 'class_grade_sheets',
     displayName: 'Planilhas de Fechamento de Notas',
     category: 'PEDAGOGICAL',
@@ -1060,6 +1074,8 @@ END $$;
       { name: 'exam_submissions', data: stored.submissions, customSync: () => this.syncTableGeneric('exam_submissions', stored.submissions) },
       { name: 'attendance_sheets', data: stored.attendanceSheets, customSync: () => this.syncTableGeneric('attendance_sheets', stored.attendanceSheets) },
       { name: 'lesson_registries', data: stored.lessonRegistries, customSync: () => this.syncTableGeneric('lesson_registries', stored.lessonRegistries) },
+      { name: 'bncc_skills', data: stored.bnccSkills, customSync: () => this.syncTableGeneric('bncc_skills', stored.bnccSkills) },
+      { name: 'bncc_skill_assessments', data: stored.bnccAssessments, customSync: () => this.syncTableGeneric('bncc_skill_assessments', stored.bnccAssessments) },
       { name: 'academic_histories', data: stored.academicHistories, customSync: () => this.syncTableGeneric('academic_histories', stored.academicHistories) },
       { 
         name: 'school_units', 

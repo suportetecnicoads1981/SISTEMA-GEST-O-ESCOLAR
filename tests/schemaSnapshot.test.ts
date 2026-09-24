@@ -2,13 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { SUPABASE_REQUIRED_COLUMNS, SUPABASE_TABLE_COLUMNS } from '../src/services/datasync/supabaseRowMapper';
 
 /**
- * Colunas reais do schema public do projeto Supabase (consultado em 23/09/2026
+ * Colunas reais do schema public do projeto Supabase (consultado em 23/09/2026; tabelas BNCC em 24/09/2026
  * via information_schema). Se o banco mudar, atualize este retrato E o
  * supabaseRowMapper.ts juntos, senão a sincronização descarta campos.
  */
 const DB_COLUMNS: Record<string, string> = {
   academic_histories: 'attendance_rate,created_at,final_result,general_average,grade_level,id,observations,records,school_name,school_year,student_id,updated_at',
   attendance_sheets: 'attendance_rate,class_id,class_name,created_at,date,entries,id,lesson_number,subject_id,subject_name,teacher_name,term,total_absent,total_justified,total_present,total_students,updated_at',
+  bncc_skill_assessments: 'class_id,created_at,id,level,notes,school_unit_id,school_year,skill_code,student_id,subject,teacher_name,term,updated_at',
+  bncc_skills: 'code,created_at,description,education_level,field_of_experience,id,knowledge_object,segment,subject,tags,updated_at',
   class_grade_sheets: 'average_score,class_id,class_name,created_at,grades,id,school_year,subject_id,subject_name,term,updated_at',
   communications: 'category,content,created_at,id,priority,read_confirmations,recipient_type,senderRole,sender_name,sender_role,status,targetRoles,target_roles,title,updated_at',
   courses: 'created_at,description,duration_years,id,name,segment,updated_at',
@@ -30,7 +32,8 @@ const DB_COLUMNS: Record<string, string> = {
 };
 
 const DB_REQUIRED: Record<string, string> = {
-  academic_histories: 'student_id', attendance_sheets: 'class_id', class_grade_sheets: 'class_id',
+  academic_histories: 'student_id', attendance_sheets: 'class_id',
+  bncc_skill_assessments: 'level,school_year,skill_code,student_id,term', bncc_skills: 'code,description', class_grade_sheets: 'class_id',
   communications: 'content,sender_name,title', courses: 'name,segment', exam_submissions: 'exam_id,student_id,student_name',
   exams: 'subject,title', lesson_registries: 'class_id,content_taught', media_assets: 'bucket,name,original_format,path,size_bytes',
   notifications: 'message,title', questions: 'stem,subject', role_preferences: 'role', school_classes: 'grade_level,name',

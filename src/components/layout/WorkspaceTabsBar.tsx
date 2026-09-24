@@ -64,6 +64,7 @@ export const TAB_METADATA: Record<
   DOCUMENTS: { label: 'Documentos & Certificados', shortLabel: 'Documentos', icon: Award, group: 'Secretaria' },
   PEDAGOGICAL_DASHBOARD: { label: 'Evolução Pedagógica', shortLabel: 'Evolução', icon: TrendingUp, group: 'Pedagógico' },
   ASSESSMENT_REPORT: { label: 'Resultados de Avaliações', shortLabel: 'Resultados', icon: Award, group: 'Pedagógico' },
+  BNCC_SKILLS: { label: 'Habilidades BNCC', shortLabel: 'Habilidades BNCC', icon: BookOpen, group: 'Pedagógico' },
   QUESTION_BANK: { label: 'Banco de Questões BNCC', shortLabel: 'Banco BNCC', icon: HelpCircle, group: 'Pedagógico' },
   EXAMS: { label: 'Gerador de Provas', shortLabel: 'Provas', icon: ClipboardList, group: 'Pedagógico' },
   STUDENT_ROOM: { label: 'Sala do Aluno', shortLabel: 'Sala de Provas', icon: CheckCircle2, group: 'Estudante' },
@@ -103,7 +104,7 @@ export const WorkspaceTabsBar: React.FC<WorkspaceTabsBarProps> = ({
   return (
     <div
       id="workspace-tabs-bar"
-      className="no-print bg-slate-900 border-b border-slate-800 text-slate-300 px-3 py-1.5 flex items-center justify-between gap-2 select-none sticky top-16 z-30 shadow-md"
+      className="no-print bg-slate-900 border-b border-slate-800 text-slate-300 px-3 py-1.5 flex items-center justify-between gap-2 select-none relative z-20 shadow-sm"
     >
       {/* Botões de Ação de Navegação: Voltar & Início */}
       <div className="flex items-center gap-1.5 shrink-0">

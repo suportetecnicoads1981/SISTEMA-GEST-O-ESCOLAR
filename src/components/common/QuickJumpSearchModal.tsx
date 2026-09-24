@@ -144,6 +144,15 @@ export const NAV_DESTINATIONS: NavDestination[] = [
     description: 'Métricas de proficiência por disciplina, turma e evolução individual.',
   },
   {
+    id: 'BNCC_SKILLS',
+    title: 'Habilidades BNCC (lançamento e relatórios)',
+    category: 'Pedagógico',
+    categoryColor: 'bg-purple-50 text-purple-700',
+    keywords: ['bncc', 'habilidades', 'competencias', 'parecer', 'relatorio', 'descritivo', 'lancamento'],
+    icon: HelpCircle,
+    description: 'Lançar o desenvolvimento das habilidades da BNCC por aluno, relatórios e gráficos.',
+  },
+  {
     id: 'QUESTION_BANK',
     title: 'Banco de Questões & Habilidades BNCC',
     category: 'Pedagógico',

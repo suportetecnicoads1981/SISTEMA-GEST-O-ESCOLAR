@@ -32,6 +32,7 @@ export const LOTE_UNIT_KEYS = [
   'classGradeSheets',
   'teacherLessonPlans',
   'teacherStudentNotes',
+  'bnccAssessments',
 ] as const;
 
 /** Cadastros compartilhados pela rede (a Sede mantém os seus; só entram os novos). */
@@ -53,6 +54,7 @@ export const LOTE_LABELS: Record<string, string> = {
   classGradeSheets: 'Notas (boletim)',
   teacherLessonPlans: 'Planos de aula',
   teacherStudentNotes: 'Anotações pedagógicas',
+  bnccAssessments: 'Habilidades BNCC (lançamentos)',
   subjects: 'Disciplinas',
   courses: 'Cursos / níveis',
   questions: 'Banco de questões',
@@ -193,6 +195,7 @@ export function buildLotePacket(state: AnyState, unit: LoteUnit, opts: BuildLote
     teacherStudentNotes: list(state, 'teacherStudentNotes').filter(
       (n) => studentIds.has(String(n?.studentId)) || classIds.has(String(n?.classId))
     ),
+    bnccAssessments: list(state, 'bnccAssessments').filter((a) => studentIds.has(String(a?.studentId)) || byClass(a)),
     subjects: list(state, 'subjects'),
     courses: list(state, 'courses'),
     questions: list(state, 'questions'),

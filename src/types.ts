@@ -197,6 +197,25 @@ export interface BnccSkill {
   tags?: string[];
 }
 
+/** Níveis de desenvolvimento de uma habilidade BNCC (escala usada nos relatórios descritivos). */
+export type BnccMasteryLevel = 1 | 2 | 3 | 4;
+
+/** Lançamento de uma habilidade BNCC para um aluno em um bimestre. */
+export interface BnccSkillAssessment {
+  id: string;
+  studentId: string;
+  classId: string;
+  schoolUnitId?: string;
+  skillCode: string;
+  subject: string;
+  schoolYear: number;
+  term: number; // 1 a 4 (bimestre)
+  level: BnccMasteryLevel;
+  notes?: string;
+  teacherName?: string;
+  updatedAt: string;
+}
+
 /* ==========================================================================
    NORMATIVAS DAS SECRETARIAS ESTADUAIS DE EDUCAÇÃO (SEDUC / SEE)
    ========================================================================== */

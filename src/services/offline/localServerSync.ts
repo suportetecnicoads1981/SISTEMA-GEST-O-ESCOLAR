@@ -210,9 +210,10 @@ async function ensureAccessKey(): Promise<{ status: number; body: any }> {
       'Chave de acesso da escola'
     );
     if (typed === null) {
-      await notify('Sem a chave de acesso, este computador não consegue abrir os dados da escola. Peça a chave ao responsável pelo servidor.', 'Chave de acesso');
-      tries++;
-      continue;
+      // Cancelar/Fechar: para de pedir e abre com os dados desta estação (recarregar a página pede de novo).
+      await notify('Sem a chave de acesso, este computador usa só os dados guardados nele. Para ligar ao servidor da escola, recarregue a página e digite a chave (LEIA-ME.txt do servidor).', 'Chave de acesso');
+      setStatus({ mode: 'sem-conexao', message: 'Chave de acesso não informada: usando os dados desta estação. Recarregue a página para digitar a chave.' });
+      return res as any;
     }
     try {
       localStorage.setItem(LOCAL_KEY_STORAGE, typed.trim().toUpperCase());

@@ -23,6 +23,7 @@ export const ENTITY_TABLES: Record<string, string> = {
   submissions: 'exam_submissions',
   attendanceSheets: 'attendance_sheets',
   lessonRegistries: 'lesson_registries',
+  bnccAssessments: 'bncc_skill_assessments',
   classGradeSheets: 'class_grade_sheets',
   academicHistories: 'academic_histories',
   schoolUnits: 'school_units',

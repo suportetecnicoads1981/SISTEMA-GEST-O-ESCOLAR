@@ -141,6 +141,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'WhatsApp Notificações & Comunicados Automáticos';
       case 'NOTIFICATIONS':
         return 'Central de Notificações & Auditoria Preventiva';
+      case 'BNCC_SKILLS':
+        return 'Habilidades BNCC - Lançamento, Relatórios e Gráficos';
       case 'QUESTION_BANK':
         return 'Banco de Questões & Habilidades BNCC';
       case 'EXAMS':
@@ -208,6 +210,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'WhatsApp Notificações';
       case 'NOTIFICATIONS':
         return 'Notificações';
+      case 'BNCC_SKILLS':
+        return 'Habilidades BNCC';
       case 'QUESTION_BANK':
         return 'Banco de Questões';
       case 'EXAMS':

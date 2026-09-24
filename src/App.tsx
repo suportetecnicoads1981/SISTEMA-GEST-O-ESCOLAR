@@ -21,6 +21,7 @@ import {
   LessonDiaryRegistry,
   StateEducationRegulation,
   BnccSkill,
+  BnccSkillAssessment,
   ClassGradeSheet,
   TeacherLessonPlan,
   TeacherStudentPedagogicalNote,
@@ -47,6 +48,8 @@ import { SupabasePersistenceService } from './services/supabasePersistenceServic
 import { supabaseBatchQueue } from './services/supabaseBatchQueue';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
+import { BnccSkillsModule } from './components/bncc/BnccSkillsModule';
+import { upsertAssessments, removeAssessments, mergeSkills } from './services/bncc/bnccAssessmentService';
 import { MainOverviewDashboard } from './components/dashboard/MainOverviewDashboard';
 import { StudentList } from './components/secretaria/StudentList';
 import { DropoutCensusReport } from './components/secretaria/DropoutCensusReport';
@@ -1125,6 +1128,18 @@ export default function App() {
     }));
   };
 
+  // Habilidades BNCC: lançamentos por aluno/bimestre e catálogo
+  const handleSaveBnccAssessments = (upserts: BnccSkillAssessment[], removeKeys: string[]) => {
+    setData((prev) => ({
+      ...prev,
+      bnccAssessments: upsertAssessments(removeAssessments(prev.bnccAssessments || [], new Set(removeKeys)), upserts),
+    }));
+  };
+
+  const handleUpsertBnccSkills = (skills: BnccSkill[]) => {
+    setData((prev) => ({ ...prev, bnccSkills: mergeSkills(prev.bnccSkills || [], skills).list }));
+  };
+
   // Teacher Grade Sheets, Lesson Plans & Pedagogical Notes Handlers
   const handleSaveGradeSheet = (sheet: ClassGradeSheet) => {
     setData((prev) => {
@@ -1769,6 +1784,23 @@ export default function App() {
                 settings={data.settings}
                 onBack={() => handleNavigate('MAIN_DASHBOARD')}
                 onNavigate={handleNavigate}
+              />
+            )}
+
+            {/* TAB: HABILIDADES BNCC (lançamento, relatórios, gráficos, importação/exportação) */}
+            {activeTab === 'BNCC_SKILLS' && (
+              <BnccSkillsModule
+                students={data.students}
+                classes={data.classes}
+                subjects={data.subjects}
+                schoolUnits={data.schoolUnits || []}
+                settings={data.settings}
+                bnccSkills={data.bnccSkills || []}
+                assessments={data.bnccAssessments || []}
+                currentUserName={currentUser?.name}
+                onSaveAssessments={handleSaveBnccAssessments}
+                onUpsertSkills={handleUpsertBnccSkills}
+                onBack={() => handleNavigate('MAIN_DASHBOARD')}
               />
             )}
 

@@ -47,6 +47,7 @@ import {
   AlignRight,
   Pin,
   PinOff,
+  BookOpenCheck,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -266,6 +267,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: TrendingUp,
           badge: 'Gráficos',
           shortcut: 'Alt+R',
+        },
+        {
+          id: 'BNCC_SKILLS',
+          label: 'Habilidades BNCC',
+          icon: BookOpenCheck,
+          badge: 'Novo',
         },
         {
           id: 'ASSESSMENT_REPORT',

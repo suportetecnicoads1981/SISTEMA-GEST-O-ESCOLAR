@@ -42,6 +42,7 @@ const TAB_LABELS: Record<string, { label: string; group: string }> = {
   DOCUMENTS: { label: 'Certificados & Documentos Oficiais', group: 'Secretaria' },
   PEDAGOGICAL_DASHBOARD: { label: 'Evolução Pedagógica & Desempenho', group: 'Pedagógico' },
   ASSESSMENT_REPORT: { label: 'Resultados Oficiais de Avaliações', group: 'Pedagógico' },
+  BNCC_SKILLS: { label: 'Habilidades BNCC', group: 'Pedagógico' },
   QUESTION_BANK: { label: 'Banco de Questões BNCC', group: 'Pedagógico' },
   EXAMS: { label: 'Gerador de Provas & Avaliações', group: 'Pedagógico' },
   STUDENT_ROOM: { label: 'Sala do Aluno (Provas)', group: 'Estudante' },

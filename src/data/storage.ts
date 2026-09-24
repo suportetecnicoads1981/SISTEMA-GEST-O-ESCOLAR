@@ -27,6 +27,7 @@ import {
   SyncAuditLog,
   UserAccount,
   BnccSkill,
+  BnccSkillAssessment,
   StateEducationRegulation,
   AttendanceSheet,
   LessonDiaryRegistry,
@@ -309,6 +310,7 @@ export interface AppStateData {
   userAccounts: UserAccount[];
   developerContact: DeveloperContact;
   bnccSkills: BnccSkill[];
+  bnccAssessments?: BnccSkillAssessment[];
   stateRegulations: StateEducationRegulation[];
   activeStateRegulationCode: string;
   attendanceSheets: AttendanceSheet[];
@@ -612,6 +614,7 @@ export function getStoredData(): AppStateData {
       userAccounts: hasArr(parsed.userAccounts) && parsed.userAccounts.length > 0 ? parsed.userAccounts : getCleanDatabase().userAccounts,
       developerContact: parsed.developerContact || DEFAULT_DEVELOPER_CONTACT,
       bnccSkills: hasArr(parsed.bnccSkills) && parsed.bnccSkills.length > 0 ? parsed.bnccSkills : DEFAULT_BNCC_SKILLS,
+      bnccAssessments: hasArr(parsed.bnccAssessments) ? parsed.bnccAssessments : [],
       stateRegulations: hasArr(parsed.stateRegulations) && parsed.stateRegulations.length > 0 ? parsed.stateRegulations : DEFAULT_STATE_REGULATIONS,
       activeStateRegulationCode: parsed.activeStateRegulationCode || 'SP',
       attendanceSheets: hasArr(parsed.attendanceSheets) ? parsed.attendanceSheets : [],

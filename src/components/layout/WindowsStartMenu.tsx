@@ -120,6 +120,7 @@ export const WindowsStartMenu: React.FC<WindowsStartMenuProps> = ({
     { id: 'CLASS_DIARY', name: 'Diário de Classe & Frequência', desc: 'Chamadas e Aulas Ministradas', icon: BookOpen, color: 'bg-emerald-600', group: 'Pedagógico' },
     { id: 'TEACHER_PORTAL', name: 'Portal Docente', desc: 'Lançamento de Notas e Avaliações', icon: GraduationCap, color: 'bg-sky-600', group: 'Pedagógico' },
     { id: 'EXAMS', name: 'Provas & Avaliações', desc: 'Gerador de Provas e Gabaritos', icon: ClipboardList, color: 'bg-amber-600', group: 'Pedagógico' },
+    { id: 'BNCC_SKILLS', name: 'Habilidades BNCC', desc: 'Lançamento, Relatórios e Gráficos', icon: HelpCircle, color: 'bg-indigo-600', group: 'Pedagógico' },
     { id: 'QUESTION_BANK', name: 'Banco de Questões BNCC', desc: 'Habilidades e Itens Avaliativos', icon: HelpCircle, color: 'bg-teal-600', group: 'Pedagógico' },
     { id: 'DOCUMENTS', name: 'Emissão de Documentos', desc: 'Históricos, Declarações e Diplomas', icon: Award, color: 'bg-rose-600', group: 'Secretaria' },
     { id: 'DROPOUT_CENSUS', name: 'Censo & Evasão Escolar', desc: 'Busca Ativa e Infrequência', icon: UserX, color: 'bg-orange-600', group: 'Gestão' },

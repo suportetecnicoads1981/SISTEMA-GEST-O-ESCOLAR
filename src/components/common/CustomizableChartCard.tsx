@@ -44,6 +44,7 @@ import {
 } from 'recharts';
 import { ChartType, ColorPaletteKey, ChartDataItem } from './CustomizableChartModal';
 import { triggerPrint } from '../../utils/printHelper';
+import { arrangeChartData, downloadCsv } from './FlexChart';
 import {
   InteractiveChartTooltip,
   DynamicInteractiveLegend,
@@ -94,7 +95,7 @@ const CustomChartTooltip: React.FC<{
 export const CustomizableChartCard: React.FC<CustomizableChartCardProps> = ({
   title,
   subtitle,
-  data,
+  data: rawData,
   defaultChartType = 'BAR_VERTICAL',
   defaultPalette = 'INDIGO',
   valueLabel = 'Rendimento',
@@ -105,10 +106,45 @@ export const CustomizableChartCard: React.FC<CustomizableChartCardProps> = ({
   onOpenFullCustomizer,
   height = 320,
 }) => {
-  const [chartType, setChartType] = useState<ChartType>(defaultChartType);
-  const [palette, setPalette] = useState<ColorPaletteKey>(defaultPalette);
-  const [showDataLabels, setShowDataLabels] = useState<boolean>(true);
-  const [showGrid, setShowGrid] = useState<boolean>(true);
+  // Preferências deste gráfico (modelo, cores, ordem, itens) ficam gravadas neste computador.
+  const prefsKey = `sucessoedu_chartcard_${title}`;
+  const savedPrefs = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem(prefsKey) || '{}') || {};
+    } catch {
+      return {};
+    }
+  }, [prefsKey]);
+  const [chartType, setChartTypeState] = useState<ChartType>(savedPrefs.chartType || defaultChartType);
+  const [palette, setPaletteState] = useState<ColorPaletteKey>(savedPrefs.palette || defaultPalette);
+  const [showDataLabels, setShowDataLabelsState] = useState<boolean>(savedPrefs.showDataLabels ?? true);
+  const [showGrid, setShowGridState] = useState<boolean>(savedPrefs.showGrid ?? true);
+  const [sortMode, setSortModeState] = useState<'original' | 'desc' | 'asc' | 'az'>(savedPrefs.sortMode || 'original');
+  const [itemLimit, setItemLimitState] = useState<number>(Number(savedPrefs.itemLimit) || 0);
+  const [showOptions, setShowOptions] = useState(false);
+  const persist = (patch: Record<string, any>) => {
+    try {
+      const cur = JSON.parse(localStorage.getItem(prefsKey) || '{}') || {};
+      localStorage.setItem(prefsKey, JSON.stringify({ ...cur, ...patch }));
+    } catch {
+      /* sem armazenamento: vale só nesta sessão */
+    }
+  };
+  const setChartType = (v: ChartType) => { setChartTypeState(v); persist({ chartType: v }); };
+  const setPalette = (v: ColorPaletteKey) => { setPaletteState(v); persist({ palette: v }); };
+  const setShowDataLabels = (v: boolean) => { setShowDataLabelsState(v); persist({ showDataLabels: v }); };
+  const setShowGrid = (v: boolean) => { setShowGridState(v); persist({ showGrid: v }); };
+  const setSortMode = (v: 'original' | 'desc' | 'asc' | 'az') => { setSortModeState(v); persist({ sortMode: v }); };
+  const setItemLimit = (v: number) => { setItemLimitState(v); persist({ itemLimit: v }); };
+
+  const data = useMemo(() => arrangeChartData(rawData || [], 'value', 'name', sortMode, itemLimit), [rawData, sortMode, itemLimit]);
+
+  const handleExportCsv = () =>
+    downloadCsv(title, data, [
+      { key: 'name', label: 'Item' },
+      { key: 'value', label: valueLabel },
+      ...(data.some((d) => d.secondaryValue !== undefined) ? [{ key: 'secondaryValue', label: secondaryValueLabel }] : []),
+    ]);
   const [hiddenSeries, setHiddenSeries] = useState<string[]>([]);
 
   const handleToggleSeries = (key: string) => {
@@ -266,6 +302,24 @@ export const CustomizableChartCard: React.FC<CustomizableChartCardProps> = ({
             <option value="MONOCHROME">🖤 Grafite</option>
           </select>
 
+          {/* Filtros do gráfico: ordem, itens, rótulos, grade */}
+          <button
+            type="button"
+            onClick={() => setShowOptions((v) => !v)}
+            title="Filtros e opções do gráfico"
+            className={`p-1.5 rounded-xl transition-colors cursor-pointer shrink-0 ${showOptions ? 'bg-indigo-600 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
+          >
+            <Sliders className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            title="Exportar dados do gráfico (CSV / Excel)"
+            className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors cursor-pointer shrink-0"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5" />
+          </button>
+
           {/* Print Button */}
           <button
             type="button"
@@ -290,6 +344,36 @@ export const CustomizableChartCard: React.FC<CustomizableChartCardProps> = ({
           )}
         </div>
       </div>
+
+      {showOptions && (
+        <div className="no-print flex flex-wrap items-center gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600">
+          <label className="flex items-center gap-1.5">
+            Ordem
+            <select value={sortMode} onChange={(e) => setSortMode(e.target.value as any)} className="px-1.5 py-1 rounded-lg border border-slate-200 bg-white cursor-pointer">
+              <option value="original">Original</option>
+              <option value="desc">Maior → menor</option>
+              <option value="asc">Menor → maior</option>
+              <option value="az">A → Z</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5">
+            Itens
+            <select value={itemLimit} onChange={(e) => setItemLimit(Number(e.target.value))} className="px-1.5 py-1 rounded-lg border border-slate-200 bg-white cursor-pointer">
+              <option value={0}>Todos</option>
+              <option value={5}>5 primeiros</option>
+              <option value={10}>10 primeiros</option>
+              <option value={20}>20 primeiros</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input type="checkbox" checked={showDataLabels} onChange={(e) => setShowDataLabels(e.target.checked)} /> Mostrar valores
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} /> Linhas de grade
+          </label>
+          <span className="text-slate-400">As escolhas ficam salvas neste computador.</span>
+        </div>
+      )}
 
       {/* Summary Stat Pills Bar for Instant Context & High Clarity */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs min-w-0">
