@@ -345,6 +345,23 @@ class SupabaseBatchQueue {
 
         if (readyItems.length === 0) continue;
 
+        // A fila fica guardada no navegador: um item antigo pode ser de um registro que já
+        // foi excluído ou corrigido depois (ex.: cópia duplicada de uma importação). Só vai
+        // para a nuvem o que ainda existe na base atual, e sempre na versão atual.
+        const current = currentRecordsById(table);
+        if (current) {
+          for (let k = readyItems.length - 1; k >= 0; k--) {
+            const now = current.get(String(readyItems[k].id));
+            if (!now) {
+              tableMap.delete(readyItems[k].id);
+              readyItems.splice(k, 1);
+            } else {
+              readyItems[k].data = now;
+            }
+          }
+          if (readyItems.length === 0) continue;
+        }
+
         // Processa em lotes (chunks)
         const chunkSize = this.config.chunkSize;
         for (let i = 0; i < readyItems.length; i += chunkSize) {
@@ -696,4 +713,23 @@ export function toIsoDateOrNull(val: any): string | null {
   const iso = `${m[1]}-${m[2]}-${m[3]}`;
   const d = new Date(iso + 'T00:00:00Z');
   return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== iso ? null : iso;
+}
+
+/** Registros atuais da base local por id (tabelas de cadastro), ou null se não der para ler. */
+const LOCAL_KEY_BY_TABLE: Record<string, string> = {
+  students: 'students',
+  school_classes: 'classes',
+  school_units: 'schoolUnits',
+};
+function currentRecordsById(table: string): Map<string, any> | null {
+  const key = LOCAL_KEY_BY_TABLE[table];
+  if (!key || typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('sucessoedu_master_store_v5');
+    const list = raw ? JSON.parse(raw)?.[key] : null;
+    if (!Array.isArray(list)) return null;
+    return new Map(list.filter((r: any) => r && r.id !== undefined).map((r: any) => [String(r.id), r]));
+  } catch {
+    return null;
+  }
 }
