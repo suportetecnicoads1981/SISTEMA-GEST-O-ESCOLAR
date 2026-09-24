@@ -29,6 +29,9 @@ $Role = 'REMOTO'
 $ServerName = 'Servidor Remoto SucessoEdu'
 $Port = 8088
 $AccessKey = ''
+$SchoolUnitId = ''
+$SchoolInep = ''
+$SchoolName = ''
 if (Test-Path $ConfigFile) {
     try {
         $cfg = Get-Content -Raw -Encoding UTF8 $ConfigFile | ConvertFrom-Json
@@ -36,6 +39,9 @@ if (Test-Path $ConfigFile) {
         if ($cfg.serverName) { $ServerName = [string]$cfg.serverName }
         if ($cfg.port) { $Port = [int]$cfg.port }
         if ($cfg.accessKey) { $AccessKey = ([string]$cfg.accessKey).Trim().ToUpper() }
+        if ($cfg.schoolUnitId) { $SchoolUnitId = [string]$cfg.schoolUnitId }
+        if ($cfg.schoolInep) { $SchoolInep = [string]$cfg.schoolInep }
+        if ($cfg.schoolName) { $SchoolName = [string]$cfg.schoolName }
     } catch { }
 }
 if ($env:SUCESSOEDU_PORT) { $Port = [int]$env:SUCESSOEDU_PORT }
@@ -312,7 +318,7 @@ function Handle-Api($ctx, [string]$path, [string]$method) {
     }
     switch ($path) {
         '/api/local/health' {
-            Send-Json $ctx 200 ('{"app":"sucessoedu-local","role":"' + $Role + '","serverName":' + (ConvertTo-JsonString $ServerName) + ',"version":' + $script:Version + ',"port":' + $Port + ',"needsKey":' + ($(if ($AccessKey -ne '') { 'true' } else { 'false' })) + ',"appBuiltAt":' + (ConvertTo-JsonString $script:AppBuiltAt) + '}')
+            Send-Json $ctx 200 ('{"app":"sucessoedu-local","role":"' + $Role + '","serverName":' + (ConvertTo-JsonString $ServerName) + ',"version":' + $script:Version + ',"port":' + $Port + ',"needsKey":' + ($(if ($AccessKey -ne '') { 'true' } else { 'false' })) + ',"appBuiltAt":' + (ConvertTo-JsonString $script:AppBuiltAt) + ',"schoolUnitId":' + (ConvertTo-JsonString $SchoolUnitId) + ',"schoolInep":' + (ConvertTo-JsonString $SchoolInep) + ',"schoolName":' + (ConvertTo-JsonString $SchoolName) + '}')
             return
         }
         '/api/local/version' {

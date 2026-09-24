@@ -21,6 +21,7 @@ import { isCloudReachable } from './connectivity';
 import { getLocalServerInfo, isLocalServerMode, LOCAL_VERSION_KEY } from './localServerSync';
 import { parseLoteFile, stableStringify, LotePacket, isOlderThanLastImport } from './batchPacket';
 import { generateLote, importLote } from './loteService';
+import { pullSchoolFromCloud } from './schoolDownSync';
 
 export interface CloudSyncStatus {
   state: 'inativo' | 'sem-internet' | 'aguardando-login' | 'enviando' | 'enviado' | 'erro';
@@ -106,6 +107,32 @@ async function sendSchoolLote(force: boolean): Promise<string> {
   return `Lote da escola enviado à Sede pela internet (${packet.counts.students || 0} aluno(s)).`;
 }
 
+const LAST_PULL_KEY = 'sucessoedu_cloud_last_pull_v1';
+const MIN_PULL_INTERVAL_MS = 2 * 60_000;
+
+/** Servidor Remoto: recebe a escola, as turmas e os alunos dela vindos da Sede (nuvem). */
+async function receiveFromSede(force: boolean): Promise<string> {
+  const last = readJson(LAST_PULL_KEY);
+  if (!force && last.at && Date.now() - new Date(last.at).getTime() < MIN_PULL_INTERVAL_MS) return '';
+  const info = getLocalServerInfo();
+  const local = getStoredData() as any;
+  const unit = (local.schoolUnits || [])[0];
+  const target = { unitId: unit?.id || info?.schoolUnitId, inep: unit?.inepCode || info?.schoolInep };
+  if (!target.unitId && !target.inep) return '';
+  try {
+    const { next, note } = await pullSchoolFromCloud(local, target);
+    writeJson(LAST_PULL_KEY, { at: new Date().toISOString() });
+    if (next) {
+      // Grava no servidor da escola (todas as estações recebem) e atualiza a tela.
+      saveStoredData(next as any);
+      window.dispatchEvent(new CustomEvent('sucessoedu_db_changed', { detail: next }));
+    }
+    return note;
+  } catch (err: any) {
+    return `Não foi possível receber da Sede agora (${err?.message || err}).`;
+  }
+}
+
 async function importPendingLotes(userId: string): Promise<string[]> {
   const client = getSupabaseClient();
   const { data, error } = await client
@@ -162,15 +189,19 @@ export async function runCloudSyncNow(force = false): Promise<CloudSyncStatus> {
     const role = getLocalServerInfo()?.role;
 
     if (role === 'REMOTO') {
+      // 1) Recebe da Sede (pela nuvem) o que mudou na escola deste servidor.
+      const pullNote = await receiveFromSede(force);
+      const versionNow = localStorage.getItem(LOCAL_VERSION_KEY) || '';
       if (!force && recent && last.version === localVersion) {
-        setStatus({ state: 'enviado', message: 'Lote da escola já enviado.' });
+        setStatus({ state: 'enviado', message: pullNote || 'Lote da escola já enviado.' });
         return status;
       }
+      // 2) Envia o lote da escola para a Sede.
       setStatus({ state: 'enviando', message: 'Enviando o lote da escola para a Sede...' });
       const note = await sendSchoolLote(force);
       const at = new Date().toISOString();
-      writeJson(LAST_PUSH_KEY, { at, version: localVersion });
-      setStatus({ state: 'enviado', lastPushAt: at, message: note });
+      writeJson(LAST_PUSH_KEY, { at, version: versionNow });
+      setStatus({ state: 'enviado', lastPushAt: at, message: [pullNote, note].filter(Boolean).join(' ') });
       return status;
     }
 

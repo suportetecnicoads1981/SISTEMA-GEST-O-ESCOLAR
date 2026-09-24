@@ -91,9 +91,12 @@ export function normalizeSchoolLinks<
   const students: Student[] = (data.students || []).map((s) => {
     if (!s || (s.schoolUnitId && unitIds.has(s.schoolUnitId))) return s;
     const cls = s.classId ? classById.get(s.classId) : undefined;
-    if (!cls?.schoolUnitId || !unitIds.has(cls.schoolUnitId)) return s;
+    // Sem turma com escola: se a base tem UMA escola só (Servidor Remoto), o aluno é dela
+    const target =
+      cls?.schoolUnitId && unitIds.has(cls.schoolUnitId) ? cls.schoolUnitId : unitIds.size === 1 ? Array.from(unitIds)[0] : '';
+    if (!target) return s;
     changed = true;
-    return { ...s, schoolUnitId: cls.schoolUnitId, updatedAt: now } as Student;
+    return { ...s, schoolUnitId: target, updatedAt: now } as Student;
   });
 
   // 5. Matrícula (RA) repetida: o aluno cadastrado primeiro fica com o número; os demais

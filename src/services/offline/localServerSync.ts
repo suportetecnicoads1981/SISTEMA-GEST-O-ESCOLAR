@@ -27,6 +27,10 @@ export interface LocalServerInfo {
   version: number;
   /** Versão do sistema que esta página carregou (data da compilação). */
   appBuiltAt?: string;
+  /** Servidor Remoto: escola atendida (definida ao gerar o pacote). */
+  schoolUnitId?: string;
+  schoolInep?: string;
+  schoolName?: string;
 }
 
 export interface LocalServerStatus {
@@ -256,6 +260,9 @@ export async function detectLocalServer(timeoutMs = 1500): Promise<LocalServerIn
       serverName: String(body.serverName || (role === 'SEDE' ? 'Servidor da Sede' : 'Servidor Remoto')),
       version: Number(body.version) || 0,
       appBuiltAt: typeof body.appBuiltAt === 'string' ? body.appBuiltAt : '',
+      schoolUnitId: typeof body.schoolUnitId === 'string' && body.schoolUnitId ? body.schoolUnitId : undefined,
+      schoolInep: typeof body.schoolInep === 'string' && body.schoolInep ? body.schoolInep : undefined,
+      schoolName: typeof body.schoolName === 'string' && body.schoolName ? body.schoolName : undefined,
     };
   } catch {
     return null;

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Building2, Download, Monitor, RefreshCw, School, WifiOff } from 'lucide-react';
-import { buildServerPackage, buildStationPackage, generateAccessKey, saveBlob } from '../../services/offline/offlinePackageBuilder';
+import { buildSchoolSeed, buildServerPackage, buildStationPackage, generateAccessKey, saveBlob } from '../../services/offline/offlinePackageBuilder';
+import { getStoredData } from '../../data/storage';
 import { getLocalServerInfo } from '../../services/offline/localServerSync';
 
 /**
@@ -17,6 +18,17 @@ export const OfflineInstallCard: React.FC<{ schoolName?: string }> = ({ schoolNa
   const [progress, setProgress] = useState('');
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const current = getLocalServerInfo();
+  // Escolas cadastradas na Sede/nuvem: o Servidor Remoto já sai com a escola escolhida
+  const schoolOptions: Array<{ id: string; name: string; inepCode?: string }> = (() => {
+    try {
+      return ((getStoredData() as any).schoolUnits || [])
+        .filter((u: any) => u && u.id && u.name)
+        .map((u: any) => ({ id: u.id, name: u.name, inepCode: u.inepCode }));
+    } catch {
+      return [];
+    }
+  })();
+  const [remoteSchoolId, setRemoteSchoolId] = useState<string>(schoolOptions[0]?.id || '');
 
   const run = async (key: string, task: () => Promise<{ blob: Blob; fileName: string }>) => {
     setBusy(key);
@@ -67,6 +79,21 @@ export const OfflineInstallCard: React.FC<{ schoolName?: string }> = ({ schoolNa
             Nome do servidor
             <input className={input} value={remoteName} onChange={(e) => setRemoteName(e.target.value)} />
           </label>
+          <label className="block text-[11px] font-semibold text-slate-600 mt-2">
+            Escola atendida por este servidor
+            <select className={input} value={remoteSchoolId} onChange={(e) => setRemoteSchoolId(e.target.value)}>
+              <option value="">Nenhuma (cadastrar a escola no servidor depois)</option>
+              {schoolOptions.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                  {u.inepCode && /^\d{8,}$/.test(String(u.inepCode)) ? ` (INEP ${u.inepCode})` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="text-[10px] text-slate-500 mt-1">
+            O servidor já sai com a escola, as turmas e os alunos dela, e depois recebe da Sede o que mudar.
+          </p>
           <button
             type="button"
             className={`${btn} bg-emerald-600 hover:bg-emerald-700`}
@@ -74,7 +101,17 @@ export const OfflineInstallCard: React.FC<{ schoolName?: string }> = ({ schoolNa
             onClick={() => {
               const key = generateAccessKey();
               run('REMOTO', async () => {
-                const out = await buildServerPackage({ role: 'REMOTO', serverName: remoteName, port, accessKey: key, onProgress: (d, t) => setProgress(`${d}/${t}`) });
+                const school = schoolOptions.find((u) => u.id === remoteSchoolId);
+                const seedData = school ? buildSchoolSeed(getStoredData() as any, school.id) : null;
+                const out = await buildServerPackage({
+                  role: 'REMOTO',
+                  serverName: remoteName,
+                  port,
+                  accessKey: key,
+                  school,
+                  seedData,
+                  onProgress: (d, t) => setProgress(`${d}/${t}`),
+                });
                 setLastKey({ role: 'Servidor Remoto', key });
                 setStationKey(key);
                 return out;

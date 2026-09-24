@@ -45,6 +45,34 @@ if ($srcFull -ne $Dest) {
 New-Item -ItemType Directory -Path (Join-Path $Dest 'data') -Force | Out-Null
 Ok 'Arquivos copiados'
 
+# Servidor Remoto gerado com a escola escolhida: o banco nasce com a escola, turmas e alunos
+# vindos da Sede. So vale para servidor novo (banco inexistente ou vazio); nunca apaga dados.
+$SeedFile = Join-Path $Source 'data_inicial\banco_sucessoedu.json'
+$DbFile = Join-Path $Dest 'data\banco_sucessoedu.json'
+if (Test-Path $SeedFile) {
+    Step 'Dados iniciais da escola (vindos da Sede)'
+    $useSeed = -not (Test-Path $DbFile)
+    if (-not $useSeed) {
+        try {
+            $cur = Get-Content -Raw -Encoding UTF8 $DbFile | ConvertFrom-Json
+            $nUnits = @($cur.schoolUnits | Where-Object { $_ }).Count
+            $nStudents = @($cur.students | Where-Object { $_ }).Count
+            if ($nUnits -eq 0 -and $nStudents -eq 0) { $useSeed = $true }
+        } catch { $useSeed = $false }
+    }
+    if ($useSeed) {
+        $hist = Join-Path $Dest 'data\historico'
+        New-Item -ItemType Directory -Path $hist -Force | Out-Null
+        if (Test-Path $DbFile) { Copy-Item -Force $DbFile (Join-Path $hist ('banco_antes_dados_iniciais_' + (Get-Date -Format 'yyyyMMdd_HHmmss') + '.json')) }
+        Copy-Item -Force $SeedFile $DbFile
+        $meta = Join-Path $Dest 'data\banco_sucessoedu.versao'
+        if (Test-Path $meta) { Remove-Item -Force $meta }
+        Ok 'Escola, turmas e alunos da Sede carregados neste servidor'
+    } else {
+        Ok 'Este servidor ja tem dados: foram mantidos (a atualizacao vem da Sede pela internet)'
+    }
+}
+
 Step ('Liberando a porta ' + $Port + ' no Firewall do Windows (rede local)')
 $ErrorActionPreference = 'Continue'
 cmd /c "netsh advfirewall firewall delete rule name=""SucessoEdu Servidor"" >nul 2>&1"

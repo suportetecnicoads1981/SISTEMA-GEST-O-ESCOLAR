@@ -34,7 +34,49 @@ export interface ServerPackageOptions {
   serverName: string;
   port: number;
   accessKey: string;
+  /** Servidor Remoto: escola atendida por este servidor (vem da Sede/nuvem). */
+  school?: { id: string; name: string; inepCode?: string };
+  /** Servidor Remoto: cópia dos dados da escola para o servidor já começar com eles. */
+  seedData?: Record<string, any> | null;
   onProgress?: (done: number, total: number) => void;
+}
+
+/**
+ * Cópia dos dados de UMA escola, para o Servidor Remoto já nascer com a escola, turmas,
+ * alunos e registros dela (sem internet). Senhas não vão no pacote: cada conta define a
+ * senha no primeiro acesso ao servidor (ou entra com a conta da nuvem).
+ */
+export function buildSchoolSeed(state: Record<string, any>, unitId: string): Record<string, any> | null {
+  const units: any[] = Array.isArray(state?.schoolUnits) ? state.schoolUnits : [];
+  const unit = units.find((u) => u && u.id === unitId);
+  if (!unit) return null;
+  const list = (k: string): any[] => (Array.isArray(state?.[k]) ? state[k].filter(Boolean) : []);
+  const classes = list('classes').filter((c) => c.schoolUnitId === unitId);
+  const classIds = new Set(classes.map((c) => c.id));
+  const students = list('students').filter((s) => s.schoolUnitId === unitId || (s.classId && classIds.has(s.classId)));
+  const studentIds = new Set(students.map((s) => s.id));
+  const byClass = (k: string) => list(k).filter((r) => r.classId && classIds.has(r.classId));
+  const byStudent = (k: string) => list(k).filter((r) => r.studentId && studentIds.has(r.studentId));
+  const accounts = list('userAccounts')
+    .filter((u) => u.role === 'ADMIN' || u.schoolUnitId === unitId)
+    .map(({ password, ...rest }) => rest);
+  return {
+    settings: state.settings,
+    municipalSecretary: state.municipalSecretary,
+    schoolUnits: [unit],
+    classes,
+    students,
+    courses: list('courses'),
+    subjects: list('subjects'),
+    exams: byClass('exams'),
+    submissions: byStudent('submissions'),
+    attendanceSheets: byClass('attendanceSheets'),
+    lessonRegistries: byClass('lessonRegistries'),
+    classGradeSheets: byClass('classGradeSheets'),
+    academicHistories: byStudent('academicHistories'),
+    userAccounts: accounts,
+    seededFrom: { unitId, at: new Date().toISOString() },
+  };
 }
 
 const SERVER_SCRIPTS = ['servidor_sucessoedu.ps1', 'atualizador_sucessoedu.ps1', 'instalar_servidor.ps1', 'criar_atalho.ps1', 'INSTALAR_SERVIDOR.bat', 'PARAR_SERVIDOR.bat', 'INICIAR_SERVIDOR.bat'];
@@ -104,6 +146,15 @@ function readmeServer(opts: ServerPackageOptions): string {
     '',
   ];
   if (opts.role === 'REMOTO') {
+    if (opts.school) {
+      lines.push(
+        `ESCOLA DESTE SERVIDOR: ${opts.school.name}${opts.school.inepCode ? ' (INEP ' + opts.school.inepCode + ')' : ''}`,
+        ' - O pacote já traz a escola, as turmas e os alunos cadastrados na Sede até a data de geração.',
+        ' - Com internet e a conta da nuvem conectada, o servidor também RECEBE da Sede o que mudar',
+        '   nesta escola (novos alunos, turmas, correções), além de enviar o lote.',
+        ''
+      );
+    }
     lines.push(
       'ENVIO PARA A SEDE:',
       ' - Rede Municipal & Polos > Exportar Lote: gera o arquivo .edusync com todos os dados da escola.',
@@ -167,11 +218,18 @@ export async function buildServerPackage(opts: ServerPackageOptions): Promise<{ 
         accessKey: opts.accessKey,
         builtAt: manifest.builtAt,
         updateUrl: officialUpdateUrl(),
+        schoolUnitId: opts.school?.id || '',
+        schoolName: opts.school?.name || '',
+        schoolInep: opts.school?.inepCode || '',
       },
       null,
       2
     )
   );
+  if (opts.role === 'REMOTO' && opts.seedData) {
+    // Usado pelo instalador só quando o servidor ainda não tem a escola (nunca apaga dados existentes).
+    root.file('data_inicial/banco_sucessoedu.json', JSON.stringify(opts.seedData));
+  }
   root.file('LEIA-ME.txt', '\uFEFF' + crlf(readmeServer(opts)));
 
   const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
