@@ -290,6 +290,13 @@ export default function App() {
     if (getLocalServerInfo()?.role === 'REMOTO') return;
     function syncTablesToSupabase() {
       try {
+        // Escolas e turmas antes dos alunos: a nuvem precisa conhecer as turmas novas (ex: PRÉ I)
+        if (data.schoolUnits && data.schoolUnits.length > 0) {
+          supabaseBatchQueue.enqueue('school_units', data.schoolUnits);
+        }
+        if (data.classes && data.classes.length > 0) {
+          supabaseBatchQueue.enqueue('school_classes', data.classes);
+        }
         if (data.students && data.students.length > 0) {
           supabaseBatchQueue.enqueue('students', data.students);
         }
@@ -304,7 +311,7 @@ export default function App() {
       }
     }
     syncTablesToSupabase();
-  }, [data.students, data.exams, data.notifications]);
+  }, [data.students, data.exams, data.notifications, data.classes, data.schoolUnits]);
 
   // Recarrega o estado da nuvem quando o login no Supabase é concluído (a carga
   // inicial já é feita por getStoredData). A mesclagem é não destrutiva.

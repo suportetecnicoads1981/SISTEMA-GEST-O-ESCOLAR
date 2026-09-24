@@ -273,6 +273,22 @@ class SupabaseBatchQueue {
       }));
     }
 
+    if (table === 'school_classes') {
+      return records.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        grade_level: c.gradeLevel || c.grade_level || 'Ensino Fundamental',
+        segment: c.segment || 'ENSINO_FUNDAMENTAL',
+        shift: c.shift || 'MANHÃ',
+        school_year: c.schoolYear || c.school_year || new Date().getFullYear(),
+        capacity: c.maxCapacity || c.capacity || 35,
+        room_number: c.roomNumber || c.room_number || null,
+        class_teacher: c.classTeacher || c.class_teacher || null,
+        school_unit_id: c.schoolUnitId || c.school_unit_id || null,
+        updated_at: c.updatedAt || new Date().toISOString(),
+      }));
+    }
+
     if (table === 'notifications') {
       return records.map((n: any, idx: number) => ({
         id: n.id || ('notif_' + idx),
@@ -337,9 +353,15 @@ class SupabaseBatchQueue {
           const sanitizedPayload = this.sanitizeForTable(table, rawDataArray);
 
           try {
+            if (table === 'students') {
+              await this.releaseConflictingRegistrations(supabase, sanitizedPayload);
+            }
             const { error } = await supabase.from(table).upsert(sanitizedPayload, { onConflict: 'id' });
 
-            if (error) {
+            if (error && this.isUniqueViolation(error) && chunkItems.length > 1) {
+              // Um registro em conflito não pode travar o lote inteiro: envia um a um.
+              await this.upsertOneByOne(supabase, table, chunkItems, sanitizedPayload);
+            } else if (error) {
               const errorMessage = error.message || error.details || JSON.stringify(error);
               this.handleChunkFailure(table, chunkItems, errorMessage, error);
             } else {
@@ -366,6 +388,73 @@ class SupabaseBatchQueue {
     } finally {
       this.isFlushing = false;
       this.notifyListeners();
+    }
+  }
+
+  private isUniqueViolation(error: any): boolean {
+    const code = String(error?.code || error?.status || '');
+    const msg = String(error?.message || error?.details || '').toLowerCase();
+    return code === '23505' || code === '409' || msg.includes('duplicate key');
+  }
+
+  /**
+   * A matrícula (RA) é única na nuvem. Quando o computador renumera os RAs (ex: após
+   * reimportar a planilha), a cópia antiga na nuvem ainda ocupa o número e o envio falha.
+   * Aqui o RA é liberado: o registro da nuvem que o ocupa com outro id recebe o sufixo
+   * "-DUP-<id>" (nada é apagado). Se esse aluno também estiver sendo enviado, ele recebe
+   * o RA certo no mesmo envio. RAs repetidos dentro do próprio lote recebem o mesmo sufixo.
+   */
+  private async releaseConflictingRegistrations(supabase: any, payload: Record<string, any>[]): Promise<void> {
+    try {
+      const seen = new Map<string, string>();
+      for (const row of payload) {
+        const ra = row?.registration_number;
+        if (!ra) continue;
+        if (seen.has(ra) && seen.get(ra) !== row.id) {
+          row.registration_number = `${ra}-DUP-${String(row.id).slice(-6)}`;
+        } else {
+          seen.set(ra, row.id);
+        }
+      }
+      const ras = Array.from(seen.keys());
+      if (ras.length === 0) return;
+      const { data, error } = await supabase.from('students').select('id, registration_number').in('registration_number', ras);
+      if (error || !Array.isArray(data)) return;
+      for (const remote of data) {
+        if (seen.get(remote.registration_number) === remote.id) continue;
+        await supabase
+          .from('students')
+          .update({ registration_number: `${remote.registration_number}-DUP-${String(remote.id).slice(-6)}` })
+          .eq('id', remote.id);
+      }
+    } catch (err) {
+      console.warn('[SupabaseBatchQueue] Não foi possível liberar RAs em conflito:', err);
+    }
+  }
+
+  /** Envia cada registro separadamente; só os que falharem voltam para a fila. */
+  private async upsertOneByOne(
+    supabase: any,
+    table: string,
+    items: QueuedBatchItem[],
+    payload: Record<string, any>[]
+  ): Promise<void> {
+    for (let k = 0; k < items.length; k++) {
+      const row = payload[k];
+      if (!row) {
+        this.handleChunkSuccess(table, [items[k]]);
+        continue;
+      }
+      try {
+        const { error } = await supabase.from(table).upsert([row], { onConflict: 'id' });
+        if (error) {
+          this.handleChunkFailure(table, [items[k]], error.message || JSON.stringify(error), error);
+        } else {
+          this.handleChunkSuccess(table, [items[k]]);
+        }
+      } catch (err: any) {
+        this.handleChunkFailure(table, [items[k]], err?.message || 'Falha de conexão com Supabase', err);
+      }
     }
   }
 
