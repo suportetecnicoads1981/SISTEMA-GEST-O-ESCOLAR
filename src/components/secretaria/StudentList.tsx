@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
+import { displayClassName } from '../../utils/schoolDataNormalizer';
 import {
   Search,
   UserPlus,
@@ -165,8 +166,8 @@ export const StudentList: React.FC<StudentListProps> = ({
   };
 
   const classMap = useMemo(
-    () => new Map(classes.map((c) => [c.id, c.name])),
-    [classes]
+    () => new Map(classes.map((c) => [c.id, displayClassName(c, schoolUnits)])),
+    [classes, schoolUnits]
   );
 
   // Lista unificada e enriquecida de Unidades Escolares com contagem de alunos

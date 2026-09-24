@@ -166,10 +166,16 @@ const useDataValidation = (props?: MunicipalSyncModuleProps) => {
         // Contagem real a partir dos alunos e turmas vinculados à escola.
         // O número salvo no cadastro (totalStudents/totalClasses) só é usado
         // quando ainda não há nenhum registro vinculado (ex: escola recebida por lote).
+        // O aluno conta para a escola pelo próprio vínculo OU pela turma em que está matriculado.
+        const unitClassIds = new Set(
+          classes.filter((c: any) => c?.schoolUnitId === u.id).map((c: any) => c.id)
+        );
         const linkedStudents = students.filter(
-          (s: any) => s?.schoolUnitId === u.id && (!s?.status || s.status === 'ACTIVE')
+          (s: any) =>
+            (s?.schoolUnitId === u.id || (s?.classId && unitClassIds.has(s.classId))) &&
+            (!s?.status || s.status === 'ACTIVE')
         ).length;
-        const linkedClasses = classes.filter((c: any) => c?.schoolUnitId === u.id).length;
+        const linkedClasses = unitClassIds.size;
         return {
         ...u,
         totalStudents: linkedStudents > 0 ? linkedStudents : Number(u?.totalStudents ?? 0),

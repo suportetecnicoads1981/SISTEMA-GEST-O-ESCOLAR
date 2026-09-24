@@ -110,7 +110,8 @@ export function fromRemoteRow(row: Record<string, any>): Record<string, any> {
  * Mescla as linhas remotas sobre a lista local, por id:
  * - campos que só existem localmente são preservados;
  * - registros que só existem localmente são mantidos (a sincronização nunca exclui);
- * - lista remota vazia não apaga os dados locais.
+ * - lista remota vazia não apaga os dados locais;
+ * - registro local com updatedAt mais recente que o da nuvem é mantido (alteração ainda não enviada).
  */
 export function mergeRemoteIntoLocal<T extends Record<string, any>>(
   localList: T[] | undefined,
@@ -133,7 +134,15 @@ export function mergeRemoteIntoLocal<T extends Record<string, any>>(
     const id = String(row.id);
     const mapped = mapRow(row);
     if (!byId.has(id)) order.push(id);
-    byId.set(id, { ...(byId.get(id) || {}), ...mapped } as T);
+    const current = byId.get(id);
+    // Alteração local mais recente que a cópia da nuvem (ainda não enviada) não é sobrescrita.
+    const localTime = Date.parse(String(current?.updatedAt ?? ''));
+    const remoteTime = Date.parse(String(row.updated_at ?? row.updatedAt ?? ''));
+    if (current && !Number.isNaN(localTime) && !Number.isNaN(remoteTime) && localTime > remoteTime) {
+      byId.set(id, { ...mapped, ...current } as T);
+      continue;
+    }
+    byId.set(id, { ...(current || {}), ...mapped } as T);
   }
   return order.map((id) => byId.get(id)!).filter(Boolean);
 }

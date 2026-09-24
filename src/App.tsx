@@ -107,6 +107,7 @@ import { isTabAvailable } from './config/features';
 import { notify } from './utils/dialogs';
 import { getLocalServerInfo } from './services/offline/localServerSync';
 import { runCloudSyncNow } from './services/offline/cloudAutoSync';
+import { normalizeSchoolLinks } from './utils/schoolDataNormalizer';
 
 export default function App() {
   const [data, setData] = useState(() => getStoredData());
@@ -271,6 +272,16 @@ export default function App() {
   useEffect(() => {
     saveStoredData(data, { skipCloudSync: data === remoteOriginDataRef.current });
   }, [data]);
+
+  // Correção automática dos vínculos escola ↔ turma ↔ aluno (ex: turma "ESCOLA X - PRÉ I (MANHÃ)"
+  // passa a "PRÉ I - MANHÃ" vinculada à escola X). Idempotente: só grava quando algo muda.
+  useEffect(() => {
+    const result = normalizeSchoolLinks(data);
+    if (result.changed) {
+      console.info('[SucessoEdu] Vínculos escola/turma/aluno corrigidos:', result.summary);
+      setData(result.data);
+    }
+  }, [data.schoolUnits, data.classes, data.students]);
 
   // Supabase Batched Queue Upsert
   useEffect(() => {
@@ -645,16 +656,24 @@ export default function App() {
       });
 
       // Turmas: as novas são incluídas e as existentes (mesmo id) são atualizadas (ex: nome ajustado)
-      const classById = new Map((explicitClasses || []).filter(Boolean).map((c) => [c.id, c]));
+      // updatedAt marca a alteração como mais recente que a cópia da nuvem (não é revertida na próxima carga)
+      const stamp = new Date().toISOString();
+      const classById = new Map(
+        (explicitClasses || []).filter(Boolean).map((c) => [c.id, { ...c, updatedAt: stamp } as SchoolClass])
+      );
       const existingClasses = (prev.classes || []).map((c) => classById.get(c.id) || c);
       const newClasses = Array.from(classById.values()).filter(
         (c) => !(prev.classes || []).some((ec) => ec.id === c.id)
       );
 
       // Alunos: quem já existe (mesmo id, reconhecido na importação) é atualizado; os demais são incluídos
-      const importedById = new Map(imported.filter(Boolean).map((s) => [s.id, s]));
+      const importedById = new Map(
+        imported.filter(Boolean).map((s) => [s.id, { ...s, updatedAt: stamp } as Student])
+      );
       const updatedStudents = (prev.students || []).map((s) => importedById.get(s.id) || s);
-      const addedStudents = imported.filter((s) => s && !(prev.students || []).some((ps) => ps.id === s.id));
+      const addedStudents = imported
+        .filter((s) => s && !(prev.students || []).some((ps) => ps.id === s.id))
+        .map((s) => importedById.get(s.id) || s);
 
       return {
         ...prev,
