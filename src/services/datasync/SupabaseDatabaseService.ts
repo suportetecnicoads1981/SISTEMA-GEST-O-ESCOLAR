@@ -823,6 +823,7 @@ END $$;
         capacity: c.maxCapacity || c.capacity || 35,
         room_number: c.roomNumber || null,
         class_teacher: c.classTeacher || null,
+        school_unit_id: c.schoolUnitId || null,
         updated_at: new Date().toISOString(),
       }));
 
