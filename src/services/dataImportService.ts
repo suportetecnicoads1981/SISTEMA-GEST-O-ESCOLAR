@@ -107,6 +107,9 @@ export interface FileImportResult {
   schoolCheck?: SchoolCheckResult; // Conferência com o cadastro da escola
   warnings?: string[]; // Alertas que não impedem a importação
   sourceMatrix?: any[][]; // Matriz original (permite reprocessar ao mudar filtros)
+  sourceContext?: ImportBlockContext; // Contexto do bloco (escola anexa)
+  sourceFileName?: string; // Nome do arquivo original (quando o arquivo tem várias escolas)
+  sections?: Array<{ series: string; count: number; header: string }>; // Tabelas (séries) encontradas
 }
 
 // Colunas esperadas no levantamento municipal, da ESQUERDA para a DIREITA
@@ -134,7 +137,15 @@ export interface ImportColumnCheck {
   required?: boolean;
 }
 
+/** Contexto de um bloco do arquivo (ex: escola anexa dentro do mesmo documento). */
+export interface ImportBlockContext {
+  isAnnex?: boolean;
+  parentUnit?: SchoolUnit; // Escola principal (bloco anterior do mesmo documento)
+}
+
 export interface SchoolCheckResult {
+  isAnnex?: boolean;
+  parentUnitName?: string;
   // CADASTRADA = escola já existe no sistema | NOVA = será cadastrada | NAO_IDENTIFICADA = sem nome na planilha
   status: 'CADASTRADA' | 'NOVA' | 'NAO_IDENTIFICADA';
   detectedName: string;
@@ -212,6 +223,21 @@ export function findRegisteredSchoolUnit(name: string, units: SchoolUnit[]): Sch
   return partial.length === 1 ? partial[0] : undefined;
 }
 
+/** Chave de comparação de aluno: nome (sem acentos/espaços extras) + data de nascimento. */
+function studentKey(name: any, birthDate: any): string {
+  return `${stripAccentsUpper(name).replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim()}|${String(birthDate || '').slice(0, 10)}`;
+}
+
+/** Aluno já cadastrado com o mesmo nome e data de nascimento (evita duplicar ao reimportar). */
+export function findExistingStudent(
+  item: { name: string; cleanName?: string; birthDate: string },
+  existing: Student[]
+): Student | undefined {
+  if (!existing || existing.length === 0) return undefined;
+  const keys = new Set([studentKey(item.cleanName || item.name, item.birthDate), studentKey(item.name, item.birthDate)]);
+  return existing.find((s) => s && keys.has(studentKey(s.name, s.birthDate)));
+}
+
 /** Turma da escola para a série informada (nunca devolve turma de outra escola). */
 export function findClassForSeries(
   unitId: string | undefined,
@@ -269,7 +295,8 @@ export function extractSeriesFromFirstColumnHeader(
   const raw = String(cellText || '').trim();
   const fullText = [raw, ...(adjacentCells || []).map((c) => String(c || '').trim())]
     .filter(Boolean)
-    .join(' ');
+    .join(' ')
+    .replace(/N\s*[º°]/g, ' Nº '); // "PRÉIINº" / "1º ANONº" -> "PRÉII Nº" / "1º ANO Nº"
 
   // Extrai número do estudante se houver no final (ex: "PRÉ II - 1" -> studentNumber = "1")
   let studentNumber: string | undefined = undefined;
@@ -467,10 +494,10 @@ export function buildClassForSeries(
   defaultShift: ClassShift | string = 'MANHÃ',
   roomIndex = 0
 ): SchoolClass {
-  const shortName = unit.tradeName || unit.name;
+  // Nome da turma = série + turno (a escola já fica no vínculo schoolUnitId)
   return {
     id: `class-${unit.id}-${stripAccentsUpper(serie).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
-    name: `${shortName} - ${serie} (${defaultShift})`,
+    name: `${serie} - ${defaultShift}`,
     gradeLevel: serie,
     segment: segmentForGrade(serie),
     shift: (defaultShift as ClassShift) || 'MANHÃ',
@@ -517,7 +544,8 @@ export function buildSchoolUnitAndClassesFromImport(
   }
 
   const schoolUnit: SchoolUnit = {
-    id: `unit-imp-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+    // Id estável pelo nome: reprocessar a planilha não cria outra escola e as anexas mantêm o vínculo
+    id: `unit-imp-${stripAccentsUpper(cleanSchoolName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`,
     name: cleanSchoolName,
     tradeName: cleanSchoolName,
     inepCode: 'Pendente de Regularização Censo',
@@ -658,99 +686,151 @@ function parseMedicalReport(val: any): { hasReport: boolean; text: string } {
   return { hasReport: false, text: str };
 }
 
-// Processa arquivo individual (qualquer formato suportado do LibreOffice e Microsoft Office)
+const SCHOOL_LINE_RE = /\bESCOLA(\s+ANEXO)?\s*:\s*(.+?)(?=\s*\|?\s*(?:TURMAS?|S[EÉ]RIES?|DATA)\s*:|\s*\||$)/i;
+
+/**
+ * Separa a matriz em blocos por escola. Um mesmo documento pode trazer a escola principal
+ * e escolas anexas (linha "ESCOLA ANEXO: ..."), cada uma com suas tabelas por série.
+ * Linhas "ESCOLA:" repetidas da mesma escola (ex: a cada página) ficam no mesmo bloco.
+ */
+export function splitMatrixBySchool(matrix: any[][]): Array<{ matrix: any[][]; schoolName: string; isAnnex: boolean }> {
+  const starts: Array<{ index: number; name: string; isAnnex: boolean }> = [];
+  matrix.forEach((row, i) => {
+    const text = (row || []).map((c) => String(c ?? '').replace(/\s+/g, ' ').trim()).filter(Boolean).join(' | ');
+    const m = text.match(SCHOOL_LINE_RE);
+    if (m && m[2].trim()) {
+      const name = normalizeSchoolName(m[2]);
+      const isAnnex = !!m[1];
+      const last = starts[starts.length - 1];
+      if (!last || last.name !== name || last.isAnnex !== isAnnex) {
+        starts.push({ index: i, name, isAnnex });
+      }
+    }
+  });
+  if (starts.length <= 1) {
+    return [{ matrix, schoolName: starts[0]?.name || '', isAnnex: !!starts[0]?.isAnnex }];
+  }
+  return starts.map((st, i) => ({
+    matrix: matrix.slice(i === 0 ? 0 : st.index, starts[i + 1] ? starts[i + 1].index : matrix.length),
+    schoolName: st.name,
+    isAnnex: st.isAnnex,
+  }));
+}
+
+/** Processa cada bloco (escola) como um resultado separado, ligando as anexas à escola principal. */
+function processMatrixBlocks(
+  matrix: any[][],
+  fileName: string,
+  fileSize: number,
+  filters: ImportFilterOptions,
+  classes: SchoolClass[],
+  schoolUnits: SchoolUnit[],
+  documentType: FileImportResult['documentType']
+): FileImportResult[] {
+  const blocks = splitMatrixBySchool(matrix);
+  const results: FileImportResult[] = [];
+  let parentUnit: SchoolUnit | undefined;
+  blocks.forEach((block) => {
+    const res = processSheetWithHeaders(block.matrix, fileName, fileSize, filters, classes, schoolUnits, {
+      isAnnex: block.isAnnex,
+      parentUnit: block.isAnnex ? parentUnit : undefined,
+    });
+    res.documentType = documentType;
+    res.sourceFileName = fileName;
+    if (blocks.length > 1) {
+      res.fileName = `${fileName} — ${res.schoolNameDetected || block.schoolName || 'escola'}`;
+    }
+    if (!block.isAnnex && res.suggestedSchoolUnit) parentUnit = res.suggestedSchoolUnit;
+    results.push(res);
+  });
+  return results;
+}
+
+/**
+ * Lê um arquivo e devolve um resultado por escola encontrada.
+ * Word/Writer: tabelas na ordem do documento. Excel/Calc: todas as abas.
+ */
+export async function parseFileResults(
+  file: File,
+  filters: ImportFilterOptions,
+  classes: SchoolClass[],
+  schoolUnits: SchoolUnit[]
+): Promise<FileImportResult[]> {
+  const fileName = file.name;
+  const fileSize = file.size;
+  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+
+  try {
+    if (ext === 'docx') {
+      const extracted = await parseDocxFile(file);
+      return processMatrixBlocks(extracted.matrix, fileName, fileSize, filters, classes, schoolUnits, 'WORD');
+    }
+
+    if (ext === 'odt') {
+      const extracted = await parseOdtFile(file);
+      return processMatrixBlocks(extracted.matrix, fileName, fileSize, filters, classes, schoolUnits, 'WRITER');
+    }
+
+    if (ext === 'json') {
+      const text = await file.text();
+      const jsonData = JSON.parse(text);
+      return [
+        processRawRows(
+          Array.isArray(jsonData) ? jsonData : jsonData.alunos || jsonData.students || [jsonData],
+          fileName,
+          fileSize,
+          filters,
+          classes,
+          schoolUnits
+        ),
+      ];
+    }
+
+    if (ext === 'csv' || ext === 'tsv' || ext === 'txt') {
+      const text = await file.text();
+      const wb = XLSX.read(text, { type: 'string' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rawRows = XLSX.utils.sheet_to_json<any>(ws, { header: 1, defval: '' });
+      return processMatrixBlocks(rawRows, fileName, fileSize, filters, classes, schoolUnits, 'CSV');
+    }
+
+    // Excel (.xlsx, .xls) e Calc (.ods): lê TODAS as abas, na ordem
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: 'array' });
+    const allRows: any[][] = [];
+    wb.SheetNames.forEach((name) => {
+      const rows = XLSX.utils.sheet_to_json<any>(wb.Sheets[name], { header: 1, defval: '' });
+      if (rows.length > 0) {
+        allRows.push(...rows, []);
+      }
+    });
+    const docType = ext === 'ods' ? 'CALC' : ext === 'xls' || ext === 'xlsx' ? 'EXCEL' : 'GENERIC';
+    return processMatrixBlocks(allRows, fileName, fileSize, filters, classes, schoolUnits, docType);
+  } catch (error: any) {
+    return [
+      {
+        fileName,
+        fileSize,
+        totalRows: 0,
+        students: [],
+        completeCount: 0,
+        incompleteCount: 0,
+        errors: [`Falha ao ler o arquivo: ${error?.message || 'Formato não reconhecido'}`],
+        documentType: 'GENERIC',
+      },
+    ];
+  }
+}
+
+// Mantido por compatibilidade: devolve só o primeiro resultado (primeira escola) do arquivo
 export async function parseSingleFile(
   file: File,
   filters: ImportFilterOptions,
   classes: SchoolClass[],
   schoolUnits: SchoolUnit[]
 ): Promise<FileImportResult> {
-  const fileName = file.name;
-  const fileSize = file.size;
-  const ext = fileName.split('.').pop()?.toLowerCase() || '';
-
-  try {
-    // 1. Microsoft Office Word (.docx)
-    if (ext === 'docx') {
-      const extracted = await parseDocxFile(file);
-      const res = processSheetWithHeaders(extracted.matrix, fileName, fileSize, filters, classes, schoolUnits);
-      res.documentType = 'WORD';
-      if (extracted.schoolNameDetected && !res.schoolNameDetected) {
-        res.schoolNameDetected = extracted.schoolNameDetected;
-      }
-      if (extracted.classOrSeriesDetected && !res.seriesDetected) {
-        res.seriesDetected = extracted.classOrSeriesDetected;
-      }
-      if (extracted.dateDetected && !res.dateDetected) {
-        res.dateDetected = extracted.dateDetected;
-      }
-      return res;
-    }
-
-    // 2. LibreOffice Writer (.odt - OpenDocument Text)
-    if (ext === 'odt') {
-      const extracted = await parseOdtFile(file);
-      const res = processSheetWithHeaders(extracted.matrix, fileName, fileSize, filters, classes, schoolUnits);
-      res.documentType = 'WRITER';
-      if (extracted.schoolNameDetected && !res.schoolNameDetected) {
-        res.schoolNameDetected = extracted.schoolNameDetected;
-      }
-      if (extracted.classOrSeriesDetected && !res.seriesDetected) {
-        res.seriesDetected = extracted.classOrSeriesDetected;
-      }
-      if (extracted.dateDetected && !res.dateDetected) {
-        res.dateDetected = extracted.dateDetected;
-      }
-      return res;
-    }
-
-    // 3. JSON
-    if (ext === 'json') {
-      const text = await file.text();
-      const jsonData = JSON.parse(text);
-      return processRawRows(
-        Array.isArray(jsonData) ? jsonData : jsonData.alunos || jsonData.students || [jsonData],
-        fileName,
-        fileSize,
-        filters,
-        classes,
-        schoolUnits
-      );
-    }
-
-    // 4. CSV, TSV, TXT
-    if (ext === 'csv' || ext === 'tsv' || ext === 'txt') {
-      const text = await file.text();
-      const wb = XLSX.read(text, { type: 'string' });
-      const wsname = wb.SheetNames[0];
-      const ws = wb.Sheets[wsname];
-      const rawRows = XLSX.utils.sheet_to_json<any>(ws, { header: 1, defval: '' });
-      const res = processSheetWithHeaders(rawRows, fileName, fileSize, filters, classes, schoolUnits);
-      res.documentType = 'CSV';
-      return res;
-    }
-
-    // 5. Microsoft Office Excel (.xlsx, .xls) e LibreOffice Calc (.ods)
-    const buffer = await file.arrayBuffer();
-    const wb = XLSX.read(buffer, { type: 'array' });
-    const wsname = wb.SheetNames[0];
-    const ws = wb.Sheets[wsname];
-    const rawRows = XLSX.utils.sheet_to_json<any>(ws, { header: 1, defval: '' });
-    const res = processSheetWithHeaders(rawRows, fileName, fileSize, filters, classes, schoolUnits);
-    res.documentType = ext === 'ods' ? 'CALC' : ext === 'xls' || ext === 'xlsx' ? 'EXCEL' : 'GENERIC';
-    return res;
-  } catch (error: any) {
-    return {
-      fileName,
-      fileSize,
-      totalRows: 0,
-      students: [],
-      completeCount: 0,
-      incompleteCount: 0,
-      errors: [`Falha ao ler o arquivo: ${error?.message || 'Formato não reconhecido'}`],
-      documentType: 'GENERIC',
-    };
-  }
+  const results = await parseFileResults(file, filters, classes, schoolUnits);
+  return results[0];
 }
 
 // Mapeia as colunas pelo texto do cabeçalho (palavras-chave)
@@ -896,9 +976,11 @@ export function processSheetWithHeaders(
   fileSize: number,
   filters: ImportFilterOptions,
   classes: SchoolClass[],
-  schoolUnits: SchoolUnit[]
+  schoolUnits: SchoolUnit[],
+  context: ImportBlockContext = {}
 ): FileImportResult {
   let schoolNameDetected = '';
+  let isAnnex = !!context.isAnnex;
   let gradesServedText = '';
   let dateDetected = '';
   let headerRowIndex = -1;
@@ -911,9 +993,10 @@ export function processSheetWithHeaders(
     const row = matrix[r] || [];
     const rowText = row.map((c) => String(c ?? '').replace(/[\r\n]+/g, ' ').trim()).filter(Boolean).join(' | ');
 
-    const schoolMatch = rowText.match(/ESCOLA\s*:\s*(.+?)(?=\s*\|?\s*(?:TURMAS?|S[EÉ]RIES?|DATA)\s*:|\s*\||$)/i);
-    if (schoolMatch && !schoolNameDetected && schoolMatch[1].trim()) {
-      schoolNameDetected = schoolMatch[1].trim();
+    const schoolMatch = rowText.match(SCHOOL_LINE_RE);
+    if (schoolMatch && !schoolNameDetected && schoolMatch[2].trim()) {
+      schoolNameDetected = schoolMatch[2].trim();
+      if (schoolMatch[1]) isAnnex = true;
     }
 
     const turmasMatch = rowText.match(/(?:TURMAS?|S[EÉ]RIES?(?:\s+ATENDIDAS)?)\s*:\s*(.+?)(?=\s*\|?\s*(?:DATA|ESCOLA)\s*:|\s*\||$)/i);
@@ -999,6 +1082,16 @@ export function processSheetWithHeaders(
       );
       targetUnit = built.schoolUnit;
       suggestedClasses = built.createdClasses;
+      if (isAnnex) {
+        const parentName = context.parentUnit?.name;
+        targetUnit = {
+          ...targetUnit,
+          type: 'ESCOLA_SATELITE',
+          isAnnex: true,
+          parentUnitId: context.parentUnit?.id,
+          tradeName: parentName ? `${targetUnit.name} (Anexo de ${parentName})` : `${targetUnit.name} (Escola Anexa)`,
+        };
+      }
       schoolMessages.push(
         `A escola "${schoolNameDetected}" não está cadastrada. Ela será cadastrada com as séries informadas na planilha e ficará pendente de complementação.`
       );
@@ -1026,23 +1119,69 @@ export function processSheetWithHeaders(
       );
     }
   }
-  if (!tableSeries) {
-    warnings.push(
-      'Não foi possível identificar a série da tabela pelo cabeçalho da 1ª coluna (ex: "PRÉ II Nº"). Confira a série de cada aluno.'
-    );
-  }
 
   const unlinkedAllowed = schoolUnits.length <= 1;
   const allClasses = [...classes, ...suggestedClasses];
 
   // 5. Linhas de alunos
   const students: ParsedImportStudent[] = [];
+  // O arquivo pode ter VÁRIAS tabelas (uma por série): cada novo cabeçalho troca a série atual
+  let activeMap: Record<string, number> = colMap;
+  let currentSeries = tableSeries;
+  const sections: Array<{ series: string; count: number; header: string }> = [];
+  const startSection = (series: string, header: string) => {
+    sections.push({ series: series || 'Série não identificada', count: 0, header: header.replace(/\s+/g, ' ').trim() });
+  };
+  startSection(currentSeries, firstColRawHeader);
 
   for (let r = headerRowIndex + 1; r < matrix.length; r++) {
     const row = matrix[r] || [];
     if (row.every((c) => !c && c !== 0)) continue;
 
-    const rawName = colMap.name !== undefined ? row[colMap.name] : row[1] || row[0];
+    const cellsUpper = row.map((c) => stripAccentsUpper(c).replace(/\s+/g, ' ').trim());
+    const nonEmpty = cellsUpper.filter(Boolean);
+
+    // a) Novo cabeçalho de tabela (ex: "1º ANO Nº | NOME COMPLETO DO ALUNO | ...")
+    const isHeaderRow = cellsUpper.some(
+      (c) => c.includes('NOME COMPLETO') || c.includes('NOME DO ALUNO') || c.includes('NOME DO ESTUDANTE') || c === 'NOME'
+    );
+    if (isHeaderRow) {
+      const newHeaders = row.map((c) => String(c ?? '').trim());
+      const newMap = mapColumnsByHeader(newHeaders);
+      checkColumnsLeftToRight(newHeaders, newMap, matrix, r);
+      activeMap = newMap;
+      const hdrIdx = newMap.seq ?? newMap.series ?? 0;
+      const parsed = extractSeriesFromFirstColumnHeader(newHeaders[hdrIdx] || '');
+      if (filters.extractSeriesFromFirstColumn !== false && parsed.known && parsed.series) {
+        currentSeries = parsed.series;
+      }
+      startSection(currentSeries, newHeaders[hdrIdx] || '');
+      continue;
+    }
+
+    // b) Linhas de identificação repetidas (ESCOLA / DATA / TURMA / título) não são alunos
+    const joined = nonEmpty.join(' | ');
+    if (/(^|\|\s)(ESCOLA(\s+ANEXO)?|DATA|TURMAS?)\s*:|LEVANTAMENTO DO QUANTITATIVO/.test(joined)) {
+      const turmaLine = joined.match(/TURMAS?\s*:\s*(.+?)(?=\s*\|?\s*(?:DATA|ESCOLA)\s*:|\s*\||$)/);
+      if (turmaLine) {
+        const g = extractSchoolGradesServed(turmaLine[1]).expandedGrades;
+        if (g.length === 1) currentSeries = g[0];
+      }
+      continue;
+    }
+
+    // c) Título de seção com a série sozinha (ex: linha "3º ANO")
+    const nameCell = activeMap.name !== undefined ? cleanPlaceholder(row[activeMap.name]) : '';
+    if (!nameCell && nonEmpty.length <= 2) {
+      const parsed = extractSeriesFromFirstColumnHeader(nonEmpty.join(' '));
+      if (parsed.known && parsed.series) {
+        currentSeries = parsed.series;
+        startSection(currentSeries, nonEmpty.join(' '));
+      }
+      continue;
+    }
+
+    const rawName = activeMap.name !== undefined ? row[activeMap.name] : row[1] || row[0];
     const name = cleanPlaceholder(rawName).replace(/\s+/g, ' ');
 
     if (!name || /TOTAL|COORDENADOR|DIRETOR|OBSERVA|ASSINATURA|SECRETARI[OA]\b/i.test(name)) {
@@ -1053,16 +1192,16 @@ export function processSheetWithHeaders(
     const hasPcdInName = pcdNameRegex.test(name);
     const cleanName = name.replace(pcdNameRegex, '').trim();
 
-    let rawSeq = colMap.seq !== undefined ? row[colMap.seq] : row[0];
-    const rawBirth = colMap.birthDate !== undefined ? row[colMap.birthDate] : '';
-    const rawGender = colMap.gender !== undefined ? row[colMap.gender] : '';
-    const rawRace = colMap.race !== undefined ? row[colMap.race] : '';
-    const rawAddr = colMap.address !== undefined ? row[colMap.address] : '';
-    const rawShift = colMap.shift !== undefined ? row[colMap.shift] : '';
-    const rawSeries = colMap.series !== undefined ? row[colMap.series] : '';
-    const rawPcd = colMap.pcd !== undefined ? row[colMap.pcd] : '';
-    const rawTea = colMap.tea !== undefined ? row[colMap.tea] : '';
-    const rawLaudo = colMap.laudo !== undefined ? row[colMap.laudo] : '';
+    let rawSeq = activeMap.seq !== undefined ? row[activeMap.seq] : row[0];
+    const rawBirth = activeMap.birthDate !== undefined ? row[activeMap.birthDate] : '';
+    const rawGender = activeMap.gender !== undefined ? row[activeMap.gender] : '';
+    const rawRace = activeMap.race !== undefined ? row[activeMap.race] : '';
+    const rawAddr = activeMap.address !== undefined ? row[activeMap.address] : '';
+    const rawShift = activeMap.shift !== undefined ? row[activeMap.shift] : '';
+    const rawSeries = activeMap.series !== undefined ? row[activeMap.series] : '';
+    const rawPcd = activeMap.pcd !== undefined ? row[activeMap.pcd] : '';
+    const rawTea = activeMap.tea !== undefined ? row[activeMap.tea] : '';
+    const rawLaudo = activeMap.laudo !== undefined ? row[activeMap.laudo] : '';
 
     // Série na própria linha (ex: "PRÉ II - 1")
     let rowSeriesParsed = '';
@@ -1101,8 +1240,8 @@ export function processSheetWithHeaders(
       finalSeries = canonicalGrade(filters.defaultSeries);
     } else if (rowSeriesParsed) {
       finalSeries = rowSeriesParsed;
-    } else if (tableSeries) {
-      finalSeries = tableSeries;
+    } else if (currentSeries) {
+      finalSeries = currentSeries;
     } else {
       finalSeries = canonicalGrade(filters.defaultSeries || 'PRÉ I');
       seriesByDefault = true;
@@ -1153,11 +1292,36 @@ export function processSheetWithHeaders(
       selectedForImport: true,
       rawRow: { rawSeq, rawName, rawBirth, rawGender, rawRace, rawAddr, rawPcd, rawTea, rawLaudo },
     });
+    sections[sections.length - 1].count++;
   }
 
   // 6. Turmas: usa a turma da série na própria escola; se não existir, cria (escola cadastrada ou nova)
   const classesToCreate: string[] = [];
   if (targetUnit) {
+    const unitPrefixes = [targetUnit.name, targetUnit.tradeName]
+      .filter(Boolean)
+      .map((n) => normalizeSchoolName(n));
+    let renamed = 0;
+    allClasses.forEach((c, idx) => {
+      const belongs = c.schoolUnitId === targetUnit!.id || (!c.schoolUnitId && unlinkedAllowed);
+      const nameNorm = normalizeSchoolName(c.name);
+      const hasSchoolPrefix = unitPrefixes.some((pfx) => pfx && nameNorm.startsWith(`${pfx} `));
+      if ((belongs || (!c.schoolUnitId && hasSchoolPrefix)) && hasSchoolPrefix) {
+        const fixed = {
+          ...c,
+          name: `${canonicalGrade(c.gradeLevel) || c.gradeLevel} - ${c.shift || filters.defaultShift || 'MANHÃ'}`,
+          schoolUnitId: targetUnit!.id,
+        } as SchoolClass;
+        allClasses[idx] = fixed;
+        const at = suggestedClasses.findIndex((sc) => sc.id === fixed.id);
+        if (at >= 0) suggestedClasses[at] = fixed;
+        else suggestedClasses.push(fixed);
+        renamed++;
+      }
+    });
+    if (renamed > 0) {
+      schoolMessages.push(`${renamed} turma(s) já existente(s) terão o nome ajustado para "SÉRIE - TURNO" (sem o nome da escola).`);
+    }
     const seriesUsed = Array.from(new Set(students.map((s) => s.series)));
     seriesUsed.forEach((serie) => {
       const found = findClassForSeries(targetUnit!.id, serie, allClasses, unlinkedAllowed);
@@ -1168,7 +1332,9 @@ export function processSheetWithHeaders(
       }
     });
     if (schoolStatus === 'CADASTRADA') {
-      suggestedClasses.forEach((c) => classesToCreate.push(c.gradeLevel));
+      suggestedClasses
+        .filter((c) => !classes.some((ex) => ex.id === c.id))
+        .forEach((c) => classesToCreate.push(c.gradeLevel));
       if (classesToCreate.length > 0) {
         schoolMessages.push(`Turma(s) que será(ão) criada(s) na escola: ${classesToCreate.join(', ')}.`);
       }
@@ -1191,8 +1357,25 @@ export function processSheetWithHeaders(
   if (students.length === 0) {
     errors.push('Nenhum aluno encontrado abaixo do cabeçalho da tabela.');
   }
+  const usedSections = sections.filter((sec) => sec.count > 0);
+  if (students.some((st) => st.pendingFields.includes('Série (não identificada na planilha)'))) {
+    warnings.push(
+      'Não foi possível identificar a série de uma ou mais tabelas pelo cabeçalho da 1ª coluna (ex: "PRÉ II Nº"). Confira a série desses alunos.'
+    );
+  }
+
+  if (schoolStatus === 'CADASTRADA' && gradesRegistered.length > 0) {
+    const notServed = Array.from(new Set(usedSections.map((sec) => sec.series))).filter(
+      (serie) => !gradesRegistered.some((g) => sameGrade(g, serie))
+    );
+    if (notServed.length > 0) {
+      schoolMessages.push(`Séries com alunos na planilha que a escola não atende no cadastro: ${notServed.join(', ')}.`);
+    }
+  }
 
   const schoolCheck: SchoolCheckResult = {
+    isAnnex,
+    parentUnitName: isAnnex ? context.parentUnit?.name : undefined,
     status: schoolStatus,
     detectedName: schoolNameDetected,
     unitId: targetUnit?.id,
@@ -1230,6 +1413,8 @@ export function processSheetWithHeaders(
     schoolCheck,
     warnings,
     sourceMatrix: matrix,
+    sourceContext: context,
+    sections: usedSections,
   };
 }
 
@@ -1294,7 +1479,8 @@ export function convertImportedStudentsToOfficial(
   existingStudentsCount: number,
   targetSchoolUnit?: SchoolUnit,
   additionalClasses: SchoolClass[] = [],
-  allSchoolUnits: SchoolUnit[] = []
+  allSchoolUnits: SchoolUnit[] = [],
+  existingStudents: Student[] = []
 ): Student[] {
   const nowIso = new Date().toISOString();
   const year = new Date().getFullYear();
@@ -1380,6 +1566,36 @@ export function convertImportedStudentsToOfficial(
       series: effectiveSeries,
       importedAt: nowIso,
     };
+
+    // Aluno já cadastrado (mesmo nome e nascimento): ATUALIZA o cadastro em vez de duplicar.
+    // Mantém id, matrícula, CPF, responsável e contatos; atualiza escola, turma, série e dados da planilha.
+    const existing = findExistingStudent(item, existingStudents);
+    if (existing) {
+      const hasCpf = existing.cpf && existing.cpf !== '000.000.000-00';
+      return {
+        ...existing,
+        name: officialStudent.name,
+        birthDate: officialStudent.birthDate,
+        gender: officialStudent.gender,
+        raceColor: officialStudent.raceColor,
+        address: officialStudent.address || existing.address,
+        schoolUnitId: officialStudent.schoolUnitId,
+        classId: officialStudent.classId,
+        series: officialStudent.series,
+        shift: officialStudent.shift,
+        medicalObservations: officialStudent.medicalObservations,
+        medicalClassification: officialStudent.medicalClassification,
+        hasMedicalReport: officialStudent.hasMedicalReport,
+        medicalReportText: officialStudent.medicalReportText,
+        specialConditions: officialStudent.specialConditions,
+        specialNeeds: officialStudent.specialNeeds,
+        schoolOriginName: officialStudent.schoolOriginName,
+        pendingFields: hasCpf
+          ? officialStudent.pendingFields?.filter((f) => f !== 'CPF / Certidão de Nascimento')
+          : officialStudent.pendingFields,
+        importedAt: nowIso,
+      } as Student;
+    }
 
     return officialStudent;
   });

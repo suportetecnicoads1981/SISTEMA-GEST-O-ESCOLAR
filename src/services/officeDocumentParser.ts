@@ -64,43 +64,51 @@ export async function parseDocxFile(file: File | Blob): Promise<ExtractedOfficeD
     }
   });
 
-  // Coleta tabelas do documento Word
-  const tables = Array.from(xml.querySelectorAll('w\\:tbl, tbl'));
+  // Monta a matriz NA ORDEM DO DOCUMENTO: parágrafos (ex: "ESCOLA: ...", "ESCOLA ANEXO: ...")
+  // e tabelas (uma por série) intercalados, para que cada tabela fique ligada à escola certa.
   const matrix: string[][] = [];
+  // Texto de um parágrafo: junta os trechos (runs) sem espaço extra, para não partir palavras
+  const paraText = (p: Element): string =>
+    Array.from(p.getElementsByTagName('*'))
+      .map((n) => (n.nodeName === 'w:t' ? n.textContent || '' : n.nodeName === 'w:tab' ? ' ' : ''))
+      .join('');
+  const cellText = (tc: Element): string =>
+    Array.from(tc.getElementsByTagName('w:p'))
+      .map(paraText)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
 
-  // Se detectamos cabeçalho fora da tabela, adiciona como primeira linha de metadados
-  if (schoolNameDetected || classOrSeriesDetected || dateDetected) {
-    const metaRow = [
-      schoolNameDetected ? `ESCOLA: ${schoolNameDetected}` : '',
-      classOrSeriesDetected ? `TURMA: ${classOrSeriesDetected}` : '',
-      dateDetected ? `DATA: ${dateDetected}` : '',
-    ].filter(Boolean);
-    if (metaRow.length > 0) {
-      matrix.push(metaRow);
-    }
-  }
+  const body = xml.getElementsByTagName('w:body')[0];
+  const elementChildren = (el: Element): Element[] =>
+    Array.from(el.childNodes).filter((n) => n.nodeType === 1) as Element[];
+  const blocks: Element[] = body ? elementChildren(body) : [];
 
-  if (titleDetected) {
-    matrix.push([titleDetected]);
-  }
+  const pushTable = (tbl: Element) => {
+    Array.from(tbl.getElementsByTagName('w:tr')).forEach((tr) => {
+      // Apenas as células desta linha (ignora tabelas aninhadas)
+      const cells = elementChildren(tr).filter((c) => c.nodeName === 'w:tc');
+      const rowData = cells.map((tc) => cellText(tc));
+      if (rowData.some((c) => c.length > 0)) matrix.push(rowData);
+    });
+  };
 
-  tables.forEach((tbl) => {
-    const rows = Array.from(tbl.querySelectorAll('w\\:tr, tr'));
-    rows.forEach((tr) => {
-      const cells = Array.from(tr.querySelectorAll('w\\:tc, tc'));
-      const rowData = cells.map((tc) => {
-        const tNodes = tc.querySelectorAll('w\\:t, t');
-        return Array.from(tNodes)
-          .map((n) => n.textContent || '')
-          .join(' ')
-          .trim();
-      });
-
-      if (rowData.some((c) => c.length > 0)) {
-        matrix.push(rowData);
+  if (blocks.length > 0) {
+    blocks.forEach((el) => {
+      if (el.nodeName === 'w:p') {
+        const text = paraText(el as Element).replace(/\s+/g, ' ').trim();
+        if (text) matrix.push([text]);
+      } else if (el.nodeName === 'w:tbl') {
+        pushTable(el as Element);
+      } else if (el.nodeName === 'w:sdt') {
+        // Conteúdo dentro de controles de conteúdo
+        Array.from(el.getElementsByTagName('w:tbl')).forEach((t) => pushTable(t));
       }
     });
-  });
+  } else {
+    // Fallback: estrutura inesperada, lê só as tabelas
+    Array.from(xml.getElementsByTagName('w:tbl')).forEach((t) => pushTable(t));
+  }
 
   return {
     matrix,
