@@ -99,6 +99,136 @@ export interface FileImportResult {
   incompleteCount: number;
   errors: string[];
   documentType?: 'EXCEL' | 'CALC' | 'WORD' | 'WRITER' | 'CSV' | 'GENERIC';
+  // Verificações da importação (conferência de colunas e do cadastro da escola)
+  tableSeries?: string; // Série da tabela (ex: 'PRÉ II', lida do cabeçalho da 1ª coluna "PRÉII Nº")
+  columnReport?: ImportColumnCheck[]; // Conferência das colunas da esquerda para a direita
+  extraColumns?: string[]; // Colunas reconhecidas além do modelo (ex: TEA, TURNO)
+  ignoredColumns?: string[]; // Colunas com cabeçalho não reconhecido (não importadas)
+  schoolCheck?: SchoolCheckResult; // Conferência com o cadastro da escola
+  warnings?: string[]; // Alertas que não impedem a importação
+  sourceMatrix?: any[][]; // Matriz original (permite reprocessar ao mudar filtros)
+}
+
+// Colunas esperadas no levantamento municipal, da ESQUERDA para a DIREITA
+export const EXPECTED_STUDENT_COLUMNS: Array<{ key: string; label: string; required?: boolean }> = [
+  { key: 'seq', label: 'Nº de ordem / Série (1ª coluna)' },
+  { key: 'name', label: 'Nome completo do aluno', required: true },
+  { key: 'birthDate', label: 'Data de nascimento', required: true },
+  { key: 'gender', label: 'Sexo' },
+  { key: 'race', label: 'Raça/Cor' },
+  { key: 'address', label: 'Endereço' },
+  { key: 'pcd', label: 'PCD' },
+  { key: 'laudo', label: 'Laudo (Sim/Não)' },
+];
+
+export interface ImportColumnCheck {
+  key: string;
+  label: string;
+  expectedPosition: number; // 1 = primeira coluna da tabela
+  columnIndex?: number;
+  columnLetter?: string; // A, B, C...
+  header?: string;
+  // OK = achada pelo cabeçalho na ordem certa | POR_POSICAO = cabeçalho não reconhecido, lida pela posição
+  // FORA_DE_ORDEM = achada pelo cabeçalho, mas fora da ordem esperada | AUSENTE = não encontrada
+  status: 'OK' | 'POR_POSICAO' | 'FORA_DE_ORDEM' | 'AUSENTE';
+  required?: boolean;
+}
+
+export interface SchoolCheckResult {
+  // CADASTRADA = escola já existe no sistema | NOVA = será cadastrada | NAO_IDENTIFICADA = sem nome na planilha
+  status: 'CADASTRADA' | 'NOVA' | 'NAO_IDENTIFICADA';
+  detectedName: string;
+  unitId?: string;
+  unitName?: string;
+  gradesInFile: string[]; // Séries atendidas informadas no cabeçalho (TURMA:)
+  gradesRegistered: string[]; // Séries atendidas no cadastro da escola
+  gradesMissingInRegistry: string[]; // Informadas na planilha, mas ausentes do cadastro
+  tableSeries?: string;
+  tableSeriesServed?: boolean; // A série da tabela consta nas séries atendidas da escola?
+  classesToCreate: string[]; // Séries cujas turmas serão criadas na escola
+  messages: string[];
+}
+
+// ===================== Normalização e comparação =====================
+
+const COLUMN_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+function columnLetter(idx: number): string {
+  let n = idx;
+  let s = '';
+  do {
+    s = COLUMN_LETTERS[n % 26] + s;
+    n = Math.floor(n / 26) - 1;
+  } while (n >= 0);
+  return s;
+}
+
+function stripAccentsUpper(val: any): string {
+  return String(val ?? '')
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+}
+
+/** Normaliza nome de escola para comparação: sem acentos, sem "ESCOLA:", sem pontuação. */
+export function normalizeSchoolName(val: any): string {
+  return stripAccentsUpper(val)
+    .replace(/^\s*(ESCOLA|UNIDADE ESCOLAR|POLO)\s*:\s*/, '')
+    .replace(/[^A-Z0-9 ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Converte qualquer escrita de série para a forma canônica (ex: "Pré-Escola II" -> "PRÉ II", "5º Ano A" -> "5º ANO"). */
+export function canonicalGrade(val: any): string {
+  const s = String(val ?? '').trim();
+  if (!s) return '';
+  const r = extractSeriesFromFirstColumnHeader(s);
+  return r.known && r.series ? r.series : s.toUpperCase().replace(/\s+/g, ' ');
+}
+
+export function sameGrade(a: any, b: any): boolean {
+  const x = stripAccentsUpper(canonicalGrade(a));
+  const y = stripAccentsUpper(canonicalGrade(b));
+  return !!x && x === y;
+}
+
+/** Procura a escola no cadastro pelo nome (ignora acentos, maiúsculas e o prefixo "ESCOLA:"). */
+export function findRegisteredSchoolUnit(name: string, units: SchoolUnit[]): SchoolUnit | undefined {
+  const target = normalizeSchoolName(name);
+  if (!target) return undefined;
+  const exact = units.find(
+    (u) => normalizeSchoolName(u.name) === target || (u.tradeName && normalizeSchoolName(u.tradeName) === target)
+  );
+  if (exact) return exact;
+  // Correspondência parcial (ex: "ERMINIO BRITO" x "EMIEIF ERMINIO BRITO"), só se houver um único candidato
+  const partial = units.filter((u) =>
+    [u.name, u.tradeName].some((n) => {
+      const nn = normalizeSchoolName(n);
+      if (!nn) return false;
+      const shorter = nn.length < target.length ? nn : target;
+      return shorter.length >= 10 && (nn.includes(target) || target.includes(nn));
+    })
+  );
+  return partial.length === 1 ? partial[0] : undefined;
+}
+
+/** Turma da escola para a série informada (nunca devolve turma de outra escola). */
+export function findClassForSeries(
+  unitId: string | undefined,
+  series: string,
+  classes: SchoolClass[],
+  allowUnlinkedClasses = false
+): SchoolClass | undefined {
+  if (!series) return undefined;
+  const sameSeries = (c: SchoolClass) => sameGrade(c.gradeLevel, series) || sameGrade(c.name, series);
+  if (unitId) {
+    const inUnit = classes.find((c) => c.schoolUnitId === unitId && sameSeries(c));
+    if (inUnit) return inUnit;
+  }
+  if (allowUnlinkedClasses || !unitId) {
+    return classes.find((c) => !c.schoolUnitId && sameSeries(c));
+  }
+  return undefined;
 }
 
 export const DEFAULT_IMPORT_FILTERS: ImportFilterOptions = {
@@ -131,7 +261,7 @@ export const DEFAULT_IMPORT_FILTERS: ImportFilterOptions = {
 export function extractSeriesFromFirstColumnHeader(
   cellText: any,
   adjacentCells?: any[]
-): { series: string | null; cleanHeader: string; studentNumber?: string } {
+): { series: string | null; cleanHeader: string; studentNumber?: string; known?: boolean } {
   if (!cellText && (!adjacentCells || adjacentCells.length === 0)) {
     return { series: null, cleanHeader: '' };
   }
@@ -151,6 +281,14 @@ export function extractSeriesFromFirstColumnHeader(
   // 1. Padrões específicos de séries e etapas escolares brasileiras
   const knownPatterns: Array<{ regex: RegExp; format: (m: RegExpMatchArray) => string }> = [
     {
+      regex: /\bPR[EÉ][\s\-_]*ESCOLA[\s\-_]*(?:II|2)\b/i,
+      format: () => 'PRÉ II',
+    },
+    {
+      regex: /\bPR[EÉ][\s\-_]*ESCOLA[\s\-_]*(?:I|1)\b/i,
+      format: () => 'PRÉ I',
+    },
+    {
       regex: /\bPR[EÉ][\s\-_]*(?:II|2)\b/i,
       format: () => 'PRÉ II',
     },
@@ -163,7 +301,7 @@ export function extractSeriesFromFirstColumnHeader(
       format: () => 'PRÉ-ESCOLA',
     },
     {
-      regex: /\b(\d+)[º°ªaA]?\s*(?:ANO|S[EÉ]RIE)\b/i,
+      regex: /\b(\d{1,2})\s*[º°ªaAoO]?\s*(?:ANOS?|S[EÉ]RIES?)\b/i,
       format: (m) => `${m[1]}º ANO`,
     },
     {
@@ -219,6 +357,7 @@ export function extractSeriesFromFirstColumnHeader(
         series: format(match),
         cleanHeader: raw,
         studentNumber,
+        known: true,
       };
     }
   }
@@ -243,97 +382,109 @@ export function extractSeriesFromFirstColumnHeader(
 }
 
 /**
- * Analisa o texto de séries atendidas no cabeçalho (ex: "PRÉ II – 1º AO 5º - 6º AO 9º")
- * e expande para a lista nominal completa de turmas/séries que a escola atende.
+ * Analisa o texto de séries atendidas no cabeçalho (ex: "PRÉ II – 1º AO 5º - 6º AO 9º ANOS")
+ * e expande para a lista nominal completa de séries que a escola atende.
+ * Ex: -> ['PRÉ II', '1º ANO', '2º ANO', ..., '9º ANO']  (não inclui PRÉ I se ele não foi citado)
  */
 export function extractSchoolGradesServed(gradesText: string): { rawText: string; expandedGrades: string[] } {
-  if (!gradesText) {
-    return { rawText: '', expandedGrades: ['PRÉ II'] };
+  const rawText = String(gradesText || '').trim();
+  if (!rawText) {
+    return { rawText: '', expandedGrades: [] };
   }
 
-  const rawText = gradesText.trim();
-  const parts = rawText.split(/[–\-\|\,\;\/]+/).map((p) => p.trim()).filter(Boolean);
   const gradesSet = new Set<string>();
+  let rest = ` ${rawText.toUpperCase()} `;
 
-  parts.forEach((part) => {
-    const upper = part.toUpperCase();
+  // 1. "PRÉ I E II", "PRÉ I/II", "PRÉ-ESCOLA I AO II"
+  rest = rest.replace(
+    /PR[EÉ](?:[\s\-_]*ESCOLA)?[\s\-_]*(?:I|1)\s*(?:E|,|\/|AO|A|À)\s*(?:II|2)\b/g,
+    () => {
+      gradesSet.add('PRÉ I');
+      gradesSet.add('PRÉ II');
+      return ' | ';
+    }
+  );
 
-    // Caso 1: "1º AO 5º" ou "1 AO 5" ou "1º AO 5º ANO"
-    const rangeMatch = upper.match(/(\d+)[º°oO]?\s*(?:AO|A|ATE|ATÉ)\s*(\d+)[º°oO]?(?:\s*ANO)?/i);
-    if (rangeMatch) {
-      const start = parseInt(rangeMatch[1], 10);
-      const end = parseInt(rangeMatch[2], 10);
-      if (!isNaN(start) && !isNaN(end) && start <= end) {
-        for (let g = start; g <= end; g++) {
-          gradesSet.add(`${g}º ANO`);
-        }
+  // 2. Intervalos: "1º AO 5º", "6 ATÉ 9º ANO", "1º ANO AO 5º ANO"
+  rest = rest.replace(
+    /(\d{1,2})\s*[º°ª]?\s*(?:ANOS?|S[EÉ]RIES?)?\s*(?:AO|ATÉ|ATE|À|A)\s*(\d{1,2})\s*[º°ª]?(?:\s*(?:ANOS?|S[EÉ]RIES?))?/g,
+    (m, a, b) => {
+      const start = parseInt(a, 10);
+      const end = parseInt(b, 10);
+      if (start >= 1 && end <= 12 && start <= end) {
+        for (let g = start; g <= end; g++) gradesSet.add(`${g}º ANO`);
+        return ' | ';
+      }
+      return m;
+    }
+  );
+
+  // 3. Demais trechos isolados ("PRÉ II", "3º ANO", "EJA", "MULTISSERIADA"...)
+  rest
+    .split(/\s[–—-]\s|[–—,;\/|+]|\sE\s/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .forEach((part) => {
+      const ordinalOnly = part.match(/^(\d{1,2})\s*[º°ª]$/);
+      if (ordinalOnly) {
+        gradesSet.add(`${parseInt(ordinalOnly[1], 10)}º ANO`);
         return;
       }
-    }
-
-    // Caso 2: Pré I, Pré II
-    if (upper.includes('PRÉ') || upper.includes('PRE')) {
-      if (upper.includes('I') && upper.includes('II')) {
-        gradesSet.add('PRÉ I');
-        gradesSet.add('PRÉ II');
-      } else if (upper.includes('II')) {
-        gradesSet.add('PRÉ II');
-      } else if (upper.includes('I')) {
-        gradesSet.add('PRÉ I');
-      } else {
-        gradesSet.add('EDUCAÇÃO INFANTIL - PRÉ');
+      const parsed = extractSeriesFromFirstColumnHeader(part);
+      if (parsed.known && parsed.series) {
+        gradesSet.add(parsed.series);
       }
-      return;
-    }
+    });
 
-    // Caso 3: Creche / Berçário / Maternal
-    if (upper.includes('CRECHE')) gradesSet.add('CRECHE');
-    if (upper.includes('BERÇÁRIO') || upper.includes('BERCARIO')) gradesSet.add('BERÇÁRIO');
-    if (upper.includes('MATERNAL')) gradesSet.add('MATERNAL');
-
-    // Caso 4: Ano específico isolado (ex: "1º ANO", "5º ANO", "9º ANO")
-    const singleAnoMatch = upper.match(/(\d+)[º°oO]?\s*ANO/i);
-    if (singleAnoMatch) {
-      gradesSet.add(`${singleAnoMatch[1]}º ANO`);
-      return;
-    }
-
-    // Se for um texto não mapeado mas com conteúdo
-    if (part.length > 1 && !/^\d+$/.test(part)) {
-      gradesSet.add(part.toUpperCase());
-    }
-  });
-
-  // Se o conjunto ficou vazio, garante pelo menos PRÉ II ou o que veio no texto
-  if (gradesSet.size === 0) {
-    gradesSet.add('PRÉ II');
-  }
-
-  // Ordenação lógica das séries
-  const orderedGrades = Array.from(gradesSet).sort((a, b) => {
-    const rank = (str: string) => {
-      if (str.includes('BERÇÁRIO')) return 1;
-      if (str.includes('CRECHE')) return 2;
-      if (str.includes('MATERNAL')) return 3;
-      if (str.includes('PRÉ I') || str.includes('PRE I')) return 4;
-      if (str.includes('PRÉ II') || str.includes('PRE II')) return 5;
-      const numMatch = str.match(/(\d+)/);
-      if (numMatch) return 10 + parseInt(numMatch[1], 10);
-      return 99;
-    };
-    return rank(a) - rank(b);
-  });
+  const rank = (str: string) => {
+    if (str.includes('BERÇÁRIO')) return 1;
+    if (str.includes('CRECHE')) return 2;
+    if (str.includes('MATERNAL')) return 3;
+    if (str === 'PRÉ II') return 5;
+    if (str === 'PRÉ I') return 4;
+    if (str.includes('PRÉ')) return 6;
+    const numMatch = str.match(/^(\d+)º ANO$/);
+    if (numMatch) return 10 + parseInt(numMatch[1], 10);
+    return 99;
+  };
 
   return {
     rawText,
-    expandedGrades: orderedGrades,
+    expandedGrades: Array.from(gradesSet).sort((a, b) => rank(a) - rank(b)),
   };
 }
 
+function segmentForGrade(serie: string): string {
+  if (/PR[EÉ]|CRECHE|MATERNAL|BER[CÇ]|INFANTIL|JARDIM/i.test(serie)) return 'EDUCACAO_INFANTIL';
+  if (/M[EÉ]DIO/i.test(serie)) return 'ENSINO_MEDIO';
+  return 'ENSINO_FUNDAMENTAL';
+}
+
+/** Monta uma turma nova para a série, vinculada à escola. */
+export function buildClassForSeries(
+  unit: SchoolUnit,
+  serie: string,
+  defaultShift: ClassShift | string = 'MANHÃ',
+  roomIndex = 0
+): SchoolClass {
+  const shortName = unit.tradeName || unit.name;
+  return {
+    id: `class-${unit.id}-${stripAccentsUpper(serie).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    name: `${shortName} - ${serie} (${defaultShift})`,
+    gradeLevel: serie,
+    segment: segmentForGrade(serie),
+    shift: (defaultShift as ClassShift) || 'MANHÃ',
+    schoolYear: new Date().getFullYear(),
+    roomNumber: `Sala ${String(roomIndex + 1).padStart(2, '0')}`,
+    maxCapacity: 30,
+    schoolUnitId: unit.id,
+  } as SchoolClass;
+}
+
 /**
- * Cria ou recupera a SchoolUnit e gera as classes (turmas) para as séries que ela atende.
- * O cadastro da unidade escolar fica com status 'INCOMPLETE' e lista de pendências
- * para complementação posterior pelo usuário/secretaria.
+ * Cria uma NOVA unidade escolar (quando não existe no cadastro) e as turmas das séries que ela atende.
+ * O cadastro fica 'INCOMPLETE' com a lista de pendências para complementação pela secretaria.
+ * Se a escola já estiver cadastrada, devolve a escola existente SEM alterá-la.
  */
 export function buildSchoolUnitAndClassesFromImport(
   schoolName: string,
@@ -348,119 +499,66 @@ export function buildSchoolUnitAndClassesFromImport(
   isNewUnit: boolean;
   createdClasses: SchoolClass[];
 } {
-  const cleanSchoolName = (schoolName || 'Escola Municipal')
-    .replace(/^ESCOLA:\s*/i, '')
-    .replace(/^EMEF\s*/i, '')
-    .trim() || 'Polo Remoto';
-
-  const fullSchoolName = schoolName.toUpperCase().startsWith('ESCOLA:')
-    ? schoolName.toUpperCase()
-    : `ESCOLA: ${cleanSchoolName.toUpperCase()}`;
+  const cleanSchoolName =
+    String(schoolName || '')
+      .replace(/^\s*ESCOLA:\s*/i, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toUpperCase() || 'ESCOLA NÃO IDENTIFICADA';
 
   const { rawText, expandedGrades } = extractSchoolGradesServed(gradesText);
-
-  // Se houver série da primeira coluna que não estava no gradesText, acrescenta
-  if (firstColumnSeries && !expandedGrades.includes(firstColumnSeries.toUpperCase())) {
-    expandedGrades.unshift(firstColumnSeries.toUpperCase());
+  if (firstColumnSeries && !expandedGrades.some((g) => sameGrade(g, firstColumnSeries))) {
+    expandedGrades.unshift(canonicalGrade(firstColumnSeries));
   }
 
-  // Verifica se já existe uma unidade com esse nome
-  const existing = existingUnits.find(
-    (u) =>
-      u.name.toLowerCase().trim() === fullSchoolName.toLowerCase().trim() ||
-      u.name.toLowerCase().trim() === cleanSchoolName.toLowerCase().trim() ||
-      u.tradeName?.toLowerCase().trim() === cleanSchoolName.toLowerCase().trim()
-  );
-
-  let schoolUnit: SchoolUnit;
-  let isNewUnit = false;
-
+  const existing = findRegisteredSchoolUnit(cleanSchoolName, existingUnits);
   if (existing) {
-    schoolUnit = {
-      ...existing,
-      gradesServed: Array.from(new Set([...(existing.gradesServed || []), ...expandedGrades])),
-      gradesServedText: existing.gradesServedText || rawText,
-    };
-  } else {
-    isNewUnit = true;
-    schoolUnit = {
-      id: `unit-imp-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-      name: fullSchoolName,
-      tradeName: cleanSchoolName,
-      inepCode: 'Pendente de Regularização Censo',
-      cnpjOrDecree: 'Pendente de Decreto / Ato de Criação',
-      type: 'ESCOLA_POLO',
-      locationZone: 'ZONA_RURAL',
-      district: 'Polo Remoto',
-      address: 'Aguardando Informações Complementares da Secretaria',
-      directorName: 'Pendente de Designação Oficial',
-      coordinatorName: 'Coordenação Polo Remoto',
-      secretaryName: 'Pendente de Nomeação',
-      phone: '',
-      email: `polo.${cleanSchoolName.toLowerCase().replace(/[^a-z0-9]/g, '')}@educacao.gov.br`,
-      hasInternet: false,
-      syncStatus: 'PENDENTE',
-      totalStudents: 0,
-      totalTeachers: 0,
-      totalClasses: expandedGrades.length,
-      lastSyncDate: new Date().toISOString(),
-      gradesServed: expandedGrades,
-      gradesServedText: rawText || 'PRÉ II – 1º AO 5º - 6º AO 9º',
-      cadastralStatus: 'INCOMPLETE', // Conforme solicitado: cadastro pendente de informações complementares
-      pendingFields: [
-        'Código INEP Escolar',
-        'Ato de Autorização / Decreto',
-        'Nome do(a) Diretor(a)',
-        'Telefone e Contato Oficial',
-        'Endereço Completo e CEP',
-        'Infraestrutura e Quantidade de Salas',
-      ],
-      createdViaImport: true,
-      importSourceFileName: sourceFileName,
-    };
+    return { schoolUnit: existing, isNewUnit: false, createdClasses: [] };
   }
 
-  // Criar turmas para cada série atendida vinculadas à unidade escolar
+  const schoolUnit: SchoolUnit = {
+    id: `unit-imp-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+    name: cleanSchoolName,
+    tradeName: cleanSchoolName,
+    inepCode: 'Pendente de Regularização Censo',
+    cnpjOrDecree: 'Pendente de Decreto / Ato de Criação',
+    type: 'ESCOLA_POLO',
+    locationZone: 'ZONA_RURAL',
+    district: 'Polo Remoto',
+    address: 'Aguardando Informações Complementares da Secretaria',
+    directorName: 'Pendente de Designação Oficial',
+    coordinatorName: 'Coordenação Polo Remoto',
+    secretaryName: 'Pendente de Nomeação',
+    phone: '',
+    email: `polo.${stripAccentsUpper(cleanSchoolName).toLowerCase().replace(/[^a-z0-9]/g, '')}@educacao.gov.br`,
+    hasInternet: false,
+    syncStatus: 'PENDENTE',
+    totalStudents: 0,
+    totalTeachers: 0,
+    totalClasses: expandedGrades.length,
+    lastSyncDate: new Date().toISOString(),
+    gradesServed: expandedGrades,
+    gradesServedText: rawText,
+    cadastralStatus: 'INCOMPLETE',
+    pendingFields: [
+      'Código INEP Escolar',
+      'Ato de Autorização / Decreto',
+      'Nome do(a) Diretor(a)',
+      'Telefone e Contato Oficial',
+      'Endereço Completo e CEP',
+      'Infraestrutura e Quantidade de Salas',
+    ],
+    createdViaImport: true,
+    importSourceFileName: sourceFileName,
+  } as SchoolUnit;
+
   const createdClasses: SchoolClass[] = [];
-  const currentYear = new Date().getFullYear();
-
   expandedGrades.forEach((serie, idx) => {
-    const classId = `class-${schoolUnit.id}-${serie.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
-
-    // Verifica se já existe classe correspondente
-    const alreadyExists = existingClasses.some(
-      (c) =>
-        (c.schoolUnitId === schoolUnit.id && c.gradeLevel.toLowerCase() === serie.toLowerCase()) ||
-        c.id === classId
-    );
-
-    if (!alreadyExists) {
-      let segment = 'ENSINO_FUNDAMENTAL';
-      if (serie.includes('PRÉ') || serie.includes('CRECHE') || serie.includes('MATERNAL') || serie.includes('INFANTIL')) {
-        segment = 'EDUCACAO_INFANTIL';
-      } else if (serie.includes('MÉDIO') || serie.includes('MEDIO')) {
-        segment = 'ENSINO_MEDIO';
-      }
-
-      createdClasses.push({
-        id: classId,
-        name: `${cleanSchoolName} - ${serie} (${defaultShift})`,
-        gradeLevel: serie,
-        segment,
-        shift: (defaultShift as ClassShift) || 'MANHÃ',
-        schoolYear: currentYear,
-        roomNumber: `Sala 0${idx + 1}`,
-        maxCapacity: 30,
-        schoolUnitId: schoolUnit.id,
-      });
-    }
+    const cls = buildClassForSeries(schoolUnit, serie, defaultShift, idx);
+    if (!existingClasses.some((c) => c.id === cls.id)) createdClasses.push(cls);
   });
 
-  return {
-    schoolUnit,
-    isNewUnit,
-    createdClasses,
-  };
+  return { schoolUnit, isNewUnit: true, createdClasses };
 }
 
 // Limpa strings com caracteres como '*****', '---', etc.
@@ -538,7 +636,7 @@ function parseGender(val: any): 'M' | 'F' | 'OTHER' {
 
 // Normaliza Raça/Cor padrão Censo Escolar / IBGE
 function parseRaceColor(val: any): RaceColorType {
-  const str = cleanPlaceholder(val).toUpperCase();
+  const str = stripAccentsUpper(cleanPlaceholder(val));
   if (str.includes('PARD')) return 'PARDA';
   if (str.includes('BRANC')) return 'BRANCA';
   if (str.includes('PRET') || str.includes('NEGR')) return 'PRETA';
@@ -655,6 +753,142 @@ export async function parseSingleFile(
   }
 }
 
+// Mapeia as colunas pelo texto do cabeçalho (palavras-chave)
+function mapColumnsByHeader(headers: string[]): Record<string, number> {
+  const colMap: Record<string, number> = {};
+  headers.forEach((h, idx) => {
+    const norm = stripAccentsUpper(h).replace(/\s+/g, ' ').trim();
+    if (!norm) return;
+
+    // SÉRIE / TURMA (coluna com a série de cada aluno)
+    if (
+      (norm.includes('SERIE') || norm.includes('TURMA') || norm.includes('ANO DE ENSINO') || norm.includes('ETAPA')) &&
+      !norm.includes('NASCIM')
+    ) {
+      if (colMap.series === undefined) colMap.series = idx;
+    }
+
+    // Nº de ordem (ex: "PRÉII Nº", "Nº", "ORDEM")
+    if (
+      /N[º°]|\bNO\.|NUMERO|\bORDEM\b|^N$|^ORD\.?$/.test(norm) ||
+      String(h).includes('Nº') ||
+      String(h).includes('N°')
+    ) {
+      if (colMap.seq === undefined) colMap.seq = idx;
+    }
+
+    const isOtherField = /SERIE|TURMA|SEXO|\bCOR\b|RACA|ENDERECO|EDENRECO|PCD|LAUDO|NASCIM|RESPONSAVEL|\bMAE\b|\bPAI\b/.test(norm);
+    if (!isOtherField && (norm.includes('NOME') || norm === 'ALUNO' || norm === 'ESTUDANTE')) {
+      if (colMap.name === undefined) colMap.name = idx;
+    }
+
+    if (norm.includes('NASCIM') || /\bNASC\b/.test(norm) || norm.includes('ANIVERSARIO')) {
+      if (colMap.birthDate === undefined) colMap.birthDate = idx;
+    }
+
+    if (norm.includes('SEXO') || norm.includes('GENERO')) {
+      if (colMap.gender === undefined) colMap.gender = idx;
+    }
+
+    if (norm.includes('RACA') || /\bCOR\b/.test(norm) || norm.includes('ETNIA')) {
+      if (colMap.race === undefined) colMap.race = idx;
+    }
+
+    if (/ENDERECO|EDENRECO|LOGRADOURO|RESIDENCIA|BAIRRO|LOCALIDADE/.test(norm)) {
+      if (colMap.address === undefined) colMap.address = idx;
+    }
+
+    if (norm.includes('TURNO') || norm.includes('PERIODO')) {
+      if (colMap.shift === undefined) colMap.shift = idx;
+    }
+
+    if (/\bTEA\b|AUTISMO|ESPECTRO/.test(norm)) {
+      if (colMap.tea === undefined) colMap.tea = idx;
+    }
+
+    if (/PCD|DEFICIENCIA|CONDICAO|CLASSIFICACAO MEDICA|NECESSIDADES/.test(norm)) {
+      if (colMap.pcd === undefined) colMap.pcd = idx;
+    }
+
+    if (/LAUDO|COMPROVACAO/.test(norm)) {
+      if (colMap.laudo === undefined) colMap.laudo = idx;
+    }
+  });
+  return colMap;
+}
+
+/**
+ * Confere as colunas da ESQUERDA para a DIREITA conforme o modelo oficial
+ * (Nº | NOME | NASCIMENTO | SEXO | RAÇA/COR | ENDEREÇO | PCD | LAUDO).
+ * Colunas cujo cabeçalho não foi reconhecido são lidas pela posição esperada.
+ */
+function checkColumnsLeftToRight(
+  headers: string[],
+  colMap: Record<string, number>,
+  matrix: any[][],
+  headerRowIndex: number
+): { report: ImportColumnCheck[]; extraColumns: string[]; ignoredColumns: string[] } {
+  const byHeader = new Set(Object.keys(colMap));
+  // A 1ª coluna pode ser "Nº" (seq) ou "SÉRIE DO ALUNO" (series)
+  if (colMap.seq === undefined && colMap.series !== undefined && colMap.series < (colMap.name ?? 1)) {
+    colMap.seq = colMap.series;
+    byHeader.add('seq');
+  }
+
+  const columnHasData = (idx: number) =>
+    matrix.slice(headerRowIndex + 1, headerRowIndex + 30).some((row) => cleanPlaceholder(row?.[idx]) !== '' || String(row?.[idx] ?? '').includes('*'));
+  const used = () => new Set(Object.values(colMap));
+
+  const anchor = colMap.name ?? 1;
+  if (colMap.name === undefined && headers.length >= 2) colMap.name = anchor;
+
+  // Preenche por posição as colunas não reconhecidas pelo cabeçalho
+  EXPECTED_STUDENT_COLUMNS.forEach((col, pos) => {
+    if (colMap[col.key] !== undefined) return;
+    const idx = anchor + (pos - 1);
+    if (idx < 0 || idx >= Math.max(headers.length, 1)) return;
+    if (used().has(idx)) return;
+    if (!String(headers[idx] ?? '').trim() && !columnHasData(idx)) return;
+    colMap[col.key] = idx;
+  });
+
+  let lastIdx = -1;
+  const report: ImportColumnCheck[] = EXPECTED_STUDENT_COLUMNS.map((col, pos) => {
+    const idx = colMap[col.key];
+    if (idx === undefined) {
+      return { key: col.key, label: col.label, expectedPosition: pos + 1, status: 'AUSENTE', required: col.required };
+    }
+    let status: ImportColumnCheck['status'] = byHeader.has(col.key) ? 'OK' : 'POR_POSICAO';
+    if (idx < lastIdx) status = 'FORA_DE_ORDEM';
+    lastIdx = Math.max(lastIdx, idx);
+    return {
+      key: col.key,
+      label: col.label,
+      expectedPosition: pos + 1,
+      columnIndex: idx,
+      columnLetter: columnLetter(idx),
+      header: String(headers[idx] ?? '').replace(/\s+/g, ' ').trim(),
+      status,
+      required: col.required,
+    };
+  });
+
+  const expectedIdx = new Set(report.map((r) => r.columnIndex).filter((i) => i !== undefined));
+  const extraLabels: Record<string, string> = { tea: 'TEA', shift: 'Turno', series: 'Série do aluno' };
+  const extraColumns: string[] = [];
+  Object.entries(extraLabels).forEach(([k, label]) => {
+    const idx = colMap[k];
+    if (idx !== undefined && !expectedIdx.has(idx)) extraColumns.push(`${label} (coluna ${columnLetter(idx)})`);
+  });
+  const allUsed = used();
+  const ignoredColumns = headers
+    .map((h, i) => ({ h: String(h ?? '').replace(/\s+/g, ' ').trim(), i }))
+    .filter(({ h, i }) => h && !allUsed.has(i))
+    .map(({ h, i }) => `${h} (coluna ${columnLetter(i)})`);
+
+  return { report, extraColumns, ignoredColumns };
+}
+
 // Processa planilha crua linha por linha com detecção de metadados do cabeçalho
 export function processSheetWithHeaders(
   matrix: any[][],
@@ -665,226 +899,156 @@ export function processSheetWithHeaders(
   schoolUnits: SchoolUnit[]
 ): FileImportResult {
   let schoolNameDetected = '';
-  let seriesDetected = '';
+  let gradesServedText = '';
   let dateDetected = '';
   let headerRowIndex = -1;
   let headers: string[] = [];
+  const warnings: string[] = [];
+  const errors: string[] = [];
 
-  // 1. Varrer as primeiras 15 linhas para detectar metadados da escola e identificar a linha de cabeçalho
+  // 1. Varre as primeiras 15 linhas: dados da escola (ESCOLA / DATA / TURMA) e linha de cabeçalho da tabela
   for (let r = 0; r < Math.min(matrix.length, 15); r++) {
     const row = matrix[r] || [];
-    const rowText = row.map((c) => String(c).trim()).join(' ');
+    const rowText = row.map((c) => String(c ?? '').replace(/[\r\n]+/g, ' ').trim()).filter(Boolean).join(' | ');
 
-    // Detecção: ESCOLA: EMEI RUTH PEREIRA BARBARESCO ou ESCOLA: MARIA DA PRAIA
-    const schoolMatch = rowText.match(/ESCOLA:\s*([^\n\r\|\t]+?)(?=\s+TURMAS?:|\s+DATA:|\s*\||$)/i);
-    if (schoolMatch && !schoolNameDetected) {
+    const schoolMatch = rowText.match(/ESCOLA\s*:\s*(.+?)(?=\s*\|?\s*(?:TURMAS?|S[EÉ]RIES?|DATA)\s*:|\s*\||$)/i);
+    if (schoolMatch && !schoolNameDetected && schoolMatch[1].trim()) {
       schoolNameDetected = schoolMatch[1].trim();
     }
 
-    // Detecção: TURMA: PRÉ-ESCOLA I A ou TURMAS: PRÉ II – 1º AO 5º - 6º AO 9º
-    const turmasMatch = rowText.match(/TURMAS?:\s*([^\n\r\|\t]+?)(?=\s+DATA:|\s*\||$)/i);
-    if (turmasMatch && !seriesDetected) {
-      seriesDetected = turmasMatch[1].trim();
+    const turmasMatch = rowText.match(/(?:TURMAS?|S[EÉ]RIES?(?:\s+ATENDIDAS)?)\s*:\s*(.+?)(?=\s*\|?\s*(?:DATA|ESCOLA)\s*:|\s*\||$)/i);
+    if (turmasMatch && !gradesServedText && turmasMatch[1].trim()) {
+      gradesServedText = turmasMatch[1].trim();
     }
 
-    // Detecção: DATA: 15/09/2026 ou 01/09/2026
-    const dataMatch = rowText.match(/DATA:\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i);
+    const dataMatch = rowText.match(/DATA\s*:\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/i);
     if (dataMatch && !dateDetected) {
       dateDetected = dataMatch[1].trim();
     }
 
-    // Procurar a linha que contém as colunas da tabela
-    // Ex: "NOME COMPLETO DO ALUNO" ou "DE NASCIM" ou "DATA DE NASCIMENTO"
     const hasStudentNameCol = row.some((cell) => {
-      const c = String(cell).toUpperCase();
-      return (
-        c.includes('NOME COMPLETO') ||
-        c.includes('NOME DO ALUNO') ||
-        c === 'NOME' ||
-        c === 'ALUNO'
-      );
+      const c = stripAccentsUpper(cell).replace(/\s+/g, ' ').trim();
+      return c.includes('NOME COMPLETO') || c.includes('NOME DO ALUNO') || c.includes('NOME DO ESTUDANTE') || c === 'NOME' || c === 'ALUNO';
     });
-
     if (hasStudentNameCol && headerRowIndex === -1) {
       headerRowIndex = r;
-      headers = row.map((c) => String(c).trim());
+      headers = row.map((c) => String(c ?? '').trim());
     }
   }
 
-  // Se não encontrou cabeçalho nas primeiras linhas, assume linha 0
   if (headerRowIndex === -1 && matrix.length > 0) {
     headerRowIndex = 0;
-    headers = (matrix[0] || []).map((c) => String(c).trim());
+    headers = (matrix[0] || []).map((c) => String(c ?? '').trim());
+    warnings.push('Não foi encontrada a coluna "NOME COMPLETO DO ALUNO" no cabeçalho; a 1ª linha foi usada como cabeçalho.');
   }
 
-  // Mapear índices das colunas
-  const colMap: Record<string, number> = {};
-  headers.forEach((h, idx) => {
-    const norm = h
-      .toUpperCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    // 1. SERIE DO ALUO / SERIE DO ALUNO / TURMA
-    if (
-      (norm.includes('SERIE') ||
-        norm.includes('TURMA') ||
-        norm.includes('ANO DE ENSINO') ||
-        norm.includes('ETAPA') ||
-        norm === 'SERIE DO ALUO' ||
-        norm === 'SERIE DO ALUNO') &&
-      !norm.includes('NASCIM')
-    ) {
-      if (colMap.series === undefined) colMap.series = idx;
-    }
-
-    // Nº de Ordem
-    if (
-      norm.includes('Nº') ||
-      norm.includes('N°') ||
-      norm.includes('NO.') ||
-      norm.includes('NUMERO') ||
-      norm.includes('ORDEM') ||
-      norm === 'N' ||
-      norm === 'ORD'
-    ) {
-      if (colMap.seq === undefined) colMap.seq = idx;
-    }
-
-    // 2. NOME COMPLETO DO ALUNO
-    // Não vincular colunas que contenham termos de outros campos (SERIE, SEXO, RACA, EDENRECO, PCD, LAUDO, NASCIM)
-    const isSpecialStudentField =
-      norm.includes('SERIE') ||
-      norm.includes('TURMA') ||
-      norm.includes('SEXO') ||
-      norm.includes('COR') ||
-      norm.includes('RACA') ||
-      norm.includes('ENDERECO') ||
-      norm.includes('EDENRECO') ||
-      norm.includes('PCD') ||
-      norm.includes('LAUDO') ||
-      norm.includes('NASCIM');
-
-    if (
-      !isSpecialStudentField &&
-      (norm.includes('NOME') || norm === 'ALUNO' || norm === 'ESTUDANTE' || norm === 'NOME COMPLETO DO ALUNO')
-    ) {
-      if (colMap.name === undefined) colMap.name = idx;
-    }
-
-    // 3. DATA DE NASCIMENTO
-    if (norm.includes('NASCIM') || norm.includes('NASC') || norm.includes('ANIVERSARIO') || norm.includes('DATA DE NASCIMENTO')) {
-      if (colMap.birthDate === undefined) colMap.birthDate = idx;
-    }
-
-    // 4. SEXO DO ALUNO
-    if (norm.includes('SEXO') || norm.includes('GENERO')) {
-      if (colMap.gender === undefined) colMap.gender = idx;
-    }
-
-    // 5. COR/RAÇA DO ALUNO
-    if (norm.includes('RACA') || norm.includes('COR') || norm.includes('ETNIA')) {
-      if (colMap.race === undefined) colMap.race = idx;
-    }
-
-    // 6. EDENREÇO DO ALUNO / ENDEREÇO
-    if (
-      norm.includes('ENDERECO') ||
-      norm.includes('EDENRECO') ||
-      norm.includes('LOGRADOURO') ||
-      norm.includes('VILA') ||
-      norm.includes('RESIDENCIA') ||
-      norm.includes('BAIRRO') ||
-      norm.includes('VICINAL') ||
-      norm.includes('FAZENDA')
-    ) {
-      if (colMap.address === undefined) colMap.address = idx;
-    }
-
-    // TURNO / PERÍODO
-    if (norm.includes('TURNO') || norm.includes('PERIODO')) {
-      if (colMap.shift === undefined) colMap.shift = idx;
-    }
-
-    // Coluna TEA (Sim/Não)
-    if (norm.includes('TEA') || norm.includes('AUTISMO') || norm.includes('ESPECTRO')) {
-      if (colMap.tea === undefined) colMap.tea = idx;
-    }
-
-    // 7. PCD DO ALUNO / Condição Especial
-    if (
-      norm.includes('PCD') ||
-      norm.includes('DEFICIENCIA') ||
-      norm.includes('CONDICAO') ||
-      norm.includes('CLASSIFICACAO MEDICA') ||
-      norm.includes('NECESSIDADES')
-    ) {
-      if (colMap.pcd === undefined) colMap.pcd = idx;
-    }
-
-    // 8. SE O ALUNO TEM LAUDO / LAUDO
-    if (norm.includes('LAUDO') || norm.includes('COMPROVACAO') || norm.includes('TEM LAUDO')) {
-      if (colMap.laudo === undefined) colMap.laudo = idx;
+  // 2. Colunas: pelo cabeçalho e, na falta, pela posição (esquerda -> direita)
+  const colMap = mapColumnsByHeader(headers);
+  const { report: columnReport, extraColumns, ignoredColumns } = checkColumnsLeftToRight(headers, colMap, matrix, headerRowIndex);
+  columnReport.forEach((c) => {
+    if (c.status === 'AUSENTE') {
+      (c.required ? errors : warnings).push(`Coluna "${c.label}" (${c.expectedPosition}ª coluna esperada) não encontrada.`);
+    } else if (c.status === 'FORA_DE_ORDEM') {
+      warnings.push(`Coluna "${c.label}" está fora da ordem esperada (encontrada na coluna ${c.columnLetter}).`);
+    } else if (c.status === 'POR_POSICAO') {
+      warnings.push(`Cabeçalho da coluna ${c.columnLetter} ("${c.header || 'vazio'}") não reconhecido; lida como "${c.label}" pela posição.`);
     }
   });
 
-  // Fallback padrão municipal caso a planilha contenha a estrutura clássica de 8 colunas:
-  // 0: SERIE DO ALUO / Nº
-  // 1: NOME COMPLETO DO ALUNO
-  // 2: DATA DE NASCIMENTO
-  // 3: SEXO DO ALUNO
-  // 4: COR/RAÇA DO ALUNO
-  // 5: EDENREÇO DO ALUNO
-  // 6: PCD DO ALUNO
-  // 7: SE O ALUNO TEM LAUDO
-  if (colMap.name === undefined && headers.length >= 2) {
-    if (colMap.series === undefined) colMap.series = 0;
-    colMap.name = 1;
-    if (colMap.birthDate === undefined && headers.length >= 3) colMap.birthDate = 2;
-    if (colMap.gender === undefined && headers.length >= 4) colMap.gender = 3;
-    if (colMap.race === undefined && headers.length >= 5) colMap.race = 4;
-    if (colMap.address === undefined && headers.length >= 6) colMap.address = 5;
-    if (colMap.pcd === undefined && headers.length >= 7) colMap.pcd = 6;
-    if (colMap.laudo === undefined && headers.length >= 8) colMap.laudo = 7;
-  }
-
-  // 2. Extração especializada da Série na 1ª Coluna (como "PRÉ II \n Nº" ou "PRÉ II Nº" ou "SERIE DO ALUO")
-  const firstColIdx = colMap.series !== undefined ? colMap.series : colMap.seq !== undefined ? colMap.seq : 0;
+  // 3. Série da tabela: cabeçalho da 1ª coluna (ex: "PRÉII Nº") ou, se o cabeçalho TURMA tiver uma só série, ela
+  const firstColIdx = colMap.seq ?? colMap.series ?? 0;
   const firstColRawHeader = headers[firstColIdx] || '';
-  const adjacentFirstColCells: any[] = [];
-  if (headerRowIndex > 0) {
-    const prevCell = matrix[headerRowIndex - 1]?.[firstColIdx];
-    if (prevCell) adjacentFirstColCells.push(prevCell);
+  const firstColExtraction = extractSeriesFromFirstColumnHeader(firstColRawHeader);
+  const seriesFromFirstColumn = firstColExtraction.known ? firstColExtraction.series || undefined : undefined;
+
+  const gradesInFile = extractSchoolGradesServed(gradesServedText).expandedGrades;
+  let tableSeries = '';
+  if (filters.extractSeriesFromFirstColumn !== false && seriesFromFirstColumn) {
+    tableSeries = seriesFromFirstColumn;
+  } else if (gradesInFile.length === 1) {
+    tableSeries = gradesInFile[0];
   }
 
-  const firstColExtraction = extractSeriesFromFirstColumnHeader(firstColRawHeader, adjacentFirstColCells);
-  const seriesFromFirstColumn = firstColExtraction.series || undefined;
+  // 4. Escola: confere com o cadastro
+  const selectedUnit = filters.selectedSchoolUnitId
+    ? schoolUnits.find((u) => u.id === filters.selectedSchoolUnitId || u.name === filters.selectedSchoolUnitId)
+    : undefined;
+  const registeredUnit = schoolNameDetected ? findRegisteredSchoolUnit(schoolNameDetected, schoolUnits) : undefined;
+  const schoolMessages: string[] = [];
 
-  // Se encontrou a série na 1ª coluna e não havia série de turma geral, atualiza seriesDetected
-  if (seriesFromFirstColumn && !seriesDetected) {
-    seriesDetected = seriesFromFirstColumn;
+  let targetUnit: SchoolUnit | undefined = selectedUnit || registeredUnit;
+  let schoolStatus: SchoolCheckResult['status'] = targetUnit ? 'CADASTRADA' : schoolNameDetected ? 'NOVA' : 'NAO_IDENTIFICADA';
+  let suggestedClasses: SchoolClass[] = [];
+
+  if (selectedUnit && schoolNameDetected && registeredUnit?.id !== selectedUnit.id) {
+    schoolMessages.push(
+      `A planilha é da escola "${schoolNameDetected}", mas o destino selecionado é "${selectedUnit.name}". Os alunos serão vinculados ao destino selecionado.`
+    );
   }
 
-  // Iterar pelas linhas de dados
+  if (!targetUnit && schoolNameDetected) {
+    if (filters.autoRegisterSchoolUnit) {
+      const built = buildSchoolUnitAndClassesFromImport(
+        schoolNameDetected,
+        gradesServedText,
+        fileName,
+        schoolUnits,
+        classes,
+        filters.defaultShift || 'MANHÃ',
+        tableSeries || undefined
+      );
+      targetUnit = built.schoolUnit;
+      suggestedClasses = built.createdClasses;
+      schoolMessages.push(
+        `A escola "${schoolNameDetected}" não está cadastrada. Ela será cadastrada com as séries informadas na planilha e ficará pendente de complementação.`
+      );
+    } else {
+      errors.push(
+        `A escola "${schoolNameDetected}" não está cadastrada. Cadastre-a, selecione a escola de destino ou ative o cadastro automático.`
+      );
+    }
+  } else if (!targetUnit) {
+    schoolStatus = 'NAO_IDENTIFICADA';
+    errors.push('Nome da escola não encontrado na planilha (linha "ESCOLA: ..."). Selecione a escola de destino antes de importar.');
+  }
+
+  const gradesRegistered = schoolStatus === 'CADASTRADA' ? targetUnit?.gradesServed || [] : gradesInFile;
+  const gradesMissingInRegistry =
+    schoolStatus === 'CADASTRADA' ? gradesInFile.filter((g) => !gradesRegistered.some((r) => sameGrade(r, g))) : [];
+
+  if (schoolStatus === 'CADASTRADA') {
+    if (gradesRegistered.length === 0) {
+      schoolMessages.push('A escola está cadastrada, mas sem séries atendidas informadas no cadastro.');
+    }
+    if (gradesMissingInRegistry.length > 0) {
+      schoolMessages.push(
+        `Séries informadas na planilha que não constam no cadastro da escola: ${gradesMissingInRegistry.join(', ')}.`
+      );
+    }
+  }
+  if (!tableSeries) {
+    warnings.push(
+      'Não foi possível identificar a série da tabela pelo cabeçalho da 1ª coluna (ex: "PRÉ II Nº"). Confira a série de cada aluno.'
+    );
+  }
+
+  const unlinkedAllowed = schoolUnits.length <= 1;
+  const allClasses = [...classes, ...suggestedClasses];
+
+  // 5. Linhas de alunos
   const students: ParsedImportStudent[] = [];
-  const errors: string[] = [];
 
   for (let r = headerRowIndex + 1; r < matrix.length; r++) {
     const row = matrix[r] || [];
-    // Pula linhas totalmente vazias
     if (row.every((c) => !c && c !== 0)) continue;
 
     const rawName = colMap.name !== undefined ? row[colMap.name] : row[1] || row[0];
-    const name = cleanPlaceholder(rawName);
+    const name = cleanPlaceholder(rawName).replace(/\s+/g, ' ');
 
-    // Se a linha não tem nome ou é continuação de rodapé (ex: "TOTAL DE ALUNOS"), pula
-    if (!name || /TOTAL|COORDENADOR|DIRETOR|OBSERVA/i.test(name)) {
+    if (!name || /TOTAL|COORDENADOR|DIRETOR|OBSERVA|ASSINATURA|SECRETARI[OA]\b/i.test(name)) {
       continue;
     }
 
-    // Detecta se o nome contém sufixo PCD (ex: "Luan Sousa de Jesus – PCD", "Lucas Sousa de Jesus - PCD")
     const pcdNameRegex = /[\s\-_–—]+PCD\b/i;
     const hasPcdInName = pcdNameRegex.test(name);
     const cleanName = name.replace(pcdNameRegex, '').trim();
@@ -900,17 +1064,13 @@ export function processSheetWithHeaders(
     const rawTea = colMap.tea !== undefined ? row[colMap.tea] : '';
     const rawLaudo = colMap.laudo !== undefined ? row[colMap.laudo] : '';
 
-    // Extrai série e número de chamada da 1ª coluna se contiver "PRÉ II - 1" ou similar
+    // Série na própria linha (ex: "PRÉ II - 1")
     let rowSeriesParsed = '';
     const seriesColVal = cleanPlaceholder(rawSeries);
     if (seriesColVal) {
       const parsedCol = extractSeriesFromFirstColumnHeader(seriesColVal);
-      if (parsedCol.series) {
-        rowSeriesParsed = parsedCol.series;
-      }
-      if (parsedCol.studentNumber && (!rawSeq || rawSeq === rawSeries)) {
-        rawSeq = parsedCol.studentNumber;
-      }
+      if (parsedCol.known && parsedCol.series) rowSeriesParsed = parsedCol.series;
+      if (parsedCol.studentNumber && (!rawSeq || rawSeq === rawSeries)) rawSeq = parsedCol.studentNumber;
     }
 
     const parsedDate = parseFlexibleDate(rawBirth);
@@ -918,86 +1078,54 @@ export function processSheetWithHeaders(
     const race = parseRaceColor(rawRace);
     const address = cleanPlaceholder(rawAddr);
 
-    // Avalia PCD
     let pcdDesc = cleanPlaceholder(rawPcd);
-    if (!pcdDesc && hasPcdInName) {
-      pcdDesc = 'PCD Identificado no Levantamento';
-    }
+    if (!pcdDesc && hasPcdInName) pcdDesc = 'PCD Identificado no Levantamento';
 
-    // Avalia TEA
     const teaStr = cleanPlaceholder(rawTea).toLowerCase();
-    const isTea =
-      teaStr === 'sim' ||
-      teaStr === 's' ||
-      /TEA|AUTISMO/i.test(pcdDesc) ||
-      /TEA|AUTISMO/i.test(name);
-
+    const isTea = teaStr === 'sim' || teaStr === 's' || /\bTEA\b|AUTISMO/i.test(pcdDesc) || /\bTEA\b|AUTISMO/i.test(name);
     const isPcd = Boolean(pcdDesc || hasPcdInName || isTea);
 
-    // Avalia Laudo
     let laudoInfo = parseMedicalReport(rawLaudo);
-    // Se PCD diz "Suspeita sem laudo", garante hasReport = false
     if (/sem laudo|suspeita/i.test(pcdDesc)) {
       laudoInfo = { hasReport: false, text: 'Suspeita sem laudo' };
     } else if (/TEA\s*[–-]\s*Nível/i.test(pcdDesc) && !cleanPlaceholder(rawLaudo)) {
-      // Diagnóstico fechado com nível especificado
       laudoInfo = { hasReport: true, text: 'SIM' };
     }
 
-    const shift =
-      cleanPlaceholder(rawShift) ||
-      filters.defaultShift ||
-      'MANHÃ';
+    const shift = cleanPlaceholder(rawShift) || filters.defaultShift || 'MANHÃ';
 
-    // Determinar a série aplicando as regras configuráveis pelo usuário:
-    let finalSeries = 'PRÉ-ESCOLA I';
+    // Série do aluno: padrão forçado > série da linha > série da tabela (1ª coluna) > padrão
+    let finalSeries = '';
+    let seriesByDefault = false;
     if (filters.overrideSeriesWithDefault && filters.defaultSeries) {
-      finalSeries = filters.defaultSeries;
+      finalSeries = canonicalGrade(filters.defaultSeries);
     } else if (rowSeriesParsed) {
       finalSeries = rowSeriesParsed;
-    } else if (cleanPlaceholder(rawSeries)) {
-      finalSeries = cleanPlaceholder(rawSeries);
-    } else if (seriesDetected) {
-      finalSeries = seriesDetected;
-    } else if (filters.extractSeriesFromFirstColumn !== false && seriesFromFirstColumn) {
-      finalSeries = seriesFromFirstColumn;
-    } else if (filters.defaultSeries) {
-      finalSeries = filters.defaultSeries;
+    } else if (tableSeries) {
+      finalSeries = tableSeries;
+    } else {
+      finalSeries = canonicalGrade(filters.defaultSeries || 'PRÉ I');
+      seriesByDefault = true;
     }
 
-    const finalSchoolName =
-      schoolNameDetected ||
-      filters.selectedSchoolUnitId ||
-      'Escola Municipal / Polo Remoto';
-
-    // Rastrear pendências cadastrais para Censo e Secretaria
     const pendingFields: string[] = [];
-    if (!parsedDate.isValid || !parsedDate.isoDate) {
-      pendingFields.push('Data de Nascimento');
-    }
-    if (!address) {
-      pendingFields.push('Endereço / Localidade');
-    }
-    if (race === 'NAO_DECLARADA') {
-      pendingFields.push('Raça/Cor (Censo Escolar)');
-    }
-    if (isPcd && !laudoInfo.hasReport) {
-      pendingFields.push('Comprovação de Laudo Médico (PCD)');
-    }
-    if (!cleanPlaceholder(rawLaudo) || rawLaudo.toString().includes('*')) {
-      pendingFields.push('Avaliação de Laudo (SIM/NÃO)');
+    if (!parsedDate.isValid || !parsedDate.isoDate) pendingFields.push('Data de Nascimento');
+    if (!address) pendingFields.push('Endereço / Localidade');
+    if (race === 'NAO_DECLARADA') pendingFields.push('Raça/Cor (Censo Escolar)');
+    if (gender === 'OTHER') pendingFields.push('Sexo');
+    if (isPcd && !laudoInfo.hasReport) pendingFields.push('Comprovação de Laudo Médico (PCD)');
+    if (!cleanPlaceholder(rawLaudo) && !laudoInfo.hasReport) pendingFields.push('Avaliação de Laudo (SIM/NÃO)');
+    if (seriesByDefault) pendingFields.push('Série (não identificada na planilha)');
+    if (
+      schoolStatus === 'CADASTRADA' &&
+      gradesRegistered.length > 0 &&
+      !gradesRegistered.some((g) => sameGrade(g, finalSeries))
+    ) {
+      pendingFields.push(`Série ${finalSeries} não consta nas séries atendidas da escola`);
     }
     pendingFields.push('CPF / Certidão de Nascimento');
 
-    const cadastralStatus: CadastralStatus =
-      pendingFields.length > 0 ? 'INCOMPLETE' : 'OK';
-
-    // Encontrar turma compatível
-    const matchedClass = classes.find(
-      (c) =>
-        c.name.toLowerCase().includes(finalSeries.toLowerCase()) ||
-        c.gradeLevel.toLowerCase().includes(finalSeries.toLowerCase())
-    );
+    const cadastralStatus: CadastralStatus = pendingFields.length > 0 ? 'INCOMPLETE' : 'OK';
 
     students.push({
       tempId: `imp-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
@@ -1017,78 +1145,91 @@ export function processSheetWithHeaders(
       isTea,
       hasMedicalReport: laudoInfo.hasReport,
       medicalReportText: laudoInfo.text,
-      schoolName: finalSchoolName,
-      classId: matchedClass?.id || classes[0]?.id || 'cls-default',
-      className: matchedClass?.name || finalSeries,
+      schoolName: targetUnit?.name || schoolNameDetected || 'Escola não identificada',
+      schoolUnitId: targetUnit?.id,
       cadastralStatus,
       pendingFields,
       sourceFileName: fileName,
-      selectedForImport: true, // Selecionado por padrão para importação
-      rawRow: {
-        rawSeq,
-        rawName,
-        rawBirth,
-        rawGender,
-        rawRace,
-        rawAddr,
-        rawPcd,
-        rawTea,
-        rawLaudo,
-      },
+      selectedForImport: true,
+      rawRow: { rawSeq, rawName, rawBirth, rawGender, rawRace, rawAddr, rawPcd, rawTea, rawLaudo },
     });
   }
 
-  const completeCount = students.filter((s) => s.cadastralStatus === 'OK').length;
-  const incompleteCount = students.filter((s) => s.cadastralStatus !== 'OK').length;
-
-  // Monta a unidade escolar e as turmas sugeridas para cadastro automático
-  const effectiveSchoolName = schoolNameDetected || 'EMEI RUTH PEREIRA BARBARESCO';
-  const effectiveGradesText = seriesDetected || seriesFromFirstColumn || 'PRÉ-ESCOLA I A';
-
-  const schoolUnitInfo = buildSchoolUnitAndClassesFromImport(
-    effectiveSchoolName,
-    effectiveGradesText,
-    fileName,
-    schoolUnits,
-    classes,
-    filters.defaultShift || 'MANHÃ',
-    seriesFromFirstColumn
-  );
-
-  // Vincula o ID da escola sugerida e classes aos estudantes
-  if (schoolUnitInfo.schoolUnit) {
-    students.forEach((std) => {
-      std.schoolUnitId = schoolUnitInfo.schoolUnit.id;
-      // Procura se tem turma correspondente na escola
-      const cls = schoolUnitInfo.createdClasses.find(
-        (c) =>
-          c.gradeLevel.toLowerCase() === std.series.toLowerCase() ||
-          c.name.toLowerCase().includes(std.series.toLowerCase())
-      );
-      if (cls) {
-        std.classId = cls.id;
-        std.className = cls.name;
+  // 6. Turmas: usa a turma da série na própria escola; se não existir, cria (escola cadastrada ou nova)
+  const classesToCreate: string[] = [];
+  if (targetUnit) {
+    const seriesUsed = Array.from(new Set(students.map((s) => s.series)));
+    seriesUsed.forEach((serie) => {
+      const found = findClassForSeries(targetUnit!.id, serie, allClasses, unlinkedAllowed);
+      if (!found && filters.autoRegisterSchoolUnit) {
+        const cls = buildClassForSeries(targetUnit!, serie, filters.defaultShift || 'MANHÃ', suggestedClasses.length);
+        suggestedClasses.push(cls);
+        allClasses.push(cls);
       }
     });
+    if (schoolStatus === 'CADASTRADA') {
+      suggestedClasses.forEach((c) => classesToCreate.push(c.gradeLevel));
+      if (classesToCreate.length > 0) {
+        schoolMessages.push(`Turma(s) que será(ão) criada(s) na escola: ${classesToCreate.join(', ')}.`);
+      }
+    }
   }
+
+  students.forEach((std) => {
+    const cls = findClassForSeries(std.schoolUnitId, std.series, allClasses, unlinkedAllowed);
+    if (cls) {
+      std.classId = cls.id;
+      std.className = cls.name;
+    } else {
+      std.classId = undefined;
+      std.className = `${std.series} (sem turma)`;
+      if (!std.pendingFields.includes('Turma (enturmação)')) std.pendingFields.push('Turma (enturmação)');
+      std.cadastralStatus = 'INCOMPLETE';
+    }
+  });
+
+  if (students.length === 0) {
+    errors.push('Nenhum aluno encontrado abaixo do cabeçalho da tabela.');
+  }
+
+  const schoolCheck: SchoolCheckResult = {
+    status: schoolStatus,
+    detectedName: schoolNameDetected,
+    unitId: targetUnit?.id,
+    unitName: targetUnit?.name,
+    gradesInFile,
+    gradesRegistered,
+    gradesMissingInRegistry,
+    tableSeries: tableSeries || undefined,
+    tableSeriesServed: tableSeries ? gradesRegistered.some((g) => sameGrade(g, tableSeries)) : undefined,
+    classesToCreate,
+    messages: schoolMessages,
+  };
 
   return {
     fileName,
     fileSize,
     schoolNameDetected,
-    seriesDetected: seriesFromFirstColumn || seriesDetected,
+    seriesDetected: tableSeries || undefined,
     firstColumnHeaderDetected: firstColRawHeader,
     seriesFromFirstColumn,
     dateDetected,
-    gradesServedDetectedText: schoolUnitInfo.schoolUnit.gradesServedText,
-    expandedGradesDetected: schoolUnitInfo.schoolUnit.gradesServed,
-    suggestedSchoolUnit: schoolUnitInfo.schoolUnit,
-    suggestedClasses: schoolUnitInfo.createdClasses,
+    gradesServedDetectedText: gradesServedText || targetUnit?.gradesServedText,
+    expandedGradesDetected: gradesInFile.length > 0 ? gradesInFile : targetUnit?.gradesServed,
+    suggestedSchoolUnit: targetUnit,
+    suggestedClasses,
     totalRows: students.length,
     students,
-    completeCount,
-    incompleteCount,
+    completeCount: students.filter((s) => s.cadastralStatus === 'OK').length,
+    incompleteCount: students.filter((s) => s.cadastralStatus !== 'OK').length,
     errors,
+    tableSeries: tableSeries || undefined,
+    columnReport,
+    extraColumns,
+    ignoredColumns,
+    schoolCheck,
+    warnings,
+    sourceMatrix: matrix,
   };
 }
 
@@ -1152,11 +1293,13 @@ export function convertImportedStudentsToOfficial(
   classes: SchoolClass[],
   existingStudentsCount: number,
   targetSchoolUnit?: SchoolUnit,
-  additionalClasses: SchoolClass[] = []
+  additionalClasses: SchoolClass[] = [],
+  allSchoolUnits: SchoolUnit[] = []
 ): Student[] {
   const nowIso = new Date().toISOString();
   const year = new Date().getFullYear();
   const allClasses = [...classes, ...additionalClasses];
+  const units = targetSchoolUnit ? [...allSchoolUnits, targetSchoolUnit] : allSchoolUnits;
 
   // Apenas estudantes selecionados para importação
   const studentsToImport = importedList.filter((item) => item.selectedForImport !== false);
@@ -1170,19 +1313,14 @@ export function convertImportedStudentsToOfficial(
           : item.series || item.seriesFromFirstCol || filters.defaultSeries || 'PRÉ-ESCOLA I')
       : undefined;
 
-    // Prioriza turma da escola alvo com a série correspondente
-    const matchedClass = allClasses.find((c) => {
-      const matchUnit = !targetSchoolUnit || c.schoolUnitId === targetSchoolUnit.id;
-      const matchSeries =
-        effectiveSeries &&
-        (c.name.toLowerCase().includes(effectiveSeries.toLowerCase()) ||
-          c.gradeLevel.toLowerCase().includes(effectiveSeries.toLowerCase()));
-      return matchUnit && matchSeries;
-    }) || allClasses.find((c) => c.id === item.classId) || allClasses[0];
+    // Cada aluno fica na escola identificada no SEU arquivo (não na do primeiro arquivo)
+    const unitId = item.schoolUnitId || targetSchoolUnit?.id;
+    const unit = units.find((u) => u.id === unitId);
+    const matchedClass =
+      (item.classId ? allClasses.find((c) => c.id === item.classId) : undefined) ||
+      (effectiveSeries ? findClassForSeries(unitId, effectiveSeries, allClasses, units.length <= 1) : undefined);
 
-    const finalSchoolName = filters.importSchoolUnit
-      ? (targetSchoolUnit?.name || item.schoolName)
-      : '';
+    const finalSchoolName = filters.importSchoolUnit ? unit?.name || item.schoolName : '';
 
     // Nome final considerando limpeza de " - PCD"
     let finalName = item.name;
@@ -1224,8 +1362,8 @@ export function convertImportedStudentsToOfficial(
       guardianName: 'Pendente de Atualização Cadastral',
       guardianPhone: '',
       courseId: 'crs-infantil',
-      schoolUnitId: targetSchoolUnit ? targetSchoolUnit.id : item.schoolUnitId,
-      classId: matchedClass?.id || item.classId || classes[0]?.id || 'cls-default',
+      schoolUnitId: unitId,
+      classId: matchedClass?.id || 'cls-default',
       status: 'ACTIVE',
       cadastralStatus: item.cadastralStatus,
       entryDate: nowIso.split('T')[0],
