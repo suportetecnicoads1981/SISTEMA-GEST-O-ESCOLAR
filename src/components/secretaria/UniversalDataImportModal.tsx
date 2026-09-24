@@ -34,6 +34,7 @@ import { Student, SchoolClass, SchoolUnit, ClassShift } from '../../types';
 import {
   parseSingleFile,
   convertImportedStudentsToOfficial,
+  processSheetWithHeaders,
   generateOfficialTemplateXlsx,
   DEFAULT_IMPORT_FILTERS,
   ImportFilterOptions,
@@ -275,49 +276,27 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
 
   // Atualiza os filtros e sincroniza dinamicamente com os alunos e arquivos já carregados no preview
   const handleUpdateFilters = (updater: (prev: ImportFilterOptions) => ImportFilterOptions) => {
-    setFilters((prev) => {
-      const next = updater(prev);
-      setFileResults((existing) =>
-        existing.map((res) => {
-          const updatedStudents = res.students.map((s) => {
-            let newSeries = s.series;
-            if (next.overrideSeriesWithDefault && next.defaultSeries) {
-              newSeries = next.defaultSeries;
-            } else if (next.extractSeriesFromFirstColumn && (s.seriesFromFirstCol || res.seriesFromFirstColumn)) {
-              newSeries = s.seriesFromFirstCol || res.seriesFromFirstColumn || next.defaultSeries || 'PRÉ II';
-            } else if (res.seriesDetected) {
-              newSeries = res.seriesDetected;
-            } else if (next.defaultSeries) {
-              newSeries = next.defaultSeries;
-            }
-
-            const updatedClass = classes.find(
-              (c) =>
-                c.name.toLowerCase().includes(newSeries.toLowerCase()) ||
-                c.gradeLevel.toLowerCase().includes(newSeries.toLowerCase())
-            );
-
-            return {
-              ...s,
-              series: newSeries,
-              shift: next.defaultShift || s.shift,
-              className: updatedClass?.name || newSeries,
-              classId: updatedClass?.id || s.classId,
-            };
-          });
-
-          return {
-            ...res,
-            seriesDetected:
-              next.overrideSeriesWithDefault && next.defaultSeries
-                ? next.defaultSeries
-                : res.seriesFromFirstColumn || res.seriesDetected || next.defaultSeries,
-            students: updatedStudents,
-          };
-        })
-      );
-      return next;
-    });
+    const next = updater(filters);
+    setFilters(next);
+    // Reprocessa cada planilha com os novos filtros (série, escola de destino, cadastro automático...),
+    // preservando a seleção de alunos feita pelo usuário (pela ordem das linhas)
+    setFileResults((existing) =>
+      existing.map((res) => {
+        if (!res.sourceMatrix) {
+          if (next.overrideSeriesWithDefault && next.defaultSeries) {
+            return { ...res, students: res.students.map((s) => ({ ...s, series: next.defaultSeries! })) };
+          }
+          return res;
+        }
+        const reprocessed = processSheetWithHeaders(res.sourceMatrix, res.fileName, res.fileSize, next, classes, schoolUnits);
+        reprocessed.documentType = res.documentType;
+        reprocessed.students = reprocessed.students.map((s, i) => ({
+          ...s,
+          selectedForImport: res.students[i] ? res.students[i].selectedForImport : true,
+        }));
+        return reprocessed;
+      })
+    );
   };
 
   // Remove arquivo da lista
@@ -354,7 +333,7 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
 
     if (filters.autoRegisterSchoolUnit) {
       fileResults.forEach((fr) => {
-        if (fr.suggestedSchoolUnit) {
+        if (fr.suggestedSchoolUnit && fr.schoolCheck?.status !== 'CADASTRADA') {
           const exists = schoolUnits.some(
             (u) =>
               u.id === fr.suggestedSchoolUnit!.id ||
@@ -377,26 +356,28 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
       });
     }
 
-    const primaryUnit = newSchoolUnits[0] || fileResults[0]?.suggestedSchoolUnit;
+    // Unidade de destino escolhida manualmente (usada só para alunos sem escola identificada)
+    const selectedUnit = schoolUnits.find(
+      (u) => u.id === filters.selectedSchoolUnitId || u.name === filters.selectedSchoolUnitId
+    );
+    const touchedUnits = fileResults
+      .map((fr) => fr.suggestedSchoolUnit)
+      .filter((u, i, arr): u is SchoolUnit => !!u && arr.findIndex((x) => x?.id === u.id) === i);
+    const primaryUnit = selectedUnit || touchedUnits[0];
 
     const officialStudents = convertImportedStudentsToOfficial(
       allParsedStudents,
       filters,
       classes,
       studentsCount,
-      primaryUnit,
-      newClasses
+      selectedUnit,
+      newClasses,
+      [...schoolUnits, ...newSchoolUnits]
     );
 
     onImportStudents(officialStudents, newSchoolUnits, newClasses);
     setImportedOfficialStudents(officialStudents);
-    setImportedUnits(
-      newSchoolUnits.length > 0
-        ? newSchoolUnits
-        : primaryUnit
-        ? [primaryUnit]
-        : []
-    );
+    setImportedUnits(touchedUnits.length > 0 ? touchedUnits : primaryUnit ? [primaryUnit] : []);
 
     const incompleteCount = officialStudents.filter((s) => s.cadastralStatus !== 'OK').length;
     setImportedStats({
@@ -477,6 +458,10 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
 
   const selectedCountInActiveFile = (activeResult?.students || []).filter((s) => s.selectedForImport !== false).length;
   const totalSelectedAcrossFiles = allParsedStudents.filter((s) => s.selectedForImport !== false).length;
+  // Arquivos com erro impeditivo (escola não identificada, coluna obrigatória ausente) e alunos selecionados
+  const blockingFiles = fileResults.filter(
+    (fr) => fr.errors.length > 0 && fr.students.some((s) => s.selectedForImport !== false)
+  );
 
   // Filtro de alunos na tela pós-importação
   const filteredImportedStudents = importedOfficialStudents.filter((s) => {
@@ -1207,7 +1192,7 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                       >
                         <option value="">Detectar da Planilha (ou Polo Padrão)</option>
                         {schoolUnits.map((u) => (
-                          <option key={u.id} value={u.name}>
+                          <option key={u.id} value={u.id}>
                             {u.name}
                           </option>
                         ))}
@@ -1750,6 +1735,124 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                         </div>
                       </div>
 
+                      {/* Conferência da importação: escola cadastrada + colunas da esquerda para a direita */}
+                      {(activeResult.schoolCheck || activeResult.columnReport) && (
+                        <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-3">
+                          <div className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
+                            <CheckSquare className="h-4 w-4 text-indigo-600" />
+                            Conferência da Planilha
+                          </div>
+
+                          {activeResult.schoolCheck && (
+                            <div className="space-y-1.5">
+                              <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                                <span className="font-bold text-slate-700">Escola:</span>
+                                <span className="text-slate-900 font-semibold">
+                                  {activeResult.schoolCheck.detectedName || 'não informada na planilha'}
+                                </span>
+                                {activeResult.schoolCheck.status === 'CADASTRADA' && (
+                                  <span className="px-2 py-0.5 rounded-md bg-emerald-100 border border-emerald-300 text-emerald-900 font-bold text-[10px]">
+                                    ✓ Cadastrada: {activeResult.schoolCheck.unitName}
+                                  </span>
+                                )}
+                                {activeResult.schoolCheck.status === 'NOVA' && (
+                                  <span className="px-2 py-0.5 rounded-md bg-amber-100 border border-amber-300 text-amber-900 font-bold text-[10px]">
+                                    Não cadastrada: será cadastrada agora
+                                  </span>
+                                )}
+                                {activeResult.schoolCheck.status === 'NAO_IDENTIFICADA' && (
+                                  <span className="px-2 py-0.5 rounded-md bg-rose-100 border border-rose-300 text-rose-900 font-bold text-[10px]">
+                                    Escola não identificada: selecione a escola de destino
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                                <span className="font-bold text-slate-700">Série da tabela (1ª coluna):</span>
+                                <span
+                                  className={`px-2 py-0.5 rounded-md font-bold text-[10px] border ${
+                                    !activeResult.tableSeries
+                                      ? 'bg-rose-50 border-rose-300 text-rose-800'
+                                      : activeResult.schoolCheck.tableSeriesServed === false
+                                      ? 'bg-amber-50 border-amber-300 text-amber-900'
+                                      : 'bg-indigo-50 border-indigo-300 text-indigo-900'
+                                  }`}
+                                >
+                                  {activeResult.tableSeries || 'não identificada'}
+                                  {activeResult.tableSeries && activeResult.schoolCheck.tableSeriesServed === false && ' (não atendida pela escola)'}
+                                </span>
+                              </div>
+                              {activeResult.schoolCheck.messages.map((m, i) => (
+                                <div key={i} className="text-[11px] text-amber-800 flex items-start gap-1">
+                                  <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0 text-amber-600" />
+                                  <span>{m}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {activeResult.columnReport && (
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-[10px] border border-slate-200 rounded-lg">
+                                <thead className="bg-slate-50 text-slate-500 uppercase">
+                                  <tr>
+                                    <th className="py-1 px-2 text-left">Ordem</th>
+                                    <th className="py-1 px-2 text-left">Campo esperado</th>
+                                    <th className="py-1 px-2 text-left">Coluna na planilha</th>
+                                    <th className="py-1 px-2 text-left">Situação</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                  {activeResult.columnReport.map((c) => (
+                                    <tr key={c.key}>
+                                      <td className="py-1 px-2 font-mono text-slate-500">{c.expectedPosition}ª</td>
+                                      <td className="py-1 px-2 font-semibold text-slate-800">{c.label}</td>
+                                      <td className="py-1 px-2 text-slate-600">
+                                        {c.columnLetter ? `${c.columnLetter} — "${c.header || 'sem título'}"` : '—'}
+                                      </td>
+                                      <td className="py-1 px-2 font-bold">
+                                        {c.status === 'OK' && <span className="text-emerald-700">✓ OK</span>}
+                                        {c.status === 'POR_POSICAO' && <span className="text-amber-700">Lida pela posição</span>}
+                                        {c.status === 'FORA_DE_ORDEM' && <span className="text-amber-700">Fora de ordem</span>}
+                                        {c.status === 'AUSENTE' && (
+                                          <span className={c.required ? 'text-rose-700' : 'text-slate-500'}>
+                                            {c.required ? '✗ Ausente (obrigatória)' : 'Ausente'}
+                                          </span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                              {(activeResult.extraColumns?.length || 0) > 0 && (
+                                <div className="text-[10px] text-slate-600 mt-1">
+                                  Colunas adicionais reconhecidas: {activeResult.extraColumns!.join(', ')}
+                                </div>
+                              )}
+                              {(activeResult.ignoredColumns?.length || 0) > 0 && (
+                                <div className="text-[10px] text-amber-800 mt-1">
+                                  Colunas não importadas (cabeçalho não reconhecido): {activeResult.ignoredColumns!.join(', ')}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {activeResult.errors.map((m, i) => (
+                            <div key={`e${i}`} className="text-[11px] text-rose-800 font-semibold flex items-start gap-1">
+                              <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0 text-rose-600" />
+                              <span>{m}</span>
+                            </div>
+                          ))}
+                          {activeResult.warnings
+                            ?.filter((w) => !w.startsWith('Cabeçalho da coluna'))
+                            .map((m, i) => (
+                              <div key={`w${i}`} className="text-[11px] text-amber-800 flex items-start gap-1">
+                                <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0 text-amber-600" />
+                                <span>{m}</span>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+
                       {/* Unidade Escolar & Séries Atendidas que serão cadastradas */}
                       {activeResult.suggestedSchoolUnit && (
                         <div className="p-3 bg-gradient-to-r from-indigo-50/90 via-slate-50 to-amber-50/80 border border-indigo-200/80 rounded-xl space-y-2">
@@ -1763,15 +1866,17 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                                 </span>
                               </span>
                             </div>
-                            <span className="px-2 py-0.5 bg-amber-100 border border-amber-300 text-amber-900 font-extrabold text-[10px] rounded-md flex items-center gap-1">
-                              <AlertTriangle className="h-3 w-3 text-amber-600" />
-                              Cadastro da Escola: Pendente de Complementação
-                            </span>
+                            {activeResult.suggestedSchoolUnit.cadastralStatus === 'INCOMPLETE' && (
+                              <span className="px-2 py-0.5 bg-amber-100 border border-amber-300 text-amber-900 font-extrabold text-[10px] rounded-md flex items-center gap-1">
+                                <AlertTriangle className="h-3 w-3 text-amber-600" />
+                                Cadastro da Escola: Pendente de Complementação
+                              </span>
+                            )}
                           </div>
 
                           <div className="flex flex-wrap items-center gap-1.5 pt-1">
                             <span className="text-[11px] font-bold text-slate-700 mr-1">
-                              Séries que a Escola Atende:
+                              Séries que a Escola Atende (conforme planilha):
                             </span>
                             {activeResult.expandedGradesDetected && activeResult.expandedGradesDetected.length > 0 ? (
                               activeResult.expandedGradesDetected.map((serie, sIdx) => (
@@ -2123,8 +2228,14 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                 Alunos Selecionados: <strong className="text-indigo-700 font-bold">{totalSelectedAcrossFiles} de {allParsedStudents.length}</strong>
               </span>
 
+              {blockingFiles.length > 0 && (
+                <span className="text-[11px] text-rose-700 font-bold flex items-center gap-1 max-w-xs">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  Corrija a conferência de: {blockingFiles.map((f) => f.fileName).join(', ')}
+                </span>
+              )}
               <button
-                disabled={totalSelectedAcrossFiles === 0 || isProcessing}
+                disabled={totalSelectedAcrossFiles === 0 || isProcessing || blockingFiles.length > 0}
                 onClick={handleConfirmImport}
                 className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer"
               >
