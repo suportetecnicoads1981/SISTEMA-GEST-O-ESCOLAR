@@ -7,6 +7,7 @@ import {
   LocalServerStatus,
 } from '../../services/offline/localServerSync';
 import { subscribeCloudSyncStatus, runCloudSyncNow, CloudSyncStatus } from '../../services/offline/cloudAutoSync';
+import { getSupabaseClient } from '../../services/datasync/supabaseClient';
 
 /**
  * Indicador (canto inferior esquerdo) exibido somente quando o sistema foi aberto
@@ -16,6 +17,45 @@ export const LocalNetworkStatusBadge: React.FC = () => {
   const [local, setLocal] = useState<LocalServerStatus | null>(null);
   const [cloud, setCloud] = useState<CloudSyncStatus | null>(null);
   const [open, setOpen] = useState(false);
+  // Login na nuvem direto pelo selo (sem sair do sistema)
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [email, setEmail] = useState(() => {
+    try {
+      return localStorage.getItem('sucessoedu_cloud_login_email') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [password, setPassword] = useState('');
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [loginMsg, setLoginMsg] = useState('');
+
+  const cloudLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !password) return;
+    setLoginBusy(true);
+    setLoginMsg('');
+    try {
+      const { data, error } = await getSupabaseClient().auth.signInWithPassword({ email: email.trim(), password });
+      if (error || !data?.user) {
+        setLoginMsg('Não foi possível entrar: confira o e-mail e a senha da conta da nuvem.');
+        return;
+      }
+      try {
+        localStorage.setItem('sucessoedu_cloud_login_email', email.trim());
+      } catch {
+        /* sem armazenamento */
+      }
+      setPassword('');
+      setLoginOpen(false);
+      setLoginMsg('');
+      await runCloudSyncNow(true);
+    } catch (err: any) {
+      setLoginMsg(`Sem resposta da nuvem agora (${err?.message || err}). Tente de novo em instantes.`);
+    } finally {
+      setLoginBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!getLocalServerInfo()) return;
@@ -112,6 +152,40 @@ export const LocalNetworkStatusBadge: React.FC = () => {
               Último envio à nuvem: {new Date(cloud.lastPushAt).toLocaleString('pt-BR')}
             </p>
           )}
+          {cloud?.state === 'aguardando-login' && !loginOpen && (
+            <button type="button" onClick={() => setLoginOpen(true)} style={{ ...btn('#b45309'), marginTop: 6 }}>
+              Entrar na nuvem
+            </button>
+          )}
+          {loginOpen && (
+            <form onSubmit={cloudLogin} style={{ marginTop: 8, display: 'grid', gap: 6 }}>
+              <input
+                type="email"
+                placeholder="E-mail da conta da nuvem"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="username"
+                style={fieldStyle}
+              />
+              <input
+                type="password"
+                placeholder="Senha da nuvem"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                style={fieldStyle}
+              />
+              {loginMsg && <span style={{ color: '#b91c1c' }}>{loginMsg}</span>}
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button type="submit" disabled={loginBusy} style={btn('#b45309')}>
+                  {loginBusy ? 'Entrando...' : 'Entrar e enviar'}
+                </button>
+                <button type="button" onClick={() => setLoginOpen(false)} style={btn('#64748b')}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          )}
           <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
             <button
               type="button"
@@ -154,6 +228,15 @@ export const LocalNetworkStatusBadge: React.FC = () => {
     </div>
     </>
   );
+};
+
+const fieldStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '6px 8px',
+  border: '1px solid #cbd5e1',
+  borderRadius: 8,
+  fontSize: 12,
+  boxSizing: 'border-box',
 };
 
 function btn(color: string): React.CSSProperties {

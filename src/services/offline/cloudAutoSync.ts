@@ -178,7 +178,7 @@ export async function runCloudSyncNow(force = false): Promise<CloudSyncStatus> {
     if (!session) {
       setStatus({
         state: 'aguardando-login',
-        message: 'Internet disponível. Para enviar pela nuvem, saia e entre novamente com uma conta cadastrada na nuvem.',
+        message: 'Internet disponível. Clique em "Entrar na nuvem" (aqui no selo) com a conta da nuvem para enviar e receber.',
       });
       return status;
     }
