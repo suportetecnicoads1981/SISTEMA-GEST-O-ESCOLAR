@@ -19,6 +19,13 @@ export function normalizeSchoolLinks<
   const summary: string[] = [];
   let changed = false;
 
+  // 0. Limpeza de importações repetidas (ver removeImportDuplicates)
+  const cleaned = removeImportDuplicates(data.schoolUnits || [], data.classes || [], data.students || [], summary);
+  if (cleaned.changed) {
+    changed = true;
+    data = { ...data, schoolUnits: cleaned.units, classes: cleaned.classes, students: cleaned.students };
+  }
+
   // 1. Escolas: remove "ESCOLA:" do nome
   const units: SchoolUnit[] = (data.schoolUnits || []).map((u) => {
     if (!u || typeof u.name !== 'string') return u;
@@ -168,4 +175,86 @@ function dedupeRegistrationNumbers(students: Student[], now: string, summary: st
     });
   });
   return out;
+}
+
+const HEADER_NAME = /^(NOME COMPLETO( DO\(?A?\)? ALUNO\(?A?\)?)?|NOME DO\(?A?\)? ALUNO\(?A?\)?|NOME|ALUNO\(?A?\)?)$/;
+
+function personKey(s: any): string {
+  const name = String(s?.name || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9 ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const birth = String(s?.birthDate || '').slice(0, 10);
+  return name && /^\d{4}-\d{2}-\d{2}$/.test(birth) ? `${name}|${birth}` : '';
+}
+
+/**
+ * Limpa o que sobra de importações repetidas da mesma planilha:
+ *  - "alunos" que são a linha de cabeçalho da tabela ("NOME COMPLETO DO ALUNO");
+ *  - o mesmo aluno importado duas vezes (mesmo nome e mesma data de nascimento, ambos
+ *    vindos de importação): fica o cadastrado primeiro;
+ *  - turmas e escolas que ficaram vazias e são cópia de outra escola com o mesmo nome.
+ * Registros criados à mão (id que não começa com "std-imp-") nunca são removidos.
+ */
+function removeImportDuplicates(
+  units: SchoolUnit[],
+  classes: SchoolClass[],
+  students: Student[],
+  summary: string[]
+): { units: SchoolUnit[]; classes: SchoolClass[]; students: Student[]; changed: boolean } {
+  const isImported = (s: any) => String(s?.id || '').startsWith('std-imp-');
+  const removed = new Set<string>();
+
+  students.forEach((s: any) => {
+    if (!s || !isImported(s)) return;
+    const n = String(s.name || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+    if (HEADER_NAME.test(n)) removed.add(s.id);
+  });
+  if (removed.size) summary.push(`${removed.size} linha(s) de cabeçalho importadas como aluno removida(s)`);
+
+  const byKey = new Map<string, any[]>();
+  students.forEach((s: any) => {
+    if (!s || removed.has(s.id) || !isImported(s)) return;
+    const k = personKey(s);
+    if (!k) return;
+    if (!byKey.has(k)) byKey.set(k, []);
+    byKey.get(k)!.push(s);
+  });
+  let dupCount = 0;
+  byKey.forEach((list) => {
+    if (list.length < 2) return;
+    const sorted = list.slice().sort((a, b) => registeredAt(a) - registeredAt(b));
+    sorted.slice(1).forEach((s) => {
+      removed.add(s.id);
+      dupCount++;
+    });
+  });
+  if (dupCount) summary.push(`${dupCount} aluno(s) importado(s) em duplicidade removido(s)`);
+  if (removed.size === 0) return { units, classes, students, changed: false };
+
+  const keptStudents = students.filter((s: any) => !s || !removed.has(s.id));
+
+  // Escola repetida (mesmo nome de outra) que ficou sem alunos: sai junto com as turmas vazias dela
+  const normName = (n: any) => normalizeSchoolName(n);
+  const studentsPerUnit = new Map<string, number>();
+  keptStudents.forEach((s: any) => s?.schoolUnitId && studentsPerUnit.set(s.schoolUnitId, (studentsPerUnit.get(s.schoolUnitId) || 0) + 1));
+  const studentsPerClass = new Map<string, number>();
+  keptStudents.forEach((s: any) => s?.classId && studentsPerClass.set(s.classId, (studentsPerClass.get(s.classId) || 0) + 1));
+  const dropUnits = new Set<string>();
+  units.forEach((u) => {
+    if (!u || (studentsPerUnit.get(u.id) || 0) > 0) return;
+    const twin = units.some((o) => o && o.id !== u.id && normName(o.name) === normName(u.name) && (studentsPerUnit.get(o.id) || 0) > 0);
+    const hadRemoved = students.some((s: any) => s && removed.has(s.id) && s.schoolUnitId === u.id);
+    if (twin && hadRemoved) dropUnits.add(u.id);
+  });
+  const keptClasses = classes.filter(
+    (c) => !c || !(dropUnits.has(c.schoolUnitId || '') && (studentsPerClass.get(c.id) || 0) === 0)
+  );
+  const keptUnits = units.filter((u) => !u || !dropUnits.has(u.id));
+  if (dropUnits.size) summary.push(`${dropUnits.size} escola(s) duplicada(s) removida(s)`);
+
+  return { units: keptUnits, classes: keptClasses, students: keptStudents, changed: true };
 }
