@@ -32,7 +32,8 @@ import {
 } from 'lucide-react';
 import { Student, SchoolClass, SchoolUnit, ClassShift } from '../../types';
 import {
-  parseSingleFile,
+  parseFileResults,
+  findExistingStudent,
   convertImportedStudentsToOfficial,
   processSheetWithHeaders,
   generateOfficialTemplateXlsx,
@@ -54,6 +55,7 @@ interface UniversalDataImportModalProps {
   classes: SchoolClass[];
   schoolUnits?: SchoolUnit[];
   studentsCount: number;
+  existingStudents?: Student[]; // Para reconhecer alunos já cadastrados e não duplicar
   onImportStudents: (
     newStudents: Student[],
     newSchoolUnits?: SchoolUnit[],
@@ -70,6 +72,7 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
   classes,
   schoolUnits = [],
   studentsCount,
+  existingStudents = [],
   onImportStudents,
   onNavigateToPendencias,
   onNavigateToSchoolUnits,
@@ -147,8 +150,9 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
     const results: FileImportResult[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const res = await parseSingleFile(file, filters, classes, schoolUnits);
-      results.push(res);
+      // Um arquivo pode trazer várias escolas (principal + anexas): um resultado por escola
+      const fileResultsForFile = await parseFileResults(file, filters, classes, schoolUnits);
+      results.push(...fileResultsForFile);
     }
 
     setFileResults((prev) => [...prev, ...results]);
@@ -288,8 +292,18 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
           }
           return res;
         }
-        const reprocessed = processSheetWithHeaders(res.sourceMatrix, res.fileName, res.fileSize, next, classes, schoolUnits);
+        const reprocessed = processSheetWithHeaders(
+          res.sourceMatrix,
+          res.sourceFileName || res.fileName,
+          res.fileSize,
+          next,
+          classes,
+          schoolUnits,
+          res.sourceContext
+        );
         reprocessed.documentType = res.documentType;
+        reprocessed.fileName = res.fileName;
+        reprocessed.sourceFileName = res.sourceFileName;
         reprocessed.students = reprocessed.students.map((s, i) => ({
           ...s,
           selectedForImport: res.students[i] ? res.students[i].selectedForImport : true,
@@ -344,11 +358,9 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
           }
         }
         if (fr.suggestedClasses) {
+          // Inclui turmas novas e também as existentes ajustadas (ex: nome sem a escola)
           fr.suggestedClasses.forEach((cls) => {
-            const clsExists =
-              classes.some((c) => c.id === cls.id) ||
-              newClasses.some((c) => c.id === cls.id);
-            if (!clsExists) {
+            if (!newClasses.some((c) => c.id === cls.id)) {
               newClasses.push(cls);
             }
           });
@@ -372,7 +384,8 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
       studentsCount,
       selectedUnit,
       newClasses,
-      [...schoolUnits, ...newSchoolUnits]
+      [...schoolUnits, ...newSchoolUnits],
+      existingStudents
     );
 
     onImportStudents(officialStudents, newSchoolUnits, newClasses);
@@ -459,6 +472,10 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
   const selectedCountInActiveFile = (activeResult?.students || []).filter((s) => s.selectedForImport !== false).length;
   const totalSelectedAcrossFiles = allParsedStudents.filter((s) => s.selectedForImport !== false).length;
   // Arquivos com erro impeditivo (escola não identificada, coluna obrigatória ausente) e alunos selecionados
+  // Alunos do arquivo que já estão cadastrados: serão atualizados, não duplicados
+  const alreadyRegisteredCount = allParsedStudents.filter(
+    (st) => st.selectedForImport !== false && !!findExistingStudent(st, existingStudents)
+  ).length;
   const blockingFiles = fileResults.filter(
     (fr) => fr.errors.length > 0 && fr.students.some((s) => s.selectedForImport !== false)
   );
@@ -1766,6 +1783,25 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                                   </span>
                                 )}
                               </div>
+                              {activeResult.schoolCheck.isAnnex && (
+                                <div className="text-[11px] text-indigo-800 font-semibold">
+                                  Escola anexa{activeResult.schoolCheck.parentUnitName ? ` de ${activeResult.schoolCheck.parentUnitName}` : ''}
+                                </div>
+                              )}
+                              {(activeResult.sections?.length || 0) > 1 ? (
+                                <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                                  <span className="font-bold text-slate-700">Tabelas encontradas (série: alunos):</span>
+                                  {activeResult.sections!.map((sec, i) => (
+                                    <span
+                                      key={i}
+                                      title={`Cabeçalho: ${sec.header}`}
+                                      className="px-2 py-0.5 rounded-md font-bold text-[10px] border bg-indigo-50 border-indigo-300 text-indigo-900"
+                                    >
+                                      {sec.series}: {sec.count}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
                               <div className="flex flex-wrap items-center gap-2 text-[11px]">
                                 <span className="font-bold text-slate-700">Série da tabela (1ª coluna):</span>
                                 <span
@@ -1781,6 +1817,7 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                                   {activeResult.tableSeries && activeResult.schoolCheck.tableSeriesServed === false && ' (não atendida pela escola)'}
                                 </span>
                               </div>
+                              )}
                               {activeResult.schoolCheck.messages.map((m, i) => (
                                 <div key={i} className="text-[11px] text-amber-800 flex items-start gap-1">
                                   <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0 text-amber-600" />
@@ -2228,6 +2265,11 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                 Alunos Selecionados: <strong className="text-indigo-700 font-bold">{totalSelectedAcrossFiles} de {allParsedStudents.length}</strong>
               </span>
 
+              {alreadyRegisteredCount > 0 && (
+                <span className="text-[11px] text-indigo-800 font-bold max-w-xs">
+                  {alreadyRegisteredCount} já cadastrado(s): serão atualizados, sem duplicar
+                </span>
+              )}
               {blockingFiles.length > 0 && (
                 <span className="text-[11px] text-rose-700 font-bold flex items-center gap-1 max-w-xs">
                   <AlertTriangle className="h-3.5 w-3.5 shrink-0" />

@@ -2446,6 +2446,7 @@ export const StudentList: React.FC<StudentListProps> = ({
         classes={classes}
         schoolUnits={schoolUnits}
         studentsCount={students.length}
+        existingStudents={students}
         onImportStudents={(imported, explicitUnits, explicitClasses) => {
           if (onBatchImportStudents) {
             onBatchImportStudents(imported, explicitUnits, explicitClasses);
