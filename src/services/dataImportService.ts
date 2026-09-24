@@ -1512,7 +1512,7 @@ export function convertImportedStudentsToOfficial(
     return candidate;
   };
 
-  return studentsToImport.map((item) => {
+  return studentsToImport.map((item, index) => {
     // Aluno já cadastrado mantém o RA dele; só aluno novo recebe número
     const ra = findExistingStudent(item, existingStudents) ? '' : takeNextRa();
 
