@@ -253,7 +253,7 @@ class SupabaseBatchQueue {
         registration_number: s.enrollmentNumber || s.registrationNumber || s.registration_number || ('RA-2026-' + idx),
         status: s.status || 'ACTIVE',
         class_id: s.classId || s.class_id || null,
-        birth_date: s.birthDate || s.birth_date || '2015-01-01',
+        birth_date: toIsoDateOrNull(s.birthDate || s.birth_date) || '2015-01-01',
         cpf: s.cpf || null,
         rg: s.rg || null,
         gender: s.gender || 'M',
@@ -404,7 +404,7 @@ class SupabaseBatchQueue {
    * "-DUP-<id>" (nada é apagado). Se esse aluno também estiver sendo enviado, ele recebe
    * o RA certo no mesmo envio. RAs repetidos dentro do próprio lote recebem o mesmo sufixo.
    */
-  private async releaseConflictingRegistrations(supabase: any, payload: Record<string, any>[]): Promise<void> {
+  public async releaseConflictingRegistrations(supabase: any, payload: Record<string, any>[]): Promise<void> {
     try {
       const seen = new Map<string, string>();
       for (const row of payload) {
@@ -683,3 +683,17 @@ class SupabaseBatchQueue {
 }
 
 export const supabaseBatchQueue = new SupabaseBatchQueue();
+
+/** Aceita só datas válidas no formato AAAA-MM-DD (ou DD/MM/AAAA); o resto vira null. */
+export function toIsoDateOrNull(val: any): string | null {
+  const t = String(val ?? '').trim();
+  let m = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) {
+    const br = t.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (br) m = [br[0], br[3], br[2], br[1]] as any;
+  }
+  if (!m) return null;
+  const iso = `${m[1]}-${m[2]}-${m[3]}`;
+  const d = new Date(iso + 'T00:00:00Z');
+  return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== iso ? null : iso;
+}

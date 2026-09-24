@@ -6,6 +6,7 @@
  */
 
 import { flushPendingDeletes } from './deletionTracker';
+import { supabaseBatchQueue, toIsoDateOrNull } from '../supabaseBatchQueue';
 import { getSupabaseClient, SUPABASE_CONFIG } from './supabaseClient';
 import { getStoredData, AppStateData } from '../../data/storage';
 import { toRemoteRow, SUPABASE_TABLE_COLUMNS, ADMIN_ONLY_TABLES } from './supabaseRowMapper';
@@ -744,13 +745,17 @@ END $$;
     try {
       const supabase = getSupabaseClient();
       
-      const payload = students.map((s) => ({
+      const payload = students
+        .filter((s) => s && s.id && String(s.name || '').trim())
+        .map((s) => ({
         id: s.id,
         name: s.name,
         registration_number: s.enrollmentNumber || s.registration_number || `REG-${s.id}`,
         cpf: s.cpf || null,
         rg: s.rg || null,
-        birth_date: s.birthDate ? s.birthDate.split('T')[0] : null,
+        // Data inválida (ex: texto do cabeçalho "DATA DE NASCIMENTO") vira vazia em vez de travar o envio
+        birth_date: toIsoDateOrNull(s.birthDate),
+        school_unit_id: s.schoolUnitId || s.school_unit_id || null,
         gender: s.gender || 'OTHER',
         email: s.email || null,
         phone: s.phone || null,
@@ -767,6 +772,9 @@ END $$;
         location_zone: s.locationZone || 'URBANA',
         updated_at: new Date().toISOString(),
       }));
+
+      // RA ocupado por outro registro na nuvem é liberado antes (mesma regra da fila de envio)
+      await supabaseBatchQueue.releaseConflictingRegistrations(supabase, payload);
 
       const { data, error } = await supabase
         .from('students')
