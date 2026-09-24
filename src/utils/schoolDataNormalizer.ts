@@ -89,8 +89,13 @@ export function normalizeSchoolLinks<
     return { ...s, schoolUnitId: cls.schoolUnitId, updatedAt: now } as Student;
   });
 
+  // 5. Matrícula (RA) repetida: o aluno cadastrado primeiro fica com o número; os demais
+  //    recebem o próximo número livre (a nuvem não aceita dois alunos com o mesmo RA).
+  const finalStudents = dedupeRegistrationNumbers(students, now, summary);
+  if (finalStudents !== students) changed = true;
+
   if (!changed) return { data, changed: false, summary };
-  return { data: { ...data, schoolUnits: units, classes, students }, changed: true, summary };
+  return { data: { ...data, schoolUnits: units, classes, students: finalStudents }, changed: true, summary };
 }
 
 /** Nome da turma para exibição, sem o nome da escola na frente. */
@@ -106,4 +111,61 @@ export function displayClassName(cls: SchoolClass | undefined, units: SchoolUnit
   if (!hasPrefix) return cls.name;
   const grade = canonicalGrade(cls.gradeLevel) || cls.gradeLevel;
   return grade ? `${grade} - ${cls.shift || 'MANHÃ'}` : cls.name;
+}
+
+/** Momento de cadastro do aluno: createdAt, ou o carimbo de tempo do id ("std-imp-1790253432996-..."). */
+function registeredAt(s: any): number {
+  const t = Date.parse(String(s?.createdAt || s?.enrollmentDate || ''));
+  if (!Number.isNaN(t)) return t;
+  const m = String(s?.id || '').match(/(\d{12,14})/);
+  return m ? Number(m[1]) : Number.MAX_SAFE_INTEGER;
+}
+
+function dedupeRegistrationNumbers(students: Student[], now: string, summary: string[]): Student[] {
+  // Agrupa pelo RA "base": "RA-2026-0181-DUP-xxxx" (marca provisória da nuvem) conta como RA-2026-0181
+  const baseOf = (ra: string) => ra.split('-DUP-')[0];
+  const groups = new Map<string, number[]>();
+  students.forEach((s, i) => {
+    const ra = String((s as any)?.enrollmentNumber || '').trim();
+    if (!ra) return;
+    const base = baseOf(ra);
+    if (!groups.has(base)) groups.set(base, []);
+    groups.get(base)!.push(i);
+  });
+
+  const needsWork = Array.from(groups.values()).some(
+    (idx) => idx.length > 1 || String((students[idx[0]] as any).enrollmentNumber).includes('-DUP-')
+  );
+  if (!needsWork) return students;
+
+  const year = new Date().getFullYear();
+  let next =
+    Math.max(
+      0,
+      ...Array.from(groups.keys()).map((r) => {
+        const m = r.match(/^RA-\d{4}-(\d+)$/);
+        return m ? parseInt(m[1], 10) : 0;
+      })
+    ) + 1;
+  const used = new Set(groups.keys());
+  const out = students.slice();
+  const setRa = (i: number, ra: string, motivo: string) => {
+    summary.push(`${motivo}: "${(out[i] as any).name}" ${(out[i] as any).enrollmentNumber} → ${ra}`);
+    out[i] = { ...out[i], enrollmentNumber: ra, updatedAt: now } as Student;
+  };
+
+  groups.forEach((idx, base) => {
+    // Quem foi cadastrado primeiro fica com o número base; os demais recebem o próximo livre
+    const sorted = idx.slice().sort((a, b) => registeredAt(out[a]) - registeredAt(out[b]) || a - b);
+    const [keeper, ...others] = sorted;
+    if (String((out[keeper] as any).enrollmentNumber) !== base) setRa(keeper, base, 'RA restaurado');
+    others.forEach((i) => {
+      let ra = `RA-${year}-${String(next).padStart(4, '0')}`;
+      while (used.has(ra)) ra = `RA-${year}-${String(++next).padStart(4, '0')}`;
+      used.add(ra);
+      next++;
+      setRa(i, ra, 'RA repetido');
+    });
+  });
+  return out;
 }

@@ -1490,8 +1490,31 @@ export function convertImportedStudentsToOfficial(
   // Apenas estudantes selecionados para importação
   const studentsToImport = importedList.filter((item) => item.selectedForImport !== false);
 
-  return studentsToImport.map((item, index) => {
-    const ra = `RA-${year}-${String(existingStudentsCount + index + 1).padStart(4, '0')}`;
+  // RA novo = próximo número livre acima do maior já usado (antes era quantidade + posição,
+  // o que repetia RAs já existentes quando havia lacunas na numeração).
+  const usedRas = new Set(existingStudents.map((s) => String(s?.enrollmentNumber || '').trim()).filter(Boolean));
+  let nextRaNumber =
+    Math.max(
+      existingStudentsCount,
+      ...Array.from(usedRas).map((r) => {
+        const m = r.match(/^RA-\d{4}-(\d+)$/);
+        return m ? parseInt(m[1], 10) : 0;
+      })
+    ) + 1;
+  const takeNextRa = () => {
+    let candidate = `RA-${year}-${String(nextRaNumber).padStart(4, '0')}`;
+    while (usedRas.has(candidate)) {
+      nextRaNumber++;
+      candidate = `RA-${year}-${String(nextRaNumber).padStart(4, '0')}`;
+    }
+    usedRas.add(candidate);
+    nextRaNumber++;
+    return candidate;
+  };
+
+  return studentsToImport.map((item) => {
+    // Aluno já cadastrado mantém o RA dele; só aluno novo recebe número
+    const ra = findExistingStudent(item, existingStudents) ? '' : takeNextRa();
 
     const effectiveSeries = filters.importSeries
       ? (filters.overrideSeriesWithDefault && filters.defaultSeries
