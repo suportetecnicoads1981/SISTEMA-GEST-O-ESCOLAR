@@ -162,10 +162,18 @@ const useDataValidation = (props?: MunicipalSyncModuleProps) => {
     if (!Array.isArray(rawSchoolUnits)) return [];
     return rawSchoolUnits
       .filter((u): u is SchoolUnit => Boolean(u && typeof u === 'object'))
-      .map((u: any) => ({
+      .map((u: any) => {
+        // Contagem real a partir dos alunos e turmas vinculados à escola.
+        // O número salvo no cadastro (totalStudents/totalClasses) só é usado
+        // quando ainda não há nenhum registro vinculado (ex: escola recebida por lote).
+        const linkedStudents = students.filter(
+          (s: any) => s?.schoolUnitId === u.id && (!s?.status || s.status === 'ACTIVE')
+        ).length;
+        const linkedClasses = classes.filter((c: any) => c?.schoolUnitId === u.id).length;
+        return {
         ...u,
-        totalStudents: Number(u?.totalStudents ?? 0),
-        totalClasses: Number(u?.totalClasses ?? 0),
+        totalStudents: linkedStudents > 0 ? linkedStudents : Number(u?.totalStudents ?? 0),
+        totalClasses: linkedClasses > 0 ? linkedClasses : Number(u?.totalClasses ?? 0),
         totalTeachers: Number(u?.totalTeachers ?? 0),
         name: u?.name ?? 'Escola Municipal',
         inepCode: u?.inepCode ?? '00000000',
@@ -174,8 +182,9 @@ const useDataValidation = (props?: MunicipalSyncModuleProps) => {
         city: u?.city ?? 'Município',
         state: u?.state ?? 'SP',
         directorName: u?.directorName ?? 'Direção Geral',
-      }));
-  }, [rawSchoolUnits]);
+        };
+      });
+  }, [rawSchoolUnits, students, classes]);
 
   const isLoading = !props || props.students === undefined || props.classes === undefined || props.exams === undefined;
 
