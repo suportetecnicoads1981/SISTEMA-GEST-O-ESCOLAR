@@ -1,0 +1,13 @@
+-- JÁ APLICADA no projeto cdxvhxqpixtbycghfsre (produção). Mantida no repositório
+-- apenas para o histórico de migrações ficar igual ao do banco. NÃO executar manualmente.
+
+create schema if not exists backup_20260923_pre_producao;
+revoke all on schema backup_20260923_pre_producao from public, anon, authenticated;
+do $$
+declare t record;
+begin
+  for t in select tablename from pg_tables where schemaname = 'public' loop
+    execute format('create table backup_20260923_pre_producao.%I as table public.%I', t.tablename, t.tablename);
+  end loop;
+end $$;
+revoke all on all tables in schema backup_20260923_pre_producao from public, anon, authenticated;
