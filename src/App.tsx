@@ -851,9 +851,11 @@ export default function App() {
   };
 
   const handleDeleteExam = (id: string) => {
+    // Excluir a prova apaga também as correções dela (senão ficam soltas e voltam para a nuvem).
     setData((prev) => ({
       ...prev,
       exams: prev.exams.filter((e) => e.id !== id),
+      submissions: (prev.submissions || []).filter((s) => s.examId !== id),
     }));
   };
 
