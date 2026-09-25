@@ -17,10 +17,12 @@ import {
   Question,
   SchoolClass,
   Subject,
+  SchoolUnit,
   ExamQuestionConfig,
   AutoCorrectionRules,
 } from '../../types';
 import { classYear } from '../../services/bncc/bnccAssessmentService';
+import { classLabelWithSchool } from '../../utils/schoolDataNormalizer';
 
 const DEFAULT_SUBJECT_NAMES = [
   'Língua Portuguesa',
@@ -43,6 +45,7 @@ interface ExamBuilderModalProps {
   classes: SchoolClass[];
   subjects: Subject[];
   initialQuestionIds?: string[];
+  schoolUnits?: SchoolUnit[];
 }
 
 export const ExamBuilderModal: React.FC<ExamBuilderModalProps> = ({
@@ -54,6 +57,7 @@ export const ExamBuilderModal: React.FC<ExamBuilderModalProps> = ({
   classes,
   subjects,
   initialQuestionIds,
+  schoolUnits = [],
 }) => {
   // Disciplinas: as cadastradas na Matriz + as das questões do banco + os componentes da BNCC.
   // Sem isso, com a Matriz vazia, a lista ficava em branco e não dava para escolher nada.
@@ -300,11 +304,32 @@ export const ExamBuilderModal: React.FC<ExamBuilderModalProps> = ({
                 onChange={(e) => setFormData({ ...formData, classId: e.target.value })}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 font-medium"
               >
-                {classes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
+                {schoolUnits.length > 1
+                  ? schoolUnits.map((u) => {
+                      const list = classes.filter((c) => c.schoolUnitId === u.id);
+                      return list.length ? (
+                        <optgroup key={u.id} label={u.name}>
+                          {list.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {classLabelWithSchool(c, schoolUnits)}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ) : null;
+                    })
+                  : classes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {classLabelWithSchool(c, schoolUnits)}
+                      </option>
+                    ))}
+                {schoolUnits.length > 1 &&
+                  classes
+                    .filter((c) => !schoolUnits.some((u) => u.id === c.schoolUnitId))
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
               </select>
             </div>
 

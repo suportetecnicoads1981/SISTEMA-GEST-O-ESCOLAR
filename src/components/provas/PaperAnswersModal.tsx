@@ -6,7 +6,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { X, Save, ClipboardCheck, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import type { Exam, ExamSubmission, Question, SchoolClass, Student } from '../../types';
+import type { Exam, ExamSubmission, Question, SchoolClass, SchoolUnit, Student } from '../../types';
 import {
   gradePaperSubmission,
   marksAreEmpty,
@@ -17,7 +17,7 @@ import {
   classesForExam,
   PaperMarks,
 } from '../../services/bncc/examSkillService';
-import { displayClassName } from '../../utils/schoolDataNormalizer';
+import { classLabelWithSchool } from '../../utils/schoolDataNormalizer';
 
 interface Props {
   exam: Exam;
@@ -27,9 +27,10 @@ interface Props {
   submissions: ExamSubmission[];
   onSave: (examId: string, upserts: ExamSubmission[], removeStudentIds: string[]) => void;
   onClose: () => void;
+  schoolUnits?: SchoolUnit[];
 }
 
-export const PaperAnswersModal: React.FC<Props> = ({ exam, questions, classes, students, submissions, onSave, onClose }) => {
+export const PaperAnswersModal: React.FC<Props> = ({ exam, questions, classes, students, submissions, onSave, onClose, schoolUnits = [] }) => {
   const [classId, setClassId] = useState<string>(exam.classId || '');
   const [marks, setMarks] = useState<Record<string, PaperMarks>>({});
   const [dirty, setDirty] = useState(false);
@@ -159,7 +160,7 @@ export const PaperAnswersModal: React.FC<Props> = ({ exam, questions, classes, s
                 <option value="">Selecione a turma</option>
                 {examClasses.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {displayClassName(c)}
+                    {classLabelWithSchool(c, schoolUnits)}
                   </option>
                 ))}
               </select>

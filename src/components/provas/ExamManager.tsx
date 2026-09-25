@@ -34,10 +34,12 @@ import {
   ExamSubmission,
   SchoolSettings,
   Student,
+  SchoolUnit,
 } from '../../types';
 import { ExamBuilderModal } from './ExamBuilderModal';
 import { ExamAnswerKeyModal } from './ExamAnswerKeyModal';
 import { PaperAnswersModal } from './PaperAnswersModal';
+import { classLabelWithSchool } from '../../utils/schoolDataNormalizer';
 import { confirmDialog } from '../../utils/dialogs';
 
 interface ExamManagerProps {
@@ -59,6 +61,8 @@ interface ExamManagerProps {
   students?: Student[];
   /** Grava as correções lançadas (substitui as do mesmo aluno na prova). */
   onSavePaperSubmissions?: (examId: string, upserts: ExamSubmission[], removeStudentIds: string[]) => void;
+  /** Escolas: para mostrar o nome da escola junto da turma. */
+  schoolUnits?: SchoolUnit[];
 }
 
 export const ExamManager: React.FC<ExamManagerProps> = ({
@@ -78,6 +82,7 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
   onNavigate,
   students = [],
   onSavePaperSubmissions,
+  schoolUnits = [],
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClassFilter, setSelectedClassFilter] = useState('ALL');
@@ -100,8 +105,8 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
   }, [initialSelectedQuestionIds]);
 
   const classMap = useMemo(
-    () => new Map(classes.map((c) => [c.id, c.name])),
-    [classes]
+    () => new Map(classes.map((c) => [c.id, classLabelWithSchool(c, schoolUnits)])),
+    [classes, schoolUnits]
   );
 
   const filteredExams = useMemo(() => {
@@ -389,7 +394,7 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
               <option value="ALL">Todas as Turmas</option>
               {classes.map((cls) => (
                 <option key={cls.id} value={cls.id}>
-                  {cls.name}
+                  {classLabelWithSchool(cls, schoolUnits)}
                 </option>
               ))}
             </select>
@@ -804,6 +809,7 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
         classes={classes}
         subjects={subjects}
         initialQuestionIds={initialSelectedQuestionIds}
+        schoolUnits={schoolUnits}
       />
 
       {examForPaperAnswers && onSavePaperSubmissions && (
@@ -815,6 +821,7 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
           submissions={submissions}
           onSave={onSavePaperSubmissions}
           onClose={() => setExamForPaperAnswers(null)}
+          schoolUnits={schoolUnits}
         />
       )}
 
