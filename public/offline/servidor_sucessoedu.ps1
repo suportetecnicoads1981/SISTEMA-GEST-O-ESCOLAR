@@ -15,6 +15,8 @@ $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $AppDir = Join-Path $Root 'app'
 $DataDir = Join-Path $Root 'data'
+# Scripts que este servidor entrega em /offline/ (para gerar pacotes de Sede, Remoto e Estacao).
+$OfflineScripts = @('servidor_sucessoedu.ps1','atualizador_sucessoedu.ps1','instalar_servidor.ps1','criar_atalho.ps1','INSTALAR_SERVIDOR.bat','PARAR_SERVIDOR.bat','INICIAR_SERVIDOR.bat','instalar_estacao.ps1','INSTALAR_ESTACAO.bat')
 $HistDir = Join-Path $DataDir 'historico'
 $DbFile = Join-Path $DataDir 'banco_sucessoedu.json'
 $MetaFile = Join-Path $DataDir 'banco_sucessoedu.versao'
@@ -151,6 +153,29 @@ $MimeTypes = @{
 function Send-StaticFile($ctx, [string]$urlPath) {
     $rel = [System.Uri]::UnescapeDataString($urlPath.TrimStart('/')).Replace('/', [System.IO.Path]::DirectorySeparatorChar)
     if ($rel -eq '') { $rel = 'index.html' }
+    # Gerar pacotes a partir deste servidor: a lista de arquivos e os scripts nao ficam em app\.
+    # offline-manifest.json -> app\versao_app.json; offline\<script> -> script da pasta do servidor.
+    if ($rel -eq 'offline-manifest.json' -and -not (Test-Path -LiteralPath (Join-Path $AppDir $rel) -PathType Leaf)) {
+        $ver = Join-Path $AppDir 'versao_app.json'
+        if (Test-Path -LiteralPath $ver -PathType Leaf) { $rel = 'versao_app.json' }
+    }
+    $scriptName = ''
+    if ($rel.StartsWith('offline' + [System.IO.Path]::DirectorySeparatorChar)) { $scriptName = $rel.Substring(8) }
+    if ($scriptName -ne '' -and $OfflineScripts -contains $scriptName -and -not (Test-Path -LiteralPath (Join-Path $AppDir $rel) -PathType Leaf)) {
+        $scriptFull = Join-Path $Root $scriptName
+        if (Test-Path -LiteralPath $scriptFull -PathType Leaf) {
+            $res = $ctx.Response
+            try {
+                $bytes = [System.IO.File]::ReadAllBytes($scriptFull)
+                $res.StatusCode = 200
+                $res.ContentType = 'text/plain; charset=utf-8'
+                $res.Headers['Cache-Control'] = 'no-cache'
+                $res.ContentLength64 = $bytes.Length
+                $res.OutputStream.Write($bytes, 0, $bytes.Length)
+            } catch { } finally { try { $res.OutputStream.Close() } catch { } }
+            return
+        }
+    }
     $appFull = [System.IO.Path]::GetFullPath($AppDir)
     $full = [System.IO.Path]::GetFullPath((Join-Path $AppDir $rel))
     if (-not $full.StartsWith($appFull, [System.StringComparison]::OrdinalIgnoreCase)) { Send-Text $ctx 403 'Acesso negado' 'text/plain; charset=utf-8'; return }
