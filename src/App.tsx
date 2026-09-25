@@ -50,7 +50,7 @@ import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { BnccSkillsModule } from './components/bncc/BnccSkillsModule';
 import { upsertAssessments, removeAssessments, mergeSkills } from './services/bncc/bnccAssessmentService';
-import { replaceSubmissions } from './services/bncc/examSkillService';
+import { replaceSubmissions, studentsForExam } from './services/bncc/examSkillService';
 import { MainOverviewDashboard } from './components/dashboard/MainOverviewDashboard';
 import { StudentList } from './components/secretaria/StudentList';
 import { DropoutCensusReport } from './components/secretaria/DropoutCensusReport';
@@ -1858,7 +1858,7 @@ export default function App() {
                   <StudentExamRoom
                     exam={examForStudentRoom}
                     questions={data.questions}
-                    students={data.students}
+                    students={studentsForExam(examForStudentRoom, data.students, data.classes)}
                     onFinishSubmission={handleFinishSubmission}
                     onExit={() => handleNavigate('EXAMS')}
                     onNavigate={handleNavigate}
