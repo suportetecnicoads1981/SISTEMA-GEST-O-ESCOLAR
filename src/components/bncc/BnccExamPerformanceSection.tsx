@@ -153,11 +153,18 @@ export const BnccExamPerformanceSection: React.FC<Props> = ({
         questions,
         submissions,
         students,
-        { classIds, examIds: pickedExams.size ? pickedExams : null, subject, schoolYear: year, term },
+        {
+          classIds,
+          examIds: pickedExams.size ? pickedExams : null,
+          subject,
+          schoolYear: year,
+          term,
+          classGradeOf: (id) => gradeKey(classes.find((c) => c.id === id)?.gradeLevel),
+        },
         cuts,
         (code) => skillsByCode.get(code)?.subject || componentFromCode(code)
       ),
-    [exams, questions, submissions, students, classIds, pickedExams, subject, year, term, cuts, skillsByCode]
+    [exams, questions, submissions, students, classes, classIds, pickedExams, subject, year, term, cuts, skillsByCode]
   );
 
   const classNameOf = (id: string) => {
