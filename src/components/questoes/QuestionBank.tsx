@@ -72,9 +72,13 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
   const [questionToEdit, setQuestionToEdit] = useState<Question | null>(null);
   const [isActionBarMinimized, setIsActionBarMinimized] = useState(false);
 
+  // Disciplinas da Matriz + as que já aparecem nas questões (a Matriz pode estar vazia).
   const subjectNames = useMemo(
-    () => Array.from(new Set(subjects.map((s) => s.name))),
-    [subjects]
+    () =>
+      Array.from(
+        new Set([...subjects.map((s) => s.name), ...questions.map((q) => q.subject)].filter(Boolean).map((n) => String(n).trim()))
+      ).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [subjects, questions]
   );
 
   const filteredQuestions = useMemo(() => {

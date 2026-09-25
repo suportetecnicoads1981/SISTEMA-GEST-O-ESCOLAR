@@ -36,22 +36,23 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
   availableSubjects,
   subjects,
 }) => {
+  // Disciplinas cadastradas + componentes padrão (a Matriz pode estar vazia ou incompleta).
   const subjectList: string[] = useMemo(() => {
-    if (availableSubjects && availableSubjects.length > 0) return availableSubjects;
-    if (subjects && subjects.length > 0) {
-      return typeof subjects[0] === 'string'
-        ? (subjects as string[])
-        : (subjects as Subject[]).map((s) => s.name);
-    }
-    return [
+    const fromProps: string[] = [
+      ...(availableSubjects || []),
+      ...((subjects || []) as Array<Subject | string>).map((s) => (typeof s === 'string' ? s : s?.name)),
+    ].filter(Boolean) as string[];
+    const defaults = [
       'Língua Portuguesa',
       'Matemática',
+      'Ciências',
       'Ciências da Natureza',
       'História',
       'Geografia',
       'Arte',
       'Educação Física',
       'Língua Inglesa',
+      'Ensino Religioso',
       'Física',
       'Química',
       'Biologia',
@@ -59,6 +60,16 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
       'Sociologia',
       'Campos de Experiências (Ed. Infantil)',
     ];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const n of [...fromProps, ...defaults]) {
+      const t = String(n).trim();
+      if (t && !seen.has(t.toLowerCase())) {
+        seen.add(t.toLowerCase());
+        out.push(t);
+      }
+    }
+    return out;
   }, [availableSubjects, subjects]);
 
   const [formData, setFormData] = useState<Partial<Question>>({
@@ -315,6 +326,7 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
                 onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 font-medium"
               >
+                {formData.subject && !subjectList.includes(formData.subject) && <option value={formData.subject}>{formData.subject}</option>}
                 {subjectList.map((sub) => (
                   <option key={sub} value={sub}>
                     {sub}
