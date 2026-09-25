@@ -98,8 +98,12 @@ export interface PaperMark {
 
 export type PaperMarks = Record<string, PaperMark>; // chave: questionId
 
-/** Id fixo: lançar de novo a mesma prova para o mesmo aluno substitui a correção anterior. */
-export const paperSubmissionId = (examId: string, studentId: string) => `sub-papel-${examId}-${studentId}`;
+/**
+ * Id da correção de papel. Leva a data do lançamento: um id excluído não pode ser recriado na nuvem,
+ * e relançar a prova substitui a correção anterior do aluno (replaceSubmissions).
+ */
+export const paperSubmissionId = (examId: string, studentId: string, when = new Date().toISOString()) =>
+  `sub-papel-${examId}-${studentId}-${Date.parse(when).toString(36)}`;
 
 const isObjective = (q?: Question) => !!q && (q.type === 'MULTIPLE_CHOICE' || q.type === 'TRUE_FALSE');
 
@@ -175,7 +179,7 @@ export function gradePaperSubmission(
   const approved = Number.isFinite(passing) && passing > 0 ? totalScore >= passing : percentage >= 60;
 
   return {
-    id: paperSubmissionId(exam.id, student.id),
+    id: paperSubmissionId(exam.id, student.id, when),
     examId: exam.id,
     studentId: student.id,
     studentName: student.name,
