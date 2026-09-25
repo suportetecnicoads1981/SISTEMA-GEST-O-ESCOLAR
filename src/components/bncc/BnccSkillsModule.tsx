@@ -22,6 +22,7 @@ import {
   AlertTriangle,
   ExternalLink,
   X,
+  ClipboardCheck,
 } from 'lucide-react';
 import type {
   BnccSkill,
@@ -32,6 +33,9 @@ import type {
   Student,
   Subject,
   SchoolSettings,
+  Exam,
+  Question,
+  ExamSubmission,
 } from '../../types';
 import {
   BNCC_LEVELS,
@@ -54,6 +58,7 @@ import { studentReportHtml, classReportHtml, downloadWordDoc, StudentReportOptio
 import { FlexChart, downloadCsv } from '../common/FlexChart';
 import { triggerPrint } from '../../utils/printHelper';
 import { displayClassName } from '../../utils/schoolDataNormalizer';
+import { BnccExamPerformanceSection } from './BnccExamPerformanceSection';
 
 interface Props {
   students: Student[];
@@ -67,12 +72,17 @@ interface Props {
   onSaveAssessments: (upserts: BnccSkillAssessment[], removeKeys: string[]) => void;
   onUpsertSkills: (skills: BnccSkill[]) => void;
   onBack?: () => void;
+  /** Provas, questões e correções: relatório de desempenho por habilidade. */
+  exams?: Exam[];
+  questions?: Question[];
+  submissions?: ExamSubmission[];
 }
 
-type Section = 'LANCAR' | 'RELATORIOS' | 'GRAFICOS' | 'CATALOGO' | 'ARQUIVOS';
+type Section = 'LANCAR' | 'PROVAS' | 'RELATORIOS' | 'GRAFICOS' | 'CATALOGO' | 'ARQUIVOS';
 
 const SECTIONS: Array<{ id: Section; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: 'LANCAR', label: 'Lançamento', icon: ClipboardEdit },
+  { id: 'PROVAS', label: 'Desempenho nas provas', icon: ClipboardCheck },
   { id: 'RELATORIOS', label: 'Relatórios', icon: FileText },
   { id: 'GRAFICOS', label: 'Gráficos', icon: BarChart3 },
   { id: 'CATALOGO', label: 'Catálogo de habilidades', icon: Library },
@@ -119,6 +129,9 @@ export const BnccSkillsModule: React.FC<Props> = ({
   onSaveAssessments,
   onUpsertSkills,
   onBack,
+  exams = [],
+  questions = [],
+  submissions = [],
 }) => {
   const [section, setSection] = useState<Section>('LANCAR');
   const currentYear = new Date().getFullYear();
@@ -295,6 +308,23 @@ export const BnccSkillsModule: React.FC<Props> = ({
             onSaveAssessments(ups, rem);
             notify('ok', `Lançamento salvo: ${ups.length} habilidade(s) registrada(s)${rem.length ? `, ${rem.length} removida(s)` : ''}.`);
           }}
+        />
+      )}
+
+      {section === 'PROVAS' && (
+        <BnccExamPerformanceSection
+          students={students}
+          classes={classes}
+          schoolUnits={schoolUnits}
+          settings={settings}
+          exams={exams}
+          questions={questions}
+          submissions={submissions}
+          skillsByCode={skillsByCode}
+          assessments={assessments}
+          teacherName={currentUserName}
+          onSaveAssessments={onSaveAssessments}
+          notify={notify}
         />
       )}
 
