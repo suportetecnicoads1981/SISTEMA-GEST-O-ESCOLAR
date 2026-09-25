@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { Question, QuestionDifficulty, QuestionType, QuestionOption, Subject, BnccSkill } from '../../types';
 import { DEFAULT_BNCC_SKILLS } from '../../data/bnccAndRegulationsData';
+import { getStoredData } from '../../data/storage';
+import { questionSkillCodes, joinSkillCodes } from '../../services/bncc/examSkillService';
 
 interface QuestionModalProps {
   isOpen: boolean;
@@ -89,10 +91,41 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
   const [showBnccPicker, setShowBnccPicker] = useState(false);
   const [bnccSegmentFilter, setBnccSegmentFilter] = useState('ALL');
   const [bnccSearch, setBnccSearch] = useState('');
+  // Uma questão pode avaliar várias habilidades.
+  const [skillCodes, setSkillCodes] = useState<string[]>([]);
+  const [skillInput, setSkillInput] = useState('');
+
+  const addSkillCodes = (text: string) => {
+    const codes = questionSkillCodes({ bnccSkill: text });
+    if (!codes.length) return;
+    setSkillCodes((prev) => [...prev, ...codes.filter((c) => !prev.includes(c))]);
+    setSkillInput('');
+  };
+  const toggleSkillCode = (code: string) => {
+    const c = code.toUpperCase();
+    setSkillCodes((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
+  };
+
+  // Catálogo: habilidades cadastradas no módulo BNCC + catálogo padrão (sem repetir código).
+  const skillCatalog: BnccSkill[] = useMemo(() => {
+    const byCode = new Map<string, BnccSkill>();
+    let stored: BnccSkill[] = [];
+    try {
+      stored = (getStoredData() as any)?.bnccSkills || [];
+    } catch {
+      stored = [];
+    }
+    for (const sk of [...stored, ...DEFAULT_BNCC_SKILLS]) {
+      if (sk?.code && !byCode.has(sk.code.toUpperCase())) byCode.set(sk.code.toUpperCase(), sk);
+    }
+    return Array.from(byCode.values());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   useEffect(() => {
     if (questionToEdit) {
       setFormData(questionToEdit);
+      setSkillCodes(questionSkillCodes(questionToEdit));
       setRawTags(questionToEdit.tags?.join(', ') || '');
       setRawKeywords(questionToEdit.essayKeywords?.join(', ') || '');
     } else {
@@ -120,7 +153,9 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
       });
       setRawTags('');
       setRawKeywords('');
+      setSkillCodes([]);
     }
+    setSkillInput('');
     setError('');
     // Reinicia só ao abrir ou trocar de questão (a lista de disciplinas é recriada a cada renderização).
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,7 +163,7 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
 
   const filteredBnccSkills = useMemo(() => {
     const q = (bnccSearch || '').toLowerCase().trim();
-    return DEFAULT_BNCC_SKILLS.filter((sk) => {
+    return skillCatalog.filter((sk) => {
       if (!sk) return false;
       const matchSegment =
         bnccSegmentFilter === 'ALL' || sk.segment === bnccSegmentFilter;
@@ -140,7 +175,7 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
         (sk.educationLevel && sk.educationLevel.toLowerCase().includes(q));
       return matchSegment && matchText;
     });
-  }, [bnccSegmentFilter, bnccSearch]);
+  }, [bnccSegmentFilter, bnccSearch, skillCatalog]);
 
   if (!isOpen) return null;
 
@@ -217,7 +252,11 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
       subject: formData.subject || 'Língua Portuguesa',
       topic: formData.topic.trim(),
       gradeLevel: formData.gradeLevel || '1º Ano',
-      bnccSkill: formData.bnccSkill?.trim() || undefined,
+      // Texto digitado e ainda não adicionado também conta.
+      ...(() => {
+        const codes = [...skillCodes, ...questionSkillCodes({ bnccSkill: skillInput }).filter((c) => !skillCodes.includes(c))];
+        return { bnccSkills: codes.length ? codes : undefined, bnccSkill: codes.length ? joinSkillCodes(codes) : undefined };
+      })(),
       difficulty: (formData.difficulty as QuestionDifficulty) || 'MEDIO',
       type: (formData.type as QuestionType) || 'MULTIPLE_CHOICE',
       stem: formData.stem.trim(),
@@ -354,7 +393,7 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
               <div className="flex items-center justify-between mb-1">
                 <label className="font-semibold text-slate-700 flex items-center gap-1">
                   <BookOpen className="h-3.5 w-3.5 text-emerald-600" />
-                  <span>Habilidade da BNCC (Educação Infantil, 1º ao 9º Ano, Médio, EJA)</span>
+                  <span>Habilidades da BNCC avaliadas nesta questão (uma ou mais)</span>
                 </label>
                 <button
                   type="button"
@@ -369,11 +408,26 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
               <div className="flex gap-2">
                 <input
                   type="text"
-                  value={formData.bnccSkill || ''}
-                  onChange={(e) => setFormData({ ...formData, bnccSkill: e.target.value })}
-                  placeholder="Ex: EI01EO01, EF01MA01, EF05LP04, EF09CI02, EM13MAT302..."
+                  value={skillInput}
+                  onChange={(e) => setSkillInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ',') {
+                      e.preventDefault();
+                      addSkillCodes(skillInput);
+                    }
+                  }}
+                  placeholder="Digite o código e tecle Enter (ex.: EF05MA01). Pode colar vários separados por vírgula."
                   className="flex-1 px-3 py-2 rounded-xl border border-slate-200 font-mono font-bold text-emerald-700 bg-emerald-50/30"
                 />
+                <button
+                  type="button"
+                  onClick={() => addSkillCodes(skillInput)}
+                  className="px-3 py-2 bg-white border border-emerald-300 hover:bg-emerald-50 text-emerald-800 font-bold rounded-xl text-xs flex items-center gap-1 cursor-pointer"
+                  title="Adicionar a habilidade digitada"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Adicionar</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => setShowBnccPicker(!showBnccPicker)}
@@ -382,6 +436,34 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
                   <Layers className="h-3.5 w-3.5" />
                   <span>Catálogo BNCC</span>
                 </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mt-2 min-h-[26px]">
+                {skillCodes.length === 0 ? (
+                  <span className="text-[11px] text-slate-400">
+                    Nenhuma habilidade vinculada. Uma questão pode avaliar uma ou mais habilidades.
+                  </span>
+                ) : (
+                  skillCodes.map((code) => {
+                    const info = skillCatalog.find((sk) => sk.code.toUpperCase() === code);
+                    return (
+                      <span
+                        key={code}
+                        title={info?.description || code}
+                        className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-lg bg-emerald-600 text-white font-mono font-bold text-[11px]"
+                      >
+                        {code}
+                        <button
+                          type="button"
+                          onClick={() => toggleSkillCode(code)}
+                          className="p-0.5 rounded hover:bg-emerald-800 cursor-pointer"
+                          title="Remover habilidade"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
@@ -440,14 +522,12 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
                     <div
                       key={skill.id}
                       onClick={() => {
-                        setFormData({
-                          ...formData,
-                          bnccSkill: skill.code,
-                          topic: formData.topic || skill.description.substring(0, 40),
-                        });
-                        setShowBnccPicker(false);
+                        toggleSkillCode(skill.code);
+                        if (!formData.topic) setFormData({ ...formData, topic: skill.description.substring(0, 40) });
                       }}
-                      className="p-2.5 bg-white hover:bg-emerald-100/70 border border-emerald-200 rounded-xl cursor-pointer transition-all flex items-start gap-2.5 group"
+                      className={`p-2.5 hover:bg-emerald-100/70 border rounded-xl cursor-pointer transition-all flex items-start gap-2.5 group ${
+                        skillCodes.includes(skill.code.toUpperCase()) ? 'bg-emerald-100 border-emerald-500 ring-1 ring-emerald-400' : 'bg-white border-emerald-200'
+                      }`}
                     >
                       <span className="px-2 py-0.5 rounded-md font-mono font-black text-[11px] bg-emerald-600 text-white shrink-0 mt-0.5">
                         {skill.code}
@@ -461,12 +541,9 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
                           {skill.description}
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        className="opacity-0 group-hover:opacity-100 px-2 py-1 bg-emerald-700 text-white rounded-lg text-[10px] font-bold shrink-0 self-center"
-                      >
-                        Vincular
-                      </button>
+                      <span className="px-2 py-1 bg-emerald-700 text-white rounded-lg text-[10px] font-bold shrink-0 self-center">
+                        {skillCodes.includes(skill.code.toUpperCase()) ? '✓ Vinculada' : 'Vincular'}
+                      </span>
                     </div>
                   ))
                 )}
