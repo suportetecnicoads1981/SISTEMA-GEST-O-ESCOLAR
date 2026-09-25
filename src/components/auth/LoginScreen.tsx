@@ -279,7 +279,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         const sector: UserSector = existing?.sector || (role === 'ADMIN' ? 'MASTER' : role === 'TEACHER' ? 'PROFESSOR' : 'ALUNO');
 
         if (existing && existing.active === false) {
-          await getSupabaseClient().auth.signOut().catch(() => {});
+          await getSupabaseClient().auth.signOut({ scope: 'local' }).catch(() => {});
           setIsLoading(false);
           setErrorMsg('Credenciais inválidas ou usuário inativo no banco de dados.');
           return;
