@@ -1850,6 +1850,7 @@ export default function App() {
                 onNavigate={handleNavigate}
                 students={data.students}
                 onSavePaperSubmissions={handleSavePaperSubmissions}
+                schoolUnits={data.schoolUnits || []}
               />
             )}
 
