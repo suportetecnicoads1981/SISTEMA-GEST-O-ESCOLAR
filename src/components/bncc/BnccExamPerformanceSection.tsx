@@ -30,7 +30,7 @@ import {
   examTermNumber,
 } from '../../services/bncc/examSkillService';
 import { triggerPrint } from '../../utils/printHelper';
-import { displayClassName } from '../../utils/schoolDataNormalizer';
+import { displayClassName, classLabelWithSchool } from '../../utils/schoolDataNormalizer';
 
 interface Props {
   students: Student[];
@@ -169,7 +169,7 @@ export const BnccExamPerformanceSection: React.FC<Props> = ({
 
   const classNameOf = (id: string) => {
     const c = classes.find((x) => x.id === id);
-    return c ? displayClassName(c) : '';
+    return c ? classLabelWithSchool(c, schoolUnits) : '';
   };
   const unitOfClass = (id: string) => classes.find((x) => x.id === id)?.schoolUnitId;
   const scopeLabel = [
@@ -341,7 +341,7 @@ export const BnccExamPerformanceSection: React.FC<Props> = ({
             <option value="">Todas as turmas</option>
             {gradeClasses.map((c) => (
               <option key={c.id} value={c.id}>
-                {displayClassName(c)}
+                {classLabelWithSchool(c, schoolUnits)}
               </option>
             ))}
           </select>
