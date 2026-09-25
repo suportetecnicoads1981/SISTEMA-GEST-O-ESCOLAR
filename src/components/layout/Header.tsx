@@ -25,6 +25,7 @@ import {
   Clock,
   GitBranch,
   History,
+  LifeBuoy,
 } from 'lucide-react';
 import { NotificationItem, UserRole, UserAccount } from '../../types';
 import { NotificationPopover } from '../notificacoes/NotificationPopover';
@@ -53,6 +54,8 @@ interface HeaderProps {
   onToggleStartMenu?: () => void;
   isStartMenuOpen?: boolean;
   onOpenTour?: () => void;
+  /** Abre o Tira-dúvidas do módulo atual (F1). */
+  onOpenHelp?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -79,6 +82,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleStartMenu,
   isStartMenuOpen = false,
   onOpenTour,
+  onOpenHelp,
 }) => {
   const [currentDateTime, setCurrentDateTime] = useState('');
   const [serverPingOk, setServerPingOk] = useState(true);
@@ -334,6 +338,19 @@ export const Header: React.FC<HeaderProps> = ({
             <Sparkles className="h-3.5 w-3.5 text-purple-600 group-hover:rotate-12 transition-transform" />
             <span className="font-mono text-[11px] text-purple-800 font-bold">{currentVersion || 'v5.4.1'}</span>
             <span className="hidden xl:inline text-[9px] bg-purple-200/80 text-purple-900 px-1.5 py-0.5 rounded-md font-sans uppercase">Novidades</span>
+          </button>
+        )}
+
+        {/* Tira-dúvidas do módulo atual */}
+        {onOpenHelp && (
+          <button
+            id="btn-header-help"
+            onClick={onOpenHelp}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-sky-50 hover:bg-sky-100 border border-sky-200 text-xs font-bold text-sky-700 shadow-2xs transition-all cursor-pointer"
+            title="Tira-dúvidas: como usar este módulo (F1)"
+          >
+            <LifeBuoy className="h-3.5 w-3.5 text-sky-600" />
+            <span className="hidden sm:inline">Tira-dúvidas</span>
           </button>
         )}
 
