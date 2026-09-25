@@ -68,6 +68,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   // Conta sem senha definida: exige cadastrar uma senha antes do primeiro acesso.
   const [firstAccessUser, setFirstAccessUser] = useState<UserAccount | null>(null);
   const [newPassword, setNewPassword] = useState('');
+  const [exitBlocked, setExitBlocked] = useState(false);
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [selectedUnitId, setSelectedUnitId] = useState('unit-sede');
@@ -189,11 +190,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setErrorMsg('');
     setActiveTabMode('SEARCH_USERS');
     try {
-      // Só fecha janelas abertas pelo atalho/aplicativo; no navegador comum nada acontece.
+      // O navegador só deixa o script fechar a janela em alguns casos (ex.: atalho recém-aberto).
       window.close();
     } catch {
       /* janela não pode ser fechada por script */
     }
+    // Se o navegador bloqueou o fechamento, mostra a tela de "sessão encerrada".
+    window.setTimeout(() => {
+      if (!window.closed) setExitBlocked(true);
+    }, 300);
   };
 
   // "Acessar" na lista de usuários apenas seleciona o perfil: a senha é sempre exigida.
@@ -372,6 +377,31 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setPassword('');
     onLoginSuccess(userWithPassword);
   };
+
+  if (exitBlocked) {
+    return (
+      <div className="min-h-screen w-full bg-slate-950 flex items-center justify-center p-6 font-sans text-slate-100">
+        <div className="max-w-md w-full text-center rounded-3xl bg-slate-900 border border-slate-800 p-8 shadow-2xl">
+          <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-emerald-600/20 flex items-center justify-center">
+            <CheckCircle2 className="h-8 w-8 text-emerald-400" />
+          </div>
+          <h1 className="text-xl font-bold mb-2">Sessão encerrada</h1>
+          <p className="text-sm text-slate-400 mb-6">
+            O navegador não permite que o sistema feche esta janela sozinho.
+            Para fechar, clique no <strong className="text-slate-200">X</strong> da janela ou aperte{' '}
+            <strong className="text-slate-200">Alt+F4</strong> (aba do navegador: <strong className="text-slate-200">Ctrl+W</strong>).
+          </p>
+          <button
+            type="button"
+            onClick={() => setExitBlocked(false)}
+            className="w-full px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-all cursor-pointer"
+          >
+            Voltar para o login
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full bg-linear-to-br from-slate-950 via-slate-900 to-indigo-950 flex items-center justify-center p-3 sm:p-6 lg:p-8 relative overflow-hidden font-sans text-slate-100">
