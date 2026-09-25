@@ -101,6 +101,25 @@ export class SupabasePersistenceService {
         supabase.from('bncc_skill_assessments').select('*'),
       ]);
 
+      // Excluídos em qualquer computador (lápides na nuvem): somem também desta cópia local.
+      const cloudDeleted = new Map<string, Set<string>>();
+      try {
+        const { data: dead, error: deadErr } = await supabase.from('deleted_records').select('table_name, record_id');
+        if (!deadErr && Array.isArray(dead)) {
+          for (const d of dead as Array<{ table_name: string; record_id: string }>) {
+            if (!cloudDeleted.has(d.table_name)) cloudDeleted.set(d.table_name, new Set());
+            cloudDeleted.get(d.table_name)!.add(String(d.record_id));
+          }
+        }
+      } catch {
+        /* tabela ainda não existe: segue sem lápides */
+      }
+      const dropDeleted = <T extends { id?: any }>(table: string, list: T[] | null | undefined): T[] => {
+        const dead = cloudDeleted.get(table);
+        const arr = Array.isArray(list) ? list : [];
+        return dead && dead.size ? arr.filter((r) => !dead.has(String(r?.id))) : arr;
+      };
+
       if (studentsRes.error && classesRes.error) {
         console.warn('Supabase fetch failed or tables not present yet:', studentsRes.error);
         return null;
@@ -108,7 +127,7 @@ export class SupabasePersistenceService {
 
       // Linhas excluídas localmente (ainda não confirmadas na nuvem) não podem reaparecer.
       const rowsOf = (res: { data: any[] | null; error: any }, table?: string) =>
-        res.error ? null : table ? withoutTombstones(table, res.data) ?? null : res.data;
+        res.error ? null : table ? (withoutTombstones(table, dropDeleted(table, res.data)) ?? null) : res.data;
       const withRoles = (row: Record<string, any>) => {
         const mapped = fromRemoteRow(row);
         mapped.targetRoles = Array.isArray(row.targetRoles)
@@ -146,9 +165,9 @@ export class SupabasePersistenceService {
         }),
         subjects: mergeRemoteIntoLocal(local.subjects, rowsOf(subjectsRes, 'subjects')),
         courses: mergeRemoteIntoLocal(local.courses, rowsOf(coursesRes, 'courses')),
-        questions: mergeRemoteIntoLocal(local.questions, rowsOf(questionsRes, 'questions')),
-        exams: mergeRemoteIntoLocal(local.exams, rowsOf(examsRes, 'exams')),
-        submissions: mergeRemoteIntoLocal(local.submissions, rowsOf(submissionsRes, 'exam_submissions')),
+        questions: mergeRemoteIntoLocal(dropDeleted('questions', local.questions), rowsOf(questionsRes, 'questions')),
+        exams: mergeRemoteIntoLocal(dropDeleted('exams', local.exams), rowsOf(examsRes, 'exams')),
+        submissions: mergeRemoteIntoLocal(dropDeleted('exam_submissions', local.submissions), rowsOf(submissionsRes, 'exam_submissions')),
         attendanceSheets: mergeRemoteIntoLocal(local.attendanceSheets, rowsOf(attendanceRes, 'attendance_sheets')),
         lessonRegistries: mergeRemoteIntoLocal(local.lessonRegistries, rowsOf(lessonsRes, 'lesson_registries')),
         // Catálogo BNCC: mescla por id e mantém uma habilidade por código
