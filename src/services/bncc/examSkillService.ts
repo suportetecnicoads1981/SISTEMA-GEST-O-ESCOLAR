@@ -279,6 +279,8 @@ export interface SkillPerformanceFilter {
   subject?: string;
   schoolYear?: number;
   term?: number; // 0 = todos
+  /** Série de cada turma: correções de alunos de outra série que não a da prova ficam fora. */
+  classGradeOf?: (classId: string) => string;
 }
 
 export function examMatches(exam: Exam, f: Pick<SkillPerformanceFilter, 'subject' | 'schoolYear' | 'term'>): boolean {
@@ -322,6 +324,10 @@ export function buildSkillPerformance(
     const student = studentMap.get(sub.studentId);
     const classId = student?.classId || sub.classId;
     if (!f.classIds.has(classId)) continue;
+    if (f.classGradeOf && exam.classId) {
+      const examGrade = f.classGradeOf(exam.classId);
+      if (examGrade && f.classGradeOf(classId) !== examGrade) continue;
+    }
 
     let counted = false;
     exam.questions.forEach((cfg, idx) => {
@@ -402,4 +408,29 @@ export function classesForGrade(classes: SchoolClass[], grade: string, unitId: s
       (unitId === 'ALL' || !unitId || c.schoolUnitId === unitId) &&
       (!classId || c.id === classId)
   );
+}
+
+// ---------------------------------------------------------------------------
+// Prova vale para a série da turma escolhida
+// ---------------------------------------------------------------------------
+
+/**
+ * Turmas que podem fazer a prova: todas as turmas da mesma série da turma da prova
+ * (ex.: prova do 5º ANO vale para o 5º ANO de qualquer escola). Sem turma na prova = todas.
+ */
+export function classesForExam(exam: Pick<Exam, 'classId'>, classes: SchoolClass[]): SchoolClass[] {
+  if (!exam?.classId) return classes;
+  const base = classes.find((c) => c.id === exam.classId);
+  if (!base) return classes.filter((c) => c.id === exam.classId);
+  const g = gradeKey(base.gradeLevel);
+  if (!g) return [base];
+  return classes.filter((c) => gradeKey(c.gradeLevel) === g);
+}
+
+/** Alunos que podem fazer a prova (da série da prova, sem transferidos/evadidos). */
+export function studentsForExam(exam: Pick<Exam, 'classId'>, students: Student[], classes: SchoolClass[]): Student[] {
+  const ids = new Set(classesForExam(exam, classes).map((c) => c.id));
+  return students
+    .filter((s) => (!exam?.classId || ids.has(s.classId)) && s.status !== 'TRANSFERRED' && s.status !== 'EVADIDO')
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 }
