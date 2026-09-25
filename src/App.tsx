@@ -51,6 +51,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { BnccSkillsModule } from './components/bncc/BnccSkillsModule';
 import { upsertAssessments, removeAssessments, mergeSkills } from './services/bncc/bnccAssessmentService';
 import { replaceSubmissions, studentsForExam } from './services/bncc/examSkillService';
+import { HelpCenterModal } from './components/common/HelpCenterModal';
 import { MainOverviewDashboard } from './components/dashboard/MainOverviewDashboard';
 import { StudentList } from './components/secretaria/StudentList';
 import { DropoutCensusReport } from './components/secretaria/DropoutCensusReport';
@@ -154,6 +155,18 @@ export default function App() {
   const [isVersionControlModalOpen, setIsVersionControlModalOpen] = useState(false);
   const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  // Tira-dúvidas (botão no alto da tela e tecla F1)
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'F1') {
+        e.preventDefault();
+        setIsHelpOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const [isTourOpen, setIsTourOpen] = useState(() => {
     try {
       return localStorage.getItem('sucessoedu_tour_seen') !== 'true';
@@ -1575,6 +1588,7 @@ export default function App() {
         onToggleStartMenu={() => setIsStartMenuOpen((prev) => !prev)}
         isStartMenuOpen={isStartMenuOpen}
         onOpenTour={() => setIsTourOpen(true)}
+        onOpenHelp={() => setIsHelpOpen(true)}
       />
 
       {/* Main Layout Shell */}
@@ -2257,6 +2271,9 @@ export default function App() {
 
       {/* FEEDBACK VISUAL FLUTUANTE DE ATALHO EXECUTADO */}
       <ShortcutToast toast={activeShortcutToast} />
+
+      {/* TIRA-DÚVIDAS DO MÓDULO ATUAL (F1) */}
+      <HelpCenterModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} activeTab={activeTab} />
 
       {/* TOUR GUIADO (ONBOARDING) PARA NOVOS USUÁRIOS */}
       <GuidedTourModal
