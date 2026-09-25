@@ -253,12 +253,14 @@ export const StudentExamRoom: React.FC<StudentExamRoomProps> = ({
             onChange={(e) => setSelectedStudentId(e.target.value)}
             className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-xs focus:ring-2 focus:ring-indigo-500"
           >
+            {students.length === 0 && <option value="">Nenhum aluno da série desta prova</option>}
             {students.map((st) => (
               <option key={st.id} value={st.id}>
                 {st.name} (RA: {st.enrollmentNumber} • {st.status})
               </option>
             ))}
           </select>
+          <p className="text-[11px] text-slate-500">Aparecem só os alunos da série da turma desta prova.</p>
         </div>
 
         {/* Instructions */}
@@ -312,7 +314,8 @@ export const StudentExamRoom: React.FC<StudentExamRoomProps> = ({
           </div>
           <button
             onClick={() => setHasStarted(true)}
-            className="px-6 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-200 flex items-center gap-2 cursor-pointer"
+            disabled={!currentStudent}
+            className="px-6 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-200 flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span>Iniciar Avaliação Agora</span>
             <ArrowRight className="h-4 w-4" />

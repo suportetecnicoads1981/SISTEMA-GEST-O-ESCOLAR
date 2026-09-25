@@ -20,6 +20,7 @@ import {
   ExamQuestionConfig,
   AutoCorrectionRules,
 } from '../../types';
+import { classYear } from '../../services/bncc/bnccAssessmentService';
 
 const DEFAULT_SUBJECT_NAMES = [
   'Língua Portuguesa',
@@ -96,6 +97,8 @@ export const ExamBuilderModal: React.FC<ExamBuilderModalProps> = ({
 
   const [selectedQuestions, setSelectedQuestions] = useState<ExamQuestionConfig[]>([]);
   const [questionSearchFilter, setQuestionSearchFilter] = useState('');
+  // Mostra só as questões do ano da turma da prova (pode desligar).
+  const [onlyClassYear, setOnlyClassYear] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -221,9 +224,15 @@ export const ExamBuilderModal: React.FC<ExamBuilderModalProps> = ({
     onSave(exam);
   };
 
+  const targetClass = classes.find((c) => c.id === formData.classId);
+  const targetYear = targetClass ? classYear(targetClass.gradeLevel) : null;
   const availableBankFiltered = questions.filter((q) => {
-    if (!questionSearchFilter) return true;
     if (!q) return false;
+    if (onlyClassYear && targetYear !== null) {
+      const qy = classYear(q.gradeLevel);
+      if (qy !== null && qy !== targetYear) return false;
+    }
+    if (!questionSearchFilter) return true;
     const filter = questionSearchFilter.toLowerCase().trim();
     return (
       (q.stem && q.stem.toLowerCase().includes(filter)) ||
@@ -506,6 +515,13 @@ export const ExamBuilderModal: React.FC<ExamBuilderModalProps> = ({
               placeholder="Filtrar questões do banco por tema, disciplina ou palavra-chave..."
               className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs"
             />
+            <label className="flex items-center gap-2 text-[11px] text-slate-600 cursor-pointer">
+              <input type="checkbox" checked={onlyClassYear} onChange={(e) => setOnlyClassYear(e.target.checked)} />
+              <span>
+                Mostrar só questões do ano da turma{targetClass ? ` (${targetClass.gradeLevel})` : ''}
+                {onlyClassYear && targetYear !== null && availableBankFiltered.length === 0 && ' — nenhuma questão deste ano no banco'}
+              </span>
+            </label>
 
             {/* Questions Bank Selection List */}
             <div className="border border-slate-200 rounded-xl max-h-60 overflow-y-auto divide-y divide-slate-100 bg-white">

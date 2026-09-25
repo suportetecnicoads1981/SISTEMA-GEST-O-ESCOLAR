@@ -14,6 +14,7 @@ import {
   optionLetter,
   questionPoints,
   questionSkillCodes,
+  classesForExam,
   PaperMarks,
 } from '../../services/bncc/examSkillService';
 import { displayClassName } from '../../utils/schoolDataNormalizer';
@@ -35,6 +36,8 @@ export const PaperAnswersModal: React.FC<Props> = ({ exam, questions, classes, s
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const cellRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
+  // A prova vale para as turmas da mesma série da turma escolhida na prova.
+  const examClasses = useMemo(() => classesForExam(exam, classes), [exam, classes]);
   const qMap = useMemo(() => new Map(questions.map((q) => [q.id, q])), [questions]);
   const items = useMemo(
     () =>
@@ -154,7 +157,7 @@ export const PaperAnswersModal: React.FC<Props> = ({ exam, questions, classes, s
                 className="px-2 py-1.5 rounded-lg text-slate-900 text-xs min-w-[180px]"
               >
                 <option value="">Selecione a turma</option>
-                {classes.map((c) => (
+                {examClasses.map((c) => (
                   <option key={c.id} value={c.id}>
                     {displayClassName(c)}
                   </option>
