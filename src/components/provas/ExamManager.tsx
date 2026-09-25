@@ -33,9 +33,11 @@ import {
   Subject,
   ExamSubmission,
   SchoolSettings,
+  Student,
 } from '../../types';
 import { ExamBuilderModal } from './ExamBuilderModal';
 import { ExamAnswerKeyModal } from './ExamAnswerKeyModal';
+import { PaperAnswersModal } from './PaperAnswersModal';
 import { confirmDialog } from '../../utils/dialogs';
 
 interface ExamManagerProps {
@@ -53,6 +55,10 @@ interface ExamManagerProps {
   onBatchImportExams?: (exams: Exam[]) => void;
   onBack?: () => void;
   onNavigate?: (tab: string, payload?: any) => void;
+  /** Alunos (para lançar as respostas da prova de papel). */
+  students?: Student[];
+  /** Grava as correções lançadas (substitui as do mesmo aluno na prova). */
+  onSavePaperSubmissions?: (examId: string, upserts: ExamSubmission[], removeStudentIds: string[]) => void;
 }
 
 export const ExamManager: React.FC<ExamManagerProps> = ({
@@ -70,6 +76,8 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
   onBatchImportExams,
   onBack,
   onNavigate,
+  students = [],
+  onSavePaperSubmissions,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClassFilter, setSelectedClassFilter] = useState('ALL');
@@ -81,6 +89,7 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
   const [importFeedback, setImportFeedback] = useState<string | null>(null);
   const [examToEdit, setExamToEdit] = useState<Exam | null>(null);
   const [selectedExamForAnswerKey, setSelectedExamForAnswerKey] = useState<Exam | null>(null);
+  const [examForPaperAnswers, setExamForPaperAnswers] = useState<Exam | null>(null);
 
   // Auto open builder if initial questions were passed from Question Bank
   useEffect(() => {
@@ -490,7 +499,7 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
 
                 {/* Card Actions */}
                 <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       onClick={() => handleOpenAnswerKey(exam)}
                       className="px-3.5 py-2 text-xs font-bold text-slate-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
@@ -499,6 +508,17 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
                       <FileCheck className="h-4 w-4 text-amber-700" />
                       <span>Caderno & Gabarito</span>
                     </button>
+
+                    {onSavePaperSubmissions && (
+                      <button
+                        onClick={() => setExamForPaperAnswers(exam)}
+                        className="px-3.5 py-2 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                        title="Digitar as respostas marcadas pelos alunos na prova de papel e corrigir"
+                      >
+                        <ClipboardList className="h-4 w-4 text-emerald-700" />
+                        <span>Lançar respostas</span>
+                      </button>
+                    )}
 
                     <button
                       onClick={() => onViewReport(exam.id)}
@@ -785,6 +805,18 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
         subjects={subjects}
         initialQuestionIds={initialSelectedQuestionIds}
       />
+
+      {examForPaperAnswers && onSavePaperSubmissions && (
+        <PaperAnswersModal
+          exam={examForPaperAnswers}
+          questions={questions}
+          classes={classes}
+          students={students}
+          submissions={submissions}
+          onSave={onSavePaperSubmissions}
+          onClose={() => setExamForPaperAnswers(null)}
+        />
+      )}
 
       {/* Exam Answer Key & Printable Sheets Modal */}
       {selectedExamForAnswerKey && (
