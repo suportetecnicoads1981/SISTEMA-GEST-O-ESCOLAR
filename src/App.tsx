@@ -50,6 +50,7 @@ import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { BnccSkillsModule } from './components/bncc/BnccSkillsModule';
 import { upsertAssessments, removeAssessments, mergeSkills } from './services/bncc/bnccAssessmentService';
+import { replaceSubmissions } from './services/bncc/examSkillService';
 import { MainOverviewDashboard } from './components/dashboard/MainOverviewDashboard';
 import { StudentList } from './components/secretaria/StudentList';
 import { DropoutCensusReport } from './components/secretaria/DropoutCensusReport';
@@ -859,6 +860,14 @@ export default function App() {
   const handleTakeExam = (examId: string) => {
     setActiveExamIdForTaking(examId);
     setActiveTab('STUDENT_ROOM');
+  };
+
+  // Prova de papel: respostas lançadas pelo professor (substitui a correção anterior do aluno).
+  const handleSavePaperSubmissions = (examId: string, upserts: ExamSubmission[], removeStudentIds: string[]) => {
+    setData((prev) => ({
+      ...prev,
+      submissions: replaceSubmissions(prev.submissions || [], examId, upserts, removeStudentIds),
+    }));
   };
 
   // Exam submission handler with auto-notification for results
@@ -1800,6 +1809,9 @@ export default function App() {
                 currentUserName={currentUser?.name}
                 onSaveAssessments={handleSaveBnccAssessments}
                 onUpsertSkills={handleUpsertBnccSkills}
+                exams={data.exams}
+                questions={data.questions}
+                submissions={data.submissions}
                 onBack={() => handleNavigate('MAIN_DASHBOARD')}
               />
             )}
@@ -1834,6 +1846,8 @@ export default function App() {
                 initialSelectedQuestionIds={preselectedQuestionIdsForExam}
                 onBack={() => handleNavigate('MAIN_DASHBOARD')}
                 onNavigate={handleNavigate}
+                students={data.students}
+                onSavePaperSubmissions={handleSavePaperSubmissions}
               />
             )}
 

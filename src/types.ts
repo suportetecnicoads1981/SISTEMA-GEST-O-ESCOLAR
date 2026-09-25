@@ -369,7 +369,8 @@ export interface Question {
   subjectId?: string; // Chave estrangeira para Subject.id (ex: sub-mat)
   topic: string;
   gradeLevel: string;
-  bnccSkill?: string; // Código de habilidade BNCC (e.g. EM13MAT301)
+  bnccSkill?: string; // Código(s) de habilidade BNCC; várias separadas por vírgula (ex.: "EF05MA01, EF05MA02")
+  bnccSkills?: string[]; // Lista de habilidades da questão (bnccSkill guarda a mesma lista em texto)
   difficulty: QuestionDifficulty;
   type: QuestionType;
   stem: string; // Enunciado
