@@ -531,7 +531,7 @@ export default function App() {
       localStorage.removeItem('sucessoedu_logged_user_id');
     } catch {}
     // Encerra também a sessão do Supabase (senão a sincronização continuaria autenticada).
-    getSupabaseClient().auth.signOut().catch(() => {});
+    getSupabaseClient().auth.signOut({ scope: 'local' }).catch(() => {});
     setAuthenticatedUserId(null);
     setIsAuthenticated(false);
     setOpenTabs(['MAIN_DASHBOARD']);
