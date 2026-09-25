@@ -261,3 +261,15 @@ function removeImportDuplicates(
 
   return { units: keptUnits, classes: keptClasses, students: keptStudents, changed: true };
 }
+
+/**
+ * Nome da turma com a escola (ex.: "1º ANO - MANHÃ — EMEF CASTRO ALVES").
+ * Várias escolas têm turmas com o mesmo nome; sem a escola não dá para distinguir na lista.
+ */
+export function classLabelWithSchool(cls: SchoolClass | undefined, units: SchoolUnit[] = []): string {
+  if (!cls) return '';
+  const base = displayClassName(cls, units);
+  if ((units || []).length <= 1) return base;
+  const unit = units.find((u) => u?.id === cls.schoolUnitId);
+  return unit?.name ? `${base} — ${unit.name}` : base;
+}
