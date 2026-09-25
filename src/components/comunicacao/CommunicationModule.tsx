@@ -54,6 +54,8 @@ interface CommunicationModuleProps {
   onDeleteMessage: (messageId: string) => void;
   onTriggerPushNotification: (title: string, body: string) => void;
   onBatchImportMessages?: (messages: CommunicationMessage[]) => void;
+  /** Abre a Central de WhatsApp com o público e o texto deste comunicado. */
+  onSendViaWhatsApp?: (message: CommunicationMessage) => void;
   onBack?: () => void;
   onNavigate?: (tab: string, payload?: any) => void;
   /** Usuário logado: assina os comunicados e as confirmações de leitura. */
@@ -72,6 +74,7 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
   onDeleteMessage,
   onTriggerPushNotification,
   onBatchImportMessages,
+  onSendViaWhatsApp,
   onBack,
   onNavigate,
   currentUserName: loggedUserName,
@@ -102,6 +105,7 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
   const [attachments, setAttachments] = useState<CommunicationAttachment[]>([]);
   const [sendPushNotification, setSendPushNotification] = useState(true);
   const [requireReadConfirmation, setRequireReadConfirmation] = useState(true);
+  const [alsoWhatsApp, setAlsoWhatsApp] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Quick message templates
@@ -145,30 +149,39 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
     }
   };
 
-  // Mock file attachment handler
+  // Anexos: o arquivo é guardado dentro do comunicado (vai junto para a nuvem).
+  // Limite por arquivo para não pesar a sincronização.
+  const MAX_ATTACHMENT_BYTES = 2 * 1024 * 1024;
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    const newAttachments: CommunicationAttachment[] = Array.from(files).map((file: File, idx: number) => {
-      const isPdf = file.name.endsWith('.pdf');
-      const isImg = file.type.startsWith('image/');
-      const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
-      const sizeKb = (file.size / 1024).toFixed(0);
-      const sizeFormatted = file.size > 1024 * 1024 ? `${sizeMb} MB` : `${sizeKb} KB`;
-
-      return {
-        id: `att-${Date.now()}-${idx}`,
-        name: file.name,
-        sizeFormatted,
-        type: isPdf ? 'PDF' : isImg ? 'IMAGE' : 'DOC',
-        url: isImg
-          ? URL.createObjectURL(file)
-          : 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&auto=format&fit=crop&q=60',
-      };
-    });
-
-    setAttachments((prev) => [...prev, ...newAttachments]);
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (files.length === 0) return;
+    const tooBig = files.filter((f) => f.size > MAX_ATTACHMENT_BYTES);
+    if (tooBig.length) {
+      window.alert(
+        `Arquivo(s) acima de 2 MB não foram anexados: ${tooBig.map((f) => f.name).join(', ')}.\nReduza o tamanho (ex.: salve o PDF em qualidade menor) ou envie por outro meio.`
+      );
+    }
+    files
+      .filter((f) => f.size <= MAX_ATTACHMENT_BYTES)
+      .forEach((file, idx) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const lower = file.name.toLowerCase();
+          const isPdf = lower.endsWith('.pdf');
+          const isImg = file.type.startsWith('image/');
+          const sizeFormatted = file.size > 1024 * 1024 ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(file.size / 1024))} KB`;
+          const att: CommunicationAttachment = {
+            id: `att-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+            name: file.name,
+            sizeFormatted,
+            type: isPdf ? 'PDF' : isImg ? 'IMAGE' : lower.endsWith('.zip') ? 'ZIP' : 'DOC',
+            url: String(reader.result || ''),
+          };
+          setAttachments((prev) => [...prev, att]);
+        };
+        reader.readAsDataURL(file);
+      });
   };
 
   const handleRemoveAttachment = (attId: string) => {
@@ -183,7 +196,7 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
 
     const studentObj = students.find((s) => s.id === selectedStudentId);
 
-    onSendMessage({
+    const payload: Omit<CommunicationMessage, 'id' | 'createdAt' | 'readConfirmations'> = {
       title,
       content,
       senderRole: currentRole,
@@ -206,7 +219,11 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
       sendPushNotification,
       requireReadConfirmation,
       status: 'ENVIADO',
-    });
+    };
+    onSendMessage(payload);
+    if (alsoWhatsApp && onSendViaWhatsApp) {
+      onSendViaWhatsApp({ ...payload, id: '', createdAt: new Date().toISOString(), readConfirmations: [] });
+    }
 
     if (sendPushNotification) {
       onTriggerPushNotification(
@@ -409,7 +426,7 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
               title="Abrir Central de Disparos WhatsApp"
             >
               <Smartphone className="h-3.5 w-3.5 text-emerald-600" />
-              <span>WhatsApp Notificações</span>
+              <span>Central de WhatsApp</span>
             </button>
           )}
         </div>
@@ -666,7 +683,7 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
                         <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-md">
                           {msg.recipientType === 'ALL' && '👥 Toda a Escola'}
                           {msg.recipientType === 'ROLE' && `🎯 ${msg.targetRoles.join(', ')}`}
-                          {msg.recipientType === 'CLASS' && '🏫 Turma Específica'}
+                          {msg.recipientType === 'CLASS' && `🏫 ${classes.find((c) => c.id === msg.targetClassId)?.name || 'Turma específica'}`}
                           {msg.recipientType === 'INDIVIDUAL' && `👤 ${msg.targetStudentName || 'Individual'}`}
                         </span>
 
@@ -779,6 +796,17 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
                           >
                             <CheckCircle2 className="h-3.5 w-3.5" />
                             <span>{isConfirmedByMe ? 'Leitura Confirmada' : 'Confirmar Ciência / Leitura'}</span>
+                          </button>
+                        )}
+
+                        {onSendViaWhatsApp && (
+                          <button
+                            onClick={() => onSendViaWhatsApp(msg)}
+                            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                            title="Enviar este comunicado pelo WhatsApp (envio assistido)"
+                          >
+                            <Smartphone className="h-3.5 w-3.5" />
+                            <span>Enviar por WhatsApp</span>
                           </button>
                         )}
 
@@ -1088,6 +1116,21 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
                   <span>Exigir Confirmação de Leitura / Ciência</span>
                 </div>
               </label>
+
+              {onSendViaWhatsApp && (
+                <label className="flex items-center gap-2 font-bold text-slate-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={alsoWhatsApp}
+                    onChange={(e) => setAlsoWhatsApp(e.target.checked)}
+                    className="h-4 w-4 text-emerald-600 rounded"
+                  />
+                  <div className="flex items-center gap-1.5">
+                    <MessageSquare className="h-4 w-4 text-emerald-600" />
+                    <span>Depois de publicar, enviar também por WhatsApp</span>
+                  </div>
+                </label>
+              )}
             </div>
 
             {/* Submit Bar */}
@@ -1216,6 +1259,8 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
                   alt={attachmentPreview.name}
                   className="max-h-64 mx-auto rounded-lg shadow-xs"
                 />
+              ) : attachmentPreview.type === 'PDF' && attachmentPreview.url.startsWith('data:application/pdf') ? (
+                <iframe title={attachmentPreview.name} src={attachmentPreview.url} className="w-full h-[60vh] rounded-lg bg-white" />
               ) : (
                 <div className="p-8 space-y-2">
                   <FileText className="h-16 w-16 text-rose-500 mx-auto" />

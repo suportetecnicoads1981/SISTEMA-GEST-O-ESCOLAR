@@ -25,7 +25,6 @@ export const HELP_ALIASES: Record<string, string> = {
   PROFESSOR: 'TEACHER_PORTAL',
   PROFESSOR_DASHBOARD: 'TEACHER_PORTAL',
   STUDENT_ROOM: 'EXAMS',
-  WHATSAPP: 'COMMUNICATION',
 };
 
 const TECNICO =
@@ -325,6 +324,43 @@ export const HELP_MODULES: HelpModule[] = [
     faq: [
       { q: 'Como publico um comunicado?', steps: ['Clique em "Novo Comunicado".', 'Escolha o público e escreva a mensagem (ou use um dos "Modelos Prontos").', 'Anexe arquivos se quiser e marque "Exigir Confirmação de Leitura" se precisar.', 'Publique.'] },
       { q: 'Como vejo quem leu?', a: 'Abra o comunicado em "Ver Detalhes & Auditoria".' },
+      {
+        q: 'Como envio um comunicado também pelo WhatsApp?',
+        steps: [
+          'Ao publicar, marque "Depois de publicar, enviar também por WhatsApp". Ou, num comunicado já publicado, clique em "Enviar por WhatsApp".',
+          'A Central de WhatsApp abre com o público e o texto já preenchidos.',
+          'Confira e clique em "Preparar envio"; depois siga "Abrir próximo" para cada pessoa.',
+        ],
+        tip: 'Anexos não vão pelo WhatsApp: a mensagem avisa que o arquivo está na secretaria.',
+      },
+      { q: 'Qual o tamanho máximo de anexo?', a: '2 MB por arquivo. Para PDFs maiores, salve em qualidade menor antes de anexar.' },
+    ],
+  },
+  {
+    id: 'WHATSAPP',
+    title: 'Central de WhatsApp',
+    where: 'Mural & Mensagens > botão "Central de WhatsApp"',
+    summary:
+      'Envio assistido: o sistema monta a lista e abre cada conversa com a mensagem pronta; você aperta Enviar no WhatsApp da escola.',
+    faq: [
+      {
+        q: 'Como envio uma mensagem para uma turma?',
+        steps: [
+          'Em "Enviar mensagem", escolha "Uma turma" e selecione a turma.',
+          'Em "Enviar para", marque Responsável, Próprio aluno ou Os dois.',
+          'Escolha um modelo ou escreva a mensagem. Confira a prévia.',
+          'Clique em "Preparar envio".',
+          'Clique em "Abrir próximo": o WhatsApp abre na conversa com o texto pronto. Aperte Enviar no WhatsApp e volte para o próximo.',
+        ],
+        tip: 'Irmãos com o mesmo telefone do responsável recebem uma só mensagem, com os nomes juntos.',
+      },
+      { q: 'O sistema envia sozinho?', a: 'Não. Ele prepara e abre cada conversa; quem envia é você, no WhatsApp. Por isso o histórico mostra "Aberto no WhatsApp", e não "entregue" ou "lido".' },
+      { q: 'Preciso de alguma instalação?', a: 'Não. Use o WhatsApp Web conectado com o celular da escola (QR Code) ou o aplicativo WhatsApp do computador. Escolha em "Ajustes".' },
+      { q: 'Por que alguns alunos aparecem "sem telefone"?', a: 'O telefone do responsável não está cadastrado ou está incompleto (falta o DDD). Corrija em Secretaria & Alunos, ou reimporte a planilha com a coluna WhatsApp/Telefone. Telefones de professores e equipe ficam em Usuários & Permissões.' },
+      { q: 'O que é "Aguardando envio"?', a: 'São os avisos gerados quando o professor salva a chamada com faltas (e notas, se ligado em Ajustes), e os envios que você guardou para depois. Abra cada um ou descarte.' },
+      { q: 'Parei no meio de um envio. E agora?', a: 'Clique em "Guardar o restante para depois". As mensagens que faltam vão para "Aguardando envio".' },
+      { q: 'O navegador não abriu o WhatsApp', a: 'O navegador bloqueou a janela. Clique no ícone de pop-up bloqueado na barra de endereço, permita para este site e tente de novo.' },
+      { q: 'Posso mandar para muita gente de uma vez?', a: 'Pode, mas envie aos poucos (por turma). Muitas mensagens seguidas para números que não salvaram o contato da escola podem fazer o WhatsApp limitar o número.' },
     ],
   },
   {

@@ -11,6 +11,7 @@ import {
   SchoolSettings,
   NotificationItem,
   CommunicationMessage,
+  WhatsAppMessageType,
   RoleNotificationPreferences,
   UserRole,
   UserAccount,
@@ -34,7 +35,6 @@ import {
   getStoredData,
   saveStoredData,
   logSecurityAudit,
-  sendWhatsAppMessage,
   performAutoBackup,
 } from './data/storage';
 import {
@@ -95,7 +95,9 @@ import { ShortcutToast } from './components/common/ShortcutToast';
 import { GuidedTourModal } from './components/common/GuidedTourModal';
 import { ModuleLoadingFallback } from './components/common/ModuleLoadingFallback';
 import { Bell, CheckCircle2, X } from 'lucide-react';
-import { startMessageQueueWorker, stopMessageQueueWorker } from './services/messageQueueService';
+import { drainMessageQueue, subscribeToMessageQueue } from './services/messageQueueService';
+import { isDemoLog } from './services/whatsapp/whatsappAssist';
+import type { WhatsAppPrefill } from './components/comunicacao/WhatsAppModule';
 import { DatabaseAutomatorService } from './services/databaseAutomatorService';
 
 import { NexusBuildHub } from './components/nexusbuild/NexusBuildHub';
@@ -157,6 +159,7 @@ export default function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   // Tira-dúvidas (botão no alto da tela e tecla F1)
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [whatsappPrefill, setWhatsappPrefill] = useState<WhatsAppPrefill | null>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'F1') {
@@ -392,11 +395,57 @@ export default function App() {
     } catch {}
   }, []);
 
-  // Worker de segundo plano para fila de mensagens e notificações
+  // Avisos de falta/nota lançados pelo professor viram "Aguardando envio" na
+  // Central de WhatsApp (envio assistido). Nada é enviado automaticamente.
   useEffect(() => {
-    startMessageQueueWorker(15000);
+    const pull = () => {
+      const items = drainMessageQueue();
+      setData((prev) => {
+        if (!prev) return prev;
+        const cfg: any = prev.whatsappConfig || {};
+        const current = prev.whatsappLogs || [];
+        const withoutDemo = current.filter((l) => !isDemoLog(l.id));
+        if (!items.length && withoutDemo.length === current.length) return prev;
+        const now = new Date().toISOString();
+        const queued = items
+          .filter((it) =>
+            it.message_payload.event === 'ATTENDANCE_ALERT'
+              ? cfg.queueAbsenceAlerts !== false
+              : it.message_payload.event === 'GRADE_PUBLISHED'
+              ? cfg.queueGradeAlerts === true
+              : false
+          )
+          .map((it) => {
+            const st = (prev.students || []).find((x) => x.id === it.student_id);
+            const isAbsence = it.message_payload.event === 'ATTENDANCE_ALERT';
+            return {
+              id: `wpp-${isAbsence ? 'falta' : 'nota'}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+              recipientName: it.recipient_name || 'Responsável',
+              recipientPhone: it.recipient_phone || st?.guardianPhone || '',
+              recipientRole: 'RESPONSAVEL' as const,
+              messageType: (isAbsence ? 'AVISO_FALTA' : 'BOLETIM_NOTAS') as WhatsAppMessageType,
+              content: it.message_payload.body,
+              studentId: it.student_id,
+              studentName: it.student_name,
+              studentClass: it.message_payload.details?.class,
+              status: 'FILA' as const,
+              sentAt: it.created_at || now,
+              createdAt: it.created_at || now,
+              updatedAt: now,
+              operatorName: 'Gerado pelo lançamento do professor',
+              source: (isAbsence ? 'FALTA' : 'NOTA') as 'FALTA' | 'NOTA',
+              title: it.message_payload.title,
+            };
+          });
+        return { ...prev, whatsappLogs: [...queued, ...withoutDemo] };
+      });
+    };
+    pull();
+    const unsub = subscribeToMessageQueue(() => window.setTimeout(pull, 0));
+    const timer = window.setInterval(pull, 15000);
     return () => {
-      stopMessageQueueWorker();
+      unsub();
+      window.clearInterval(timer);
     };
   }, []);
 
@@ -1241,32 +1290,72 @@ export default function App() {
       currentUser?.name || 'Administrador',
       currentUser?.role || 'ADMIN',
       currentUser?.sector || 'MASTER',
-      `Configuração do WhatsApp atualizada. Status: ${newConfig.status}. Instância: ${newConfig.instanceName}`
-    );
-    triggerPushNotification(
-      '📱 WhatsApp Notificações',
-      `Configurações da instância ${newConfig.instanceName} atualizadas.`
+      `Ajustes do WhatsApp alterados (faltas na fila: ${newConfig.queueAbsenceAlerts !== false ? 'sim' : 'não'}; notas na fila: ${newConfig.queueGradeAlerts === true ? 'sim' : 'não'})`
     );
   };
 
+  // Envio assistido: registra a conversa aberta no WhatsApp (ou guardada na fila).
   const handleSendWhatsAppMessage = (logData: Omit<WhatsAppMessageLog, 'id' | 'sentAt'>) => {
-    const newLog = sendWhatsAppMessage(logData);
+    const now = new Date().toISOString();
+    const newLog: WhatsAppMessageLog = {
+      ...logData,
+      id: `wpp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      sentAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
     setData((prev) => ({
       ...prev,
       whatsappLogs: [newLog, ...(prev.whatsappLogs || [])],
     }));
-    logSecurityAudit(
-      'COMUNICADO',
-      currentUser?.id || 'usr-master-001',
-      currentUser?.name || 'Administrador',
-      currentUser?.role || 'ADMIN',
-      currentUser?.sector || 'MASTER',
-      `Disparo de WhatsApp para ${logData.recipientName} (${logData.recipientPhone}) - Tipo: ${logData.messageType}`
-    );
-    triggerPushNotification(
-      '📱 WhatsApp Enviado',
-      `Mensagem enviada com sucesso para ${logData.recipientName}.`
-    );
+    if (logData.status === 'ENVIADO') {
+      logSecurityAudit(
+        'COMUNICADO',
+        currentUser?.id || 'usr-master-001',
+        currentUser?.name || 'Administrador',
+        currentUser?.role || 'ADMIN',
+        currentUser?.sector || 'MASTER',
+        `WhatsApp aberto para ${logData.recipientName} (${logData.recipientPhone}) - Tipo: ${logData.messageType}`
+      );
+    }
+  };
+
+  const handleUpdateWhatsAppLogs = (ids: string[], patch: Partial<WhatsAppMessageLog>) => {
+    const set = new Set(ids);
+    const now = new Date().toISOString();
+    setData((prev) => ({
+      ...prev,
+      whatsappLogs: (prev.whatsappLogs || []).map((l) => (set.has(l.id) ? { ...l, ...patch, updatedAt: now } : l)),
+    }));
+  };
+
+  // Mural -> WhatsApp: abre a Central já com o público e o texto do aviso.
+  const handleSendAnnouncementViaWhatsApp = (msg: CommunicationMessage) => {
+    const roles = msg.targetRoles || [];
+    let audience: WhatsAppPrefill['audience'];
+    if (msg.recipientType === 'INDIVIDUAL' && msg.targetStudentId) {
+      audience = { kind: 'ALUNO', studentId: msg.targetStudentId, contact: 'RESPONSAVEL' };
+    } else if (msg.recipientType === 'CLASS' && msg.targetClassId) {
+      audience = { kind: 'TURMA', classId: msg.targetClassId, contact: 'RESPONSAVEL' };
+    } else if (msg.recipientType === 'ROLE' && roles.length > 0 && roles.every((r) => r === 'TEACHER' || r === 'ADMIN')) {
+      audience = { kind: 'PROFISSIONAIS', staff: roles.includes('ADMIN') ? 'EQUIPE' : 'PROFESSORES' };
+    } else {
+      const toStudents = msg.recipientType === 'ROLE' && roles.includes('STUDENT');
+      const toParents = msg.recipientType !== 'ROLE' || roles.includes('PARENT');
+      audience = { kind: 'ESCOLA', unitId: '', contact: toStudents && toParents ? 'AMBOS' : toStudents ? 'ALUNO' : 'RESPONSAVEL' };
+    }
+    const schoolName = (data.settings as any)?.name || '';
+    const files = (msg.attachments || []).map((a) => a.name).filter(Boolean);
+    const attachNote = files.length ? `\n\n📎 Anexo: ${files.join(', ')} (peça na secretaria da escola).` : '';
+    const text = `*${msg.title}*\n\n${msg.content}${attachNote}${msg.senderName ? `\n\n— ${msg.senderName}${schoolName ? `, ${schoolName}` : ''}` : ''}`;
+    setWhatsappPrefill({
+      title: msg.title,
+      text,
+      audience,
+      messageType: msg.category === 'EVENTO' ? 'EVENTO_REUNIAO' : 'AVISO_GERAL',
+      source: 'MURAL',
+    });
+    handleNavigate('WHATSAPP');
   };
 
   const handleSaveWhatsAppTemplate = (tpl: WhatsAppTemplate) => {
@@ -1935,6 +2024,7 @@ export default function App() {
                 onConfirmRead={handleConfirmRead}
                 onDeleteMessage={handleDeleteMessage}
                 onTriggerPushNotification={triggerPushNotification}
+                onSendViaWhatsApp={handleSendAnnouncementViaWhatsApp}
                 onBack={handleGoBack}
                 onNavigate={handleNavigate}
               />
@@ -1943,17 +2033,7 @@ export default function App() {
             {/* TAB: WHATSAPP NOTIFICAÇÕES & COMUNICADOS ADMINISTRATIVOS */}
             {activeTab === 'WHATSAPP' && (
               <WhatsAppModule
-                config={data.whatsappConfig || {
-                  instanceName: 'sucessoedu-instancia-oficial',
-                  phoneNumber: '+55 (11) 98765-4321',
-                  status: 'DISCONNECTED',
-                  apiKey: '',
-                  webhookUrl: 'https://api.sucessoedu.edu.br/webhook/whatsapp',
-                  autoNotifyGrades: true,
-                  autoNotifyAttendance: true,
-                  autoNotifyAnnouncements: true,
-                  serverEndpoint: 'https://whatsapp-api.sucessoedu.com.br',
-                }}
+                config={data.whatsappConfig}
                 logs={data.whatsappLogs || []}
                 messageLogs={data.whatsappLogs || []}
                 templates={data.whatsappTemplates || []}
@@ -1961,6 +2041,12 @@ export default function App() {
                 classes={data.classes}
                 userAccounts={data.userAccounts || []}
                 currentUser={currentUser}
+                schoolUnits={data.schoolUnits || []}
+                schoolName={(data.settings as any)?.name || (data.settings as any)?.schoolName || ''}
+                schoolPhone={(data.settings as any)?.phone || ''}
+                prefill={whatsappPrefill}
+                onPrefillConsumed={() => setWhatsappPrefill(null)}
+                onUpdateLogs={handleUpdateWhatsAppLogs}
                 onUpdateConfig={handleUpdateWhatsAppConfig}
                 onSendMessage={handleSendWhatsAppMessage}
                 onSaveTemplate={handleSaveWhatsAppTemplate}

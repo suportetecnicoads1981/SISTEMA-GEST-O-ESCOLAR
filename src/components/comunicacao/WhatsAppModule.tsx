@@ -1,31 +1,32 @@
-import React, { useState } from 'react';
+/**
+ * Central de WhatsApp — envio ASSISTIDO.
+ *
+ * O sistema monta a lista de destinatários com a mensagem de cada um pronta e
+ * abre a conversa no WhatsApp; quem opera aperta "Enviar" no próprio WhatsApp.
+ * Nada é marcado como "entregue" ou "lido": o histórico registra apenas que a
+ * conversa foi aberta, por quem e quando.
+ */
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   MessageSquare,
-  QrCode,
-  Smartphone,
   Send,
-  RefreshCw,
-  CheckCheck,
-  Check,
   Clock,
-  AlertTriangle,
-  Users,
   Search,
-  Filter,
   Plus,
   Trash2,
   Edit2,
   FileText,
-  Building2,
-  GraduationCap,
-  Sparkles,
   ExternalLink,
-  ShieldCheck,
-  Zap,
-  PhoneCall,
   CheckCircle2,
   Settings2,
   ArrowLeft,
+  AlertTriangle,
+  Users,
+  ListChecks,
+  PhoneOff,
+  X,
+  Inbox,
+  Info,
 } from 'lucide-react';
 import {
   WhatsAppConfig,
@@ -33,11 +34,39 @@ import {
   WhatsAppTemplate,
   Student,
   SchoolClass,
+  SchoolUnit,
   UserAccount,
   WhatsAppMessageType,
-  WhatsAppRecipientRole,
 } from '../../types';
 import { DEFAULT_WHATSAPP_CONFIG, DEFAULT_WHATSAPP_TEMPLATES } from '../../data/defaultData';
+import { classLabelWithSchool } from '../../utils/schoolDataNormalizer';
+import {
+  Audience,
+  AudienceKind,
+  OpenMode,
+  Recipient,
+  StaffFilter,
+  StudentContact,
+  buildRecipients,
+  fillMessage,
+  formatPhoneBR,
+  isDemoLog,
+  loadOpenMode,
+  missingVariables,
+  normalizeWhatsAppPhone,
+  openWhatsApp,
+  saveOpenMode,
+  studentsForAudience,
+} from '../../services/whatsapp/whatsappAssist';
+
+/** Pedido de envio vindo de outro módulo (ex.: Mural de Comunicados). */
+export interface WhatsAppPrefill {
+  title?: string;
+  text: string;
+  audience: Audience;
+  messageType?: WhatsAppMessageType;
+  source?: 'MURAL' | 'MANUAL';
+}
 
 export interface WhatsAppModuleProps {
   config?: WhatsAppConfig;
@@ -46,664 +75,802 @@ export interface WhatsAppModuleProps {
   templates?: WhatsAppTemplate[];
   students?: Student[];
   classes?: SchoolClass[];
+  schoolUnits?: SchoolUnit[];
   userAccounts?: UserAccount[];
   currentUser?: UserAccount;
+  schoolName?: string;
+  schoolPhone?: string;
+  prefill?: WhatsAppPrefill | null;
+  onPrefillConsumed?: () => void;
   onUpdateConfig: (newConfig: WhatsAppConfig) => void;
   onSendMessage: (log: Omit<WhatsAppMessageLog, 'id' | 'sentAt'>) => void;
+  onUpdateLogs?: (ids: string[], patch: Partial<WhatsAppMessageLog>) => void;
   onSaveTemplate: (tpl: WhatsAppTemplate) => void;
   onDeleteTemplate: (tplId: string) => void;
   onBack?: () => void;
   onNavigate?: (tab: string, payload?: any) => void;
 }
 
+type SubTab = 'ENVIAR' | 'FILA' | 'HISTORICO' | 'MODELOS' | 'AJUSTES';
+
+const TYPE_LABEL: Record<string, string> = {
+  AVISO_FALTA: 'Aviso de falta',
+  BOLETIM_NOTAS: 'Notas / boletim',
+  CONVOCACAO_RESPONSAVEL: 'Convocação',
+  COMUNICADO_INTERNO: 'Aviso à equipe',
+  BUSCA_ATIVA: 'Busca ativa',
+  EVENTO_REUNIAO: 'Reunião / evento',
+  AVISO_GERAL: 'Comunicado geral',
+};
+
+const SOURCE_LABEL: Record<string, string> = {
+  MANUAL: 'Envio manual',
+  MURAL: 'Mural de comunicados',
+  FALTA: 'Falta lançada',
+  NOTA: 'Nota lançada',
+};
+
+const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
+  ENVIADO: { text: 'Aberto no WhatsApp', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  FILA: { text: 'Aguardando envio', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+  DESCARTADO: { text: 'Descartado', cls: 'bg-slate-100 text-slate-500 border-slate-200' },
+  ENTREGUE: { text: 'Registro antigo', cls: 'bg-slate-100 text-slate-500 border-slate-200' },
+  LIDO: { text: 'Registro antigo', cls: 'bg-slate-100 text-slate-500 border-slate-200' },
+  ERRO: { text: 'Erro', cls: 'bg-rose-50 text-rose-700 border-rose-200' },
+};
+
+interface SessionRow {
+  recipient: Recipient;
+  text: string;
+  opened: boolean;
+}
+
+interface Session {
+  batchId: string;
+  title: string;
+  messageType: WhatsAppMessageType;
+  source: 'MANUAL' | 'MURAL';
+  rows: SessionRow[];
+  withoutPhone: Recipient[];
+}
+
+const fmtDateTime = (iso?: string) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(d);
+};
+
 export const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({
-  config = DEFAULT_WHATSAPP_CONFIG,
+  config,
   logs,
   messageLogs,
-  templates = DEFAULT_WHATSAPP_TEMPLATES,
+  templates,
   students = [],
   classes = [],
+  schoolUnits = [],
   userAccounts = [],
   currentUser,
+  schoolName = '',
+  schoolPhone = '',
+  prefill,
+  onPrefillConsumed,
   onUpdateConfig,
   onSendMessage,
+  onUpdateLogs,
   onSaveTemplate,
   onDeleteTemplate,
   onBack,
-  onNavigate,
 }) => {
-  const effectiveLogs = logs || messageLogs || [];
-  const effectiveTemplates = templates && templates.length > 0 ? templates : DEFAULT_WHATSAPP_TEMPLATES;
   const effectiveConfig = config || DEFAULT_WHATSAPP_CONFIG;
+  const effectiveTemplates = templates && templates.length > 0 ? templates : DEFAULT_WHATSAPP_TEMPLATES;
+  const allLogs = useMemo(() => (logs || messageLogs || []).filter((l) => l && !isDemoLog(l.id)), [logs, messageLogs]);
+  const queue = useMemo(() => allLogs.filter((l) => l.status === 'FILA'), [allLogs]);
+  const history = useMemo(() => allLogs.filter((l) => l.status !== 'FILA'), [allLogs]);
+  const operator = currentUser?.name || 'Secretaria';
+  const school = { name: schoolName, phone: schoolPhone };
 
-  const [activeSubTab, setActiveSubTab] = useState<'DISPATCH' | 'LOGS' | 'TEMPLATES' | 'SETTINGS'>('DISPATCH');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [tab, setTab] = useState<SubTab>('ENVIAR');
+  const [openMode, setOpenMode] = useState<OpenMode>(() => loadOpenMode());
+  const [notice, setNotice] = useState('');
 
-  // Dispatch composer state
-  const [selectedType, setSelectedType] = useState<WhatsAppMessageType>('AVISO_FALTA');
-  const [selectedTargetGroup, setSelectedTargetGroup] = useState<'INDIVIDUAL' | 'TURMA' | 'DOCENTES' | 'TODOS_RESPONSAVEIS'>('INDIVIDUAL');
-  const [selectedClassId, setSelectedClassId] = useState(classes[0]?.id || '');
-  const [selectedStudentId, setSelectedStudentId] = useState(students[0]?.id || '');
-  const [customPhone, setCustomPhone] = useState(students[0]?.guardianPhone || '(11) 98765-4321');
-  const [customRecipientName, setCustomRecipientName] = useState(students[0]?.guardianName || 'Responsável');
-  const [messageBody, setMessageBody] = useState(() => {
-    const initialTpl = effectiveTemplates.find((t) => t.type === 'AVISO_FALTA') || effectiveTemplates[0];
-    if (initialTpl && students[0]) {
-      const studentClass = classes.find((c) => c.id === students[0]?.classId);
-      return initialTpl.body
-        .replace(/\{\{aluno\}\}/g, students[0].name)
-        .replace(/\{\{responsavel\}\}/g, students[0].guardianName || 'Responsável')
-        .replace(/\{\{turma\}\}/g, studentClass?.name || students[0].gradeLevel)
-        .replace(/\{\{data\}\}/g, new Intl.DateTimeFormat('pt-BR').format(new Date()))
-        .replace(/\{\{escola\}\}/g, 'Colégio Horizonte do Saber')
-        .replace(/\{\{telefone_escola\}\}/g, '(11) 3456-7890');
-    }
-    return initialTpl?.body || '';
+  // ---------------- Público ----------------
+  const [kind, setKind] = useState<AudienceKind>('TURMA');
+  const [studentId, setStudentId] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
+  const [classId, setClassId] = useState('');
+  const [unitId, setUnitId] = useState('');
+  const [contact, setContact] = useState<StudentContact>('RESPONSAVEL');
+  const [staff, setStaff] = useState<StaffFilter>('PROFESSORES');
+
+  // ---------------- Mensagem ----------------
+  const [messageType, setMessageType] = useState<WhatsAppMessageType>('AVISO_GERAL');
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [source, setSource] = useState<'MANUAL' | 'MURAL'>('MANUAL');
+  const [session, setSession] = useState<Session | null>(null);
+
+  // Pedido vindo do Mural: já preenche público e texto.
+  useEffect(() => {
+    if (!prefill) return;
+    const a = prefill.audience;
+    setKind(a.kind);
+    setStudentId(a.studentId || '');
+    setClassId(a.classId || '');
+    setUnitId(a.unitId || '');
+    setContact(a.contact || 'RESPONSAVEL');
+    setStaff(a.staff || 'EQUIPE');
+    setMessageType(prefill.messageType || 'AVISO_GERAL');
+    setTitle(prefill.title || '');
+    setBody(prefill.text);
+    setSource(prefill.source || 'MURAL');
+    setSession(null);
+    setTab('ENVIAR');
+    onPrefillConsumed?.();
+  }, [prefill, onPrefillConsumed]);
+
+  const activeStudents = useMemo(
+    () => students.filter((s) => s && !['TRANSFERRED', 'EVADIDO', 'CONCLUDED'].includes(String(s.status || ''))),
+    [students]
+  );
+  const sortedClasses = useMemo(
+    () => [...classes].sort((a, b) => classLabelWithSchool(a, schoolUnits).localeCompare(classLabelWithSchool(b, schoolUnits), 'pt-BR')),
+    [classes, schoolUnits]
+  );
+  const studentOptions = useMemo(() => {
+    const q = studentSearch.trim().toLowerCase();
+    return activeStudents
+      .filter((s) => !q || s.name.toLowerCase().includes(q) || String(s.enrollmentNumber || '').includes(q))
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+      .slice(0, 300);
+  }, [activeStudents, studentSearch]);
+
+  const audience: Audience = { kind, studentId, classId, unitId, contact, staff };
+  const recipients = useMemo(
+    () => buildRecipients(audience, students, classes, userAccounts, schoolUnits),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [kind, studentId, classId, unitId, contact, staff, students, classes, userAccounts, schoolUnits]
+  );
+  const withPhone = recipients.filter((r) => r.phone);
+  const withoutPhone = recipients.filter((r) => !r.phone);
+  const previewText = fillMessage(body, withPhone[0] || recipients[0] || null, school);
+  const pendingVars = missingVariables(previewText);
+
+  // Cobertura de telefones (ajuda a secretaria a completar os cadastros).
+  const coverage = useMemo(() => {
+    const total = activeStudents.length;
+    const ok = activeStudents.filter((s) => normalizeWhatsAppPhone(s.guardianPhone)).length;
+    const staffList = userAccounts.filter((u) => u && u.active !== false && !['ALUNO', 'RESPONSAVEL'].includes(String(u.sector)));
+    const staffOk = staffList.filter((u) => normalizeWhatsAppPhone(u.phone)).length;
+    return { total, ok, staffTotal: staffList.length, staffOk };
+  }, [activeStudents, userAccounts]);
+
+  const flash = (msg: string) => {
+    setNotice(msg);
+    window.setTimeout(() => setNotice(''), 5000);
+  };
+
+  const applyTemplate = (tpl: WhatsAppTemplate) => {
+    setMessageType(tpl.type);
+    setBody(tpl.body);
+    if (!title) setTitle(tpl.title);
+  };
+
+  const audienceReady =
+    (kind === 'ALUNO' && !!studentId) || (kind === 'TURMA' && !!classId) || kind === 'ESCOLA' || kind === 'PROFISSIONAIS';
+
+  const prepare = () => {
+    if (!body.trim() || withPhone.length === 0) return;
+    setSession({
+      batchId: `lote-${Date.now().toString(36)}`,
+      title: title.trim() || TYPE_LABEL[messageType] || 'Mensagem',
+      messageType,
+      source,
+      rows: withPhone.map((r) => ({ recipient: r, text: fillMessage(body, r, school), opened: false })),
+      withoutPhone,
+    });
+  };
+
+  const logFor = (
+    r: Recipient,
+    text: string,
+    status: 'ENVIADO' | 'FILA',
+    meta: { batchId: string; title: string; messageType: WhatsAppMessageType; source: 'MANUAL' | 'MURAL' }
+  ): Omit<WhatsAppMessageLog, 'id' | 'sentAt'> => ({
+    recipientName: r.name,
+    recipientPhone: r.phone,
+    recipientRole: r.role,
+    messageType: meta.messageType,
+    content: text,
+    studentId: r.studentIds[0],
+    studentName: r.studentNames.length ? r.studentNames.join(', ') : undefined,
+    studentClass: r.className,
+    status,
+    operatorName: operator,
+    source: meta.source,
+    batchId: meta.batchId,
+    title: meta.title,
   });
-  const [isSending, setIsSending] = useState(false);
-  const [sendSuccessMsg, setSendSuccessMsg] = useState('');
 
-  // Editing template state
-  const [isEditingTemplate, setIsEditingTemplate] = useState(false);
-  const [editingTemplateData, setEditingTemplateData] = useState<WhatsAppTemplate | null>(null);
-
-  // Load template into message composer when type changes
-  const handleSelectTemplateType = (type: WhatsAppMessageType) => {
-    setSelectedType(type);
-    const matchedTpl = effectiveTemplates.find((t) => t.type === type) || effectiveTemplates[0];
-    if (matchedTpl) {
-      // Auto-interpolate basic variables based on student
-      const student = students.find((s) => s.id === selectedStudentId) || students[0];
-      const studentClass = classes.find((c) => c.id === student?.classId);
-
-      let text = matchedTpl.body;
-      if (student) {
-        text = text
-          .replace(/\{\{aluno\}\}/g, student.name)
-          .replace(/\{\{responsavel\}\}/g, student.guardianName || 'Responsável')
-          .replace(/\{\{turma\}\}/g, studentClass?.name || student.gradeLevel)
-          .replace(/\{\{data\}\}/g, new Intl.DateTimeFormat('pt-BR').format(new Date()))
-          .replace(/\{\{escola\}\}/g, 'Colégio Horizonte do Saber')
-          .replace(/\{\{telefone_escola\}\}/g, '(11) 3456-7890')
-          .replace(/\{\{bimestre\}\}/g, '1º Bimestre')
-          .replace(/\{\{media_geral\}\}/g, '8.5')
-          .replace(/\{\{data_reuniao\}\}/g, '04/09/2026')
-          .replace(/\{\{horario\}\}/g, '19h00')
-          .replace(/\{\{prazo_fechamento\}\}/g, '05/09/2026');
-      }
-      setMessageBody(text);
+  const openRow = (idx: number) => {
+    if (!session) return;
+    const row = session.rows[idx];
+    if (!row) return;
+    const ok = openWhatsApp(row.recipient.phone, row.text, openMode);
+    if (!ok) {
+      flash('O navegador bloqueou a janela do WhatsApp. Permita pop-ups para este site e tente de novo.');
+      return;
     }
+    if (!row.opened) onSendMessage(logFor(row.recipient, row.text, 'ENVIADO', session));
+    setSession({ ...session, rows: session.rows.map((r, i) => (i === idx ? { ...r, opened: true } : r)) });
   };
 
-  // Sync selected student details into custom phone and recipient name
-  const handleStudentSelect = (stdId: string) => {
-    setSelectedStudentId(stdId);
-    const st = students.find((s) => s.id === stdId);
-    if (st) {
-      setCustomRecipientName(st.guardianName || `${st.name} (Resp.)`);
-      setCustomPhone(st.guardianPhone || '(11) 98765-4321');
+  const nextIdx = session ? session.rows.findIndex((r) => !r.opened) : -1;
+  const openedCount = session ? session.rows.filter((r) => r.opened).length : 0;
+
+  const saveRestToQueue = () => {
+    if (!session) return;
+    const rest = session.rows.filter((r) => !r.opened);
+    rest.forEach((r) => onSendMessage(logFor(r.recipient, r.text, 'FILA', session)));
+    setSession(null);
+    flash(`${rest.length} mensagem(ns) guardada(s) em "Aguardando envio".`);
+  };
+
+  const finishSession = () => {
+    if (!session) return;
+    const rest = session.rows.filter((r) => !r.opened).length;
+    if (rest > 0 && !window.confirm(`Ainda faltam ${rest} mensagem(ns) sem abrir. Encerrar mesmo assim? (Use "Guardar o restante" para continuar depois.)`)) return;
+    setSession(null);
+    flash(`Envio encerrado: ${openedCount} conversa(s) aberta(s) no WhatsApp.`);
+  };
+
+  // ---------------- Fila (avisos automáticos e restantes) ----------------
+  const [queueFilter, setQueueFilter] = useState<string>('ALL');
+  const queueShown = queue
+    .filter((l) => queueFilter === 'ALL' || (l.source || 'MANUAL') === queueFilter)
+    .sort((a, b) => String(a.createdAt || a.sentAt).localeCompare(String(b.createdAt || b.sentAt)));
+
+  const openQueued = (l: WhatsAppMessageLog) => {
+    const phone = normalizeWhatsAppPhone(l.recipientPhone);
+    if (!phone) return;
+    const ok = openWhatsApp(phone, l.content, openMode);
+    if (!ok) {
+      flash('O navegador bloqueou a janela do WhatsApp. Permita pop-ups para este site e tente de novo.');
+      return;
     }
+    onUpdateLogs?.([l.id], { status: 'ENVIADO', sentAt: new Date().toISOString(), operatorName: operator });
+  };
+  const discardQueued = (ids: string[]) => {
+    if (!ids.length) return;
+    onUpdateLogs?.(ids, { status: 'DESCARTADO', operatorName: operator });
   };
 
-  // Handle send message dispatch
-  const handleSendDispatch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!messageBody.trim()) return;
+  // ---------------- Histórico ----------------
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const historyShown = history
+    .filter((l) => {
+      const q = search.trim().toLowerCase();
+      const hit =
+        !q ||
+        (l.recipientName || '').toLowerCase().includes(q) ||
+        (l.recipientPhone || '').includes(q) ||
+        (l.studentName || '').toLowerCase().includes(q) ||
+        (l.content || '').toLowerCase().includes(q);
+      return hit && (statusFilter === 'ALL' || l.status === statusFilter);
+    })
+    .sort((a, b) => String(b.sentAt).localeCompare(String(a.sentAt)));
 
-    setIsSending(true);
-    setSendSuccessMsg('');
+  // ---------------- Modelos ----------------
+  const [editingTpl, setEditingTpl] = useState<WhatsAppTemplate | null>(null);
 
-    setTimeout(() => {
-      if (selectedTargetGroup === 'INDIVIDUAL') {
-        const student = students.find((s) => s.id === selectedStudentId);
-        onSendMessage({
-          recipientName: customRecipientName || student?.guardianName || 'Destinatário',
-          recipientPhone: customPhone || student?.guardianPhone || '+55 (11) 98765-4321',
-          recipientRole: 'RESPONSAVEL',
-          messageType: selectedType,
-          content: messageBody,
-          studentName: student?.name,
-          studentClass: classes.find((c) => c.id === student?.classId)?.name,
-          status: 'ENTREGUE',
-          operatorName: 'Secretaria Escolar (Painel Central)',
-        });
-        setSendSuccessMsg('Notificação via WhatsApp enviada com sucesso para o destinatário!');
-      } else if (selectedTargetGroup === 'TURMA') {
-        const targetStudents = students.filter((s) => s.classId === selectedClassId);
-        targetStudents.forEach((st) => {
-          onSendMessage({
-            recipientName: st.guardianName || `${st.name} (Resp.)`,
-            recipientPhone: st.guardianPhone || '+55 (11) 98765-4321',
-            recipientRole: 'RESPONSAVEL',
-            messageType: selectedType,
-            content: messageBody.replace(/\{\{aluno\}\}/g, st.name),
-            studentName: st.name,
-            studentClass: classes.find((c) => c.id === st.classId)?.name,
-            status: 'ENTREGUE',
-            operatorName: 'Disparo em Lote para Turma',
-          });
-        });
-        setSendSuccessMsg(`Disparo em lote concluído para ${targetStudents.length} responsáveis da turma selecionada!`);
-      } else if (selectedTargetGroup === 'DOCENTES') {
-        const teachers = userAccounts.filter((u) => u.sector === 'PROFESSOR' || u.role === 'TEACHER');
-        teachers.forEach((t) => {
-          onSendMessage({
-            recipientName: t.name,
-            recipientPhone: t.phone || '+55 (11) 98765-4321',
-            recipientRole: 'PROFESSOR',
-            messageType: 'COMUNICADO_INTERNO',
-            content: messageBody,
-            status: 'LIDO',
-            operatorName: 'Diretoria / Secretaria SME',
-          });
-        });
-        setSendSuccessMsg(`Comunicado interno enviado para ${teachers.length} professores cadastrados!`);
-      }
+  const tabBtn = (id: SubTab, label: string, Icon: React.ElementType, badge?: number) => (
+    <button
+      key={id}
+      onClick={() => setTab(id)}
+      className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer ${
+        tab === id ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+      }`}
+    >
+      <Icon className="h-4 w-4" />
+      <span>{label}</span>
+      {badge !== undefined && badge > 0 && (
+        <span className={`px-1.5 rounded-full text-[10px] ${tab === id ? 'bg-white/25' : 'bg-amber-100 text-amber-800'}`}>{badge}</span>
+      )}
+    </button>
+  );
 
-      setIsSending(false);
-      setTimeout(() => setSendSuccessMsg(''), 4000);
-    }, 500);
-  };
-
-  // Filter logs
-  const filteredLogs = effectiveLogs.filter((l) => {
-    const matchSearch =
-      (l.recipientName && l.recipientName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (l.recipientPhone && l.recipientPhone.includes(searchTerm)) ||
-      (l.studentName && l.studentName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (l.content && l.content.toLowerCase().includes(searchTerm.toLowerCase()));
-
-    const matchStatus = statusFilter === 'ALL' || l.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
+  const selectCls = 'w-full py-2 px-3 rounded-xl bg-white border border-slate-300 text-slate-800 text-xs focus:ring-2 focus:ring-emerald-500 outline-hidden';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {onBack && (
-        <div className="flex items-center justify-between pb-1">
-          <button
-            onClick={onBack}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold transition-all border border-slate-200 shadow-2xs cursor-pointer group"
-          >
-            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform text-slate-500" />
-            <span>Voltar ao Painel Principal</span>
-          </button>
-        </div>
+        <button
+          onClick={onBack}
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200 cursor-pointer"
+        >
+          <ArrowLeft className="h-4 w-4 text-slate-500" /> Voltar ao Painel Principal
+        </button>
       )}
 
-      {/* Top Banner & Connection Status */}
-      <div className="bg-linear-to-r from-emerald-900 via-teal-900 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl border border-emerald-700/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden">
-        <div className="flex items-center gap-4 z-10">
-          <div className="h-16 w-16 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 shadow-lg shadow-emerald-900/40 shrink-0">
-            <MessageSquare className="h-8 w-8" />
+      {/* Cabeçalho */}
+      <div className="bg-linear-to-r from-emerald-900 via-teal-900 to-slate-900 rounded-3xl p-6 text-white flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+        <div className="flex items-start gap-4">
+          <div className="h-14 w-14 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 shrink-0">
+            <MessageSquare className="h-7 w-7" />
           </div>
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
-                Central de WhatsApp & Notificações Administrativas
-              </h2>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                {effectiveConfig.status === 'CONNECTED' ? 'Conectado & Ativo' : 'Aguardando Sincronização'}
-              </span>
-            </div>
-            <p className="text-xs sm:text-sm text-emerald-200/80 max-w-2xl leading-relaxed">
-              Disparo automatizado e manual de avisos de ausências, boletins escolares, convocações de busca ativa e comunicados internos para responsáveis e docentes.
+            <h2 className="text-xl font-bold">Central de WhatsApp</h2>
+            <p className="text-xs text-emerald-100/80 max-w-2xl leading-relaxed mt-1">
+              Envio assistido: o sistema monta a lista e abre cada conversa com a mensagem pronta. Você confere e aperta
+              <strong> Enviar</strong> no WhatsApp. Use o WhatsApp da escola, conectado neste computador.
             </p>
           </div>
         </div>
-
-        {/* Quick Connection Card */}
-        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15 min-w-[240px] z-10 shrink-0">
-          <div className="flex items-center justify-between text-xs text-emerald-200 mb-2">
-            <span className="font-semibold">Instância Conectada:</span>
-            <span className="font-mono text-white text-[11px] font-bold">{effectiveConfig.instanceName}</span>
+        <div className="grid grid-cols-2 gap-2 shrink-0 text-center">
+          <div className="bg-white/10 rounded-2xl px-4 py-2.5 border border-white/15">
+            <div className="text-lg font-black">
+              {coverage.ok}
+              <span className="text-xs font-semibold text-emerald-200"> / {coverage.total}</span>
+            </div>
+            <div className="text-[10px] text-emerald-100">alunos com WhatsApp do responsável</div>
           </div>
-          <div className="flex items-center justify-between text-xs text-emerald-200 mb-3">
-            <span>Telefone do Emissor:</span>
-            <span className="font-mono text-emerald-300 font-bold">{effectiveConfig.connectedPhone || '(11) 98765-4321'}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                onUpdateConfig({
-                  ...effectiveConfig,
-                  status: effectiveConfig.status === 'CONNECTED' ? 'DISCONNECTED' : 'CONNECTED',
-                });
-              }}
-              className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
-                effectiveConfig.status === 'CONNECTED'
-                  ? 'bg-rose-500/30 hover:bg-rose-500/40 text-rose-200 border border-rose-400/30'
-                  : 'bg-emerald-500 hover:bg-emerald-600 text-white'
-              }`}
-              title={effectiveConfig.status === 'CONNECTED' ? 'Desconectar WhatsApp' : 'Conectar Instância'}
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              {effectiveConfig.status === 'CONNECTED' ? 'Desconectar' : 'Reconectar Instância'}
-            </button>
+          <div className="bg-white/10 rounded-2xl px-4 py-2.5 border border-white/15">
+            <div className="text-lg font-black">
+              {coverage.staffOk}
+              <span className="text-xs font-semibold text-emerald-200"> / {coverage.staffTotal}</span>
+            </div>
+            <div className="text-[10px] text-emerald-100">profissionais com telefone</div>
           </div>
         </div>
       </div>
 
-      {/* Sub-Tab Navigation Bar */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
-        <button
-          onClick={() => setActiveSubTab('DISPATCH')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-            activeSubTab === 'DISPATCH'
-              ? 'bg-emerald-600 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-          }`}
-          title="Abrir Central de Disparos de Mensagens"
-        >
-          <Send className="h-4 w-4" />
-          <span>Enviar Mensagens & Avisos</span>
-        </button>
+      {coverage.total > 0 && coverage.ok / coverage.total < 0.8 && (
+        <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>
+            Só {coverage.ok} de {coverage.total} alunos têm o WhatsApp do responsável cadastrado. Quem não tem telefone não recebe
+            nada. Complete na <strong>Secretaria &amp; Alunos</strong> (campo "Telefone do responsável") ou reimporte a planilha com a coluna
+            <strong> WhatsApp/Telefone</strong>. Telefones dos profissionais ficam em <strong>Usuários &amp; Permissões</strong>.
+          </span>
+        </div>
+      )}
 
-        <button
-          onClick={() => setActiveSubTab('LOGS')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-            activeSubTab === 'LOGS'
-              ? 'bg-emerald-600 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-          }`}
-          title="Visualizar Histórico Completo de Envios"
-        >
-          <Clock className="h-4 w-4" />
-          <span>Histórico de Envios ({effectiveLogs.length})</span>
-        </button>
+      {notice && (
+        <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 shrink-0" /> <span className="font-semibold">{notice}</span>
+        </div>
+      )}
 
-        <button
-          onClick={() => setActiveSubTab('TEMPLATES')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-            activeSubTab === 'TEMPLATES'
-              ? 'bg-emerald-600 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-          }`}
-          title="Gerenciar Modelos de Mensagens e Variáveis"
-        >
-          <FileText className="h-4 w-4" />
-          <span>Modelos de Mensagens ({effectiveTemplates.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('SETTINGS')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-            activeSubTab === 'SETTINGS'
-              ? 'bg-emerald-600 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-          }`}
-          title="Configurações de Gateway e Automação de Alertas"
-        >
-          <Settings2 className="h-4 w-4" />
-          <span>Regras Automáticas & Gateway</span>
-        </button>
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
+        {tabBtn('ENVIAR', 'Enviar mensagem', Send)}
+        {tabBtn('FILA', 'Aguardando envio', Inbox, queue.length)}
+        {tabBtn('HISTORICO', `Histórico (${history.length})`, Clock)}
+        {tabBtn('MODELOS', 'Modelos', FileText)}
+        {tabBtn('AJUSTES', 'Ajustes', Settings2)}
       </div>
 
-      {/* Tab 1: Message Dispatcher */}
-      {activeSubTab === 'DISPATCH' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Form: Target & Message Selection */}
-          <div className="lg:col-span-7 bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-5">
-            <div>
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Send className="h-4 w-4 text-emerald-600" />
-                Compositor de Notificação WhatsApp
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Selecione o tipo de comunicado e os destinatários desejados. As tags de variáveis serão preenchidas automaticamente.
-              </p>
-            </div>
-
-            {sendSuccessMsg && (
-              <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2 shadow-2xs">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                <span className="font-semibold">{sendSuccessMsg}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSendDispatch} className="space-y-4">
-              {/* Type of Notice */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Tipo de Notificação / Modelo Predefinido
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {[
-                    { type: 'AVISO_FALTA', label: 'Aviso de Falta', desc: 'Ausência não justificada' },
-                    { type: 'BOLETIM_NOTAS', label: 'Boletim & Notas', desc: 'Espelho de desempenho' },
-                    { type: 'BUSCA_ATIVA', label: 'Busca Ativa', desc: 'Convocação prioritária' },
-                    { type: 'EVENTO_REUNIAO', label: 'Reunião de Pais', desc: 'Convite pedagógico' },
-                    { type: 'COMUNICADO_INTERNO', label: 'Aviso Docente', desc: 'Equipe e fechamento' },
-                    { type: 'AVISO_GERAL', label: 'Comunicado Geral', desc: 'Informativo amplo' },
-                  ].map((item) => {
-                    const isSelected = selectedType === item.type;
-                    return (
-                      <button
-                        key={item.type}
-                        type="button"
-                        onClick={() => handleSelectTemplateType(item.type as WhatsAppMessageType)}
-                        className={`p-2.5 rounded-2xl border text-left transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-emerald-50 border-emerald-500 text-emerald-900 shadow-2xs font-bold ring-2 ring-emerald-500/20'
-                            : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700'
-                        }`}
-                        title={`Carregar modelo de ${item.label}`}
-                      >
-                        <div className="text-xs font-bold">{item.label}</div>
-                        <div className="text-[10px] text-slate-500 truncate">{item.desc}</div>
-                      </button>
-                    );
-                  })}
-                </div>
+      {/* ========================= ENVIAR ========================= */}
+      {tab === 'ENVIAR' && !session && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          <div className="lg:col-span-7 bg-white rounded-3xl p-5 border border-slate-200 space-y-5">
+            {/* 1. Para quem */}
+            <section className="space-y-2.5">
+              <h3 className="text-sm font-bold text-slate-900">1. Para quem</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {(
+                  [
+                    ['ALUNO', 'Um aluno'],
+                    ['TURMA', 'Uma turma'],
+                    ['ESCOLA', 'Escola inteira'],
+                    ['PROFISSIONAIS', 'Profissionais'],
+                  ] as Array<[AudienceKind, string]>
+                ).map(([k, label]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setKind(k)}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold cursor-pointer ${
+                      kind === k ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
 
-              {/* Target Audience */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Público Alvo do Disparo
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {[
-                    { key: 'INDIVIDUAL', label: 'Aluno Específico' },
-                    { key: 'TURMA', label: 'Toda a Turma' },
-                    { key: 'DOCENTES', label: 'Todos Professores' },
-                    { key: 'TODOS_RESPONSAVEIS', label: 'Toda a Escola' },
-                  ].map((item) => (
-                    <button
-                      key={item.key}
-                      type="button"
-                      onClick={() => setSelectedTargetGroup(item.key as any)}
-                      className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer text-center ${
-                        selectedTargetGroup === item.key
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
-                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Dynamic Target Selectors */}
-              {selectedTargetGroup === 'INDIVIDUAL' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Selecionar Estudante
-                    </label>
-                    <select
-                      value={selectedStudentId}
-                      onChange={(e) => handleStudentSelect(e.target.value)}
-                      className="w-full py-2 px-3 rounded-xl bg-white border border-slate-300 text-slate-800 text-xs focus:ring-2 focus:ring-emerald-500 outline-hidden"
-                    >
-                      {students.map((st) => (
-                        <option key={st.id} value={st.id}>
-                          {st.name} ({st.enrollmentNumber})
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-3">
+                {kind === 'ALUNO' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input
+                      value={studentSearch}
+                      onChange={(e) => setStudentSearch(e.target.value)}
+                      placeholder="Buscar aluno por nome ou matrícula"
+                      className={selectCls}
+                    />
+                    <select value={studentId} onChange={(e) => setStudentId(e.target.value)} className={selectCls}>
+                      <option value="">Selecione o aluno…</option>
+                      {studentOptions.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} — {classLabelWithSchool(classes.find((c) => c.id === s.classId), schoolUnits) || s.gradeLevel || 'sem turma'}
                         </option>
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      WhatsApp do Responsável
-                    </label>
-                    <input
-                      type="text"
-                      value={customPhone}
-                      onChange={(e) => setCustomPhone(e.target.value)}
-                      placeholder="+55 (11) 98765-4321"
-                      className="w-full py-2 px-3 rounded-xl bg-white border border-slate-300 text-slate-800 text-xs focus:ring-2 focus:ring-emerald-500 outline-hidden"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {selectedTargetGroup === 'TURMA' && (
-                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Selecionar Turma para Disparo em Lote
-                  </label>
-                  <select
-                    value={selectedClassId}
-                    onChange={(e) => setSelectedClassId(e.target.value)}
-                    className="w-full py-2 px-3 rounded-xl bg-white border border-slate-300 text-slate-800 text-xs focus:ring-2 focus:ring-emerald-500 outline-hidden"
-                  >
-                    {classes.map((cls) => {
-                      const count = students.filter((s) => s.classId === cls.id).length;
-                      return (
-                        <option key={cls.id} value={cls.id}>
-                          {cls.name} ({count} alunos matriculados)
-                        </option>
-                      );
-                    })}
+                )}
+                {kind === 'TURMA' && (
+                  <select value={classId} onChange={(e) => setClassId(e.target.value)} className={selectCls}>
+                    <option value="">Selecione a turma…</option>
+                    {sortedClasses.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {classLabelWithSchool(c, schoolUnits)} ({studentsForAudience({ kind: 'TURMA', classId: c.id }, students, classes).length} alunos)
+                      </option>
+                    ))}
                   </select>
-                </div>
-              )}
-
-              {/* Message Content Body */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-bold text-slate-700">
-                    Mensagem a ser Transmitida
-                  </label>
-                  <span className="text-[11px] text-slate-400">
-                    {messageBody.length} caracteres
-                  </span>
-                </div>
-                <textarea
-                  rows={5}
-                  required
-                  value={messageBody}
-                  onChange={(e) => setMessageBody(e.target.value)}
-                  placeholder="Escreva aqui a mensagem oficial..."
-                  className="w-full p-3.5 rounded-2xl bg-white border border-slate-300 text-slate-800 text-xs leading-relaxed focus:ring-2 focus:ring-emerald-500 outline-hidden transition-all shadow-inner"
-                />
-              </div>
-
-              {/* Submit Buttons */}
-              <div className="flex items-center gap-3 pt-2">
-                <button
-                  type="submit"
-                  disabled={isSending}
-                  className="flex-1 py-3 px-4 rounded-xl bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs tracking-wide shadow-md shadow-emerald-600/30 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99] disabled:opacity-50"
-                  title="Enviar mensagem através do WhatsApp Gateway Oficial"
-                >
-                  {isSending ? (
-                    <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4" />
-                      <span>Transmitir Mensagem WhatsApp</span>
-                    </>
-                  )}
-                </button>
-
-                {customPhone && (
-                  <a
-                    href={`https://api.whatsapp.com/send?phone=${customPhone.replace(/\D/g, '')}&text=${encodeURIComponent(messageBody)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-300 flex items-center gap-1.5 transition-all"
-                    title="Abrir diretamente no WhatsApp Web"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    <span>WhatsApp Web</span>
-                  </a>
+                )}
+                {(kind === 'ESCOLA' || kind === 'PROFISSIONAIS') && schoolUnits.length > 0 && (
+                  <select value={unitId} onChange={(e) => setUnitId(e.target.value)} className={selectCls}>
+                    <option value="">Todas as escolas</option>
+                    {schoolUnits.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {kind !== 'PROFISSIONAIS' ? (
+                  <div className="flex flex-wrap gap-3 text-xs text-slate-700">
+                    <span className="font-semibold">Enviar para:</span>
+                    {(
+                      [
+                        ['RESPONSAVEL', 'Responsável'],
+                        ['ALUNO', 'Próprio aluno'],
+                        ['AMBOS', 'Os dois'],
+                      ] as Array<[StudentContact, string]>
+                    ).map(([v, label]) => (
+                      <label key={v} className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" checked={contact === v} onChange={() => setContact(v)} /> {label}
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-3 text-xs text-slate-700">
+                    {(
+                      [
+                        ['PROFESSORES', 'Só professores'],
+                        ['EQUIPE', 'Toda a equipe (direção, coordenação, secretaria e professores)'],
+                      ] as Array<[StaffFilter, string]>
+                    ).map(([v, label]) => (
+                      <label key={v} className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" checked={staff === v} onChange={() => setStaff(v)} /> {label}
+                      </label>
+                    ))}
+                  </div>
                 )}
               </div>
-            </form>
+
+              {audienceReady && (
+                <p className="text-xs text-slate-600 flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5 text-slate-400" />
+                  <strong>{recipients.length}</strong> destinatário(s): <span className="text-emerald-700 font-semibold">{withPhone.length} com WhatsApp</span>
+                  {withoutPhone.length > 0 && <span className="text-rose-600 font-semibold">· {withoutPhone.length} sem telefone</span>}
+                </p>
+              )}
+            </section>
+
+            {/* 2. Mensagem */}
+            <section className="space-y-2.5">
+              <h3 className="text-sm font-bold text-slate-900">2. Mensagem</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {effectiveTemplates.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => applyTemplate(t)}
+                    className="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 text-[11px] font-semibold text-slate-700 cursor-pointer"
+                    title={t.body}
+                  >
+                    {t.title}
+                  </button>
+                ))}
+              </div>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Assunto (fica só no histórico, não vai na mensagem)"
+                className={selectCls}
+              />
+              <textarea
+                rows={7}
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                placeholder="Escreva a mensagem ou escolha um modelo acima."
+                className="w-full p-3 rounded-2xl bg-white border border-slate-300 text-slate-800 text-xs leading-relaxed focus:ring-2 focus:ring-emerald-500 outline-hidden"
+              />
+              <p className="text-[11px] text-slate-500">
+                O sistema troca sozinho: <code>{'{{aluno}}'}</code> <code>{'{{responsavel}}'}</code> <code>{'{{nome}}'}</code>{' '}
+                <code>{'{{turma}}'}</code> <code>{'{{escola}}'}</code> <code>{'{{telefone_escola}}'}</code> <code>{'{{data}}'}</code>. Para
+                deixar em negrito no WhatsApp, use *asteriscos*.
+              </p>
+              {body.trim() && pendingVars.length > 0 && (
+                <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>
+                    Troque no texto antes de enviar: <strong>{pendingVars.join(', ')}</strong>
+                    {pendingVars.some((v) => v.includes('escola')) && ' (o nome e o telefone da escola vêm das Configurações da Escola).'}
+                  </span>
+                </div>
+              )}
+            </section>
+
+            <button
+              type="button"
+              onClick={prepare}
+              disabled={!audienceReady || !body.trim() || withPhone.length === 0 || pendingVars.length > 0}
+              className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ListChecks className="h-4 w-4" />
+              {withPhone.length > 0 ? `Preparar envio (${withPhone.length} mensagem${withPhone.length > 1 ? 's' : ''})` : 'Preparar envio'}
+            </button>
           </div>
 
-          {/* Right Live Simulation Preview */}
+          {/* Prévia */}
           <div className="lg:col-span-5 space-y-4">
-            <div className="bg-slate-900 rounded-3xl p-5 border border-slate-800 shadow-lg text-white">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full bg-emerald-600 flex items-center justify-center text-white">
-                    <GraduationCap className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold">SucessoEdu Oficial</div>
-                    <div className="text-[10px] text-emerald-400 flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                      Online • Canal Verificado
-                    </div>
-                  </div>
-                </div>
-                <Smartphone className="h-5 w-5 text-slate-500" />
+            <div className="bg-[#e5ddd5] rounded-3xl p-4 border border-slate-200">
+              <div className="text-[11px] font-bold text-slate-600 mb-2">
+                Prévia {withPhone[0] ? `— ${withPhone[0].name}` : ''}
               </div>
-
-              {/* Chat Bubble Simulation */}
-              <div className="bg-slate-800/80 rounded-2xl p-4 border border-slate-700/60 text-xs text-slate-200 leading-relaxed shadow-inner">
-                <p className="whitespace-pre-wrap font-sans">
-                  {messageBody || 'Selecione um modelo acima ou digite o texto da notificação para visualizar a prévia instantânea aqui...'}
-                </p>
-                <div className="flex items-center justify-end gap-1 mt-2 text-[10px] text-slate-400">
-                  <span>{new Intl.DateTimeFormat('pt-BR', { timeStyle: 'short' }).format(new Date())}</span>
-                  <CheckCheck className="h-3.5 w-3.5 text-sky-400" />
-                </div>
-              </div>
-
-              <div className="mt-4 p-3 rounded-xl bg-slate-800/40 border border-slate-700/40 text-[11px] text-slate-400 flex items-center justify-between">
-                <span>Destinatário: <strong className="text-slate-200">{customRecipientName || 'Responsável'}</strong></span>
-                <span>Tel: <strong className="text-emerald-400 font-mono">{customPhone || '+55 (11) 98765-4321'}</strong></span>
+              <div className="bg-[#dcf8c6] rounded-2xl rounded-tr-sm p-3 text-xs text-slate-800 leading-relaxed whitespace-pre-wrap shadow-xs">
+                {previewText || 'A mensagem aparece aqui como o destinatário vai ler.'}
               </div>
             </div>
-
-            {/* Quick Automation Notice */}
-            <div className="bg-linear-to-br from-indigo-50 to-sky-50 rounded-3xl p-5 border border-indigo-100">
-              <div className="flex items-center gap-2 text-indigo-900 font-bold text-xs mb-1.5">
-                <Zap className="h-4 w-4 text-amber-500" />
-                Automação Inteligente de Presença
+            <div className="bg-sky-50 rounded-3xl p-4 border border-sky-100 text-xs text-slate-700 space-y-1.5">
+              <div className="font-bold text-sky-900 flex items-center gap-1.5">
+                <Info className="h-4 w-4" /> Como funciona
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Quando o professor realiza o fechamento da chamada no <strong>Diário de Classe</strong>, os estudantes marcados como ausentes geram automaticamente notificações sugeridas prontas para envio aos responsáveis.
-              </p>
+              <ol className="list-decimal pl-4 space-y-1">
+                <li>Escolha para quem e escreva a mensagem.</li>
+                <li>Clique em <strong>Preparar envio</strong>: aparece a lista com cada pessoa.</li>
+                <li>Clique em <strong>Abrir próximo</strong>: o WhatsApp abre na conversa com o texto pronto.</li>
+                <li>Confira e aperte <strong>Enviar</strong> no WhatsApp. Volte aqui e abra o próximo.</li>
+              </ol>
+              <p className="text-slate-500">Dica: para lotes grandes, envie aos poucos (por turma). Muitas mensagens seguidas podem fazer o WhatsApp limitar o número.</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Tab 2: Logs History */}
-      {activeSubTab === 'LOGS' && (
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          {/* Header Controls */}
-          <div className="p-4 sm:p-6 border-b border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      {/* Lista de envio em andamento */}
+      {tab === 'ENVIAR' && session && (
+        <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden">
+          <div className="p-5 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Clock className="h-4 w-4 text-emerald-600" />
-                Histórico & Auditoria de Disparos WhatsApp
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Registro detalhado de mensagens enviadas, status de entrega e leituras confirmadas.
+              <h3 className="text-base font-bold text-slate-900">{session.title}</h3>
+              <p className="text-xs text-slate-500">
+                {openedCount} de {session.rows.length} aberta(s) no WhatsApp
+                {session.withoutPhone.length > 0 && ` · ${session.withoutPhone.length} sem telefone`}
+              </p>
+              <div className="mt-2 h-2 w-64 max-w-full rounded-full bg-slate-100 overflow-hidden">
+                <div className="h-full bg-emerald-500" style={{ width: `${(openedCount / Math.max(1, session.rows.length)) * 100}%` }} />
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => nextIdx >= 0 && openRow(nextIdx)}
+                disabled={nextIdx < 0}
+                className="py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 cursor-pointer disabled:opacity-40"
+              >
+                <ExternalLink className="h-4 w-4" />
+                {nextIdx >= 0 ? `Abrir próximo: ${session.rows[nextIdx].recipient.name}` : 'Todos abertos'}
+              </button>
+              {nextIdx >= 0 && (
+                <button onClick={saveRestToQueue} className="py-2.5 px-3 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-50 cursor-pointer">
+                  Guardar o restante para depois
+                </button>
+              )}
+              <button onClick={finishSession} className="py-2.5 px-3 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-50 cursor-pointer">
+                Encerrar
+              </button>
+            </div>
+          </div>
+          <div className="divide-y divide-slate-100 max-h-[60vh] overflow-y-auto">
+            {session.rows.map((row, i) => (
+              <div key={row.recipient.key} className={`px-5 py-2.5 flex items-center gap-3 ${i === nextIdx ? 'bg-emerald-50/60' : ''}`}>
+                <span className="w-6 text-[11px] text-slate-400 text-right">{i + 1}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-slate-900 truncate">{row.recipient.name}</div>
+                  <div className="text-[11px] text-slate-500 truncate">
+                    {formatPhoneBR(row.recipient.phone)}
+                    {row.recipient.studentNames.length > 0 && row.recipient.role !== 'ALUNO' && ` · ${row.recipient.studentNames.join(', ')}`}
+                    {row.recipient.className && ` · ${row.recipient.className}`}
+                  </div>
+                </div>
+                {row.opened ? (
+                  <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                    <CheckCircle2 className="h-4 w-4" /> Aberto
+                  </span>
+                ) : null}
+                <button
+                  onClick={() => openRow(i)}
+                  className="py-1.5 px-3 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-[11px] font-bold cursor-pointer"
+                >
+                  {row.opened ? 'Abrir de novo' : 'Abrir WhatsApp'}
+                </button>
+              </div>
+            ))}
+          </div>
+          {session.withoutPhone.length > 0 && (
+            <div className="p-4 bg-rose-50 border-t border-rose-100">
+              <div className="text-xs font-bold text-rose-800 flex items-center gap-1.5 mb-1.5">
+                <PhoneOff className="h-4 w-4" /> Sem WhatsApp cadastrado ({session.withoutPhone.length}) — avise de outra forma e complete o cadastro:
+              </div>
+              <div className="text-[11px] text-rose-900 leading-relaxed">
+                {session.withoutPhone
+                  .map((r) => (r.role === 'RESPONSAVEL' || r.role === 'ALUNO' ? `${r.studentNames.join(', ')}${r.className ? ` (${r.className})` : ''}` : r.name))
+                  .join(' · ')}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================= FILA ========================= */}
+      {tab === 'FILA' && (
+        <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden">
+          <div className="p-5 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Aguardando envio</h3>
+              <p className="text-xs text-slate-500">
+                Avisos gerados quando o professor lança faltas ou notas (conforme os Ajustes) e envios guardados para depois.
               </p>
             </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <select value={queueFilter} onChange={(e) => setQueueFilter(e.target.value)} className="py-1.5 px-3 rounded-xl bg-slate-50 border border-slate-300 text-xs">
+                <option value="ALL">Todas as origens</option>
+                <option value="FALTA">Faltas</option>
+                <option value="NOTA">Notas</option>
+                <option value="MURAL">Mural</option>
+                <option value="MANUAL">Envio manual</option>
+              </select>
+              {queueShown.some((l) => normalizeWhatsAppPhone(l.recipientPhone)) && (
+                <button
+                  onClick={() => {
+                    const first = queueShown.find((l) => normalizeWhatsAppPhone(l.recipientPhone));
+                    if (first) openQueued(first);
+                  }}
+                  className="py-2 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <ExternalLink className="h-4 w-4" /> Abrir próxima
+                </button>
+              )}
+              {queueShown.length > 0 && (
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Descartar ${queueShown.length} mensagem(ns) da lista? Elas não serão enviadas.`)) discardQueued(queueShown.map((l) => l.id));
+                  }}
+                  className="py-2 px-3 rounded-xl border border-slate-300 text-slate-600 text-xs font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  Descartar todas
+                </button>
+              )}
+            </div>
+          </div>
+          {queueShown.length === 0 ? (
+            <p className="p-8 text-center text-xs text-slate-400">Nada aguardando envio.</p>
+          ) : (
+            <div className="divide-y divide-slate-100 max-h-[65vh] overflow-y-auto">
+              {queueShown.map((l) => {
+                const phone = normalizeWhatsAppPhone(l.recipientPhone);
+                return (
+                  <div key={l.id} className="px-5 py-3 flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-slate-900">
+                        {l.recipientName}
+                        {l.studentName && <span className="font-normal text-slate-500"> · {l.studentName}</span>}
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        {SOURCE_LABEL[l.source || 'MANUAL']} · {fmtDateTime(l.createdAt || l.sentAt)} ·{' '}
+                        {phone ? formatPhoneBR(phone) : <span className="text-rose-600 font-semibold">sem telefone</span>}
+                      </div>
+                      <p className="text-xs text-slate-600 mt-1 line-clamp-2" title={l.content}>
+                        {l.content}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {phone && (
+                        <button onClick={() => openQueued(l)} className="py-1.5 px-3 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-[11px] font-bold cursor-pointer">
+                          Abrir WhatsApp
+                        </button>
+                      )}
+                      <button onClick={() => discardQueued([l.id])} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer" title="Descartar">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <div className="relative flex-1 sm:w-64">
+      {/* ========================= HISTÓRICO ========================= */}
+      {tab === 'HISTORICO' && (
+        <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden">
+          <div className="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Histórico de envios</h3>
+              <p className="text-xs text-slate-500">"Aberto no WhatsApp" = a conversa foi aberta com o texto pronto por quem está indicado.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative">
                 <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Buscar por nome, telefone..."
-                  className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-slate-50 border border-slate-300 text-xs focus:ring-2 focus:ring-emerald-500 outline-hidden"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar nome, aluno, telefone…"
+                  className="pl-9 pr-3 py-1.5 rounded-xl bg-slate-50 border border-slate-300 text-xs w-60"
                 />
               </div>
-
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="py-1.5 px-3 rounded-xl bg-slate-50 border border-slate-300 text-xs font-semibold text-slate-700 outline-hidden"
-              >
-                <option value="ALL">Todos os Status</option>
-                <option value="LIDO">Lido / Visualizado</option>
-                <option value="ENTREGUE">Entregue</option>
-                <option value="ENVIADO">Enviado</option>
-                <option value="ERRO">Falha no Envio</option>
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="py-1.5 px-3 rounded-xl bg-slate-50 border border-slate-300 text-xs">
+                <option value="ALL">Todos</option>
+                <option value="ENVIADO">Aberto no WhatsApp</option>
+                <option value="DESCARTADO">Descartado</option>
               </select>
             </div>
           </div>
-
-          {/* Table */}
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-700">
-              <thead className="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+              <thead className="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">
                 <tr>
-                  <th className="py-3 px-4">Destinatário & Telefone</th>
-                  <th className="py-3 px-4">Estudante / Turma</th>
-                  <th className="py-3 px-4">Tipo de Aviso</th>
-                  <th className="py-3 px-4">Conteúdo</th>
-                  <th className="py-3 px-4">Data/Hora</th>
-                  <th className="py-3 px-4 text-center">Status</th>
-                  <th className="py-3 px-4 text-right">Operador</th>
+                  <th className="py-2.5 px-4">Destinatário</th>
+                  <th className="py-2.5 px-4">Aluno / Turma</th>
+                  <th className="py-2.5 px-4">Tipo</th>
+                  <th className="py-2.5 px-4">Mensagem</th>
+                  <th className="py-2.5 px-4">Data</th>
+                  <th className="py-2.5 px-4">Situação</th>
+                  <th className="py-2.5 px-4">Quem</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredLogs.length === 0 ? (
+                {historyShown.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">
-                      Nenhum registro de envio localizado com os filtros selecionados.
+                    <td colSpan={7} className="py-8 text-center text-slate-400">
+                      Nenhum envio registrado.
                     </td>
                   </tr>
                 ) : (
-                  filteredLogs.map((log) => {
-                    const statusBadge =
-                      log.status === 'LIDO'
-                        ? 'bg-sky-50 text-sky-700 border-sky-200'
-                        : log.status === 'ENTREGUE'
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : log.status === 'ENVIADO'
-                        ? 'bg-slate-100 text-slate-700 border-slate-200'
-                        : 'bg-rose-50 text-rose-700 border-rose-200';
-
+                  historyShown.slice(0, 500).map((l) => {
+                    const st = STATUS_LABEL[l.status] || STATUS_LABEL.ENVIADO;
                     return (
-                      <tr key={log.id} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="py-3 px-4 font-semibold text-slate-900">
-                          <div>{log.recipientName}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">{log.recipientPhone}</div>
+                      <tr key={l.id} className="hover:bg-slate-50/70">
+                        <td className="py-2.5 px-4">
+                          <div className="font-semibold text-slate-900">{l.recipientName}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">{l.recipientPhone ? formatPhoneBR(normalizeWhatsAppPhone(l.recipientPhone) || l.recipientPhone) : '—'}</div>
                         </td>
-                        <td className="py-3 px-4">
-                          {log.studentName ? (
-                            <div>
-                              <span className="font-semibold text-indigo-900">{log.studentName}</span>
-                              <div className="text-[10px] text-slate-400">{log.studentClass || 'Turma Sede'}</div>
-                            </div>
+                        <td className="py-2.5 px-4">
+                          {l.studentName ? (
+                            <>
+                              <div className="font-semibold text-indigo-900">{l.studentName}</div>
+                              <div className="text-[10px] text-slate-400">{l.studentClass}</div>
+                            </>
                           ) : (
-                            <span className="text-slate-400 italic">Geral / Docente</span>
+                            <span className="text-slate-400">Equipe</span>
                           )}
                         </td>
-                        <td className="py-3 px-4">
-                          <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                            {log.messageType}
-                          </span>
+                        <td className="py-2.5 px-4 whitespace-nowrap">
+                          {TYPE_LABEL[l.messageType] || l.messageType}
+                          <div className="text-[10px] text-slate-400">{SOURCE_LABEL[l.source || 'MANUAL']}</div>
                         </td>
-                        <td className="py-3 px-4 max-w-xs">
-                          <p className="truncate text-slate-600 text-xs" title={log.content}>
-                            {log.content}
+                        <td className="py-2.5 px-4 max-w-xs">
+                          <p className="truncate" title={l.content}>
+                            {l.content}
                           </p>
                         </td>
-                        <td className="py-3 px-4 text-[11px] text-slate-500 font-mono whitespace-nowrap">
-                          {new Intl.DateTimeFormat('pt-BR', {
-                            dateStyle: 'short',
-                            timeStyle: 'short',
-                          }).format(new Date(log.sentAt))}
+                        <td className="py-2.5 px-4 whitespace-nowrap text-[11px] text-slate-500">{fmtDateTime(l.sentAt)}</td>
+                        <td className="py-2.5 px-4">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap ${st.cls}`}>{st.text}</span>
                         </td>
-                        <td className="py-3 px-4 text-center">
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold border inline-flex items-center gap-1 ${statusBadge}`}
-                          >
-                            {log.status === 'LIDO' && <CheckCheck className="h-3 w-3 text-sky-500" />}
-                            {log.status === 'ENTREGUE' && <Check className="h-3 w-3 text-emerald-500" />}
-                            {log.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right text-[11px] text-slate-500">
-                          {log.operatorName}
-                        </td>
+                        <td className="py-2.5 px-4 text-[11px] text-slate-500">{l.operatorName}</td>
                       </tr>
                     );
                   })
@@ -714,139 +881,95 @@ export const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({
         </div>
       )}
 
-      {/* Tab 3: Message Templates */}
-      {activeSubTab === 'TEMPLATES' && (
+      {/* ========================= MODELOS ========================= */}
+      {tab === 'MODELOS' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-bold text-slate-900">
-                Modelos Oficiais de Mensagens & Variáveis Dinâmicas
-              </h3>
-              <p className="text-xs text-slate-500">
-                Configure modelos padronizados utilizando tags como <code>{'{{aluno}}'}</code>, <code>{'{{responsavel}}'}</code>, <code>{'{{turma}}'}</code> e <code>{'{{escola}}'}</code>.
-              </p>
-            </div>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-slate-500 max-w-2xl">
+              Modelos prontos para usar no envio. Use as variáveis <code>{'{{aluno}}'}</code>, <code>{'{{responsavel}}'}</code>,{' '}
+              <code>{'{{turma}}'}</code>, <code>{'{{escola}}'}</code>, <code>{'{{telefone_escola}}'}</code> e <code>{'{{data}}'}</code>. Outras
+              marcações (ex.: <code>{'{{horario}}'}</code>) precisam ser trocadas à mão antes de enviar.
+            </p>
             <button
-              onClick={() => {
-                setEditingTemplateData({
-                  id: `tpl-${Date.now()}`,
-                  title: 'Novo Modelo Institucional',
-                  type: 'AVISO_GERAL',
-                  body: 'Olá, {{responsavel}}! Informamos que...',
-                  variables: ['{{responsavel}}', '{{aluno}}'],
-                });
-                setIsEditingTemplate(true);
-              }}
-              className="py-2 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+              onClick={() =>
+                setEditingTpl({ id: `tpl-${Date.now()}`, title: 'Novo modelo', type: 'AVISO_GERAL', body: 'Olá, {{responsavel}}! ', variables: [] })
+              }
+              className="py-2 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shrink-0"
             >
-              <Plus className="h-4 w-4" />
-              <span>Criar Novo Modelo</span>
+              <Plus className="h-4 w-4" /> Novo modelo
             </button>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {effectiveTemplates.map((tpl) => (
-              <div key={tpl.id} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase bg-emerald-50 text-emerald-800 border border-emerald-200">
-                      {tpl.type}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => {
-                          setEditingTemplateData(tpl);
-                          setIsEditingTemplate(true);
-                        }}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                        title="Editar Modelo"
-                      >
-                        <Edit2 className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => onDeleteTemplate(tpl.id)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                        title="Excluir Modelo"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+              <div key={tpl.id} className="bg-white rounded-2xl p-4 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                    {TYPE_LABEL[tpl.type] || tpl.type}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setEditingTpl(tpl)} className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 cursor-pointer" title="Editar">
+                      <Edit2 className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => window.confirm(`Excluir o modelo "${tpl.title}"?`) && onDeleteTemplate(tpl.id)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                      title="Excluir"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
-                  <h4 className="text-sm font-bold text-slate-900 mb-2">{tpl.title}</h4>
-                  <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200 leading-relaxed font-mono whitespace-pre-wrap">
-                    {tpl.body}
-                  </p>
                 </div>
-
-                <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[10px] font-bold text-slate-400">Variáveis:</span>
-                  {tpl.variables.map((v) => (
-                    <span key={v} className="px-1.5 py-0.5 rounded-md bg-slate-100 text-[10px] font-mono text-slate-600">
-                      {v}
-                    </span>
-                  ))}
-                </div>
+                <h4 className="text-sm font-bold text-slate-900">{tpl.title}</h4>
+                <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-200 whitespace-pre-wrap">{tpl.body}</p>
+                <button
+                  onClick={() => {
+                    applyTemplate(tpl);
+                    setTab('ENVIAR');
+                  }}
+                  className="text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer"
+                >
+                  Usar este modelo →
+                </button>
               </div>
             ))}
           </div>
 
-          {/* Modal Template Edit */}
-          {isEditingTemplate && editingTemplateData && (
-            <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-3xl p-6 max-w-lg w-full border border-slate-200 shadow-2xl space-y-4">
-                <h3 className="text-base font-bold text-slate-900">Configurar Modelo de Notificação</h3>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Título do Modelo</label>
-                  <input
-                    type="text"
-                    value={editingTemplateData.title}
-                    onChange={(e) => setEditingTemplateData({ ...editingTemplateData, title: e.target.value })}
-                    className="w-full py-2 px-3 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-emerald-500 outline-hidden"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Tipo de Finalidade</label>
-                  <select
-                    value={editingTemplateData.type}
-                    onChange={(e) => setEditingTemplateData({ ...editingTemplateData, type: e.target.value as any })}
-                    className="w-full py-2 px-3 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-emerald-500 outline-hidden"
-                  >
-                    <option value="AVISO_FALTA">Aviso de Falta</option>
-                    <option value="BOLETIM_NOTAS">Boletim de Notas</option>
-                    <option value="BUSCA_ATIVA">Busca Ativa</option>
-                    <option value="EVENTO_REUNIAO">Evento / Reunião</option>
-                    <option value="COMUNICADO_INTERNO">Comunicado Interno</option>
-                    <option value="AVISO_GERAL">Aviso Geral</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Corpo da Mensagem (com tags)</label>
-                  <textarea
-                    rows={4}
-                    value={editingTemplateData.body}
-                    onChange={(e) => setEditingTemplateData({ ...editingTemplateData, body: e.target.value })}
-                    className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-emerald-500 outline-hidden font-mono"
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2">
-                  <button
-                    onClick={() => setIsEditingTemplate(false)}
-                    className="py-2 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
-                  >
+          {editingTpl && (
+            <div className="fixed inset-0 bg-slate-950/60 flex items-center justify-center p-4 z-50" onClick={() => setEditingTpl(null)}>
+              <div className="bg-white rounded-3xl p-6 max-w-lg w-full space-y-3" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-base font-bold text-slate-900">Modelo de mensagem</h3>
+                <input
+                  value={editingTpl.title}
+                  onChange={(e) => setEditingTpl({ ...editingTpl, title: e.target.value })}
+                  placeholder="Nome do modelo"
+                  className={selectCls}
+                />
+                <select value={editingTpl.type} onChange={(e) => setEditingTpl({ ...editingTpl, type: e.target.value as WhatsAppMessageType })} className={selectCls}>
+                  {Object.entries(TYPE_LABEL).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+                <textarea
+                  rows={6}
+                  value={editingTpl.body}
+                  onChange={(e) => setEditingTpl({ ...editingTpl, body: e.target.value })}
+                  className="w-full p-3 rounded-xl border border-slate-300 text-xs"
+                />
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => setEditingTpl(null)} className="py-2 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer">
                     Cancelar
                   </button>
                   <button
                     onClick={() => {
-                      onSaveTemplate(editingTemplateData);
-                      setIsEditingTemplate(false);
+                      if (!editingTpl.title.trim() || !editingTpl.body.trim()) return;
+                      onSaveTemplate({ ...editingTpl, variables: missingVariables(editingTpl.body) });
+                      setEditingTpl(null);
                     }}
-                    className="py-2 px-4 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs"
+                    className="py-2 px-4 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer"
                   >
-                    Salvar Modelo
+                    Salvar modelo
                   </button>
                 </div>
               </div>
@@ -855,100 +978,72 @@ export const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({
         </div>
       )}
 
-      {/* Tab 4: Gateway Settings & Automation */}
-      {activeSubTab === 'SETTINGS' && (
-        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6">
-          <div>
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Settings2 className="h-4 w-4 text-emerald-600" />
-              Configurações de Gateway WhatsApp & Regras Automáticas
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Conexão com provedores de API WhatsApp (Evolution API, Z-API, Baileys, WPPConnect ou Webhooks oficiais).
+      {/* ========================= AJUSTES ========================= */}
+      {tab === 'AJUSTES' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="bg-white rounded-3xl p-5 border border-slate-200 space-y-3">
+            <h3 className="text-sm font-bold text-slate-900">Onde abrir o WhatsApp</h3>
+            {(
+              [
+                ['WEB', 'WhatsApp Web (navegador)', 'Abre web.whatsapp.com sempre na mesma aba. Precisa estar conectado com o QR Code do celular da escola.'],
+                ['APP', 'Aplicativo WhatsApp do computador', 'Abre o WhatsApp instalado no Windows. Mais rápido para lotes grandes.'],
+              ] as Array<[OpenMode, string, string]>
+            ).map(([m, label, desc]) => (
+              <label key={m} className={`flex gap-3 p-3 rounded-xl border cursor-pointer ${openMode === m ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200'}`}>
+                <input
+                  type="radio"
+                  checked={openMode === m}
+                  onChange={() => {
+                    setOpenMode(m);
+                    saveOpenMode(m);
+                  }}
+                />
+                <div>
+                  <div className="text-xs font-bold text-slate-800">{label}</div>
+                  <div className="text-[11px] text-slate-500">{desc}</div>
+                </div>
+              </label>
+            ))}
+            <p className="text-[11px] text-slate-500">Essa escolha vale para este computador.</p>
+          </div>
+
+          <div className="bg-white rounded-3xl p-5 border border-slate-200 space-y-3">
+            <h3 className="text-sm font-bold text-slate-900">Avisos automáticos para a lista "Aguardando envio"</h3>
+            <label className="flex gap-3 p-3 rounded-xl border border-slate-200 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={effectiveConfig.queueAbsenceAlerts !== false}
+                onChange={(e) => onUpdateConfig({ ...effectiveConfig, queueAbsenceAlerts: e.target.checked })}
+              />
+              <div>
+                <div className="text-xs font-bold text-slate-800">Faltas</div>
+                <div className="text-[11px] text-slate-500">Quando o professor salva a chamada, cada falta gera uma mensagem ao responsável.</div>
+              </div>
+            </label>
+            <label className="flex gap-3 p-3 rounded-xl border border-slate-200 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={effectiveConfig.queueGradeAlerts === true}
+                onChange={(e) => onUpdateConfig({ ...effectiveConfig, queueGradeAlerts: e.target.checked })}
+              />
+              <div>
+                <div className="text-xs font-bold text-slate-800">Notas</div>
+                <div className="text-[11px] text-slate-500">
+                  Quando o professor fecha a pauta, gera uma mensagem por aluno e disciplina. Desligado por padrão: pode gerar muitas mensagens.
+                </div>
+              </div>
+            </label>
+            <p className="text-[11px] text-slate-500">
+              Os avisos não saem sozinhos: ficam em "Aguardando envio" para a secretaria conferir e abrir no WhatsApp.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Gateway Endpoint Form */}
-            <div className="space-y-4 bg-slate-50 p-5 rounded-2xl border border-slate-200">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Parâmetros do Servidor</h4>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Nome da Instância</label>
-                <input
-                  type="text"
-                  value={config.instanceName}
-                  onChange={(e) => onUpdateConfig({ ...config, instanceName: e.target.value })}
-                  className="w-full py-2 px-3 rounded-xl bg-white border border-slate-300 text-xs focus:ring-2 focus:ring-emerald-500 outline-hidden font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Endpoint do Servidor Gateway</label>
-                <input
-                  type="text"
-                  value={config.serverEndpoint}
-                  onChange={(e) => onUpdateConfig({ ...config, serverEndpoint: e.target.value })}
-                  className="w-full py-2 px-3 rounded-xl bg-white border border-slate-300 text-xs focus:ring-2 focus:ring-emerald-500 outline-hidden font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Token de Autenticação / API Key</label>
-                <input
-                  type="password"
-                  value={config.apiKeyOrToken}
-                  onChange={(e) => onUpdateConfig({ ...config, apiKeyOrToken: e.target.value })}
-                  className="w-full py-2 px-3 rounded-xl bg-white border border-slate-300 text-xs focus:ring-2 focus:ring-emerald-500 outline-hidden font-mono"
-                />
-              </div>
+          <div className="md:col-span-2 bg-slate-50 rounded-3xl p-5 border border-slate-200 text-xs text-slate-600 space-y-1">
+            <div className="font-bold text-slate-800">Dados da escola usados nas mensagens</div>
+            <div>
+              Nome: <strong>{schoolName || '— não informado'}</strong> · Telefone: <strong>{schoolPhone || '— não informado'}</strong>
             </div>
-
-            {/* Automation Rules */}
-            <div className="space-y-4 bg-slate-50 p-5 rounded-2xl border border-slate-200">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Gatilhos de Notificação Automática</h4>
-
-              <div className="space-y-3">
-                <label className="flex items-center gap-3 p-2.5 rounded-xl bg-white border border-slate-200 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={config.autoSendAbsenceAlerts}
-                    onChange={(e) => onUpdateConfig({ ...config, autoSendAbsenceAlerts: e.target.checked })}
-                    className="h-4 w-4 rounded text-emerald-600 focus:ring-emerald-500"
-                  />
-                  <div>
-                    <div className="text-xs font-bold text-slate-800">Alerta de Faltas Automático</div>
-                    <div className="text-[11px] text-slate-500">Notificar pais quando o docente lançar ausência no Diário.</div>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-3 p-2.5 rounded-xl bg-white border border-slate-200 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={config.autoSendGradeAlerts}
-                    onChange={(e) => onUpdateConfig({ ...config, autoSendGradeAlerts: e.target.checked })}
-                    className="h-4 w-4 rounded text-emerald-600 focus:ring-emerald-500"
-                  />
-                  <div>
-                    <div className="text-xs font-bold text-slate-800">Aviso de Fechamento de Boletim</div>
-                    <div className="text-[11px] text-slate-500">Enviar link do boletim assim que a secretaria homologar as notas.</div>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-3 p-2.5 rounded-xl bg-white border border-slate-200 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={config.autoSendActiveSearchSummons}
-                    onChange={(e) => onUpdateConfig({ ...config, autoSendActiveSearchSummons: e.target.checked })}
-                    className="h-4 w-4 rounded text-emerald-600 focus:ring-emerald-500"
-                  />
-                  <div>
-                    <div className="text-xs font-bold text-slate-800">Convocação Busca Ativa Escolar</div>
-                    <div className="text-[11px] text-slate-500">Disparar convocação urgente quando atingir 5 faltas consecutivas.</div>
-                  </div>
-                </label>
-              </div>
-            </div>
+            <div className="text-[11px] text-slate-500">Para mudar, use Configurações da Escola.</div>
           </div>
         </div>
       )}

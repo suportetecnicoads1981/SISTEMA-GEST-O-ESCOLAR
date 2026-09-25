@@ -79,6 +79,7 @@ export class SupabasePersistenceService {
         updatesRes,
         bnccSkillsRes,
         bnccAssessRes,
+        whatsappRes,
       ] = await Promise.all([
         supabase.from('students').select('*'),
         supabase.from('school_classes').select('*'),
@@ -99,6 +100,7 @@ export class SupabasePersistenceService {
         supabase.from('system_updates').select('*'),
         supabase.from('bncc_skills').select('*'),
         supabase.from('bncc_skill_assessments').select('*'),
+        supabase.from('whatsapp_messages').select('*'),
       ]);
 
       // Excluídos em qualquer computador (lápides na nuvem): somem também desta cópia local.
@@ -191,6 +193,7 @@ export class SupabasePersistenceService {
         academicHistories: mergeRemoteIntoLocal(local.academicHistories, rowsOf(historiesRes, 'academic_histories')),
         schoolUnits: mergeRemoteIntoLocal(local.schoolUnits, rowsOf(unitsRes, 'school_units')),
         communications: mergeRemoteIntoLocal(local.communications, rowsOf(commsRes, 'communications'), withRoles),
+        whatsappLogs: mergeRemoteIntoLocal(local.whatsappLogs, rowsOf(whatsappRes, 'whatsapp_messages')),
         notifications: mergeRemoteIntoLocal(local.notifications, rowsOf(notifsRes, 'notifications'), (row) => ({
           ...withRoles(row),
           read: Boolean(row.read),

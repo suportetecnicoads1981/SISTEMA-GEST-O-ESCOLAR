@@ -294,7 +294,7 @@ export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
       }
     });
 
-    const triggerNote = enqueuedCount > 0 ? ` 📢 [trg_grade_published]: ${enqueuedCount} boletim(ns) enfileirados na message_queue.` : '';
+    const triggerNote = '';
     setSaveSuccessAlert(`Pauta de Notas do ${selectedTerm} (${activeClass.name} - ${activeSubject.name}) salva e homologada com sucesso!${triggerNote}`);
     setTimeout(() => setSaveSuccessAlert(null), 5000);
   };

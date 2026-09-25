@@ -167,6 +167,13 @@ export const ECOSYSTEM_TABLES: TableDefinitionMeta[] = [
     localKey: 'communications',
   },
   {
+    tableName: 'whatsapp_messages',
+    displayName: 'WhatsApp (envios e fila)',
+    category: 'COMMUNICATION',
+    description: 'Mensagens abertas no WhatsApp pela secretaria e avisos aguardando envio.',
+    localKey: 'whatsappLogs',
+  },
+  {
     tableName: 'notifications',
     displayName: 'Notificações do Sistema',
     category: 'COMMUNICATION',
@@ -1112,11 +1119,18 @@ END $$;
             sector_title: u.sectorTitle || null,
             active: u.active !== undefined ? u.active : true,
             permissions: u.permissions || {},
+            phone: u.phone || null,
           }))
         ) 
       },
       { name: 'communications', data: stored.communications, customSync: () => this.syncTableGeneric('communications', stored.communications) },
       { name: 'notifications', data: stored.notifications, customSync: () => this.syncTableGeneric('notifications', stored.notifications) },
+      {
+        name: 'whatsapp_messages',
+        data: stored.whatsappLogs,
+        // Registros de demonstração antigos (wpp-001…) não vão para a nuvem.
+        customSync: () => this.syncTableGeneric('whatsapp_messages', (stored.whatsappLogs || []).filter((l: any) => !/^wpp-\d{3}$/.test(String(l?.id || '')))),
+      },
       { 
         name: 'school_settings', 
         data: [stored.settings], 

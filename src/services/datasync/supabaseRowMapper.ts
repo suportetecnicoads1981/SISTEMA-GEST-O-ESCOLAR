@@ -15,7 +15,7 @@ export const SUPABASE_TABLE_COLUMNS: Record<string, string[]> = {
   bncc_skill_assessments: ['id', 'student_id', 'class_id', 'school_unit_id', 'skill_code', 'subject', 'school_year', 'term', 'level', 'notes', 'teacher_name', 'created_at', 'updated_at'],
   attendance_sheets: ['id', 'date', 'class_id', 'class_name', 'subject_id', 'subject_name', 'teacher_name', 'lesson_number', 'term', 'entries', 'total_students', 'total_present', 'total_absent', 'total_justified', 'attendance_rate', 'created_at', 'updated_at'],
   class_grade_sheets: ['id', 'class_id', 'class_name', 'subject_id', 'subject_name', 'school_year', 'term', 'grades', 'average_score', 'created_at', 'updated_at'],
-  communications: ['id', 'title', 'content', 'sender_role', 'sender_name', 'recipient_type', 'priority', 'category', 'status', 'read_confirmations', 'created_at', 'updated_at', 'senderRole', 'target_roles', 'targetRoles'],
+  communications: ['id', 'title', 'content', 'sender_role', 'sender_name', 'recipient_type', 'priority', 'category', 'status', 'read_confirmations', 'created_at', 'updated_at', 'senderRole', 'target_roles', 'targetRoles', 'sender_title', 'target_class_id', 'target_student_id', 'target_student_name', 'attachments', 'send_push_notification', 'require_read_confirmation'],
   courses: ['id', 'name', 'segment', 'duration_years', 'description', 'created_at', 'updated_at'],
   exam_submissions: ['id', 'exam_id', 'student_id', 'student_name', 'enrollment_number', 'class_id', 'started_at', 'submitted_at', 'time_spent_seconds', 'total_score', 'max_score', 'percentage', 'correct_count', 'incorrect_count', 'answers', 'status', 'created_at'],
   exams: ['id', 'title', 'description', 'subject', 'class_id', 'teacher_name', 'school_year', 'term', 'total_points', 'passing_score', 'time_limit_minutes', 'questions', 'status', 'scheduled_date', 'due_date_time', 'created_at', 'updated_at'],
@@ -31,7 +31,8 @@ export const SUPABASE_TABLE_COLUMNS: Record<string, string[]> = {
   subjects: ['id', 'name', 'code', 'segment', 'teacher_name', 'workload_hours', 'created_at', 'updated_at'],
   sync_audit_logs: ['id', 'table_name', 'operation', 'station_id', 'records_count', 'latency_ms', 'status', 'details', 'created_at'],
   system_updates: ['id', 'version', 'release_date', 'title', 'summary', 'description', 'severity', 'size_formatted', 'sha256_checksum', 'download_url', 'cloud_storage_url', 'min_compatible_version', 'author', 'target_platform', 'is_cloud_available', 'improvements', 'published_by', 'published_at', 'created_at', 'updated_at'],
-  user_accounts: ['id', 'name', 'login', 'email', 'role', 'sector', 'sector_title', 'active', 'permissions', 'created_at', 'updated_at', 'school_unit_id'],
+  user_accounts: ['id', 'name', 'login', 'email', 'role', 'sector', 'sector_title', 'active', 'permissions', 'created_at', 'updated_at', 'school_unit_id', 'phone'],
+  whatsapp_messages: ['id', 'recipient_name', 'recipient_phone', 'recipient_role', 'message_type', 'content', 'student_id', 'student_name', 'student_class', 'status', 'source', 'batch_id', 'title', 'operator_name', 'sent_at', 'created_at', 'updated_at'],
 };
 
 /** Colunas NOT NULL sem valor padrão: linhas sem elas fariam o lote inteiro falhar. */
@@ -58,6 +59,7 @@ export const SUPABASE_REQUIRED_COLUMNS: Record<string, string[]> = {
   sync_audit_logs: ['operation', 'status', 'station_id', 'table_name'],
   system_updates: ['title', 'version'],
   user_accounts: ['email', 'login', 'name'],
+  whatsapp_messages: ['recipient_name', 'content'],
 };
 
 /** Tabelas em que apenas ADMIN pode gravar (ver políticas RLS). */

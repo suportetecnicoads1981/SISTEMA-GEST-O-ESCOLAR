@@ -1464,6 +1464,10 @@ export interface WhatsAppConfig {
   autoNotifyAttendance?: boolean;
   autoNotifyAnnouncements?: boolean;
   defaultCountryCode?: string;
+  /** Envio assistido: faltas lançadas geram mensagem em "Aguardando envio" (padrão: sim). */
+  queueAbsenceAlerts?: boolean;
+  /** Envio assistido: notas fechadas geram mensagem em "Aguardando envio" (padrão: não). */
+  queueGradeAlerts?: boolean;
 }
 
 export type WhatsAppRecipientRole = 'RESPONSAVEL' | 'PROFESSOR' | 'SECRETARIA' | 'DIRETORIA' | 'COORDENACAO' | 'ALUNO';
@@ -1486,12 +1490,25 @@ export interface WhatsAppMessageLog {
   content: string;
   studentName?: string;
   studentClass?: string;
-  status: 'ENVIADO' | 'ENTREGUE' | 'LIDO' | 'ERRO' | 'FILA';
+  /**
+   * FILA = aguardando envio; ENVIADO = aberto no WhatsApp pelo operador;
+   * DESCARTADO = removido da fila sem enviar. ENTREGUE/LIDO/ERRO só existem em
+   * registros antigos (o envio assistido não recebe confirmação de entrega).
+   */
+  status: 'ENVIADO' | 'ENTREGUE' | 'LIDO' | 'ERRO' | 'FILA' | 'DESCARTADO';
   sentAt: string;
   deliveredAt?: string;
   readAt?: string;
   errorMessage?: string;
   operatorName: string;
+  studentId?: string;
+  /** Origem: envio manual, aviso do mural, falta ou nota lançada pelo professor. */
+  source?: 'MANUAL' | 'MURAL' | 'FALTA' | 'NOTA';
+  /** Agrupa as mensagens de um mesmo envio em lote. */
+  batchId?: string;
+  title?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface WhatsAppTemplate {

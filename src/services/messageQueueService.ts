@@ -1,8 +1,9 @@
 /**
- * SucessoEdu Gestão Educacional - Motor de Mensageria e Fila Assíncrona
- * Integração Supabase / Local para processamento desacoplado de triggers:
- * - trg_attendance_alert: Falta registrada -> WhatsApp para pais/responsáveis
- * - trg_grade_published: Nota bimestral homologada -> WhatsApp com boletim
+ * Fila de avisos gerados pelo professor (faltas e notas).
+ *
+ * Esta fila NÃO envia nada: o App recolhe os itens (drainMessageQueue) e os
+ * coloca em "Aguardando envio" na Central de WhatsApp, onde a secretaria abre
+ * cada conversa e confirma o envio no próprio WhatsApp (envio assistido).
  */
 
 export interface MessageQueueRecord {
@@ -61,6 +62,7 @@ export function enqueueMessage(
 
   const updated = [newItem, ...current];
   saveLocalMessageQueue(updated);
+  notifyQueueSubscribers(updated);
   return newItem;
 }
 
@@ -79,7 +81,7 @@ export function triggerAttendanceAlert(params: {
   lessonNumber: number;
 }): MessageQueueRecord {
   const formattedDate = new Date(params.date + 'T00:00:00').toLocaleDateString('pt-BR');
-  const phone = params.guardianPhone || '+55 (11) 98765-4321';
+  const phone = params.guardianPhone || '';
   const guardian = params.guardianName || 'Responsável';
 
   const body = `Olá, ${guardian}. Informamos que o(a) estudante ${params.studentName} registrou ausência na aula de ${params.subjectName} (${params.className}) realizada em ${formattedDate} (Aula ${params.lessonNumber}). Caso tenha justificativa ou atestado, favor encaminhar à secretaria escolar.`;
@@ -120,11 +122,11 @@ export function triggerGradePublished(params: {
   passingScore: number;
   status: string;
 }): MessageQueueRecord {
-  const phone = params.guardianPhone || '+55 (11) 98765-4321';
+  const phone = params.guardianPhone || '';
   const guardian = params.guardianName || 'Responsável';
   const situation = params.status === 'APROVADO' ? 'Satisfatório / Aprovado' : params.status === 'RECUPERACAO' ? 'Em Recuperação' : 'Abaixo da Média';
 
-  const body = `Prezado(a) ${guardian}, a pauta do ${params.term} foi homologada. Nota de ${params.studentName} em ${params.subjectName}: Média ${params.average.toFixed(1)} (Média mínima para aprovação: ${params.passingScore.toFixed(1)}). Situação: ${situation}. Acesse o portal do aluno para consultar o boletim completo.`;
+  const body = `Prezado(a) ${guardian}, a pauta do ${params.term} foi homologada. Nota de ${params.studentName} em ${params.subjectName}: Média ${params.average.toFixed(1)} (Média mínima para aprovação: ${params.passingScore.toFixed(1)}). Situação: ${situation}. Em caso de dúvidas, procure a secretaria da escola.`;
 
   return enqueueMessage({
     recipient_phone: phone,
@@ -148,57 +150,24 @@ export function triggerGradePublished(params: {
 }
 
 /**
- * Processamento assíncrono da fila (Edge Function / Background Worker)
+ * Retira da fila os avisos pendentes (para virarem "Aguardando envio" na
+ * Central de WhatsApp). Nada é enviado aqui.
  */
+export function drainMessageQueue(): MessageQueueRecord[] {
+  const queue = getLocalMessageQueue();
+  const pending = queue.filter((item) => item.status === 'PENDING');
+  if (pending.length === 0) return [];
+  saveLocalMessageQueue(queue.filter((item) => item.status !== 'PENDING'));
+  return pending;
+}
+
+/** Mantida por compatibilidade: não envia nem marca nada como enviado. */
 export async function processMessageQueue(): Promise<{
   processed: number;
   sent: number;
   failed: number;
 }> {
-  const queue = getLocalMessageQueue();
-  const pendingItems = queue.filter((item) => item.status === 'PENDING');
-
-  if (pendingItems.length === 0) {
-    return { processed: 0, sent: 0, failed: 0 };
-  }
-
-  let sent = 0;
-  let failed = 0;
-
-  const updatedQueue = queue.map((item) => {
-    if (item.status === 'PENDING') {
-      try {
-        // Simulação da Edge Function / Gateway oficial disparando WhatsApp / Notificação
-        sent++;
-        return {
-          ...item,
-          status: 'SENT' as const,
-          processed_at: new Date().toISOString(),
-        };
-      } catch (err: any) {
-        if (item.retry_count < 3) {
-          return {
-            ...item,
-            retry_count: item.retry_count + 1,
-            error_message: err?.message || 'Falha transitória na rede',
-          };
-        } else {
-          failed++;
-          return {
-            ...item,
-            status: 'FAILED' as const,
-            error_message: err?.message || 'Excedido limite de 3 tentativas',
-            processed_at: new Date().toISOString(),
-          };
-        }
-      }
-    }
-    return item;
-  });
-
-  saveLocalMessageQueue(updatedQueue);
-  notifyQueueSubscribers(updatedQueue);
-  return { processed: pendingItems.length, sent, failed };
+  return { processed: 0, sent: 0, failed: 0 };
 }
 
 // -------------------------------------------------------------
