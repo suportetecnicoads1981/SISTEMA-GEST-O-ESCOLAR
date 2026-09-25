@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Save,
@@ -21,6 +21,18 @@ import {
   AutoCorrectionRules,
 } from '../../types';
 
+const DEFAULT_SUBJECT_NAMES = [
+  'Língua Portuguesa',
+  'Matemática',
+  'Ciências',
+  'História',
+  'Geografia',
+  'Arte',
+  'Educação Física',
+  'Língua Inglesa',
+  'Ensino Religioso',
+];
+
 interface ExamBuilderModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -42,13 +54,24 @@ export const ExamBuilderModal: React.FC<ExamBuilderModalProps> = ({
   subjects,
   initialQuestionIds,
 }) => {
+  // Disciplinas: as cadastradas na Matriz + as das questões do banco + os componentes da BNCC.
+  // Sem isso, com a Matriz vazia, a lista ficava em branco e não dava para escolher nada.
+  const subjectNames: string[] = useMemo(() => {
+    const set = new Set<string>();
+    (subjects || []).forEach((s) => s?.name && set.add(s.name.trim()));
+    (questions || []).forEach((q) => q?.subject && set.add(String(q.subject).trim()));
+    DEFAULT_SUBJECT_NAMES.forEach((n) => set.add(n));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [subjects, questions]);
+  const defaultSubject = subjects[0]?.name || 'Matemática';
+
   const [formData, setFormData] = useState<Partial<Exam>>({
     title: '',
     description: '',
-    subject: subjects[0]?.name || 'Matemática',
+    subject: defaultSubject,
     classId: classes[0]?.id || '',
     teacherName: 'Prof. Titular',
-    schoolYear: 2026,
+    schoolYear: new Date().getFullYear(),
     term: '1º Bimestre',
     totalPoints: 10.0,
     passingScore: 6.0,
@@ -84,10 +107,10 @@ export const ExamBuilderModal: React.FC<ExamBuilderModalProps> = ({
       setFormData({
         title: '',
         description: 'Avaliação com correção automática instantânea e diagnóstico de erros.',
-        subject: subjects[0]?.name || 'Matemática',
+        subject: defaultSubject,
         classId: classes[0]?.id || '',
         teacherName: 'Prof. Titular',
-        schoolYear: 2026,
+        schoolYear: new Date().getFullYear(),
         term: '1º Bimestre',
         totalPoints: 10.0,
         passingScore: 6.0,
@@ -283,9 +306,12 @@ export const ExamBuilderModal: React.FC<ExamBuilderModalProps> = ({
                 onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200"
               >
-                {subjects.map((s) => (
-                  <option key={s.id} value={s.name}>
-                    {s.name}
+                {formData.subject && !subjectNames.includes(formData.subject) && (
+                  <option value={formData.subject}>{formData.subject}</option>
+                )}
+                {subjectNames.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
                   </option>
                 ))}
               </select>
@@ -302,6 +328,7 @@ export const ExamBuilderModal: React.FC<ExamBuilderModalProps> = ({
                 <option value="2º Bimestre">2º Bimestre</option>
                 <option value="3º Bimestre">3º Bimestre</option>
                 <option value="4º Bimestre">4º Bimestre</option>
+                <option value="Recuperação">Recuperação</option>
                 <option value="Simulado Geral">Simulado Geral</option>
                 <option value="Recuperação">Recuperação Paralela</option>
               </select>
