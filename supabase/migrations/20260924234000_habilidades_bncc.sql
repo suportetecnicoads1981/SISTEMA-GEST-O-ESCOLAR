@@ -70,3 +70,8 @@ drop trigger if exists trg_skip_deleted_units_bncc on public.bncc_skill_assessme
 create trigger trg_skip_deleted_units_bncc
   before insert or update on public.bncc_skill_assessments
   for each row execute function public.skip_rows_of_deleted_units();
+
+-- Permissão de acesso para usuários logados (as regras RLS acima decidem o que cada um pode fazer).
+-- Sem isto a nuvem respondia 403 (aplicada em 24/09/2026 como habilidades_bncc_permissoes).
+grant select, insert, update, delete on public.bncc_skills to authenticated;
+grant select, insert, update, delete on public.bncc_skill_assessments to authenticated;
