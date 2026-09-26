@@ -1,4 +1,5 @@
 import { Exam, Question, SchoolSettings } from '../types';
+import { letterheadHtml } from '../services/documentBranding';
 
 export interface ExamOptionVariant {
   originalIndex: number;
@@ -43,6 +44,8 @@ export interface ExamBatchConfig {
   scheduledDate: string;
   totalPoints: number;
   timeLimitMinutes: number;
+  /** Turma da prova: define a escola do timbre (logos). */
+  classId?: string;
 }
 
 /**
@@ -232,6 +235,7 @@ export function generateBatchPrintHtml(
     .map((variant) => {
       return `
       <div class="exam-page">
+        ${letterheadHtml({ classId: config.classId, schoolName: config.schoolName })}
         <!-- CABEÇALHO OFICIAL COM IDENTIFICAÇÃO DO MODELO -->
         <div class="header-box">
           <div class="header-top">

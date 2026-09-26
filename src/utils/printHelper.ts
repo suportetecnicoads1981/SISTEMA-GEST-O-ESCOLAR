@@ -1,4 +1,5 @@
 import { sanitizeHtmlFragment } from './safeHtml';
+import { withLetterhead } from '../services/documentBranding';
 /**
  * Utilitário centralizado e robusto para Impressão e Pré-visualização Oficial no SucessoEdu.
  * Garante compatibilidade total em iframes, navegadores móveis e sandboxes.
@@ -12,6 +13,11 @@ export interface PrintOptions {
   schoolCity?: string;
   schoolState?: string;
   orientation?: 'portrait' | 'landscape';
+  /** Escola do timbre (logo e nome). Sem ela, usa a escola do usuário. */
+  schoolUnitId?: string;
+  classId?: string;
+  /** true: não acrescenta o timbre padrão (documento já tem o seu). */
+  noLetterhead?: boolean;
 }
 
 /**
@@ -20,6 +26,9 @@ export interface PrintOptions {
 export function buildPrintHtml(contentHtml: string, options?: PrintOptions): string {
   const title = options?.title || 'Documento Oficial - SucessoEdu Gestão Escolar';
   const orientation = options?.orientation || 'portrait';
+  const bodyHtml = options?.noLetterhead
+    ? contentHtml
+    : withLetterhead(contentHtml, { schoolUnitId: options?.schoolUnitId, classId: options?.classId, schoolName: options?.schoolName });
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -184,7 +193,7 @@ export function buildPrintHtml(contentHtml: string, options?: PrintOptions): str
   </div>
 
   <div class="print-container">
-    ${contentHtml}
+    ${bodyHtml}
   </div>
 
   <script>
@@ -297,7 +306,7 @@ function showInAppPrintModal(contentHtml: string, options?: PrintOptions) {
       <!-- Folha A4 de Pré-Visualização -->
       <div style="background: #e2e8f0; padding: 24px 16px; min-height: 500px; display: flex; justify-content: center;">
         <div id="sucessoedu_a4_sheet" style="width: 100%; max-width: 800px; background: white; padding: 32px 36px; border-radius: 4px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); color: #0f172a; font-family: 'Plus Jakarta Sans', sans-serif;">
-          ${contentHtml}
+          ${options?.noLetterhead ? contentHtml : withLetterhead(contentHtml, { schoolUnitId: options?.schoolUnitId, classId: options?.classId, schoolName: options?.schoolName })}
         </div>
       </div>
     </div>

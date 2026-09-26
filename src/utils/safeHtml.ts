@@ -8,6 +8,8 @@
  * pode executar código antes de escrever o HTML na janela.
  */
 
+import { withLetterheadInDocument, type LetterheadTarget } from '../services/documentBranding';
+
 /** Escapa texto para inserção segura dentro de HTML. */
 export function escapeHtml(value: unknown): string {
   return String(value ?? '')
@@ -75,9 +77,16 @@ export function sanitizeHtmlFragment(html: string): string {
  * Escreve um documento de impressão já sanitizado na janela e dispara a
  * impressão (os <script> originais, como window.onload = print, são removidos).
  */
-export function writeSafePrintDocument(printWindow: Window, html: string, autoPrint = true): void {
+export function writeSafePrintDocument(
+  printWindow: Window,
+  html: string,
+  autoPrint = true,
+  letterhead?: LetterheadTarget | false
+): void {
   printWindow.document.open();
-  printWindow.document.write(sanitizeHtmlDocument(html));
+  // Timbre padrão (logos da Gestão, SEMED e escola) no topo do documento.
+  const withHead = letterhead === false ? html : withLetterheadInDocument(html, letterhead || undefined);
+  printWindow.document.write(sanitizeHtmlDocument(withHead));
   printWindow.document.close();
   if (autoPrint) {
     setTimeout(() => {
