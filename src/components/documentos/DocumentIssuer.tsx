@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { DocumentLetterhead } from '../common/DocumentLetterhead';
 import {
   Award,
   FileText,
@@ -264,6 +265,9 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
             <Award className="w-[500px] h-[500px] text-slate-900" />
           </div>
 
+          {/* Timbre padrão: logos da Gestão, SEMED e escola do aluno (cadastros da Rede Municipal) */}
+          <DocumentLetterhead schoolUnitId={selectedStudent?.schoolUnitId} classId={selectedClass?.id} className="relative" />
+
           {/* ========================================================================= */}
           {/* CASE 1: CERTIFICADO DE CONCLUSÃO */}
           {/* ========================================================================= */}
@@ -271,11 +275,6 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
             <div className="border-8 border-double border-indigo-900/40 p-6 sm:p-10 rounded-xl h-full flex flex-col justify-between relative">
               {/* Header */}
               <div className="text-center space-y-2">
-                <div className="flex justify-center mb-2">
-                  <div className="h-16 w-16 rounded-full bg-indigo-900 text-amber-300 flex items-center justify-center font-serif text-2xl font-bold shadow-md">
-                    HS
-                  </div>
-                </div>
                 <h3 className="text-sm font-semibold tracking-widest uppercase text-slate-600">
                   República Federativa do Brasil • Estado de {settings.state}
                 </h3>
