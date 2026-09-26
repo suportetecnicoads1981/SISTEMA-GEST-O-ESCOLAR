@@ -73,7 +73,7 @@ export const LocalNetworkStatusBadge: React.FC = () => {
   const dot = !connected ? '#e11d48' : local.pending > 0 ? '#f59e0b' : '#10b981';
   const roleLabel = local.role === 'SEDE' ? 'Servidor da Sede' : 'Servidor Remoto';
   const label = !connected
-    ? `${roleLabel}: sem conexão`
+    ? `${roleLabel}: sem resposta (rede local)`
     : local.pending > 0
       ? `${roleLabel}: enviando ${local.pending} alteração(ões)`
       : `${roleLabel}: conectado`;
