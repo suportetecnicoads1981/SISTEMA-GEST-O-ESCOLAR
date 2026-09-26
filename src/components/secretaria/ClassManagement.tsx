@@ -76,6 +76,46 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
   const [editingClass, setEditingClass] = useState<SchoolClass | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterShift, setFilterShift] = useState('ALL');
+  // Filtros por escola, série (ano) e ano letivo
+  const [filterUnit, setFilterUnit] = useState('ALL');
+  const [filterGrade, setFilterGrade] = useState('ALL');
+  const [filterYear, setFilterYear] = useState('ALL');
+  const gradeKey = (g?: string) =>
+    String(g || '')
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  const unitName = (id?: string) => schoolUnits.find((u) => u.id === id)?.name || 'Sem escola';
+  const unitOptions = useMemo(
+    () =>
+      [...schoolUnits]
+        .filter((u) => classes.some((c) => c.schoolUnitId === u.id))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR')),
+    [schoolUnits, classes]
+  );
+  const gradeOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    classes
+      .filter((c) => filterUnit === 'ALL' || c.schoolUnitId === filterUnit)
+      .forEach((c) => {
+        if (c.gradeLevel && !map.has(gradeKey(c.gradeLevel))) map.set(gradeKey(c.gradeLevel), c.gradeLevel);
+      });
+    const rank = (g: string) => {
+      const k = gradeKey(g);
+      if (/BERCARIO|CRECHE|MATERNAL/.test(k)) return 0;
+      if (/PRE\s*I\b(?!I)|PRE I$/.test(k)) return 1;
+      if (/PRE/.test(k)) return 2;
+      const m = k.match(/(\d{1,2})/);
+      return m ? 10 + Number(m[1]) : 99;
+    };
+    return Array.from(map.values()).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, 'pt-BR'));
+  }, [classes, filterUnit]);
+  const yearOptions = useMemo(
+    () => Array.from(new Set(classes.map((c) => String(c.schoolYear || 2026)))).sort().reverse(),
+    [classes]
+  );
   const classPrintRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState<Partial<SchoolClass>>({
@@ -100,10 +140,18 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
         const matchesShift = filterShift === 'ALL' || cls.shift === filterShift ||
           (filterShift === 'MATUTINO' && cls.shift === 'MANHÃ') ||
           (filterShift === 'VESPERTINO' && cls.shift === 'TARDE');
-        return matchesSearch && matchesShift;
+        const matchesUnit = filterUnit === 'ALL' || cls.schoolUnitId === filterUnit;
+        const matchesGrade = filterGrade === 'ALL' || gradeKey(cls.gradeLevel) === filterGrade;
+        const matchesYear = filterYear === 'ALL' || String(cls.schoolYear || 2026) === filterYear;
+        return matchesSearch && matchesShift && matchesUnit && matchesGrade && matchesYear;
       })
-      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { numeric: true }));
-  }, [classes, searchTerm, filterShift]);
+      // Escola primeiro (quando mostra todas), depois a turma em ordem alfabética
+      .sort(
+        (a, b) =>
+          (filterUnit === 'ALL' ? unitName(a.schoolUnitId).localeCompare(unitName(b.schoolUnitId), 'pt-BR') : 0) ||
+          a.name.localeCompare(b.name, 'pt-BR', { numeric: true })
+      );
+  }, [classes, searchTerm, filterShift, filterUnit, filterGrade, filterYear, schoolUnits]);
 
   // Colunas do Painel de Impressão Configurável de Turmas
   const classPrintColumns: PrintColumnConfig[] = useMemo(
@@ -131,11 +179,14 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
     } else {
       list.push({ label: 'Turno', value: 'Todos os Turnos' });
     }
+    if (filterUnit !== 'ALL') list.push({ label: 'Escola', value: unitName(filterUnit) });
+    if (filterGrade !== 'ALL') list.push({ label: 'Série', value: gradeOptions.find((g) => gradeKey(g) === filterGrade) || filterGrade });
+    if (filterYear !== 'ALL') list.push({ label: 'Ano letivo', value: filterYear });
     if (searchTerm.trim()) {
       list.push({ label: 'Busca', value: `"${searchTerm.trim()}"` });
     }
     return list;
-  }, [filterShift, searchTerm]);
+  }, [filterShift, searchTerm, filterUnit, filterGrade, filterYear, gradeOptions, schoolUnits]);
 
   const printClassSummaryMetrics: SummaryMetricItem[] = useMemo(() => {
     const totalEnrolled = sortedClasses.reduce((acc, c) => acc + students.filter((s) => s.classId === c.id).length, 0);
@@ -447,6 +498,73 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
               <option value="INTEGRAL">Tempo Integral</option>
             </select>
           </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-400 font-semibold">Escola:</span>
+            <select
+              value={filterUnit}
+              onChange={(e) => {
+                setFilterUnit(e.target.value);
+                setFilterGrade('ALL');
+              }}
+              className="px-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 font-semibold text-slate-700 cursor-pointer max-w-[240px]"
+            >
+              <option value="ALL">Todas as Escolas</option>
+              {unitOptions.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-400 font-semibold">Série:</span>
+            <select
+              value={filterGrade}
+              onChange={(e) => setFilterGrade(e.target.value)}
+              className="px-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 font-semibold text-slate-700 cursor-pointer"
+            >
+              <option value="ALL">Todas as Séries</option>
+              {gradeOptions.map((g) => (
+                <option key={gradeKey(g)} value={gradeKey(g)}>
+                  {g}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-400 font-semibold">Ano letivo:</span>
+            <select
+              value={filterYear}
+              onChange={(e) => setFilterYear(e.target.value)}
+              className="px-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 font-semibold text-slate-700 cursor-pointer"
+            >
+              <option value="ALL">Todos</option>
+              {yearOptions.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {(filterUnit !== 'ALL' || filterGrade !== 'ALL' || filterYear !== 'ALL' || filterShift !== 'ALL' || searchTerm) && (
+            <button
+              type="button"
+              onClick={() => {
+                setFilterUnit('ALL');
+                setFilterGrade('ALL');
+                setFilterYear('ALL');
+                setFilterShift('ALL');
+                setSearchTerm('');
+              }}
+              className="px-2.5 py-1.5 text-xs rounded-xl text-indigo-600 hover:bg-indigo-50 font-semibold cursor-pointer"
+            >
+              Limpar filtros
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
