@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { readLogoFile } from '../../services/documentBranding';
 import {
   X,
   Save,
@@ -70,15 +71,16 @@ export const MunicipalSecretaryModal: React.FC<MunicipalSecretaryModalProps> = (
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      setFormData((prev) => ({
-        ...prev,
-        [field]: base64,
-      }));
-    };
-    reader.readAsDataURL(file);
+    // A logo é reduzida (até 480 px) para não pesar no banco nem na sincronização.
+    readLogoFile(file)
+      .then((dataUrl) => {
+        setFormData((prev) => ({
+          ...prev,
+          [field]: dataUrl,
+        }));
+      })
+      .catch(() => notify('Não foi possível ler a imagem. Tente outro arquivo (PNG ou JPG).'));
+    e.target.value = '';
   };
 
   const handleRestoreOfficial = async () => {
