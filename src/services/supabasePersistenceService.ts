@@ -146,6 +146,9 @@ export class SupabasePersistenceService {
         delete remoteSettings.id;
         delete remoteSettings.createdAt;
         delete remoteSettings.updatedAt;
+        // Logos vazias na nuvem não apagam as que este computador já tem.
+        if (!remoteSettings.logoUrl) delete remoteSettings.logoUrl;
+        if (!remoteSettings.managementLogoUrl) delete remoteSettings.managementLogoUrl;
       }
 
       // Mescla não destrutiva: dados da nuvem atualizam os registros locais por id,
@@ -191,7 +194,13 @@ export class SupabasePersistenceService {
         }) as any,
         classGradeSheets: mergeRemoteIntoLocal(local.classGradeSheets, rowsOf(gradeSheetsRes, 'class_grade_sheets')),
         academicHistories: mergeRemoteIntoLocal(local.academicHistories, rowsOf(historiesRes, 'academic_histories')),
-        schoolUnits: mergeRemoteIntoLocal(local.schoolUnits, rowsOf(unitsRes, 'school_units')),
+        schoolUnits: mergeRemoteIntoLocal(local.schoolUnits, rowsOf(unitsRes, 'school_units'), (row) => {
+          // Logo vazia na nuvem não apaga a logo que este computador já tem.
+          const m = fromRemoteRow(row);
+          if (!m.logoUrl) delete m.logoUrl;
+          if (!m.managementLogoUrl) delete m.managementLogoUrl;
+          return m;
+        }),
         communications: mergeRemoteIntoLocal(local.communications, rowsOf(commsRes, 'communications'), withRoles),
         whatsappLogs: mergeRemoteIntoLocal(local.whatsappLogs, rowsOf(whatsappRes, 'whatsapp_messages')),
         notifications: mergeRemoteIntoLocal(local.notifications, rowsOf(notifsRes, 'notifications'), (row) => ({
