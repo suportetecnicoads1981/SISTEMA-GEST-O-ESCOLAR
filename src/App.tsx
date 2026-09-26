@@ -92,7 +92,7 @@ import { QuickJumpSearchModal } from './components/common/QuickJumpSearchModal';
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
 import { KeyboardShortcutsModal } from './components/common/KeyboardShortcutsModal';
 import { ShortcutToast } from './components/common/ShortcutToast';
-import { GuidedTourModal } from './components/common/GuidedTourModal';
+import { GuidedTourModal, isTourDismissed, dismissTourForever } from './components/common/GuidedTourModal';
 import { ModuleLoadingFallback } from './components/common/ModuleLoadingFallback';
 import { Bell, CheckCircle2, X } from 'lucide-react';
 import { drainMessageQueue, subscribeToMessageQueue } from './services/messageQueueService';
@@ -171,13 +171,7 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-  const [isTourOpen, setIsTourOpen] = useState(() => {
-    try {
-      return localStorage.getItem('sucessoedu_tour_seen') !== 'true';
-    } catch {
-      return true;
-    }
-  });
+  const [isTourOpen, setIsTourOpen] = useState(() => !isTourDismissed());
 
   // Desktop Windows Keyboard Shortcuts Layer (Ctrl+Esc para Menu Iniciar, Alt+B para Sidebar)
   useEffect(() => {
@@ -791,14 +785,17 @@ export default function App() {
       const updated = previous
         ? prev.classes.map((c) => (c.id === newClass.id ? newClass : c))
         : [...prev.classes, newClass];
-      // Turma transferida para outra escola: os alunos dela vão junto (senão ficariam presos à escola antiga)
+      // Os alunos da turma ficam sempre na escola da turma: se a turma foi transferida (agora ou numa
+      // versão antiga que não levava os alunos), salvar a turma leva junto quem ficou na escola anterior.
       const movedUnit =
-        !!previous && !!newClass.schoolUnitId && (previous.schoolUnitId || '') !== newClass.schoolUnitId;
+        !!previous &&
+        !!newClass.schoolUnitId &&
+        (prev.students || []).some((st) => st.classId === newClass.id && st.schoolUnitId !== newClass.schoolUnitId);
       if (!movedUnit) return { ...prev, classes: updated };
       const stamp = new Date().toISOString();
       const unit = (prev.schoolUnits || []).find((u) => u.id === newClass.schoolUnitId);
       const students = (prev.students || []).map((st) =>
-        st.classId === newClass.id
+        st.classId === newClass.id && st.schoolUnitId !== newClass.schoolUnitId
           ? ({
               ...st,
               schoolUnitId: newClass.schoolUnitId,
@@ -2406,11 +2403,9 @@ export default function App() {
       {/* TOUR GUIADO (ONBOARDING) PARA NOVOS USUÁRIOS */}
       <GuidedTourModal
         isOpen={isTourOpen}
-        onClose={() => {
+        onClose={(neverShowAgain) => {
           setIsTourOpen(false);
-          try {
-            localStorage.setItem('sucessoedu_tour_seen', 'true');
-          } catch {}
+          if (neverShowAgain) dismissTourForever();
         }}
         onNavigate={handleNavigate}
       />
