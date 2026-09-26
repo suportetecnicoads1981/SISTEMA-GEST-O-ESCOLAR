@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { cpfDigits, cpfState, formatAge, formatCpf, isFutureBirthDate, isValidCpf } from '../../utils/studentDocuments';
 import {
   X,
   Save,
@@ -148,10 +149,21 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
       return;
     }
 
+    // CPF: pode ficar em branco (pendência), mas se for informado precisa ser válido.
+    const cpfNow = cpfState(formData.cpf);
+    if (cpfNow === 'INVALIDO') {
+      setError('CPF inválido. Confira os números ou deixe o campo em branco para completar depois.');
+      return;
+    }
+    if (isFutureBirthDate(formData.birthDate)) {
+      setError('A data de nascimento está no futuro. Confira o dia, o mês e o ano.');
+      return;
+    }
+
     // Recalcular pendências remanescentes
     const pendingList: string[] = [];
-    const finalCpf = formData.cpf?.trim() || '000.000.000-00';
-    if (!formData.cpf || formData.cpf.trim() === '' || finalCpf === '000.000.000-00') {
+    const finalCpf = cpfNow === 'OK' ? formatCpf(formData.cpf) : '000.000.000-00';
+    if (cpfNow !== 'OK') {
       pendingList.push('CPF do Aluno');
     }
 
@@ -386,6 +398,15 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
                       Pendente
                     </span>
                   )}
+                  {hasCpf && cpfDigits(formData.cpf).length === 11 && (
+                    <span
+                      className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                        isValidCpf(formData.cpf) ? 'text-emerald-700 bg-emerald-100' : 'text-rose-700 bg-rose-100'
+                      }`}
+                    >
+                      {isValidCpf(formData.cpf) ? '✓ Válido' : 'CPF inválido'}
+                    </span>
+                  )}
                 </div>
                 <input
                   type="text"
@@ -406,6 +427,11 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-semibold text-slate-700">
                     Data de Nascimento
+                    {formatAge(formData.birthDate) && (
+                      <span className="ml-2 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-bold">
+                        Idade: {formatAge(formData.birthDate)}
+                      </span>
+                    )}
                   </label>
                   {!hasBirthDate && (
                     <span className="text-[10px] text-amber-600 font-bold bg-amber-100 px-1.5 py-0.2 rounded">

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { cpfDigits, cpfState, formatAge, formatCpf, isCpfMissing, isFutureBirthDate, withCpfPending } from '../../utils/studentDocuments';
 import {
   X,
   UserPlus,
@@ -77,7 +78,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
     enrollmentNumber: '',
     cpf: '',
     rg: '',
-    birthDate: '2008-01-01',
+    birthDate: '',
     gender: 'F',
     colorRace: 'PARDO',
     schoolUnitId: schoolUnits[0]?.id || '',
@@ -256,10 +257,20 @@ export const StudentModal: React.FC<StudentModalProps> = ({
       setError('O número de matrícula é obrigatório.');
       return;
     }
-    if (!formData.cpf?.trim()) {
-      setError('O CPF do estudante é obrigatório.');
+    // CPF: pode ficar em branco por enquanto (vira pendência), mas se for informado precisa ser válido.
+    const cpfNow = cpfState(formData.cpf);
+    if (cpfNow === 'INVALIDO') {
+      setError('CPF inválido. Confira os números ou deixe o campo em branco para completar depois (o cadastro fica com a pendência "CPF do Aluno").');
       return;
     }
+    if (isFutureBirthDate(formData.birthDate)) {
+      setError('A data de nascimento está no futuro. Confira o dia, o mês e o ano.');
+      return;
+    }
+    const pendingFields = withCpfPending(formData.pendingFields, formData.cpf);
+    let cadastralStatus = (formData.cadastralStatus as CadastralStatus) || 'OK';
+    if (cpfNow !== 'OK' && cadastralStatus === 'OK') cadastralStatus = 'INCOMPLETE';
+    if (cpfNow === 'OK' && pendingFields.length === 0 && cadastralStatus === 'INCOMPLETE') cadastralStatus = 'OK';
 
     if (formData.status === 'EVADIDO' && !formData.dropoutReason) {
       setError('Por favor selecione o motivo da evasão escolar conforme os padrões do Censo MEC.');
@@ -270,7 +281,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
       id: studentToEdit?.id || `std-${Date.now()}`,
       name: formData.name.trim(),
       enrollmentNumber: formData.enrollmentNumber.trim(),
-      cpf: formData.cpf.trim(),
+      cpf: cpfNow === 'OK' ? formatCpf(formData.cpf) : '',
       rg: formData.rg?.trim() || '',
       birthDate: formData.birthDate || '',
       gender: (formData.gender as 'M' | 'F' | 'OTHER') || 'F',
@@ -289,7 +300,8 @@ export const StudentModal: React.FC<StudentModalProps> = ({
       courseId: formData.courseId || '',
       classId: formData.classId || '',
       status: (formData.status as StudentStatus) || 'ACTIVE',
-      cadastralStatus: (formData.cadastralStatus as CadastralStatus) || 'OK',
+      cadastralStatus,
+      pendingFields,
       entryDate: formData.entryDate || new Date().toISOString().split('T')[0],
       // Sem foto enviada fica vazio (antes usava uma foto de banco de imagens de outra pessoa).
       photoUrl: formData.photoUrl || '',
@@ -432,24 +444,42 @@ export const StudentModal: React.FC<StudentModalProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  CPF do Estudante *
+                  CPF do Estudante
                 </label>
                 <input
                   type="text"
-                  value={formData.cpf || ''}
-                  onChange={(e) => setFormData({ ...formData, cpf: e.target.value })}
+                  inputMode="numeric"
+                  value={isCpfMissing(formData.cpf) ? '' : formData.cpf || ''}
+                  onChange={(e) => setFormData({ ...formData, cpf: formatCpf(e.target.value) })}
                   placeholder="000.000.000-00"
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono"
+                  className={`w-full px-3 py-2 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono ${
+                    cpfState(formData.cpf) === 'INVALIDO' && cpfDigits(formData.cpf).length === 11
+                      ? 'border-rose-400 bg-rose-50'
+                      : 'border-slate-200'
+                  }`}
                 />
+                {(() => {
+                  const st = cpfState(formData.cpf);
+                  const typing = cpfDigits(formData.cpf).length > 0 && cpfDigits(formData.cpf).length < 11;
+                  if (st === 'OK') return <p className="mt-1 text-[11px] font-semibold text-emerald-700">✓ CPF válido</p>;
+                  if (typing) return <p className="mt-1 text-[11px] text-slate-500">Digite os 11 números do CPF.</p>;
+                  if (st === 'INVALIDO') return <p className="mt-1 text-[11px] font-semibold text-rose-700">CPF inválido: confira os números.</p>;
+                  return <p className="mt-1 text-[11px] text-amber-700">Sem CPF: o aluno pode ser salvo, mas fica com a pendência "CPF do Aluno" até o número ser informado.</p>;
+                })()}
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Data de Nascimento
+                  {formatAge(formData.birthDate) && (
+                    <span className="ml-2 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                      Idade: {formatAge(formData.birthDate)}
+                    </span>
+                  )}
                 </label>
                 <input
                   type="date"
-                  value={formData.birthDate || '2008-01-01'}
+                  value={formData.birthDate || ''}
                   onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                 />

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
+import { formatAge } from '../../utils/studentDocuments';
 import { displayClassName } from '../../utils/schoolDataNormalizer';
 import {
   Search,
@@ -608,7 +609,7 @@ export const StudentList: React.FC<StudentListProps> = ({
       { id: 'series', label: 'Série', align: 'center', width: '80px', defaultVisible: true },
       { id: 'className', label: 'Turma', align: 'center', width: '80px', defaultVisible: true },
       { id: 'shift', label: 'Turno', align: 'center', width: '70px', defaultVisible: false },
-      { id: 'birthDate', label: 'Data Nasc.', align: 'center', width: '80px', defaultVisible: true },
+      { id: 'birthDate', label: 'Data Nasc. (idade)', align: 'center', width: '120px', defaultVisible: true },
       { id: 'gender', label: 'Sexo', align: 'center', width: '50px', defaultVisible: false },
       { id: 'race', label: 'Raça/Cor', align: 'center', width: '75px', defaultVisible: false },
       { id: 'cpf', label: 'CPF', align: 'center', width: '105px', defaultVisible: false },
@@ -748,7 +749,12 @@ export const StudentList: React.FC<StudentListProps> = ({
       case 'shift':
         return student.shift || 'Manhã';
       case 'birthDate':
-        return student.birthDate ? new Date(student.birthDate).toLocaleDateString('pt-BR') : '—';
+        if (!student.birthDate) return '—';
+        {
+          const d = new Date(student.birthDate + (student.birthDate.length === 10 ? 'T00:00:00' : '')).toLocaleDateString('pt-BR');
+          const age = formatAge(student.birthDate);
+          return age ? `${d} (${age})` : d;
+        }
       case 'gender':
         return student.gender === 'M' ? 'M' : student.gender === 'F' ? 'F' : 'Outro';
       case 'race':
@@ -1966,6 +1972,7 @@ export const StudentList: React.FC<StudentListProps> = ({
                               <Calendar className="h-3 w-3" />
                               Nascimento:{' '}
                               {student.birthDate ? new Date(student.birthDate + (student.birthDate.length === 10 ? 'T00:00:00' : '')).toLocaleDateString('pt-BR') : '—'}
+                              {formatAge(student.birthDate) && <span className="ml-1 text-slate-400">({formatAge(student.birthDate)})</span>}
                             </p>
                           </div>
                         </div>
