@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { DocumentLetterhead } from './DocumentLetterhead';
 import {
   Printer,
   X,
@@ -499,35 +500,16 @@ export const ConfigurablePrintModal: React.FC<ConfigurablePrintModalProps> = ({
             >
               {/* Topo do Documento */}
               <div className="space-y-4">
-                {/* Cabeçalho Institucional Oficial */}
+                {/* Cabeçalho Institucional Oficial (logos da Gestão, SEMED e escola dos cadastros) */}
                 {showHeader && (
-                  <div className="border-b-2 border-slate-800 pb-3">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-slate-900 text-white rounded-lg flex items-center justify-center font-black text-xl shadow-xs">
-                          SE
-                        </div>
-                        <div>
-                          <h1 className="text-sm font-black text-slate-900 uppercase tracking-tight">
-                            {schoolSettings?.name || 'Prefeitura Municipal & Secretaria de Educação'}
-                          </h1>
-                          <p className="text-[10px] text-slate-600 font-semibold">
-                            {schoolSettings?.tradeName || 'SucessoEdu Gestão Educacional Integrada'}
-                          </p>
-                          {showSchoolDetails && (
-                            <p className="text-[9px] text-slate-500 mt-0.5">
-                              {schoolSettings?.inepCode ? `INEP: ${schoolSettings.inepCode} • ` : ''}
-                              {schoolSettings?.cnpj ? `CNPJ: ${schoolSettings.cnpj} • ` : ''}
-                              {schoolSettings?.accreditationDecree || 'Sistema Oficial de Gestão Escolar'}
-                            </p>
-                          )}
-                        </div>
+                  <div>
+                    <DocumentLetterhead />
+                    <div className="flex items-center justify-between gap-4 -mt-1 text-[9px] text-slate-500">
+                      <div>
+                        {showSchoolDetails &&
+                          `${schoolSettings?.cnpj ? `CNPJ: ${schoolSettings.cnpj} • ` : ''}${schoolSettings?.accreditationDecree || ''}`}
                       </div>
-
-                      <div className="text-right text-[9px] text-slate-500 font-mono">
-                        <div>VIA OFICIAL DE CONTROLE</div>
-                        <div>EMISSÃO: {nowFormatted}</div>
-                      </div>
+                      <div className="text-right font-mono">EMISSÃO: {nowFormatted}</div>
                     </div>
                   </div>
                 )}

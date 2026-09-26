@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { DocumentLetterhead } from './DocumentLetterhead';
 import {
   X,
   Printer,
@@ -1208,50 +1209,14 @@ export const CustomReportBuilderModal: React.FC<CustomReportBuilderModalProps> =
 
               {/* Folha de Prévia Formatada para Impressão */}
               <div className="p-4 sm:p-6 bg-white text-slate-900 rounded-xl shadow-xl overflow-x-auto print:p-0 print:shadow-none border border-slate-200">
-                {/* Cabeçalho Oficial Timbrado */}
+                {/* Cabeçalho Oficial Timbrado (logos da Gestão, SEMED e escola dos cadastros) */}
                 {showOfficialHeader && (
-                  <div className="border-b-2 border-slate-800 pb-3 mb-4 flex items-center justify-between gap-4">
-                    {includeManagementLogo && (settings.managementLogoUrl || municipalSecretary?.managementLogoUrl) ? (
-                      <img
-                        src={settings.managementLogoUrl || municipalSecretary?.managementLogoUrl}
-                        alt="Brasão Gestão"
-                        className="h-14 max-w-[100px] object-contain shrink-0"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center text-slate-700 font-black text-xs border border-slate-300 shrink-0">
-                        SEMED
-                      </div>
-                    )}
-
-                    <div className="text-center flex-1">
-                      <div className="text-[10px] font-black uppercase tracking-wider text-slate-600">
-                        {municipalSecretary?.name || 'PREFEITURA MUNICIPAL DE CUMARU DO NORTE'}
-                      </div>
-                      <div className="text-xs font-black uppercase text-slate-900">
-                        {settings.name || settings.schoolName || 'ESCOLA MUNICIPAL DE EDUCAÇÃO BÁSICA'}
-                      </div>
-                      <div className="text-[9px] text-slate-600">
-                        INEP: {settings.inepCode || '15027560'} • {settings.address || 'Centro'} – {settings.city || 'Cumaru do Norte'}/{settings.state || 'PA'}
-                      </div>
-                      <div className="mt-1.5 text-xs font-black uppercase text-indigo-900 tracking-wide border-t border-slate-300 pt-1">
-                        {reportTitle}
-                      </div>
-                      {reportSubtitle && (
-                        <div className="text-[10px] text-slate-700 font-medium">{reportSubtitle}</div>
-                      )}
+                  <div className="mb-4">
+                    <DocumentLetterhead />
+                    <div className="text-center">
+                      <div className="text-xs font-black uppercase text-indigo-900 tracking-wide">{reportTitle}</div>
+                      {reportSubtitle && <div className="text-[10px] text-slate-700 font-medium">{reportSubtitle}</div>}
                     </div>
-
-                    {includeSchoolLogo && settings.logoUrl ? (
-                      <img
-                        src={settings.logoUrl}
-                        alt="Logo Escola"
-                        className="h-14 max-w-[100px] object-contain shrink-0"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 bg-indigo-50 text-indigo-800 rounded-lg flex items-center justify-center font-black text-xs border border-indigo-200 shrink-0">
-                        ESCOLA
-                      </div>
-                    )}
                   </div>
                 )}
 
