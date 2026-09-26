@@ -113,6 +113,7 @@ import { AdminTIHub } from './components/admin/AdminTIHub';
 import { isTabAvailable } from './config/features';
 import { notify } from './utils/dialogs';
 import { getLocalServerInfo } from './services/offline/localServerSync';
+import { setDocumentBranding } from './services/documentBranding';
 import { runCloudSyncNow } from './services/offline/cloudAutoSync';
 import { normalizeSchoolLinks } from './utils/schoolDataNormalizer';
 
@@ -292,6 +293,17 @@ export default function App() {
   useEffect(() => {
     saveStoredData(data, { skipCloudSync: data === remoteOriginDataRef.current });
   }, [data]);
+
+  // Timbre dos documentos: logos da Gestão e da SEMED (cadastro da Secretaria) e das escolas.
+  useEffect(() => {
+    setDocumentBranding({
+      settings: data.settings,
+      secretary: (data as any).municipalSecretary,
+      schoolUnits: data.schoolUnits,
+      classes: data.classes,
+      defaultSchoolUnitId: currentUser?.schoolUnitId || getLocalServerInfo()?.schoolUnitId,
+    });
+  }, [data.settings, (data as any).municipalSecretary, data.schoolUnits, data.classes, currentUser?.schoolUnitId]);
 
   // Correção automática dos vínculos escola ↔ turma ↔ aluno (ex: turma "ESCOLA X - PRÉ I (MANHÃ)"
   // passa a "PRÉ I - MANHÃ" vinculada à escola X). Idempotente: só grava quando algo muda.
@@ -1994,7 +2006,12 @@ export default function App() {
                 submissions={data?.submissions || []}
                 academicHistories={data?.academicHistories || []}
                 settings={data?.settings || DEFAULT_SCHOOL_SETTINGS}
-                municipalSecretary={data?.municipalSecretary || DEFAULT_MUNICIPAL_SECRETARY}
+                municipalSecretary={{
+                  ...(data?.municipalSecretary || DEFAULT_MUNICIPAL_SECRETARY),
+                  // Logos que vieram da nuvem (outro computador) aparecem no cadastro da Secretaria.
+                  logoUrl: data?.municipalSecretary?.logoUrl || data?.settings?.logoUrl || '',
+                  managementLogoUrl: data?.municipalSecretary?.managementLogoUrl || data?.settings?.managementLogoUrl || '',
+                }}
                 onUpdateSchoolUnits={(units) =>
                   setData((prev) => ({ ...prev, schoolUnits: units }))
                 }
@@ -2002,7 +2019,16 @@ export default function App() {
                   setData((prev) => ({ ...prev, syncLogs: logs }))
                 }
                 onUpdateMunicipalSecretary={(secretary) =>
-                  setData((prev) => ({ ...prev, municipalSecretary: secretary }))
+                  setData((prev) => ({
+                    ...prev,
+                    municipalSecretary: secretary,
+                    // As logos também ficam nas configurações, que vão para a nuvem.
+                    settings: {
+                      ...prev.settings,
+                      logoUrl: secretary.logoUrl || '',
+                      managementLogoUrl: secretary.managementLogoUrl || '',
+                    },
+                  }))
                 }
                 onRefreshData={() => setData(getStoredData())}
                 onBack={() => handleNavigate('MAIN_DASHBOARD')}
