@@ -275,7 +275,7 @@ export const TeacherClassDiaryTab: React.FC<TeacherClassDiaryTabProps> = ({
         </script>
       </body>
       </html>
-    `);
+    `, true, { classId: activeClass?.id });
   };
 
   return (

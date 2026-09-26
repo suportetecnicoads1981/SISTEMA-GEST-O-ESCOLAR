@@ -217,9 +217,10 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
       scheduledDate: new Date(activeExam.scheduledDate + 'T00:00:00').toLocaleDateString('pt-BR'),
       totalPoints: activeExam.totalPoints,
       timeLimitMinutes: activeExam.timeLimitMinutes,
+      classId: activeExam.classId,
     });
 
-    writeSafePrintDocument(printWindow, html);
+    writeSafePrintDocument(printWindow, html, true, { classId: activeExam.classId });
   };
 
   // Impressão Exclusiva do Modelo Ativo

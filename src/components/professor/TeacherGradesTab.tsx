@@ -441,7 +441,7 @@ export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
         </script>
       </body>
       </html>
-    `);
+    `, true, { classId: activeClass?.id });
   };
 
   return (

@@ -350,7 +350,7 @@ export const TeacherAttendanceTab: React.FC<TeacherAttendanceTabProps> = ({
         </script>
       </body>
       </html>
-    `);
+    `, true, { classId: activeClass?.id });
   };
 
   return (
