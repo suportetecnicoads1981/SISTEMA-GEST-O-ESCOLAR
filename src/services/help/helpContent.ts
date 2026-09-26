@@ -151,6 +151,12 @@ export const HELP_MODULES: HelpModule[] = [
       { q: 'Como encontro alunos com pendências no Censo?', a: 'Use o atalho "Pendências Censo" acima da lista, ou "Mais Filtros" > Situação Cadastral. Clique em "Completar" para corrigir o que falta.' },
       { q: 'Como imprimo ou exporto a lista?', a: 'Filtre a lista como quiser e clique em "Imprimir lista filtrada" ou "Exportar CSV".' },
       { q: 'Como emito declaração, histórico ou boletim de um aluno?', a: 'Clique no ícone de documentos na linha do aluno. O sistema abre "Documentos & Certificados" já com ele selecionado.' },
+      {
+        q: 'O CPF do aluno é obrigatório?',
+        a: 'O aluno pode ser salvo sem o CPF, mas fica com a pendência "CPF do Aluno" até o número ser informado. Quando o CPF é digitado, o sistema confere os números: CPF inválido não é aceito. Abaixo do campo aparece "✓ CPF válido" ou o que precisa corrigir.',
+        tip: 'Para achar quem está sem CPF (ou com CPF inválido vindo de planilha), use "Pendências Censo" e o filtro "Sem CPF ou CPF inválido".',
+      },
+      { q: 'Onde vejo a idade do aluno?', a: 'Ao preencher a data de nascimento, a idade aparece ao lado do campo. Na lista de alunos, a coluna "Data Nasc. (idade)" mostra as duas informações. Data de nascimento no futuro não é aceita.' },
     ],
   },
   {
@@ -184,6 +190,11 @@ export const HELP_MODULES: HelpModule[] = [
     faq: [
       { q: 'Como emito um documento?', steps: ['Escolha o aluno.', 'Escolha o tipo de documento.', 'Confira os dados na prévia.', 'Clique em "Imprimir / Gerar PDF".'] },
       { q: 'O nome da escola ou do diretor está errado no documento.', a: 'Corrija os dados da escola em Secretaria & Alunos > "Editar Dados da Escola". O documento usa esses dados.' },
+      {
+        q: 'Quais logos aparecem nos documentos e relatórios?',
+        a: 'Todo documento, relatório, impressão, PDF e Word sai com o mesmo timbre: logo da Gestão Municipal (Prefeitura) à esquerda; nome da Prefeitura, da Secretaria e da escola no centro; logo da SEMED e, se houver, a logo da escola à direita. As logos vêm dos cadastros da Rede Municipal & Polos.',
+        tip: 'Sem logo cadastrada, o espaço fica em branco e o documento sai normalmente, só com os nomes.',
+      },
     ],
   },
   {
@@ -299,6 +310,16 @@ export const HELP_MODULES: HelpModule[] = [
     where: 'Menu > Gestão Municipal & Polos',
     summary: 'Escolas da rede, envio de lotes das escolas para a Sede e consolidação na Secretaria.',
     faq: [
+      {
+        q: 'Onde cadastro as logos da Prefeitura (gestão atual), da SEMED e das escolas?',
+        steps: [
+          'Gestão e SEMED: aqui em Rede Municipal & Polos, clique em "Editar SEMED" (ou "Editar Dados SEMED").',
+          'Em "1. Logo da Gestão / Brasão Municipal", clique em "Enviar Logo Gestão / Brasão" e escolha a imagem.',
+          'Em "Logo SEMED", clique em "Enviar Logo SEMED". Salve.',
+          'Escola: edite a escola na lista e, em "1. Logo / Brasão da Escola", clique em "Enviar Logo da Escola". Salve.',
+        ],
+        tip: 'Use PNG com fundo transparente. O sistema reduz a imagem automaticamente. As logos vão para a nuvem e passam a sair em todos os documentos e relatórios.',
+      },
       {
         q: 'Como a escola (Servidor Remoto) envia os dados para a Sede?',
         steps: [
