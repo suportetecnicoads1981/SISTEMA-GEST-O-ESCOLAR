@@ -26,6 +26,22 @@ if (-not $desktop -and $env:PUBLIC) { $desktop = Join-Path $env:PUBLIC 'Desktop'
 if (-not $desktop) { throw 'Pasta da Area de Trabalho nao encontrada.' }
 $lnkPath = Join-Path $desktop ($name + '.lnk')
 
+# Icone do sistema: no servidor fica em C:\SucessoEdu\app; na estacao vem junto do pacote.
+# Copiado para uma pasta fixa, para o atalho nao perder o icone se o pacote for apagado.
+$icon = $null
+$here = Split-Path -Parent $MyInvocation.MyCommand.Path
+foreach ($c in @((Join-Path $here 'app\sucessoedu.ico'), (Join-Path $here 'sucessoedu.ico'))) {
+    if (Test-Path $c) {
+        try {
+            if ($AllUsers -and $env:ProgramData) { $iconDir = Join-Path $env:ProgramData 'SucessoEdu' } else { $iconDir = Join-Path $env:LOCALAPPDATA 'SucessoEdu' }
+            if (-not (Test-Path $iconDir)) { New-Item -ItemType Directory -Path $iconDir -Force | Out-Null }
+            $icon = Join-Path $iconDir 'sucessoedu.ico'
+            Copy-Item -Path $c -Destination $icon -Force
+        } catch { $icon = $c }
+        break
+    }
+}
+
 $shell = New-Object -ComObject WScript.Shell
 $lnk = $shell.CreateShortcut($lnkPath)
 if ($browser) {
@@ -36,6 +52,7 @@ if ($browser) {
     $lnk.TargetPath = Join-Path $env:windir 'explorer.exe'
     $lnk.Arguments = $Url
 }
+if ($icon) { $lnk.IconLocation = $icon + ',0' }
 $lnk.Description = 'SucessoEdu - Sistema de Gestao Escolar'
 $lnk.Save()
 Write-Host ('Atalho criado: ' + $lnkPath)
