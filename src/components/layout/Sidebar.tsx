@@ -23,6 +23,8 @@ import {
   UserX,
   BookOpen,
   MessageSquare,
+  MessageCircle,
+  Megaphone,
   RefreshCw,
   LogOut,
   Keyboard,
@@ -206,7 +208,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const menuSections = [
     {
-      title: 'Visão Geral & Notificações',
+      title: 'Visão Geral',
       items: [
         {
           id: 'MAIN_DASHBOARD',
@@ -222,12 +224,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
           badge: '18 Módulos',
           shortcut: 'Alt+A',
         },
+      ],
+    },
+    {
+      title: 'Comunicação & Avisos',
+      items: [
         {
           id: 'NOTIFICATIONS',
           label: 'Central de Notificações',
           icon: Bell,
           count: counts?.unreadNotifications,
           shortcut: 'Alt+N',
+        },
+        {
+          id: 'COMMUNICATION',
+          label: 'Mural de Comunicados & Mensagens',
+          icon: Megaphone,
+          badge: 'Avisos',
+        },
+        {
+          id: 'WHATSAPP',
+          label: 'WhatsApp para Pais & Equipe',
+          icon: MessageCircle,
+          badge: 'Envio',
         },
       ],
     },
