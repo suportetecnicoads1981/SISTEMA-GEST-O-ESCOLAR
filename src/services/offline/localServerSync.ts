@@ -71,6 +71,23 @@ let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 /** Muda a cada gravação/adoção: uma leitura iniciada antes disso é descartada. */
 let syncEpoch = 0;
+/**
+ * Falhas seguidas ao falar com o servidor da rede local. Com o banco grande, o servidor pode
+ * demorar alguns segundos numa gravação e uma consulta isolada estoura o tempo: isso não é
+ * "sem conexão". O aviso só aparece depois de algumas falhas seguidas.
+ */
+let failStreak = 0;
+const FAILS_BEFORE_OFFLINE = 3;
+const OFFLINE_MSG =
+  'O servidor desta rede (programa SucessoEdu no computador da Sede) não está respondendo. As alterações ficam guardadas nesta estação e são enviadas quando ele voltar. Isso não tem relação com a internet.';
+function markFailure() {
+  failStreak++;
+  if (failStreak >= FAILS_BEFORE_OFFLINE) {
+    setStatus({ mode: 'sem-conexao', message: OFFLINE_MSG });
+  } else if (status.mode !== 'sem-conexao') {
+    setStatus({ message: 'Servidor ocupado; tentando de novo em instantes.' });
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Estado e avisos
@@ -199,7 +216,7 @@ function captureAccessKeyFromUrl() {
 
 /** Pede a chave da escola até ela ser aceita pelo servidor. */
 async function ensureAccessKey(): Promise<{ status: number; body: any }> {
-  let res = await call('/store', {}, 15000);
+  let res = await call('/store', {}, 30000);
   let tries = 0;
   while (res.status === 401) {
     const typed = await promptDialog(
@@ -221,7 +238,7 @@ async function ensureAccessKey(): Promise<{ status: number; body: any }> {
       /* sem armazenamento */
     }
     tries++;
-    res = await call('/store', {}, 15000);
+    res = await call('/store', {}, 30000);
   }
   return res as any;
 }
@@ -342,7 +359,7 @@ function putStore(baseVersion: number, data: Record<string, any>) {
       body: JSON.stringify(data),
       headers: { 'X-Base-Version': String(baseVersion), 'X-Station': stationName() },
     },
-    30000
+    60000
   );
 }
 
@@ -430,7 +447,7 @@ export function flushLocalChanges(): Promise<void> {
         if (!queue.length) return;
         setStatus({ mode: 'sincronizando' });
         debug('flush tentativa', attempt);
-        const current = await call('/store', {}, 15000);
+        const current = await call('/store', {}, 30000);
         debug('flush GET', current.status);
         if (current.status !== 200 || !current.body) throw new Error(`HTTP ${current.status}`);
         const merged = applyOps(current.body.data || readLocalData() || {}, queue.map((q) => q.op));
@@ -442,13 +459,14 @@ export function flushLocalChanges(): Promise<void> {
         const sent = new Set(queue.map((q) => q.seq));
         writeQueue(readQueue().filter((q) => !sent.has(q.seq)));
         adoptServerData(merged, Number(put.body.version) || 0);
+        failStreak = 0;
         setStatus({ mode: 'conectado', lastSyncAt: new Date().toISOString(), message: undefined });
         if (!readQueue().length) return;
       }
       setStatus({ mode: 'conectado', message: 'Servidor ocupado; nova tentativa em instantes.' });
     } catch (err) {
       debug('flush erro', err);
-      setStatus({ mode: 'sem-conexao', message: 'Sem conexão com o servidor. As alterações ficam guardadas nesta estação.' });
+      markFailure();
     }
   };
   // O "finally" é ligado DEPOIS da atribuição: se a fila estiver vazia a função termina
@@ -474,7 +492,7 @@ export async function pullFromLocalServer(): Promise<void> {
       return;
     }
     const epoch = syncEpoch;
-    const v = await call('/version', {}, 4000);
+    const v = await call('/version', {}, 10000);
     if (v.status !== 200 || !v.body) throw new Error(`HTTP ${v.status}`);
     const serverVersion = Number(v.body.version) || 0;
     const serverApp = typeof v.body.appBuiltAt === 'string' ? v.body.appBuiltAt : '';
@@ -482,15 +500,16 @@ export async function pullFromLocalServer(): Promise<void> {
       setStatus({ newAppVersion: true });
     }
     if (serverVersion !== lastVersion()) {
-      const s = await call('/store', {}, 15000);
+      const s = await call('/store', {}, 30000);
       // Descarta a leitura se esta estação gravou/recebeu algo enquanto ela acontecia.
       if (s.status === 200 && s.body?.data && !readQueue().length && epoch === syncEpoch) {
         adoptServerData(s.body.data, Number(s.body.version) || 0);
       }
     }
+    failStreak = 0;
     if (status.mode !== 'conectado' || (status.message && !storageFull)) setStatus({ mode: 'conectado', message: storageFull ? STORAGE_FULL_MSG : undefined, lastSyncAt: new Date().toISOString() });
   } catch {
-    setStatus({ mode: 'sem-conexao', message: 'Sem conexão com o servidor. As alterações ficam guardadas nesta estação.' });
+    markFailure();
   }
 }
 
@@ -506,6 +525,7 @@ function startPolling() {
 /** Somente para testes. */
 export function __resetLocalServerForTests() {
   info = null;
+  failStreak = 0;
   status = { mode: 'desativado', pending: 0 };
   if (pollTimer) clearInterval(pollTimer);
   pollTimer = null;
