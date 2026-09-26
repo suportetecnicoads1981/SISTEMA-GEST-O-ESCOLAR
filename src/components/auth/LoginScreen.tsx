@@ -1,7 +1,6 @@
 import { isCloudReachable } from '../../services/offline/connectivity';
 import React, { useState, useMemo, useEffect } from 'react';
 import {
-  GraduationCap,
   Lock,
   User,
   Eye,
@@ -434,9 +433,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   className="h-12 w-12 rounded-2xl object-contain bg-white/10 p-1 border border-white/15 shadow-md"
                 />
               ) : (
-                <div className="h-12 w-12 rounded-2xl bg-linear-to-tr from-indigo-600 via-indigo-500 to-sky-500 flex items-center justify-center shadow-lg shadow-indigo-500/25 text-white">
-                  <GraduationCap className="h-7 w-7" />
-                </div>
+                <img src="/favicon.svg" alt="SucessoEdu" className="h-12 w-12 rounded-2xl shadow-lg shadow-indigo-500/25" />
               )}
               <div>
                 <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
