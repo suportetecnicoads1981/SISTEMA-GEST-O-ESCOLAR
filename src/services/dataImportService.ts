@@ -63,6 +63,7 @@ export interface ParsedImportStudent {
   city?: string;
   shift: string;
   series: string;
+  classLetter?: string; // Letra da turma (ex: "A" em "1º ANO A" ou "TURMA: PRÉ-ESCOLA I A")
   seriesFromFirstCol?: string; // Informação da série extraída da 1ª coluna
   medicalClassification: string;
   specialConditions?: string[];
@@ -141,6 +142,7 @@ export interface ImportColumnCheck {
 export interface ImportBlockContext {
   isAnnex?: boolean;
   parentUnit?: SchoolUnit; // Escola principal (bloco anterior do mesmo documento)
+  schoolName?: string; // Nome do bloco quando a linha não tem "ESCOLA:" (ex: linha "ANEXO NGÔNH-RE")
 }
 
 export interface SchoolCheckResult {
@@ -182,11 +184,49 @@ function stripAccentsUpper(val: any): string {
 
 /** Normaliza nome de escola para comparação: sem acentos, sem "ESCOLA:", sem pontuação. */
 export function normalizeSchoolName(val: any): string {
-  return stripAccentsUpper(val)
-    .replace(/^\s*(ESCOLA|UNIDADE ESCOLAR|POLO)\s*:\s*/, '')
-    .replace(/[^A-Z0-9 ]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return canonicalSchoolAcronyms(
+    stripAccentsUpper(val)
+      .replace(/^\s*(ESCOLA|UNIDADE ESCOLAR|POLO)\s*:\s*/, '')
+      .replace(/[^A-Z0-9 ]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
+}
+
+/**
+ * A mesma escola aparece escrita de jeitos diferentes nos levantamentos:
+ * "EMEIF NOVA VIDA", "E.M.E.I.F NOVA VIDA", "ESCOLA MUNICIPAL DE ENSINO INFANTIL E FUNDAMENTAL NOVA VIDA"
+ * ou "MUNICIPAL DE ENSINO INFANTIL E FUNDAMENTAL NOVA VIDA". Tudo vira a sigla, para comparar.
+ */
+function canonicalSchoolAcronyms(name: string): string {
+  const s = ` ${name} `
+    // Siglas com pontos (E.M.E.I.F -> "E M E I F" depois de tirar a pontuação)
+    .replace(/ E M I E I F /g, ' EMIEIF ')
+    .replace(/ E M E I F /g, ' EMEIF ')
+    .replace(/ E M E F /g, ' EMEF ')
+    .replace(/ E M E I /g, ' EMEI ')
+    // Nomes por extenso (do mais longo para o mais curto)
+    .replace(/ (ESCOLA )?MUNICIPAL (DE )?(ENSINO|EDUCACAO) INFANTIL E (ENSINO )?FUNDAMENTAL /g, ' EMEIF ')
+    .replace(/ ESCOLA MUNICIPAL (DE )?(ENSINO )?FUNDAMENTAL /g, ' EMEF ')
+    .replace(/ ESCOLA MUNICIPAL (DE )?(ENSINO|EDUCACAO) INFANTIL /g, ' EMEI ');
+  return s.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Letra da turma escrita logo depois da série: "1º ANO A", "3 ANO B", "PRÉ-ESCOLA I C",
+ * "PRÉ II - D". Devolve '' quando não houver letra (ex: "PRÉ II Nº", "1º ANO - MANHÃ").
+ */
+export function extractClassLetter(text: any): string {
+  const t = stripAccentsUpper(text).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ');
+  const m = t.match(
+    /(?:PRE[\s\-_–—]*(?:ESCOLA[\s\-_–—]*)?(?:II|I(?!I)|1|2)|\d{1,2}\s*[º°ªO]?\s*(?:ANOS?|SERIES?)|MATERNAL(?:[\s\-_–—]*(?:II|I(?!I)))?|JARDIM(?:[\s\-_–—]*(?:II|I(?!I)))?|BERCARIO(?:[\s\-_–—]*(?:II|I(?!I)))?)(?:\s+|\s*[\-–—]\s*)(?:TURMA\s+)?([A-J])(?![A-Z0-9])/
+  );
+  return m ? m[1] : '';
+}
+
+/** Letra da turma cadastrada (pelo nome da turma, ex: "1º ANO A - MANHÃ"). */
+function classLetterOf(c: SchoolClass): string {
+  return extractClassLetter(c?.name || '');
 }
 
 /** Converte qualquer escrita de série para a forma canônica (ex: "Pré-Escola II" -> "PRÉ II", "5º Ano A" -> "5º ANO"). */
@@ -207,6 +247,11 @@ export function sameGrade(a: any, b: any): boolean {
 export function findRegisteredSchoolUnit(name: string, units: SchoolUnit[]): SchoolUnit | undefined {
   const target = normalizeSchoolName(name);
   if (!target) return undefined;
+  // 1º: nome escrito igual (sem acentos/pontuação); 2º: mesmo nome com as siglas unificadas (EMEIF = por extenso)
+  const plain = (v: any) => stripAccentsUpper(v).replace(/^\s*(ESCOLA|UNIDADE ESCOLAR|POLO)\s*:\s*/, '').replace(/[^A-Z0-9]+/g, '');
+  const plainTarget = plain(name);
+  const literal = units.find((u) => plain(u.name) === plainTarget || (u.tradeName && plain(u.tradeName) === plainTarget));
+  if (literal) return literal;
   const exact = units.find(
     (u) => normalizeSchoolName(u.name) === target || (u.tradeName && normalizeSchoolName(u.tradeName) === target)
   );
@@ -243,16 +288,24 @@ export function findClassForSeries(
   unitId: string | undefined,
   series: string,
   classes: SchoolClass[],
-  allowUnlinkedClasses = false
+  allowUnlinkedClasses = false,
+  classLetter = ''
 ): SchoolClass | undefined {
   if (!series) return undefined;
+  const letter = String(classLetter || '').toUpperCase();
   const sameSeries = (c: SchoolClass) => sameGrade(c.gradeLevel, series) || sameGrade(c.name, series);
+  // Com letra (turma A, B, C...): só a turma daquela letra. Sem letra: prefere a turma sem letra.
+  const pick = (list: SchoolClass[]) => {
+    const candidates = list.filter(sameSeries);
+    if (letter) return candidates.find((c) => classLetterOf(c) === letter);
+    return candidates.find((c) => !classLetterOf(c)) || candidates[0];
+  };
   if (unitId) {
-    const inUnit = classes.find((c) => c.schoolUnitId === unitId && sameSeries(c));
+    const inUnit = pick(classes.filter((c) => c.schoolUnitId === unitId));
     if (inUnit) return inUnit;
   }
   if (allowUnlinkedClasses || !unitId) {
-    return classes.find((c) => !c.schoolUnitId && sameSeries(c));
+    return pick(classes.filter((c) => !c.schoolUnitId));
   }
   return undefined;
 }
@@ -308,23 +361,23 @@ export function extractSeriesFromFirstColumnHeader(
   // 1. Padrões específicos de séries e etapas escolares brasileiras
   const knownPatterns: Array<{ regex: RegExp; format: (m: RegExpMatchArray) => string }> = [
     {
-      regex: /\bPR[EÉ][\s\-_]*ESCOLA[\s\-_]*(?:II|2)\b/i,
+      regex: /\bPR[EÉ][\s\-_–—]*ESCOLA[\s\-_–—]*(?:II|2)\b/i,
       format: () => 'PRÉ II',
     },
     {
-      regex: /\bPR[EÉ][\s\-_]*ESCOLA[\s\-_]*(?:I|1)\b/i,
+      regex: /\bPR[EÉ][\s\-_–—]*ESCOLA[\s\-_–—]*(?:I|1)\b/i,
       format: () => 'PRÉ I',
     },
     {
-      regex: /\bPR[EÉ][\s\-_]*(?:II|2)\b/i,
+      regex: /\bPR[EÉ][\s\-_–—]*(?:II|2)\b/i,
       format: () => 'PRÉ II',
     },
     {
-      regex: /\bPR[EÉ][\s\-_]*(?:I|1)\b/i,
+      regex: /\bPR[EÉ][\s\-_–—]*(?:I|1)\b/i,
       format: () => 'PRÉ I',
     },
     {
-      regex: /\bPR[EÉ][\s\-_]*ESCOLA\b/i,
+      regex: /\bPR[EÉ][\s\-_–—]*ESCOLA\b/i,
       format: () => 'PRÉ-ESCOLA',
     },
     {
@@ -332,11 +385,11 @@ export function extractSeriesFromFirstColumnHeader(
       format: (m) => `${m[1]}º ANO`,
     },
     {
-      regex: /\bMATERNAL[\s\-_]*(?:II|2)\b/i,
+      regex: /\bMATERNAL[\s\-_–—]*(?:II|2)\b/i,
       format: () => 'MATERNAL II',
     },
     {
-      regex: /\bMATERNAL[\s\-_]*(?:I|1)\b/i,
+      regex: /\bMATERNAL[\s\-_–—]*(?:I|1)\b/i,
       format: () => 'MATERNAL I',
     },
     {
@@ -344,11 +397,11 @@ export function extractSeriesFromFirstColumnHeader(
       format: () => 'MATERNAL',
     },
     {
-      regex: /\bBER[CÇ][AÁ]RIO[\s\-_]*(?:II|2)\b/i,
+      regex: /\bBER[CÇ][AÁ]RIO[\s\-_–—]*(?:II|2)\b/i,
       format: () => 'BERÇÁRIO II',
     },
     {
-      regex: /\bBER[CÇ][AÁ]RIO[\s\-_]*(?:I|1)\b/i,
+      regex: /\bBER[CÇ][AÁ]RIO[\s\-_–—]*(?:I|1)\b/i,
       format: () => 'BERÇÁRIO I',
     },
     {
@@ -356,11 +409,11 @@ export function extractSeriesFromFirstColumnHeader(
       format: () => 'BERÇÁRIO',
     },
     {
-      regex: /\bJARDIM[\s\-_]*(?:II|2)\b/i,
+      regex: /\bJARDIM[\s\-_–—]*(?:II|2)\b/i,
       format: () => 'JARDIM II',
     },
     {
-      regex: /\bJARDIM[\s\-_]*(?:I|1)\b/i,
+      regex: /\bJARDIM[\s\-_–—]*(?:I|1)\b/i,
       format: () => 'JARDIM I',
     },
     {
@@ -492,12 +545,14 @@ export function buildClassForSeries(
   unit: SchoolUnit,
   serie: string,
   defaultShift: ClassShift | string = 'MANHÃ',
-  roomIndex = 0
+  roomIndex = 0,
+  classLetter = ''
 ): SchoolClass {
-  // Nome da turma = série + turno (a escola já fica no vínculo schoolUnitId)
+  // Nome da turma = série + letra (se houver) + turno (a escola já fica no vínculo schoolUnitId)
+  const letter = String(classLetter || '').toUpperCase();
   return {
-    id: `class-${unit.id}-${stripAccentsUpper(serie).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
-    name: `${serie} - ${defaultShift}`,
+    id: `class-${unit.id}-${stripAccentsUpper(serie).toLowerCase().replace(/[^a-z0-9]+/g, '-')}${letter ? `-${letter.toLowerCase()}` : ''}`,
+    name: `${serie}${letter ? ` ${letter}` : ''} - ${defaultShift}`,
     gradeLevel: serie,
     segment: segmentForGrade(serie),
     shift: (defaultShift as ClassShift) || 'MANHÃ',
@@ -545,7 +600,8 @@ export function buildSchoolUnitAndClassesFromImport(
 
   const schoolUnit: SchoolUnit = {
     // Id estável pelo nome: reprocessar a planilha não cria outra escola e as anexas mantêm o vínculo
-    id: `unit-imp-${stripAccentsUpper(cleanSchoolName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`,
+    // (nome normalizado: "E.M.E.I.F X" e "ESCOLA MUNICIPAL DE ENSINO INFANTIL E FUNDAMENTAL X" dão o mesmo id)
+    id: `unit-imp-${normalizeSchoolName(cleanSchoolName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`,
     name: cleanSchoolName,
     tradeName: cleanSchoolName,
     inepCode: 'Pendente de Regularização Censo',
@@ -693,27 +749,45 @@ const SCHOOL_LINE_RE = /\bESCOLA(\s+ANEXO)?\s*:\s*(.+?)(?=\s*\|?\s*(?:TURMAS?|S[
  * e escolas anexas (linha "ESCOLA ANEXO: ..."), cada uma com suas tabelas por série.
  * Linhas "ESCOLA:" repetidas da mesma escola (ex: a cada página) ficam no mesmo bloco.
  */
-export function splitMatrixBySchool(matrix: any[][]): Array<{ matrix: any[][]; schoolName: string; isAnnex: boolean }> {
-  const starts: Array<{ index: number; name: string; isAnnex: boolean }> = [];
+// Linha sozinha que abre uma escola anexa sem "ESCOLA:" (ex: "ANEXO NGÔNH-RE", "ESCOLA ANEXO - SÃO JOSÉ")
+const ANNEX_ONLY_LINE_RE = /^\s*(?:ESCOLA\s+)?ANEXOS?\s*[:\-–—]?\s+(.{3,80})$/i;
+
+export function splitMatrixBySchool(
+  matrix: any[][]
+): Array<{ matrix: any[][]; schoolName: string; isAnnex: boolean; displayName?: string }> {
+  const starts: Array<{ index: number; name: string; isAnnex: boolean; displayName: string }> = [];
   matrix.forEach((row, i) => {
-    const text = (row || []).map((c) => String(c ?? '').replace(/\s+/g, ' ').trim()).filter(Boolean).join(' | ');
+    const cells = (row || []).map((c) => String(c ?? '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const text = cells.join(' | ');
     const m = text.match(SCHOOL_LINE_RE);
+    let rawName = '';
+    let isAnnex = false;
     if (m && m[2].trim()) {
-      const name = normalizeSchoolName(m[2]);
-      const isAnnex = !!m[1];
+      rawName = m[2].trim();
+      isAnnex = !!m[1];
+    } else if (cells.length === 1) {
+      const a = cells[0].match(ANNEX_ONLY_LINE_RE);
+      if (a && !/\b(LAUDO|NOME|ALUNO|TOTAL)\b/i.test(a[1])) {
+        rawName = a[1].trim();
+        isAnnex = true;
+      }
+    }
+    if (rawName) {
+      const name = normalizeSchoolName(rawName);
       const last = starts[starts.length - 1];
       if (!last || last.name !== name || last.isAnnex !== isAnnex) {
-        starts.push({ index: i, name, isAnnex });
+        starts.push({ index: i, name, isAnnex, displayName: rawName.toUpperCase() });
       }
     }
   });
   if (starts.length <= 1) {
-    return [{ matrix, schoolName: starts[0]?.name || '', isAnnex: !!starts[0]?.isAnnex }];
+    return [{ matrix, schoolName: starts[0]?.name || '', isAnnex: !!starts[0]?.isAnnex, displayName: starts[0]?.displayName }];
   }
   return starts.map((st, i) => ({
     matrix: matrix.slice(i === 0 ? 0 : st.index, starts[i + 1] ? starts[i + 1].index : matrix.length),
     schoolName: st.name,
     isAnnex: st.isAnnex,
+    displayName: st.displayName,
   }));
 }
 
@@ -734,6 +808,7 @@ function processMatrixBlocks(
     const res = processSheetWithHeaders(block.matrix, fileName, fileSize, filters, classes, schoolUnits, {
       isAnnex: block.isAnnex,
       parentUnit: block.isAnnex ? parentUnit : undefined,
+      schoolName: block.isAnnex ? block.displayName : undefined,
     });
     res.documentType = documentType;
     res.sourceFileName = fileName;
@@ -1019,6 +1094,12 @@ export function processSheetWithHeaders(
     }
   }
 
+  // Bloco de escola anexa aberto por uma linha "ANEXO ..." (sem "ESCOLA:")
+  if (!schoolNameDetected && context.schoolName) {
+    schoolNameDetected = context.schoolName;
+    if (context.isAnnex) isAnnex = true;
+  }
+
   if (headerRowIndex === -1 && matrix.length > 0) {
     headerRowIndex = 0;
     headers = (matrix[0] || []).map((c) => String(c ?? '').trim());
@@ -1046,10 +1127,13 @@ export function processSheetWithHeaders(
 
   const gradesInFile = extractSchoolGradesServed(gradesServedText).expandedGrades;
   let tableSeries = '';
+  let tableLetter = '';
   if (filters.extractSeriesFromFirstColumn !== false && seriesFromFirstColumn) {
     tableSeries = seriesFromFirstColumn;
+    tableLetter = extractClassLetter(firstColRawHeader);
   } else if (gradesInFile.length === 1) {
     tableSeries = gradesInFile[0];
+    tableLetter = extractClassLetter(gradesServedText);
   }
 
   // 4. Escola: confere com o cadastro
@@ -1128,9 +1212,11 @@ export function processSheetWithHeaders(
   // O arquivo pode ter VÁRIAS tabelas (uma por série): cada novo cabeçalho troca a série atual
   let activeMap: Record<string, number> = colMap;
   let currentSeries = tableSeries;
+  let currentLetter = tableLetter;
   const sections: Array<{ series: string; count: number; header: string }> = [];
   const startSection = (series: string, header: string) => {
-    sections.push({ series: series || 'Série não identificada', count: 0, header: header.replace(/\s+/g, ' ').trim() });
+    const label = series ? `${series}${currentLetter ? ` ${currentLetter}` : ''}` : 'Série não identificada';
+    sections.push({ series: label, count: 0, header: header.replace(/\s+/g, ' ').trim() });
   };
   startSection(currentSeries, firstColRawHeader);
 
@@ -1154,6 +1240,8 @@ export function processSheetWithHeaders(
       const parsed = extractSeriesFromFirstColumnHeader(newHeaders[hdrIdx] || '');
       if (filters.extractSeriesFromFirstColumn !== false && parsed.known && parsed.series) {
         currentSeries = parsed.series;
+        // A série veio do cabeçalho da tabela: a letra (se houver) também vem dele ("1º ANO B Nº")
+        currentLetter = extractClassLetter(newHeaders[hdrIdx] || '');
       }
       startSection(currentSeries, newHeaders[hdrIdx] || '');
       continue;
@@ -1165,7 +1253,10 @@ export function processSheetWithHeaders(
       const turmaLine = joined.match(/TURMAS?\s*:\s*(.+?)(?=\s*\|?\s*(?:DATA|ESCOLA)\s*:|\s*\||$)/);
       if (turmaLine) {
         const g = extractSchoolGradesServed(turmaLine[1]).expandedGrades;
-        if (g.length === 1) currentSeries = g[0];
+        if (g.length === 1) {
+          currentSeries = g[0];
+          currentLetter = extractClassLetter(turmaLine[1]); // "TURMA: PRÉ-ESCOLA I B"
+        }
       }
       continue;
     }
@@ -1176,6 +1267,7 @@ export function processSheetWithHeaders(
       const parsed = extractSeriesFromFirstColumnHeader(nonEmpty.join(' '));
       if (parsed.known && parsed.series) {
         currentSeries = parsed.series;
+        currentLetter = extractClassLetter(nonEmpty.join(' '));
         startSection(currentSeries, nonEmpty.join(' '));
       }
       continue;
@@ -1205,10 +1297,14 @@ export function processSheetWithHeaders(
 
     // Série na própria linha (ex: "PRÉ II - 1")
     let rowSeriesParsed = '';
+    let rowLetter = '';
     const seriesColVal = cleanPlaceholder(rawSeries);
     if (seriesColVal) {
       const parsedCol = extractSeriesFromFirstColumnHeader(seriesColVal);
-      if (parsedCol.known && parsedCol.series) rowSeriesParsed = parsedCol.series;
+      if (parsedCol.known && parsedCol.series) {
+        rowSeriesParsed = parsedCol.series;
+        rowLetter = extractClassLetter(seriesColVal);
+      }
       if (parsedCol.studentNumber && (!rawSeq || rawSeq === rawSeries)) rawSeq = parsedCol.studentNumber;
     }
 
@@ -1235,13 +1331,16 @@ export function processSheetWithHeaders(
 
     // Série do aluno: padrão forçado > série da linha > série da tabela (1ª coluna) > padrão
     let finalSeries = '';
+    let finalLetter = '';
     let seriesByDefault = false;
     if (filters.overrideSeriesWithDefault && filters.defaultSeries) {
       finalSeries = canonicalGrade(filters.defaultSeries);
     } else if (rowSeriesParsed) {
       finalSeries = rowSeriesParsed;
+      finalLetter = rowLetter;
     } else if (currentSeries) {
       finalSeries = currentSeries;
+      finalLetter = currentLetter;
     } else {
       finalSeries = canonicalGrade(filters.defaultSeries || 'PRÉ I');
       seriesByDefault = true;
@@ -1278,6 +1377,7 @@ export function processSheetWithHeaders(
       address: address || 'Endereço pendente de cadastro',
       shift,
       series: finalSeries,
+      classLetter: finalLetter || undefined,
       seriesFromFirstCol: seriesFromFirstColumn,
       medicalClassification: pcdDesc || (isPcd ? 'PCD' : 'Não declarada'),
       isPcd,
@@ -1322,27 +1422,21 @@ export function processSheetWithHeaders(
     if (renamed > 0) {
       schoolMessages.push(`${renamed} turma(s) já existente(s) terão o nome ajustado para "SÉRIE - TURNO" (sem o nome da escola).`);
     }
-    const seriesUsed = Array.from(new Set(students.map((s) => s.series)));
-    seriesUsed.forEach((serie) => {
-      const found = findClassForSeries(targetUnit!.id, serie, allClasses, unlinkedAllowed);
+    // Uma turma por série + letra (1º ANO A, 1º ANO B...). Sem letra, uma turma por série.
+    const combos = new Map<string, { serie: string; letter: string }>();
+    students.forEach((s) => combos.set(`${s.series}|${s.classLetter || ''}`, { serie: s.series, letter: s.classLetter || '' }));
+    combos.forEach(({ serie, letter }) => {
+      const found = findClassForSeries(targetUnit!.id, serie, allClasses, unlinkedAllowed, letter);
       if (!found && filters.autoRegisterSchoolUnit) {
-        const cls = buildClassForSeries(targetUnit!, serie, filters.defaultShift || 'MANHÃ', suggestedClasses.length);
+        const cls = buildClassForSeries(targetUnit!, serie, filters.defaultShift || 'MANHÃ', suggestedClasses.length, letter);
         suggestedClasses.push(cls);
         allClasses.push(cls);
       }
     });
-    if (schoolStatus === 'CADASTRADA') {
-      suggestedClasses
-        .filter((c) => !classes.some((ex) => ex.id === c.id))
-        .forEach((c) => classesToCreate.push(c.gradeLevel));
-      if (classesToCreate.length > 0) {
-        schoolMessages.push(`Turma(s) que será(ão) criada(s) na escola: ${classesToCreate.join(', ')}.`);
-      }
-    }
   }
 
   students.forEach((std) => {
-    const cls = findClassForSeries(std.schoolUnitId, std.series, allClasses, unlinkedAllowed);
+    const cls = findClassForSeries(std.schoolUnitId, std.series, allClasses, unlinkedAllowed, std.classLetter);
     if (cls) {
       std.classId = cls.id;
       std.className = cls.name;
@@ -1353,6 +1447,42 @@ export function processSheetWithHeaders(
       std.cadastralStatus = 'INCOMPLETE';
     }
   });
+
+  // Turmas novas só entram se receberem alunos (evita turmas vazias, ex: "1º ANO" sem letra
+  // quando a planilha separa 1º ANO A, B, C). Turmas já existentes ajustadas continuam.
+  if (students.length > 0) {
+    suggestedClasses = suggestedClasses.filter(
+      (c) => classes.some((ex) => ex.id === c.id) || students.some((st) => st.classId === c.id)
+    );
+  }
+  if (targetUnit && schoolStatus === 'CADASTRADA') {
+    suggestedClasses
+      .filter((c) => !classes.some((ex) => ex.id === c.id))
+      .forEach((c) => classesToCreate.push(c.name.replace(/\s*-\s*[^-]+$/, '') || c.gradeLevel));
+    if (classesToCreate.length > 0) {
+      schoolMessages.push(`Turma(s) que será(ão) criada(s) na escola: ${classesToCreate.join(', ')}.`);
+    }
+  }
+
+  // Aluno repetido no mesmo arquivo (mesmo nome e nascimento): entra uma vez só
+  const seen = new Map<string, ParsedImportStudent>();
+  const repeated: string[] = [];
+  students.forEach((st) => {
+    const key = studentKey(st.cleanName || st.name, st.birthDate);
+    const first = seen.get(key);
+    if (first) {
+      const a = `${first.series}${first.classLetter ? ` ${first.classLetter}` : ''}`;
+      const b = `${st.series}${st.classLetter ? ` ${st.classLetter}` : ''}`;
+      repeated.push(`${st.cleanName || st.name} (${a === b ? `2 vezes no ${a}` : `${a} e ${b}`})`);
+    } else {
+      seen.set(key, st);
+    }
+  });
+  if (repeated.length > 0) {
+    warnings.push(
+      `${repeated.length} aluno(s) aparece(m) repetido(s) no arquivo e será(ão) cadastrado(s) uma vez só. Confira com a escola em qual turma ele(s) está(ão): ${repeated.join('; ')}.`
+    );
+  }
 
   if (students.length === 0) {
     errors.push('Nenhum aluno encontrado abaixo do cabeçalho da tabela.');
@@ -1488,7 +1618,16 @@ export function convertImportedStudentsToOfficial(
   const units = targetSchoolUnit ? [...allSchoolUnits, targetSchoolUnit] : allSchoolUnits;
 
   // Apenas estudantes selecionados para importação
-  const studentsToImport = importedList.filter((item) => item.selectedForImport !== false);
+  // Aluno repetido no mesmo lote (mesmo nome e nascimento) entra uma vez só
+  const seenKeys = new Set<string>();
+  const studentsToImport = importedList
+    .filter((item) => item.selectedForImport !== false)
+    .filter((item) => {
+      const key = studentKey(item.cleanName || item.name, item.birthDate);
+      if (seenKeys.has(key)) return false;
+      seenKeys.add(key);
+      return true;
+    });
 
   // RA novo = próximo número livre acima do maior já usado (antes era quantidade + posição,
   // o que repetia RAs já existentes quando havia lacunas na numeração).
@@ -1527,7 +1666,7 @@ export function convertImportedStudentsToOfficial(
     const unit = units.find((u) => u.id === unitId);
     const matchedClass =
       (item.classId ? allClasses.find((c) => c.id === item.classId) : undefined) ||
-      (effectiveSeries ? findClassForSeries(unitId, effectiveSeries, allClasses, units.length <= 1) : undefined);
+      (effectiveSeries ? findClassForSeries(unitId, effectiveSeries, allClasses, units.length <= 1, item.classLetter) : undefined);
 
     const finalSchoolName = filters.importSchoolUnit ? unit?.name || item.schoolName : '';
 
