@@ -2145,6 +2145,7 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                                         <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded font-bold text-[11px]">
                                           <GraduationCap className="h-3 w-3 text-indigo-600" />
                                           {std.series}
+                                          {std.classLetter ? ` ${std.classLetter}` : ''}
                                           {std.seriesFromFirstCol && (
                                             <span className="text-[9px] font-normal text-indigo-700">
                                               (1ª col)
