@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { isCpfPending } from '../../utils/studentDocuments';
 import {
   AlertTriangle,
   FileSpreadsheet,
@@ -51,7 +52,8 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
         s.cadastralStatus === 'NEEDS_UPDATE';
 
       const hasPendingFields = (s.pendingFields && s.pendingFields.length > 0);
-      const isMissingCpf = !s.cpf || s.cpf === '000.000.000-00';
+      // Sem CPF ou com CPF inválido: continua pendente até ser corrigido.
+      const isMissingCpf = isCpfPending(s.cpf);
       const isMissingBirth = !s.birthDate || s.birthDate === '2020-01-01' || s.birthDate === '2012-01-01';
       const isMissingAddress = !s.address || s.address.toLowerCase().includes('pendente');
       const hasMedicalPending =
@@ -104,7 +106,7 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
           s.pendingFields?.some((f) => f.toLowerCase().includes('endereço') || f.toLowerCase().includes('endereco'));
         if (!hasAddressPending) return false;
       } else if (selectedPendingType === 'CPF') {
-        const hasCpfPending = !s.cpf || s.cpf === '000.000.000-00';
+        const hasCpfPending = isCpfPending(s.cpf);
         if (!hasCpfPending) return false;
       }
 
@@ -387,7 +389,7 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
             <option value="LAUDO">Sem Laudo PCD ({stats.missingLaudoCount})</option>
             <option value="BIRTH">Sem Data de Nascimento ({stats.missingBirthCount})</option>
             <option value="ADDRESS">Sem Endereço Completo ({stats.missingAddressCount})</option>
-            <option value="CPF">Sem CPF do Aluno</option>
+            <option value="CPF">Sem CPF ou CPF inválido</option>
           </select>
         </div>
       </div>
