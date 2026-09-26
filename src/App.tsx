@@ -787,11 +787,27 @@ export default function App() {
   // Classes handler
   const handleSaveClass = (newClass: SchoolClass) => {
     setData((prev) => {
-      const exists = prev.classes.some((c) => c.id === newClass.id);
-      const updated = exists
+      const previous = prev.classes.find((c) => c.id === newClass.id);
+      const updated = previous
         ? prev.classes.map((c) => (c.id === newClass.id ? newClass : c))
         : [...prev.classes, newClass];
-      return { ...prev, classes: updated };
+      // Turma transferida para outra escola: os alunos dela vão junto (senão ficariam presos à escola antiga)
+      const movedUnit =
+        !!previous && !!newClass.schoolUnitId && (previous.schoolUnitId || '') !== newClass.schoolUnitId;
+      if (!movedUnit) return { ...prev, classes: updated };
+      const stamp = new Date().toISOString();
+      const unit = (prev.schoolUnits || []).find((u) => u.id === newClass.schoolUnitId);
+      const students = (prev.students || []).map((st) =>
+        st.classId === newClass.id
+          ? ({
+              ...st,
+              schoolUnitId: newClass.schoolUnitId,
+              schoolOriginName: unit?.name || st.schoolOriginName,
+              updatedAt: stamp,
+            } as Student)
+          : st
+      );
+      return { ...prev, classes: updated.map((c) => (c.id === newClass.id ? ({ ...c, updatedAt: stamp } as SchoolClass) : c)), students };
     });
   };
 
