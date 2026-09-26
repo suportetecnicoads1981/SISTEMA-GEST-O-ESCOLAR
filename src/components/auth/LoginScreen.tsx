@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { UserAccount, SchoolUnit, UserRole, UserSector } from '../../types';
 import { getLatestAutoBackup } from '../../data/storage';
+import { getDocumentBranding } from '../../services/documentBranding';
 import { getSupabaseClient } from '../../services/datasync/supabaseClient';
 import { getDefaultSectorPermissions } from '../usuarios/UserAccessControl';
 import {
@@ -62,7 +63,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   systemVersion = 'v5.4.0-ENTERPRISE',
   companyLogoUrl,
 }) => {
-  const [username, setUsername] = useState('master');
+  const [username, setUsername] = useState('');
+  // Tela simples (login e senha) para todos. A tela completa — lista de usuários, IP da rede,
+  // backup — só abre para o Master, depois de confirmar login e senha em "Acesso do administrador".
+  // Base sem nenhuma conta (primeira instalação) abre direto a completa.
+  const [adminPanel, setAdminPanel] = useState(() => userAccounts.length === 0);
+  const [adminGateOpen, setAdminGateOpen] = useState(false);
+  const [adminLogin, setAdminLogin] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [adminError, setAdminError] = useState('');
+  const [adminBusy, setAdminBusy] = useState(false);
   const [password, setPassword] = useState('');
   // Conta sem senha definida: exige cadastrar uma senha antes do primeiro acesso.
   const [firstAccessUser, setFirstAccessUser] = useState<UserAccount | null>(null);
@@ -351,6 +361,45 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     }
   };
 
+  /** "Acesso do administrador": confere login e senha do Master e abre a tela completa. */
+  const handleAdminGateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminError('');
+    setAdminBusy(true);
+    try {
+      const clean = adminLogin.trim().toLowerCase();
+      const isAlias = clean === 'master' || clean === 'admin';
+      const master =
+        userAccounts.find(
+          (u) =>
+            u &&
+            u.active !== false &&
+            (u.isMaster || u.sector === 'MASTER') &&
+            ((u.login && u.login.toLowerCase() === clean) || (u.email && u.email.toLowerCase() === clean))
+        ) || (isAlias ? userAccounts.find((u) => u && u.isMaster && u.active !== false) : undefined);
+      if (!master) {
+        setAdminError('Este acesso é exclusivo do administrador Master.');
+        return;
+      }
+      let ok = hasPasswordDefined(master.password) && verifyPassword(master.password, adminPassword);
+      if (!ok && master.email) {
+        const cloud = await trySupabaseSignIn(master.email.toLowerCase(), adminPassword);
+        ok = String(cloud?.user?.app_metadata?.role || '').toUpperCase() === 'ADMIN';
+      }
+      if (!ok) {
+        setAdminError('Login ou senha do administrador incorretos.');
+        return;
+      }
+      setUsername(master.login || 'master');
+      setPassword('');
+      setAdminPassword('');
+      setAdminGateOpen(false);
+      setAdminPanel(true);
+    } finally {
+      setAdminBusy(false);
+    }
+  };
+
   const handleFirstAccessSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!firstAccessUser) return;
@@ -402,6 +451,223 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     );
   }
 
+  if (!adminPanel) {
+    const brand = getDocumentBranding();
+    const leftLogo = brand.managementLogoUrl || companyLogoUrl || '';
+    const rightLogo = brand.semedLogoUrl || '';
+    const semedLine = brand.semedName || 'Secretaria Municipal de Educação';
+    const cityLine = brand.cityName ? `${brand.cityName}${brand.stateCode ? ` – ${brand.stateCode}` : ''}` : '';
+    const inputCls =
+      'w-full px-4 py-3 rounded-xl bg-slate-800/90 border border-slate-700 text-slate-100 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-hidden';
+    return (
+      <div className="min-h-screen w-full bg-linear-to-br from-slate-950 via-slate-900 to-indigo-950 flex items-center justify-center p-4 relative overflow-hidden font-sans text-slate-100">
+        <div className="absolute top-[-15%] left-[-10%] w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[140px] pointer-events-none" />
+        <div className="absolute bottom-[-15%] right-[-10%] w-[500px] h-[500px] bg-sky-600/15 rounded-full blur-[140px] pointer-events-none" />
+        <button
+          type="button"
+          onClick={handleExitLogin}
+          className="absolute top-3 right-3 sm:top-5 sm:right-5 z-20 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-rose-600 border border-slate-700 hover:border-rose-500 text-slate-300 hover:text-white text-xs font-semibold transition-all cursor-pointer"
+          title="Sair / Fechar"
+        >
+          <X className="h-4 w-4" />
+          <span className="hidden sm:inline">Fechar</span>
+        </button>
+
+        <div className="w-full max-w-md rounded-3xl bg-slate-900/90 border border-slate-800 shadow-2xl backdrop-blur-2xl p-6 sm:p-8 z-10">
+          {/* Cabeçalho com as logos da Gestão e da SEMED */}
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <div className="h-14 w-14 shrink-0 flex items-center justify-center">
+              {leftLogo ? <img src={leftLogo} alt="Gestão Municipal" className="max-h-14 max-w-14 object-contain" /> : null}
+            </div>
+            <div className="flex flex-col items-center text-center min-w-0">
+              <img src="/favicon.svg" alt="SucessoEdu" className="h-10 w-10 rounded-xl shadow-lg shadow-indigo-500/25 mb-1" />
+              <h1 className="text-lg font-bold text-white tracking-tight">SucessoEdu</h1>
+            </div>
+            <div className="h-14 w-14 shrink-0 flex items-center justify-center">
+              {rightLogo ? <img src={rightLogo} alt="SEMED" className="max-h-14 max-w-14 object-contain" /> : null}
+            </div>
+          </div>
+          <p className="text-center text-xs text-slate-300 font-semibold">{semedLine}</p>
+          <p className="text-center text-xs text-slate-400 mb-6">{cityLine}</p>
+
+          {errorMsg && !adminGateOpen && (
+            <div className="mb-4 p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {adminGateOpen ? (
+            <form onSubmit={handleAdminGateSubmit} className="space-y-4" data-testid="admin-gate">
+              <div className="p-3 rounded-xl bg-indigo-950/60 border border-indigo-500/30 text-xs text-indigo-200 flex items-start gap-2">
+                <ShieldCheck className="h-4 w-4 text-indigo-300 shrink-0 mt-0.5" />
+                <span>Acesso exclusivo do administrador Master: abre a tela completa, com a lista de usuários e os dados da rede.</span>
+              </div>
+              {adminError && (
+                <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs">{adminError}</div>
+              )}
+              <input
+                type="text"
+                required
+                autoFocus
+                autoComplete="username"
+                placeholder="Login do administrador"
+                value={adminLogin}
+                onChange={(e) => setAdminLogin(e.target.value)}
+                className={inputCls}
+              />
+              <input
+                type="password"
+                required
+                autoComplete="current-password"
+                placeholder="Senha"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                className={inputCls}
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminGateOpen(false);
+                    setAdminError('');
+                    setAdminPassword('');
+                  }}
+                  className="px-4 py-3 rounded-xl bg-slate-700/80 hover:bg-slate-700 text-slate-300 text-sm font-semibold cursor-pointer"
+                >
+                  Voltar
+                </button>
+                <button
+                  type="submit"
+                  disabled={adminBusy}
+                  className="flex-1 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-bold text-sm cursor-pointer"
+                >
+                  {adminBusy ? 'Conferindo...' : 'Abrir tela do administrador'}
+                </button>
+              </div>
+            </form>
+          ) : firstAccessUser ? (
+            <form onSubmit={handleFirstAccessSubmit} className="space-y-4">
+              <div className="p-3 rounded-xl bg-amber-950/50 border border-amber-500/40 text-xs text-amber-200 flex items-start gap-2">
+                <Key className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                <span>
+                  Primeiro acesso de <strong>{firstAccessUser.name}</strong>. Cadastre a sua senha pessoal (mínimo de{' '}
+                  {MIN_PASSWORD_LENGTH} caracteres) para continuar.
+                </span>
+              </div>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                autoFocus
+                autoComplete="new-password"
+                placeholder="Nova senha"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className={inputCls}
+              />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                autoComplete="new-password"
+                placeholder="Confirmar nova senha"
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+                className={inputCls}
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFirstAccessUser(null);
+                    setErrorMsg('');
+                  }}
+                  className="px-4 py-3 rounded-xl bg-slate-700/80 hover:bg-slate-700 text-slate-300 text-sm font-semibold cursor-pointer"
+                >
+                  Voltar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm cursor-pointer flex items-center justify-center gap-2"
+                >
+                  Definir senha e entrar <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form onSubmit={handleLoginSubmit} className="space-y-4" data-testid="simple-login">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Login ou e-mail</label>
+                <div className="relative">
+                  <User className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    autoComplete="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className={`${inputCls} pl-10`}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Senha</label>
+                <div className="relative">
+                  <Lock className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={`${inputCls} pl-10 pr-10`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
+                    title={showPassword ? 'Esconder senha' : 'Mostrar senha'}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-3 rounded-xl bg-linear-to-r from-indigo-600 via-indigo-500 to-sky-600 hover:from-indigo-500 hover:to-sky-500 disabled:opacity-60 text-white font-bold text-sm shadow-lg cursor-pointer flex items-center justify-center gap-2"
+              >
+                {isLoading ? 'Entrando...' : 'Entrar'}
+                {!isLoading && <ArrowRight className="h-4 w-4" />}
+              </button>
+              <p className="text-[11px] text-slate-400 text-center leading-relaxed">
+                Primeiro acesso? Digite o seu login e clique em Entrar para cadastrar a sua senha.
+                <br />
+                Esqueceu a senha? Procure a secretaria ou o administrador do sistema.
+              </p>
+            </form>
+          )}
+
+          <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
+            <span>{systemVersion}</span>
+            {!adminGateOpen && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAdminGateOpen(true);
+                  setAdminError('');
+                  setErrorMsg('');
+                }}
+                className="text-slate-400 hover:text-indigo-300 underline-offset-2 hover:underline cursor-pointer"
+              >
+                Acesso do administrador
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen w-full bg-linear-to-br from-slate-950 via-slate-900 to-indigo-950 flex items-center justify-center p-3 sm:p-6 lg:p-8 relative overflow-hidden font-sans text-slate-100">
       {/* Decorative Ambient Background Lights */}
@@ -418,6 +684,24 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         <X className="h-4 w-4" />
         <span className="hidden sm:inline">Fechar</span>
       </button>
+
+      {userAccounts.length > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            setAdminPanel(false);
+            setUsername('');
+            setPassword('');
+            setErrorMsg('');
+            setSelectedUserForLogin(null);
+          }}
+          className="absolute top-3 left-3 sm:top-5 sm:left-5 z-20 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition-all cursor-pointer"
+          title="Voltar para a tela de login simples"
+        >
+          <ArrowRight className="h-4 w-4 rotate-180" />
+          <span className="hidden sm:inline">Login simples</span>
+        </button>
+      )}
 
       <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 rounded-3xl bg-slate-900/85 border border-slate-800/80 shadow-2xl backdrop-blur-2xl overflow-hidden z-10">
         
