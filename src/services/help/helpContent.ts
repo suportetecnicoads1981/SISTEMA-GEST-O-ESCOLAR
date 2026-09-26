@@ -147,6 +147,36 @@ export const HELP_MODULES: HelpModule[] = [
         ],
         tip: 'No Word, cada tabela deve ter um título com a série (ex.: "1º ANO"). Arquivos com escola principal e escolas anexas são separados por escola.',
       },
+      {
+        q: 'Como a importação separa as turmas A, B, C de uma mesma série?',
+        a: 'Pela letra escrita logo depois da série: no título da tabela ("1º ANO A Nº", "3 ANO B") ou na linha acima dela ("TURMA: PRÉ-ESCOLA I C"). Cada letra vira uma turma própria (ex.: "1º ANO A - MANHÃ", "1º ANO B - MANHÃ"). Sem letra, a série fica numa turma só.',
+        tip: 'O turno não vem nos levantamentos: as turmas entram como MANHÃ. Para as turmas da tarde, abra Turmas & Matrizes, clique em editar e troque o turno.',
+      },
+      {
+        q: 'Importei antes da correção e as turmas A, B, C ficaram juntas. Como arrumo?',
+        steps: [
+          'Importe de novo o mesmo arquivo da escola. Não precisa apagar nada.',
+          'Na conferência, o rodapé mostra que os alunos "já cadastrados" serão atualizados, sem duplicar.',
+          'Confirme: cada aluno vai para a turma da letra dele (1º ANO A, B, C...).',
+          'Em Turmas & Matrizes, exclua as turmas antigas sem letra, que ficaram vazias.',
+        ],
+      },
+      {
+        q: 'Um aluno aparece repetido no arquivo. O que acontece?',
+        a: 'Aluno com o mesmo nome e a mesma data de nascimento entra uma vez só. A conferência avisa quem está repetido e em quais turmas, para você confirmar com a escola em qual turma ele realmente estuda.',
+      },
+      {
+        q: 'A mesma escola apareceu duas vezes com nomes diferentes. Como junto?',
+        a: 'A importação entende que EMEIF, E.M.E.I.F e "Escola Municipal de Ensino Infantil e Fundamental" são a mesma coisa (o mesmo vale para EMEF e EMEI), então isso não se repete nas próximas importações.',
+        steps: [
+          'Em Turmas & Matrizes, edite cada turma da escola repetida e troque a Escola para a escola correta. Os alunos da turma vão junto.',
+          'Com a escola repetida sem turmas e sem alunos, remova-a em Rede Municipal & Polos.',
+        ],
+      },
+      {
+        q: 'O arquivo tem uma escola anexa. Ela é importada separada?',
+        a: 'Sim. Uma linha "ESCOLA ANEXO: nome" ou só "ANEXO nome" antes das tabelas abre a escola anexa. Ela vira uma escola própria, ligada à escola principal, com as turmas e os alunos dela.',
+      },
       { q: 'Como edito ou corrijo o cadastro de um aluno?', a: 'Na lista, clique no lápis (Editar) na linha do aluno, altere e salve.' },
       { q: 'Como encontro alunos com pendências no Censo?', a: 'Use o atalho "Pendências Censo" acima da lista, ou "Mais Filtros" > Situação Cadastral. Clique em "Completar" para corrigir o que falta.' },
       { q: 'Como imprimo ou exporto a lista?', a: 'Filtre a lista como quiser e clique em "Imprimir lista filtrada" ou "Exportar CSV".' },
@@ -168,6 +198,7 @@ export const HELP_MODULES: HelpModule[] = [
       { q: 'Como cadastro uma turma?', steps: ['Clique em "Cadastrar Nova Turma".', 'Informe escola, série, turno, sala e capacidade.', 'Salve.'], tip: 'Use sempre o mesmo padrão de série (ex.: "1º ANO"). Provas e relatórios agrupam as turmas pela série.' },
       { q: 'Por que a lista de disciplinas das provas está incompleta?', a: 'As disciplinas vêm da Matriz Curricular. Cadastre aqui as disciplinas oficiais da rede. Enquanto isso, o sistema oferece os componentes padrão da BNCC.' },
       { q: 'Como vejo as vagas livres?', a: 'A tabela mostra matriculados, capacidade e vagas remanescentes de cada turma.' },
+      { q: 'Se eu trocar a escola de uma turma, os alunos vão junto?', a: 'Sim. Ao editar a turma e escolher outra escola, todos os alunos matriculados nela passam para a nova escola. Use isso para juntar uma escola que entrou repetida na importação.' },
     ],
   },
   {
