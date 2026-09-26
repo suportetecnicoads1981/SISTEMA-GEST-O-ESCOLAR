@@ -408,6 +408,21 @@ export const HELP_MODULES: HelpModule[] = [
       },
       { q: 'Como instalo uma estação (outro computador da escola)?', a: 'Baixe o "Pacote da Estação (.ZIP)", rode INSTALAR_ESTACAO.bat no computador e informe a chave de acesso do servidor no primeiro acesso.' },
       { q: 'Como atualizo o servidor?', steps: ['Clique em "Verificar atualização agora" e aguarde de 1 a 3 minutos.', 'Quando aparecer a data de hoje em "Versão baixada e conferida", clique em "Aplicar atualização" > "Aplicar agora".', 'Aperte F5.'] },
+      {
+        q: 'O atalho está com o ícone do navegador, e não com o do SucessoEdu',
+        a: 'O ícone do SucessoEdu (capelo com a seta verde) entra no atalho quando o servidor ou a estação é instalado com um pacote gerado a partir de 26/09/2026. Para trocar num computador já instalado, gere um pacote novo e rode o instalador de novo: os dados são mantidos.',
+        tip: 'Se o ícone antigo continuar aparecendo, reinicie o computador: o Windows guarda os ícones em memória por um tempo.',
+      },
+      {
+        q: 'Como removo completamente o sistema de um computador?',
+        steps: [
+          'Abra o PowerShell como administrador (botão Iniciar, digite PowerShell, botão direito > Executar como administrador).',
+          'Pare e apague as tarefas: schtasks /End /TN "SucessoEdu Servidor" e schtasks /Delete /TN "SucessoEdu Servidor" /F (repita para "SucessoEdu Atualizador").',
+          'Apague a pasta C:\\SucessoEdu e o atalho da Área de Trabalho.',
+          'No navegador, abra o sistema, aperte F12 > Application > Storage > Clear site data.',
+        ],
+        tip: 'A pasta C:\\SucessoEdu\\data guarda o banco. Copie antes para um pendrive se quiser manter os dados.',
+      },
       { q: 'Um computador só pode ter um servidor?', a: 'Sim. Se já existe a pasta C:\\SucessoEdu, o computador já tem um servidor. Não instale outro tipo por cima sem orientação.' },
       { q: 'Como faço cópia de segurança?', a: 'O servidor guarda cópias automáticas em C:\\SucessoEdu\\data\\historico. Copie a pasta C:\\SucessoEdu\\data para um pendrive de tempos em tempos.' },
     ],
