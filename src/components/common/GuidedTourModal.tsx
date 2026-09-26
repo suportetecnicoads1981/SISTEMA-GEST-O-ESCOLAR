@@ -16,8 +16,39 @@ import {
 
 interface GuidedTourModalProps {
   isOpen: boolean;
-  onClose: () => void;
+  /** neverShowAgain = true quando o usuário marcou "Não mostrar mais ao entrar". */
+  onClose: (neverShowAgain: boolean) => void;
   onNavigate?: (tabId: string) => void;
+}
+
+// A escolha "Não mostrar mais" fica no navegador (localStorage) e, como reserva, num cookie:
+// com o banco local grande o localStorage pode ficar cheio e recusar a gravação.
+const TOUR_KEY = 'sucessoedu_tour_seen';
+
+export function isTourDismissed(): boolean {
+  try {
+    if (localStorage.getItem(TOUR_KEY) === 'true') return true;
+  } catch {
+    /* sem armazenamento */
+  }
+  try {
+    return typeof document !== 'undefined' && document.cookie.split(';').some((c) => c.trim() === `${TOUR_KEY}=true`);
+  } catch {
+    return false;
+  }
+}
+
+export function dismissTourForever(): void {
+  try {
+    localStorage.setItem(TOUR_KEY, 'true');
+  } catch {
+    /* localStorage cheio: fica o cookie */
+  }
+  try {
+    document.cookie = `${TOUR_KEY}=true; max-age=${60 * 60 * 24 * 3650}; path=/; SameSite=Lax`;
+  } catch {
+    /* sem cookie */
+  }
 }
 
 interface TourStep {
@@ -103,6 +134,8 @@ const TOUR_STEPS: TourStep[] = [
 
 export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({ isOpen, onClose, onNavigate }) => {
   const [currentStep, setCurrentStep] = useState(0);
+  const [neverShow, setNeverShow] = useState(true);
+  const close = () => onClose(neverShow);
 
   if (!isOpen) return null;
 
@@ -115,7 +148,7 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({ isOpen, onClos
       onNavigate(step.targetTab);
     }
     if (isLast) {
-      onClose();
+      close();
     } else {
       setCurrentStep((prev) => prev + 1);
     }
@@ -139,7 +172,7 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({ isOpen, onClos
             </span>
           </div>
           <button
-            onClick={onClose}
+            onClick={close}
             className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
             title="Fechar Tour"
           >
@@ -184,6 +217,19 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({ isOpen, onClos
           </div>
         </div>
 
+        {/* Não mostrar mais (o tour continua disponível no botão "Tour Guiado" do topo) */}
+        <div className="px-6 pb-3 flex justify-center">
+          <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={neverShow}
+              onChange={(e) => setNeverShow(e.target.checked)}
+              className="accent-indigo-500 cursor-pointer h-3.5 w-3.5"
+            />
+            Não mostrar mais ao entrar (continua no botão "Tour Guiado" do topo)
+          </label>
+        </div>
+
         {/* Footer Actions */}
         <div className="px-6 py-4 bg-slate-950/80 border-t border-slate-800 flex items-center justify-between">
           <button
@@ -197,7 +243,7 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({ isOpen, onClos
 
           <div className="flex items-center gap-2">
             <button
-              onClick={onClose}
+              onClick={close}
               className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             >
               Pular Tour
