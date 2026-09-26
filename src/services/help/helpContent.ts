@@ -86,7 +86,7 @@ export const HELP_MODULES: HelpModule[] = [
   {
     id: 'NOTIFICATIONS',
     title: 'Central de Notificações',
-    where: 'Menu > Visão Geral & Notificações (Alt+N)',
+    where: 'Menu > Comunicação & Avisos > Central de Notificações (Alt+N)',
     summary: 'Avisos do sistema: resultados de provas, atualizações e comunicados.',
     faq: [
       { q: 'Como marco os avisos como lidos?', a: 'Clique no aviso para marcá-lo, ou use "Marcar todas como lidas" no sino do alto da tela.' },
@@ -319,7 +319,7 @@ export const HELP_MODULES: HelpModule[] = [
   {
     id: 'COMMUNICATION',
     title: 'Comunicados & Avisos',
-    where: 'Botão Início (rodapé) > Mural & Mensagens',
+    where: 'Menu > Comunicação & Avisos > Mural de Comunicados & Mensagens (ou botão Início > Mural & Mensagens)',
     summary: 'Mural de comunicados para professores, alunos e famílias, com anexos e confirmação de leitura.',
     faq: [
       { q: 'Como publico um comunicado?', steps: ['Clique em "Novo Comunicado".', 'Escolha o público e escreva a mensagem (ou use um dos "Modelos Prontos").', 'Anexe arquivos se quiser e marque "Exigir Confirmação de Leitura" se precisar.', 'Publique.'] },
@@ -338,8 +338,8 @@ export const HELP_MODULES: HelpModule[] = [
   },
   {
     id: 'WHATSAPP',
-    title: 'Central de WhatsApp',
-    where: 'Mural & Mensagens > botão "Central de WhatsApp"',
+    title: 'WhatsApp para Pais & Equipe',
+    where: 'Menu > Comunicação & Avisos > WhatsApp para Pais & Equipe (ou pelo Mural, no botão "Enviar por WhatsApp")',
     summary:
       'Envio assistido: o sistema monta a lista e abre cada conversa com a mensagem pronta; você aperta Enviar no WhatsApp da escola.',
     faq: [
@@ -354,6 +354,16 @@ export const HELP_MODULES: HelpModule[] = [
         ],
         tip: 'Irmãos com o mesmo telefone do responsável recebem uma só mensagem, com os nomes juntos.',
       },
+      {
+        q: 'O botão "Preparar envio" está apagado e não faz nada',
+        a: 'Logo abaixo do botão aparece, em laranja, o que está faltando. Os motivos possíveis são: público não escolhido em "1. Para quem" (a turma ou o aluno); ninguém da escolha tem telefone cadastrado; mensagem em branco; ou um campo do modelo ainda sem valor, como {{data_reuniao}} ou {{horario}}. Resolva o que a mensagem pede e o botão libera.',
+        tip: 'Para um teste rápido: escolha "Um aluno" que tenha telefone, clique no modelo "Comunicado geral" e complete o texto.',
+      },
+      {
+        q: 'O modelo tem {{data_reuniao}}, {{horario}} ou {{prazo}}. O que faço?',
+        a: 'Esses campos o sistema não sabe preencher sozinho. Troque cada um pelo valor real no texto (por exemplo, {{data_reuniao}} por 10/10). Nome do aluno, responsável, turma, escola, telefone da escola e data de hoje são preenchidos automaticamente.',
+      },
+      { q: 'Preciso conectar alguma conta de WhatsApp no sistema?', a: 'Não. O sistema usa o WhatsApp de quem está operando. Basta deixar o WhatsApp Web conectado no computador (leia o QR Code com o celular da escola uma vez) ou usar o aplicativo WhatsApp do computador.' },
       { q: 'O sistema envia sozinho?', a: 'Não. Ele prepara e abre cada conversa; quem envia é você, no WhatsApp. Por isso o histórico mostra "Aberto no WhatsApp", e não "entregue" ou "lido".' },
       { q: 'Preciso de alguma instalação?', a: 'Não. Use o WhatsApp Web conectado com o celular da escola (QR Code) ou o aplicativo WhatsApp do computador. Escolha em "Ajustes".' },
       { q: 'Por que alguns alunos aparecem "sem telefone"?', a: 'O telefone do responsável não está cadastrado ou está incompleto (falta o DDD). Corrija em Secretaria & Alunos, ou reimporte a planilha com a coluna WhatsApp/Telefone. Telefones de professores e equipe ficam em Usuários & Permissões.' },
