@@ -793,13 +793,13 @@ const ReportsSection: React.FC<{
             )}
             <div className="space-y-1.5 pt-2 border-t border-slate-100">
               <button
-                onClick={() => triggerPrint(html, { title: `Relatório de Habilidades BNCC - ${displayClassName(selectedClass)}`, documentCategory: 'RELATÓRIO DE HABILIDADES BNCC', schoolName })}
+                onClick={() => triggerPrint(html, { title: `Relatório de Habilidades BNCC - ${displayClassName(selectedClass)}`, documentCategory: 'RELATÓRIO DE HABILIDADES BNCC', schoolName, classId: selectedClass?.id })}
                 className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer"
               >
                 <Printer className="h-4 w-4" /> Imprimir / salvar PDF
               </button>
               <button
-                onClick={() => downloadWordDoc(fileBase, html)}
+                onClick={() => downloadWordDoc(fileBase, html, { classId: selectedClass?.id, schoolName })}
                 className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 font-semibold cursor-pointer"
               >
                 <FileDown className="h-4 w-4" /> Baixar para Word (.doc)
