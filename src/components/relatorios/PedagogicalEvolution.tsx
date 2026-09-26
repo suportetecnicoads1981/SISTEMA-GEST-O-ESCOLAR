@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { DocumentLetterhead } from '../common/DocumentLetterhead';
 import {
   TrendingUp,
   Award,
@@ -376,6 +377,10 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Timbre padrão: aparece só na impressão */}
+      <div className="hidden print:block">
+        <DocumentLetterhead classId={selectedClassId !== 'ALL' ? selectedClassId : undefined} />
+      </div>
       {/* Module Top Navigation Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
         <div className="flex items-center gap-2">
