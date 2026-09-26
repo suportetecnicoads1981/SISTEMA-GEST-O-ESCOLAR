@@ -1101,6 +1101,8 @@ END $$;
             phone: u.phone || null,
             email: u.email || null,
             active: u.active !== undefined ? u.active : true,
+            logo_url: u.logoUrl || null,
+            management_logo_url: u.managementLogoUrl || null,
           }))
         ) 
       },
@@ -1151,6 +1153,7 @@ END $$;
             principal_name: s.principalName || null,
             secretary_name: s.secretaryName || null,
             logo_url: s.logoUrl || null,
+            management_logo_url: s.managementLogoUrl || null,
             neighborhood: s.neighborhood || null,
             zip_code: s.zipCode || null,
             website: s.website || null,
