@@ -258,6 +258,23 @@ export const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({
   const audienceReady =
     (kind === 'ALUNO' && !!studentId) || (kind === 'TURMA' && !!classId) || kind === 'ESCOLA' || kind === 'PROFISSIONAIS';
 
+  // Motivo de o botão "Preparar envio" estar desativado (mostrado logo abaixo dele).
+  const prepareBlockedReason = !audienceReady
+    ? kind === 'ALUNO'
+      ? 'Escolha o aluno em "1. Para quem".'
+      : 'Escolha a turma em "1. Para quem".'
+    : recipients.length === 0
+    ? 'Nenhum destinatário encontrado para essa escolha.'
+    : withPhone.length === 0
+    ? kind === 'PROFISSIONAIS'
+      ? 'Nenhum profissional dessa escolha tem telefone. Cadastre o telefone em Usuários & Permissões.'
+      : `Nenhum ${contact === 'ALUNO' ? 'aluno' : 'responsável'} dessa escolha tem telefone. Cadastre o telefone no cadastro do aluno.`
+    : !body.trim()
+    ? 'Escreva a mensagem ou escolha um modelo em "2. Mensagem".'
+    : pendingVars.length > 0
+    ? `Troque no texto: ${pendingVars.join(', ')}.`
+    : '';
+
   const prepare = () => {
     if (!body.trim() || withPhone.length === 0) return;
     setSession({
@@ -611,6 +628,12 @@ export const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({
               <ListChecks className="h-4 w-4" />
               {withPhone.length > 0 ? `Preparar envio (${withPhone.length} mensagem${withPhone.length > 1 ? 's' : ''})` : 'Preparar envio'}
             </button>
+            {prepareBlockedReason && (
+              <p role="status" className="-mt-1 text-xs font-semibold text-amber-700 flex items-start gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <span>{prepareBlockedReason}</span>
+              </p>
+            )}
           </div>
 
           {/* Prévia */}
