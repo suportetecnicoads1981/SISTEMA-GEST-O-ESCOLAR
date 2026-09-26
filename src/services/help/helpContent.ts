@@ -41,6 +41,28 @@ export const HELP_GENERAL: HelpModule = {
       a: 'Clique no botão "Tira-dúvidas" no alto da tela ou aperte F1. Ele abre nas perguntas do módulo em que você está. Use a busca para procurar em todos os módulos.',
     },
     {
+      q: 'Como entro no sistema?',
+      steps: [
+        'Na tela de login, digite o seu login (ou e-mail) e a sua senha e clique em "Entrar".',
+        'Primeiro acesso: digite o login e clique em "Entrar"; o sistema pede para você cadastrar a sua senha.',
+        'Esqueceu a senha? Procure a secretaria ou o administrador do sistema.',
+      ],
+      tip: 'A tela completa, com a lista de usuários, o IP da rede e o último backup, é só do administrador Master: clique em "Acesso do administrador" e confirme o login e a senha dele. "Login simples" volta para a tela normal.',
+    },
+    {
+      q: 'Como faço o Tour Guiado parar de aparecer toda vez que entro?',
+      a: 'No Tour Guiado, deixe marcada a opção "Não mostrar mais ao entrar" e feche (ou conclua) o tour. Quando quiser rever, clique no botão "Tour Guiado" no alto da tela.',
+    },
+    {
+      q: 'O selo do rodapé mostra "sem resposta (rede local)". É falta de internet?',
+      a: 'Não. Esse aviso é sobre o servidor desta rede: o programa SucessoEdu que roda no computador da Sede (ou da escola). A internet aparece separada, na linha "Nuvem" do mesmo quadro. Um atraso rápido não gera mais o aviso: ele só aparece se o servidor ficar sem responder por alguns segundos seguidos.',
+      steps: [
+        'Espere alguns segundos: com o banco grande, o servidor pode demorar numa gravação e volta sozinho.',
+        'Se continuar, confira se o computador servidor está ligado e na mesma rede.',
+        'Ainda sem resposta: reinicie o computador servidor. Nada se perde; as alterações ficam guardadas na estação e são enviadas quando o servidor voltar.',
+      ],
+    },
+    {
       q: 'Como saio do sistema com segurança?',
       steps: ['Clique em "Sair do Sistema" no fim do menu lateral.', 'Na tela de login, o botão "Fechar" encerra a janela.'],
       tip: 'Se o navegador não deixar fechar sozinho, aparece a tela "Sessão encerrada": feche a janela no X ou com Alt+F4 (aba do navegador: Ctrl+W).',
@@ -198,7 +220,8 @@ export const HELP_MODULES: HelpModule[] = [
       { q: 'Como cadastro uma turma?', steps: ['Clique em "Cadastrar Nova Turma".', 'Informe escola, série, turno, sala e capacidade.', 'Salve.'], tip: 'Use sempre o mesmo padrão de série (ex.: "1º ANO"). Provas e relatórios agrupam as turmas pela série.' },
       { q: 'Por que a lista de disciplinas das provas está incompleta?', a: 'As disciplinas vêm da Matriz Curricular. Cadastre aqui as disciplinas oficiais da rede. Enquanto isso, o sistema oferece os componentes padrão da BNCC.' },
       { q: 'Como vejo as vagas livres?', a: 'A tabela mostra matriculados, capacidade e vagas remanescentes de cada turma.' },
-      { q: 'Se eu trocar a escola de uma turma, os alunos vão junto?', a: 'Sim. Ao editar a turma e escolher outra escola, todos os alunos matriculados nela passam para a nova escola. Use isso para juntar uma escola que entrou repetida na importação.' },
+      { q: 'Se eu trocar a escola de uma turma, os alunos vão junto?', a: 'Sim. Ao editar a turma e escolher outra escola, todos os alunos matriculados nela passam para a nova escola. Use isso para juntar uma escola que entrou repetida na importação.', tip: 'Se a turma já foi trocada antes e os alunos ficaram na escola antiga, basta abrir a turma, clicar em editar e salvar de novo: os alunos acompanham a escola da turma.' },
+      { q: 'Como vejo só as turmas de uma escola, de uma série ou de um ano letivo?', a: 'Use os filtros acima da lista: Escola, Série, Ano letivo e Turno. Eles podem ser combinados (ex.: escola ZILDA + série 1º ANO). "Limpar filtros" mostra tudo de novo. A impressão e o CSV saem com os filtros aplicados.' },
     ],
   },
   {
