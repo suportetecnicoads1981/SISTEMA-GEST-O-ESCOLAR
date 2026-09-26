@@ -241,6 +241,13 @@ export async function buildStationPackage(serverIp: string, port: number, access
   const zip = new JSZip();
   const root = zip.folder('SucessoEdu_Estacao')!;
   for (const script of STATION_SCRIPTS) root.file(script, crlf(await fetchText(`/offline/${script}`)));
+  // Ícone do atalho (opcional: sem ele o atalho usa o ícone do navegador).
+  try {
+    const ico = await fetch('/sucessoedu.ico', { cache: 'no-store' });
+    if (ico.ok) root.file('sucessoedu.ico', await ico.arrayBuffer());
+  } catch {
+    /* segue sem o ícone */
+  }
   root.file('estacao.json', JSON.stringify({ serverIp: serverIp.trim(), port, accessKey: accessKey.trim().toUpperCase() }, null, 2));
   root.file(
     'LEIA-ME.txt',
