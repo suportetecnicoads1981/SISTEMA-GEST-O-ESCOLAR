@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  GraduationCap,
   Wifi,
   WifiOff,
   Printer,
@@ -275,9 +274,11 @@ export const Header: React.FC<HeaderProps> = ({
           className="flex items-center gap-2.5 cursor-pointer select-none shrink-0 group"
           title="Ir para a Visão Geral do Sistema"
         >
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform shrink-0">
-            <GraduationCap className="h-5 w-5" />
-          </div>
+          <img
+            src="/favicon.svg"
+            alt="SucessoEdu"
+            className="h-9 w-9 rounded-xl shadow-xs group-hover:scale-105 transition-transform shrink-0"
+          />
           <div className="text-left leading-tight">
             <div className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-2">
               <span>SucessoEdu</span>
