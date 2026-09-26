@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { DocumentLetterhead } from '../common/DocumentLetterhead';
 import {
   X,
   Printer,
@@ -177,6 +178,7 @@ export const ExamAnswerKeyModal: React.FC<ExamAnswerKeyModalProps> = ({
         {/* Printable Document Body */}
         <div className="flex-1 overflow-y-auto p-6 sm:p-8 bg-slate-50 print:bg-white print:p-0">
           {/* INSTITUTIONAL HEADER (appears on all printed views) */}
+          <DocumentLetterhead classId={exam.classId || schoolClass?.id} className="bg-white px-6 pt-4 print:p-0" />
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs mb-6 print:rounded-none print:border-b-2 print:border-black print:p-4 print:shadow-none">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-200 pb-4 print:border-black print:pb-2">
               <div className="flex items-center gap-3">
