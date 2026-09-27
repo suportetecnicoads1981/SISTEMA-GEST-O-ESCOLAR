@@ -102,7 +102,7 @@ export const HELP_GENERAL: HelpModule = {
     },
     {
       q: 'A nuvem fica em "enviando..." e o número de matrícula (RA) de alguns alunos muda sozinho. Por quê?',
-      a: 'A nuvem não aceita dois alunos com o mesmo RA. Quando isso acontece, o sistema dá o número ao aluno cadastrado primeiro e um número novo ao outro. Todos os computadores fazem essa escolha da mesma forma, então depois de uma ou duas sincronizações os números param de mudar. Se continuar em "enviando..." por mais de 15 minutos, avise o suporte.',
+      a: 'A nuvem não aceita dois alunos com o mesmo RA. Quando um aluno chega com um RA que já pertence a outro aluno na nuvem, quem já estava lá fica com o número e o que chegou recebe o mesmo número com uma terminação, por exemplo "RA-2026-0364-R8KNM". Essa terminação é sempre a mesma para aquele aluno, então os números param de mudar. Se quiser, corrija o RA desse aluno pela ficha. Se a nuvem continuar em "enviando..." por mais de 15 minutos, avise o suporte.',
       tip: 'Evite deixar o sistema aberto em duas janelas no mesmo computador: cada janela é tratada como uma estação separada.',
     },
     {

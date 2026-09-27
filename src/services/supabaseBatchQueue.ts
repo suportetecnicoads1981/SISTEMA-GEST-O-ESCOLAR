@@ -48,6 +48,12 @@ const DLQ_PERSISTENCE_KEY = 'sucessoedu_supabase_batch_dlq_v2';
 
 class SupabaseBatchQueue {
   private queue: Map<string, Map<string, QueuedBatchItem>> = new Map();
+  /**
+   * Versão (texto) de cada registro já aceita pela nuvem nesta sessão. A tela chama o envio
+   * com a lista inteira a cada mudança (ex: 2.011 alunos); só o que mudou de verdade entra
+   * na fila. Antes, todos eram regravados a cada poucos segundos, deixando a tela lenta.
+   */
+  private sentSig: Map<string, string> = new Map();
   private deadLetterQueue: DeadLetterBatchItem[] = [];
   private timer: any = null;
   private isFlushing = false;
@@ -140,6 +146,13 @@ class SupabaseBatchQueue {
       const recordId = record?.id || `temp_${table}_${idx}_${now}_${Math.random().toString(36).substring(2, 7)}`;
 
       const existingItem = tableMap.get(recordId);
+      let sig = '';
+      try {
+        sig = JSON.stringify(record);
+      } catch {
+        sig = '';
+      }
+      if (!existingItem && sig && this.sentSig.get(`${table}:${recordId}`) === sig) continue;
       const retryCount = existingItem ? existingItem.retryCount : 0;
 
       tableMap.set(recordId, {
@@ -444,12 +457,27 @@ class SupabaseBatchQueue {
         if (res.error || !Array.isArray(res.data)) return;
         data.push(...res.data);
       }
+      const inPayload = new Set(payload.map((r) => String(r?.id)));
       for (const remote of data) {
         if (seen.get(remote.registration_number) === remote.id) continue;
-        await supabase
-          .from('students')
-          .update({ registration_number: `${remote.registration_number}-DUP-${String(remote.id).slice(-6)}` })
-          .eq('id', remote.id);
+        if (inPayload.has(String(remote.id))) {
+          // Quem ocupa o número também está neste envio com outro RA: libera o número só até
+          // o envio terminar (o registro recebe o RA novo no mesmo envio).
+          await supabase
+            .from('students')
+            .update({ registration_number: `${remote.registration_number}-DUP-${String(remote.id).slice(-6)}` })
+            .eq('id', remote.id);
+          continue;
+        }
+        // Quem já está na nuvem com o número fica com ele. O aluno que chega recebe um RA
+        // derivado do próprio id (sempre o mesmo em qualquer computador), sem mexer no outro.
+        // Antes a nuvem marcava o outro aluno como "-DUP-", as estações renumeravam e o
+        // conflito voltava num vai e vem sem fim.
+        for (const row of payload) {
+          if (row?.registration_number === remote.registration_number && String(row.id) !== String(remote.id)) {
+            row.registration_number = `${remote.registration_number}-R${stableTag(String(row.id))}`;
+          }
+        }
       }
     } catch (err) {
       console.warn('[SupabaseBatchQueue] Não foi possível liberar RAs em conflito:', err);
@@ -490,7 +518,13 @@ class SupabaseBatchQueue {
     if (!tableMap) return;
 
     for (const item of items) {
-      tableMap.delete(item.id);
+      try {
+        this.sentSig.set(`${table}:${item.id}`, JSON.stringify(item.data));
+      } catch {
+        /* sem assinatura: será reenviado na próxima mudança */
+      }
+      // Só tira da fila se não chegou uma versão mais nova enquanto esta era enviada.
+      if (tableMap.get(item.id) === item) tableMap.delete(item.id);
     }
 
     this.consecutiveFailures = 0;
@@ -704,6 +738,16 @@ class SupabaseBatchQueue {
       localStorage.setItem(DLQ_PERSISTENCE_KEY, JSON.stringify(this.deadLetterQueue.slice(0, 200)));
     } catch (_) {}
   }
+}
+
+/** Etiqueta curta e estável (5 letras/números) calculada a partir do id do registro. */
+function stableTag(id: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h.toString(36).toUpperCase().padStart(5, '0').slice(-5);
 }
 
 export const supabaseBatchQueue = new SupabaseBatchQueue();
