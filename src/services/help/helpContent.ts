@@ -69,7 +69,30 @@ export const HELP_GENERAL: HelpModule = {
     },
     {
       q: 'Os dados vão para a nuvem sozinhos?',
-      a: 'Sim, quando há internet e uma conta da nuvem conectada. No selo do rodapé (canto de baixo à esquerda) você vê a situação e pode clicar em "Sincronizar agora". Sem internet, o trabalho continua normalmente e é enviado depois.',
+      a: 'Sim, quando há internet e uma conta da nuvem conectada. No selo do rodapé (canto de baixo à esquerda) você vê a situação e pode clicar em "Enviar à nuvem agora". Sem internet, o trabalho continua normalmente e é enviado depois.',
+    },
+    {
+      q: 'Como faço para não precisar digitar a senha da nuvem toda vez?',
+      steps: [
+        'Na tela de login (ou no selo do rodapé, em "Entrar na nuvem"), deixe marcada a opção "Manter este computador conectado à nuvem".',
+        'Pronto: ao usar "Sair do Sistema", só o usuário sai. A nuvem continua conectada e os dados seguem sendo enviados.',
+        'Para tirar o computador da conta da nuvem, clique no selo do rodapé e em "Desconectar da nuvem".',
+      ],
+      tip: 'A senha não fica guardada: o computador guarda apenas a conexão. Nos servidores (Sede e escolas) a opção já vem marcada; pelo link ela vem desmarcada. Em computador emprestado ou compartilhado, deixe desmarcada.',
+    },
+    {
+      q: 'O que significa cada cor do selo do rodapé?',
+      steps: [
+        'Verde: tudo enviado ("Nuvem: dados enviados" ou "conectado").',
+        'Amarelo: enviando alterações ou aguardando o login da nuvem. Se for login, clique no selo e em "Entrar na nuvem".',
+        'Vermelho: sem internet, servidor da rede sem resposta ou erro no envio. Clique no selo para ver o motivo.',
+        'Aberto pelo link, o selo mostra "Acesso pelo link (nuvem)". Aberto pelo atalho do servidor, mostra "Servidor da Sede" ou "Servidor Remoto".',
+      ],
+      tip: 'O selo aparece nos dois modos. Se abrir pelo atalho do servidor e ele mostrar "Acesso pelo link", o servidor demorou a responder na abertura: aguarde o aviso "Recarregar agora" no alto da tela, ou aperte F5.',
+    },
+    {
+      q: 'Apareceu o aviso "respondeu agora... Recarregue para conectar". O que faço?',
+      a: 'O servidor da rede local estava ocupado quando o sistema abriu e só respondeu depois. Salve o que estiver fazendo e clique em "Recarregar agora". Até recarregar, este computador não troca dados com o servidor da rede.',
     },
     {
       q: 'Fiz uma alteração e não apareceu em outro computador. O que faço?',

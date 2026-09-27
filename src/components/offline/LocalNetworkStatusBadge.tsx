@@ -2,20 +2,29 @@ import React, { useEffect, useState } from 'react';
 import {
   getLocalServerInfo,
   subscribeLocalServerStatus,
+  subscribeLateLocalServer,
   flushLocalChanges,
   pullFromLocalServer,
   LocalServerStatus,
+  LocalServerInfo,
 } from '../../services/offline/localServerSync';
 import { subscribeCloudSyncStatus, runCloudSyncNow, CloudSyncStatus } from '../../services/offline/cloudAutoSync';
 import { getSupabaseClient } from '../../services/datasync/supabaseClient';
+import { supabaseBatchQueue, BatchQueueStatus } from '../../services/supabaseBatchQueue';
+import { shouldKeepCloudSession, setKeepCloudSession } from '../../services/offline/cloudSessionPreference';
 
 /**
- * Indicador (canto inferior esquerdo) exibido somente quando o sistema foi aberto
- * a partir do Servidor Remoto ou do Servidor da Sede na rede local.
+ * Indicador (canto inferior esquerdo).
+ * - Aberto pelo Servidor Remoto ou da Sede: mostra o servidor da rede local e a nuvem.
+ * - Aberto pelo link: mostra só a situação do envio à nuvem.
  */
 export const LocalNetworkStatusBadge: React.FC = () => {
   const [local, setLocal] = useState<LocalServerStatus | null>(null);
   const [cloud, setCloud] = useState<CloudSyncStatus | null>(null);
+  const [queue, setQueue] = useState<BatchQueueStatus | null>(null);
+  const [hasSession, setHasSession] = useState<boolean | null>(null);
+  const [lateServer, setLateServer] = useState<LocalServerInfo | null>(null);
+  const isServerMode = !!getLocalServerInfo();
   const [open, setOpen] = useState(false);
   // Login na nuvem direto pelo selo (sem sair do sistema)
   const [loginOpen, setLoginOpen] = useState(false);
@@ -29,6 +38,17 @@ export const LocalNetworkStatusBadge: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loginBusy, setLoginBusy] = useState(false);
   const [loginMsg, setLoginMsg] = useState('');
+  const [keepCloud, setKeepCloud] = useState(() => shouldKeepCloudSession());
+
+  // Tira este computador da conta da nuvem (troca de máquina, computador emprestado...).
+  const cloudDisconnect = async () => {
+    if (!window.confirm('Desconectar este computador da nuvem? O envio para a nuvem para até alguém entrar de novo com a senha.')) return;
+    setKeepCloudSession(false);
+    setKeepCloud(false);
+    await getSupabaseClient().auth.signOut({ scope: 'local' }).catch(() => {});
+    setHasSession(false);
+    if (getLocalServerInfo()) await runCloudSyncNow(true).catch(() => {});
+  };
 
   const cloudLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,13 +69,57 @@ export const LocalNetworkStatusBadge: React.FC = () => {
       setPassword('');
       setLoginOpen(false);
       setLoginMsg('');
-      await runCloudSyncNow(true);
+      setHasSession(true);
+      if (getLocalServerInfo()) await runCloudSyncNow(true);
+      else await supabaseBatchQueue.flush();
     } catch (err: any) {
       setLoginMsg(`Sem resposta da nuvem agora (${err?.message || err}). Tente de novo em instantes.`);
     } finally {
       setLoginBusy(false);
     }
   };
+
+  const renderLoginForm = () =>
+    loginOpen ? (
+          <form onSubmit={cloudLogin} style={{ marginTop: 8, display: 'grid', gap: 6 }}>
+            <input
+              type="email"
+              placeholder="E-mail da conta da nuvem"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="username"
+              style={fieldStyle}
+            />
+            <input
+              type="password"
+              placeholder="Senha da nuvem"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              style={fieldStyle}
+            />
+            <label style={{ display: 'flex', gap: 6, alignItems: 'flex-start', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={keepCloud}
+                onChange={(e) => {
+                  setKeepCloud(e.target.checked);
+                  setKeepCloudSession(e.target.checked);
+                }}
+              />
+              <span>Manter este computador conectado à nuvem</span>
+            </label>
+            {loginMsg && <span style={{ color: '#b91c1c' }}>{loginMsg}</span>}
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button type="submit" disabled={loginBusy} style={btn('#b45309')}>
+                {loginBusy ? 'Entrando...' : 'Entrar e enviar'}
+              </button>
+              <button type="button" onClick={() => setLoginOpen(false)} style={btn('#64748b')}>
+                Cancelar
+              </button>
+            </div>
+          </form>
+    ) : null;
 
   useEffect(() => {
     if (!getLocalServerInfo()) return;
@@ -66,6 +130,50 @@ export const LocalNetworkStatusBadge: React.FC = () => {
       offB();
     };
   }, []);
+
+  // Modo link: acompanha a fila de envio à nuvem e o login da nuvem.
+  useEffect(() => {
+    if (getLocalServerInfo()) return;
+    const offQ = supabaseBatchQueue.subscribe(setQueue);
+    const offL = subscribeLateLocalServer(setLateServer);
+    const client = getSupabaseClient();
+    let alive = true;
+    const check = () =>
+      client.auth
+        .getSession()
+        .then(({ data }) => alive && setHasSession(!!data?.session))
+        .catch(() => alive && setHasSession(false));
+    check();
+    const { data: sub } = client.auth.onAuthStateChange(() => {
+      // Adiado: chamar o Supabase dentro deste callback trava o cliente de autenticação.
+      setTimeout(check, 0);
+    });
+    // A fila só avisa quando envia; o relógio mantém "sem internet" atualizado.
+    const tick = setInterval(() => setQueue(supabaseBatchQueue.getStatus()), 5000);
+    return () => {
+      alive = false;
+      offQ();
+      offL();
+      clearInterval(tick);
+      sub?.subscription?.unsubscribe();
+    };
+  }, []);
+
+  if (!isServerMode) {
+    return (
+      <WebCloudBadge
+        queue={queue}
+        hasSession={hasSession}
+        lateServer={lateServer}
+        open={open}
+        setOpen={setOpen}
+        loginOpen={loginOpen}
+        setLoginOpen={setLoginOpen}
+        loginForm={renderLoginForm()}
+        onDisconnect={cloudDisconnect}
+      />
+    );
+  }
 
   if (!local || local.mode === 'desativado') return null;
 
@@ -157,35 +265,7 @@ export const LocalNetworkStatusBadge: React.FC = () => {
               Entrar na nuvem
             </button>
           )}
-          {loginOpen && (
-            <form onSubmit={cloudLogin} style={{ marginTop: 8, display: 'grid', gap: 6 }}>
-              <input
-                type="email"
-                placeholder="E-mail da conta da nuvem"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="username"
-                style={fieldStyle}
-              />
-              <input
-                type="password"
-                placeholder="Senha da nuvem"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                style={fieldStyle}
-              />
-              {loginMsg && <span style={{ color: '#b91c1c' }}>{loginMsg}</span>}
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button type="submit" disabled={loginBusy} style={btn('#b45309')}>
-                  {loginBusy ? 'Entrando...' : 'Entrar e enviar'}
-                </button>
-                <button type="button" onClick={() => setLoginOpen(false)} style={btn('#64748b')}>
-                  Cancelar
-                </button>
-              </div>
-            </form>
-          )}
+          {renderLoginForm()}
           <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
             <button
               type="button"
@@ -199,6 +279,11 @@ export const LocalNetworkStatusBadge: React.FC = () => {
             <button type="button" onClick={() => runCloudSyncNow(true)} style={btn('#0f766e')}>
               Enviar à nuvem agora
             </button>
+            {cloud && cloud.state !== 'aguardando-login' && cloud.state !== 'inativo' && (
+              <button type="button" onClick={cloudDisconnect} style={btn('#64748b')}>
+                Desconectar da nuvem
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -251,3 +336,167 @@ function btn(color: string): React.CSSProperties {
     cursor: 'pointer',
   };
 }
+
+type WebCloudBadgeProps = {
+  queue: BatchQueueStatus | null;
+  hasSession: boolean | null;
+  lateServer: LocalServerInfo | null;
+  open: boolean;
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  loginOpen: boolean;
+  setLoginOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  loginForm: React.ReactNode;
+  onDisconnect: () => void;
+};
+
+/** Selo do modo link: situação do envio à nuvem (sem servidor da rede local). */
+const WebCloudBadge: React.FC<WebCloudBadgeProps> = ({
+  queue,
+  hasSession,
+  lateServer,
+  open,
+  setOpen,
+  loginOpen,
+  setLoginOpen,
+  loginForm,
+  onDisconnect,
+}) => {
+  const online = typeof navigator === 'undefined' || navigator.onLine !== false;
+  const pending = queue?.totalPendingCount || 0;
+  const failed = queue?.deadLetterCount || 0;
+
+  let dot = '#10b981';
+  let label = 'Nuvem: dados enviados';
+  let detail = 'Tudo o que foi feito neste computador já está na nuvem.';
+  if (!online) {
+    dot = '#e11d48';
+    label = 'Nuvem: sem internet';
+    detail = `O trabalho continua normalmente${pending ? ` (${pending} alteração(ões) guardada(s))` : ''} e é enviado quando a internet voltar.`;
+  } else if (hasSession === false) {
+    dot = '#f59e0b';
+    label = 'Nuvem: aguardando login';
+    detail = `Há internet, mas este computador não está conectado à conta da nuvem${pending ? `: ${pending} alteração(ões) esperando envio` : ''}.`;
+  } else if (queue?.isFlushing || pending > 0) {
+    dot = '#f59e0b';
+    label = pending ? `Nuvem: enviando ${pending} alteração(ões)` : 'Nuvem: enviando...';
+    detail = queue?.lastError && (queue?.consecutiveFailures || 0) > 0
+      ? `Tentando de novo: ${queue.lastError}`
+      : 'As alterações estão sendo enviadas. Aguarde antes de fechar o sistema.';
+  } else if (failed > 0) {
+    dot = '#e11d48';
+    label = 'Nuvem: erro no envio';
+    detail = `${failed} registro(s) foram recusados pela nuvem.${queue?.lastError ? ` Último erro: ${queue.lastError}` : ''}`;
+  } else if (hasSession === null) {
+    dot = '#94a3b8';
+    label = 'Nuvem: verificando...';
+    detail = 'Conferindo a conexão com a nuvem.';
+  }
+
+  return (
+    <>
+      {lateServer && (
+        <div
+          role="status"
+          data-testid="late-local-server"
+          style={{
+            position: 'fixed',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            top: 12,
+            zIndex: 2147482001,
+            background: '#b45309',
+            color: '#fff',
+            borderRadius: 12,
+            padding: '10px 14px',
+            fontFamily: 'Inter, system-ui, sans-serif',
+            fontSize: 13,
+            boxShadow: '0 10px 25px rgba(0,0,0,0.25)',
+            display: 'flex',
+            gap: 12,
+            alignItems: 'center',
+          }}
+        >
+          <span>
+            O {lateServer.serverName} respondeu agora (estava demorando na abertura). Recarregue para conectar a este servidor.
+          </span>
+          <button type="button" onClick={() => window.location.reload()} style={btn('#16a34a')}>
+            Recarregar agora
+          </button>
+        </div>
+      )}
+      <div
+        data-testid="cloud-status-web"
+        style={{ position: 'fixed', left: 12, bottom: 12, zIndex: 2147482000, fontFamily: 'Inter, system-ui, sans-serif' }}
+      >
+        {open && (
+          <div
+            style={{
+              marginBottom: 8,
+              width: 300,
+              background: '#fff',
+              color: '#0f172a',
+              border: '1px solid #e2e8f0',
+              borderRadius: 14,
+              boxShadow: '0 12px 30px rgba(0,0,0,0.18)',
+              padding: 14,
+              fontSize: 12,
+              lineHeight: 1.45,
+            }}
+          >
+            <strong style={{ fontSize: 13 }}>Acesso pelo link (nuvem)</strong>
+            <p style={{ margin: '6px 0' }}>{label}</p>
+            <p style={{ margin: '6px 0', color: '#64748b' }}>{detail}</p>
+            {queue?.lastSuccessfulSync && (
+              <p style={{ margin: '6px 0', color: '#64748b' }}>
+                Último envio à nuvem: {new Date(queue.lastSuccessfulSync).toLocaleString('pt-BR')}
+              </p>
+            )}
+            {hasSession === false && !loginOpen && (
+              <button type="button" onClick={() => setLoginOpen(true)} style={{ ...btn('#b45309'), marginTop: 6 }}>
+                Entrar na nuvem
+              </button>
+            )}
+            {loginForm}
+            <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => supabaseBatchQueue.handleNetworkRestored()}
+                style={btn('#0f766e')}
+              >
+                Enviar à nuvem agora
+              </button>
+              {hasSession && (
+                <button type="button" onClick={onDisconnect} style={btn('#64748b')}>
+                  Desconectar da nuvem
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-label={label}
+          title={label}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            background: '#0f172a',
+            color: '#fff',
+            border: 0,
+            borderRadius: 999,
+            padding: '6px 12px',
+            fontSize: 11,
+            fontWeight: 700,
+            cursor: 'pointer',
+            boxShadow: '0 6px 16px rgba(0,0,0,0.25)',
+          }}
+        >
+          <span style={{ width: 9, height: 9, borderRadius: 999, background: dot, display: 'inline-block' }} />
+          {label}
+        </button>
+      </div>
+    </>
+  );
+};

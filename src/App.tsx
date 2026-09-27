@@ -46,6 +46,7 @@ import {
 import { getSupabaseClient } from './services/supabaseClient';
 import { SupabasePersistenceService } from './services/supabasePersistenceService';
 import { supabaseBatchQueue } from './services/supabaseBatchQueue';
+import { shouldKeepCloudSession } from './services/offline/cloudSessionPreference';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { BnccSkillsModule } from './components/bncc/BnccSkillsModule';
@@ -599,8 +600,11 @@ export default function App() {
       localStorage.removeItem('sucessoedu_auth_session');
       localStorage.removeItem('sucessoedu_logged_user_id');
     } catch {}
-    // Encerra também a sessão do Supabase (senão a sincronização continuaria autenticada).
-    getSupabaseClient().auth.signOut({ scope: 'local' }).catch(() => {});
+    // Encerra também a sessão da nuvem, exceto quando este computador foi marcado para
+    // "Manter conectado à nuvem" (a sincronização continua sem pedir a senha de novo).
+    if (!shouldKeepCloudSession()) {
+      getSupabaseClient().auth.signOut({ scope: 'local' }).catch(() => {});
+    }
     setAuthenticatedUserId(null);
     setIsAuthenticated(false);
     setOpenTabs(['MAIN_DASHBOARD']);

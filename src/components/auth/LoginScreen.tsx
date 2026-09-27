@@ -36,6 +36,7 @@ import { UserAccount, SchoolUnit, UserRole, UserSector } from '../../types';
 import { getLatestAutoBackup } from '../../data/storage';
 import { getDocumentBranding } from '../../services/documentBranding';
 import { getSupabaseClient } from '../../services/datasync/supabaseClient';
+import { shouldKeepCloudSession, setKeepCloudSession } from '../../services/offline/cloudSessionPreference';
 import { getDefaultSectorPermissions } from '../usuarios/UserAccessControl';
 import {
   hashPassword,
@@ -74,6 +75,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [adminError, setAdminError] = useState('');
   const [adminBusy, setAdminBusy] = useState(false);
   const [password, setPassword] = useState('');
+  const [keepCloud, setKeepCloud] = useState(() => shouldKeepCloudSession());
   // Conta sem senha definida: exige cadastrar uma senha antes do primeiro acesso.
   const [firstAccessUser, setFirstAccessUser] = useState<UserAccount | null>(null);
   const [newPassword, setNewPassword] = useState('');
@@ -631,6 +633,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   </button>
                 </div>
               </div>
+              <label className="flex items-start gap-2 text-xs text-slate-300 cursor-pointer select-none" data-testid="keep-cloud">
+                <input
+                  type="checkbox"
+                  checked={keepCloud}
+                  onChange={(e) => {
+                    setKeepCloud(e.target.checked);
+                    setKeepCloudSession(e.target.checked);
+                  }}
+                  className="mt-0.5 h-4 w-4 accent-indigo-500 cursor-pointer"
+                />
+                <span>Manter este computador conectado à nuvem (não pedir a senha da nuvem de novo ao sair)</span>
+              </label>
               <button
                 type="submit"
                 disabled={isLoading}
@@ -1216,6 +1230,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   </div>
                 </div>
 
+                <label className="flex items-start gap-2 text-xs text-slate-300 cursor-pointer select-none" data-testid="keep-cloud">
+                  <input
+                    type="checkbox"
+                    checked={keepCloud}
+                    onChange={(e) => {
+                      setKeepCloud(e.target.checked);
+                      setKeepCloudSession(e.target.checked);
+                    }}
+                    className="mt-0.5 h-4 w-4 accent-indigo-500 cursor-pointer"
+                  />
+                  <span>Manter este computador conectado à nuvem (não pedir a senha da nuvem de novo ao sair)</span>
+                </label>
                 <div className="pt-2">
                   <button
                     type="submit"

@@ -265,12 +265,72 @@ async function call<T = any>(path: string, init: RequestInit = {}, timeoutMs = 8
   }
 }
 
+/**
+ * Resultado de uma consulta ao /health:
+ * - found: a página veio de um servidor SucessoEdu da rede local;
+ * - not-server: alguém respondeu, mas não é um servidor SucessoEdu (ex.: aberto pelo link);
+ * - no-answer: ninguém respondeu a tempo (servidor ocupado, ligando, antivírus...).
+ */
+type LocalServerProbe = { kind: 'found'; info: LocalServerInfo } | { kind: 'not-server' } | { kind: 'no-answer' };
+
+async function probeLocalServer(timeoutMs: number): Promise<LocalServerProbe> {
+  if (typeof window === 'undefined' || typeof fetch === 'undefined') return { kind: 'not-server' };
+  if (!/^https?:$/.test(window.location.protocol)) return { kind: 'not-server' };
+  let code: number;
+  let body: any;
+  try {
+    ({ status: code, body } = await call('/health', {}, timeoutMs));
+  } catch {
+    return { kind: 'no-answer' };
+  }
+  if (code >= 500) return { kind: 'no-answer' };
+  const found = parseHealth(code, body);
+  return found ? { kind: 'found', info: found } : { kind: 'not-server' };
+}
+
+/** Tempos de espera de cada tentativa na abertura (o servidor pode estar ocupado). */
+const DETECT_TIMEOUTS_MS = [2500, 5000, 8000];
+const LATE_DETECT_EVERY_MS = 15000;
+let lateDetectTimer: ReturnType<typeof setInterval> | null = null;
+let lateServer: LocalServerInfo | null = null;
+const lateListeners = new Set<(s: LocalServerInfo | null) => void>();
+
+/** Servidor da rede local que só respondeu depois que a tela abriu (precisa recarregar). */
+export function subscribeLateLocalServer(fn: (s: LocalServerInfo | null) => void): () => void {
+  lateListeners.add(fn);
+  fn(lateServer);
+  return () => lateListeners.delete(fn);
+}
+
+function startLateDetection() {
+  if (lateDetectTimer || typeof window === 'undefined') return;
+  let busy = false;
+  lateDetectTimer = setInterval(async () => {
+    if (busy) return;
+    busy = true;
+    try {
+      const probe = await probeLocalServer(5000);
+      if (probe.kind === 'no-answer') return;
+      if (lateDetectTimer) clearInterval(lateDetectTimer);
+      lateDetectTimer = null;
+      if (probe.kind === 'found') {
+        lateServer = probe.info;
+        lateListeners.forEach((fn) => fn(lateServer));
+      }
+    } finally {
+      busy = false;
+    }
+  }, LATE_DETECT_EVERY_MS);
+}
+
 /** Verifica se esta página foi aberta a partir de um servidor SucessoEdu da rede local. */
 export async function detectLocalServer(timeoutMs = 1500): Promise<LocalServerInfo | null> {
-  if (typeof window === 'undefined' || typeof fetch === 'undefined') return null;
-  if (!/^https?:$/.test(window.location.protocol)) return null;
+  const probe = await probeLocalServer(timeoutMs);
+  return probe.kind === 'found' ? probe.info : null;
+}
+
+function parseHealth(code: number, body: any): LocalServerInfo | null {
   try {
-    const { status: code, body } = await call('/health', {}, timeoutMs);
     if (code !== 200 || !body || body.app !== 'sucessoedu-local') return null;
     const role: LocalServerRole = body.role === 'SEDE' ? 'SEDE' : 'REMOTO';
     return {
@@ -317,8 +377,27 @@ function adoptServerData(serverData: Record<string, any>, version: number) {
 export async function bootstrapLocalServer(options: { dataKey: string; markInitialized: () => void }): Promise<boolean> {
   dataKey = options.dataKey;
   captureAccessKeyFromUrl();
-  const found = await detectLocalServer();
-  if (!found) return false;
+  // Várias tentativas com espera crescente: com o computador acabando de ligar ou o banco
+  // grande, o servidor pode demorar a responder. Pelo link, a resposta "não é servidor"
+  // chega na hora e não há espera.
+  let found: LocalServerInfo | null = null;
+  let answered = false;
+  for (const timeoutMs of DETECT_TIMEOUTS_MS) {
+    const probe = await probeLocalServer(timeoutMs);
+    if (probe.kind === 'found') {
+      found = probe.info;
+      break;
+    }
+    if (probe.kind === 'not-server') {
+      answered = true;
+      break;
+    }
+  }
+  if (!found) {
+    // Ninguém respondeu: continua procurando em segundo plano e avisa quando o servidor aparecer.
+    if (!answered) startLateDetection();
+    return false;
+  }
   info = found;
   options.markInitialized();
   setStatus({ mode: 'conectado', role: found.role, serverName: found.serverName, message: undefined });
