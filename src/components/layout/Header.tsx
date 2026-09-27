@@ -25,7 +25,10 @@ import {
   GitBranch,
   History,
   LifeBuoy,
+  RefreshCw,
 } from 'lucide-react';
+import { getLocalServerInfo, flushLocalChanges } from '../../services/offline/localServerSync';
+import { supabaseBatchQueue } from '../../services/supabaseBatchQueue';
 import { NotificationItem, UserRole, UserAccount } from '../../types';
 import { NotificationPopover } from '../notificacoes/NotificationPopover';
 
@@ -354,6 +357,29 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden sm:inline">Tira-dúvidas</span>
           </button>
         )}
+
+        {/* Botão Atualizar: envia o que estiver pendente e recarrega a tela */}
+        <button
+          id="btn-header-refresh"
+          type="button"
+          onClick={async (e) => {
+            const btn = e.currentTarget;
+            btn.disabled = true;
+            try {
+              // Nada se perde: as alterações pendentes são enviadas antes de recarregar.
+              if (getLocalServerInfo()) await Promise.race([flushLocalChanges(), new Promise((r) => setTimeout(r, 8000))]);
+              else await Promise.race([supabaseBatchQueue.flush(), new Promise((r) => setTimeout(r, 8000))]);
+            } catch {
+              /* recarrega mesmo assim: as pendências continuam guardadas neste computador */
+            }
+            window.location.reload();
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-sky-50 hover:bg-sky-100 border border-sky-200 text-xs font-bold text-sky-700 shadow-2xs transition-all cursor-pointer disabled:opacity-60"
+          title="Atualizar a tela (as alterações pendentes são enviadas antes)"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Atualizar</span>
+        </button>
 
         {/* Botão do Tour Guiado */}
         {onOpenTour && (

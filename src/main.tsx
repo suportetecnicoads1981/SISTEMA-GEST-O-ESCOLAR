@@ -8,6 +8,7 @@ import { sanitizeLegacyLocalStorage, applyProductionStartOnce, PRODUCTION_START_
 import { bootstrapLocalServer } from './services/offline/localServerSync';
 import { startCloudAutoSync } from './services/offline/cloudAutoSync';
 import { LocalNetworkStatusBadge } from './components/offline/LocalNetworkStatusBadge';
+import { UpdateAvailableNotice } from './components/offline/UpdateAvailableNotice';
 import './index.css';
 import { installApiAuthFetch } from './utils/apiAuthFetch';
 
@@ -49,6 +50,7 @@ function renderApp() {
           </AuthBarrier>
         </AuthProvider>
         <LocalNetworkStatusBadge />
+        <UpdateAvailableNotice />
       </ErrorBoundary>
     </StrictMode>,
   );

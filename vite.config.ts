@@ -48,6 +48,8 @@ function offlineManifest(): Plugin {
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss(), offlineManifest()],
+    // Data e hora da publicação: mostrada no selo do rodapé para conferir qual versão está em uso.
+    define: { __APP_BUILT_AT__: JSON.stringify(new Date().toISOString()) },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

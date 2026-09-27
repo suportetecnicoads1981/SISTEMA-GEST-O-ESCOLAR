@@ -671,6 +671,8 @@ export interface UserAccount {
   permissions: Record<SystemModuleKey, ModulePermission>;
   createdAt: string;
   lastLogin?: string;
+  /** Marcou "Não mostrar mais" no Tour: vale em qualquer computador ligado ao mesmo servidor. */
+  tourDismissed?: boolean;
 }
 
 export interface UserProfile {

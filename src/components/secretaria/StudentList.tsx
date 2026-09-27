@@ -2321,6 +2321,71 @@ export const StudentList: React.FC<StudentListProps> = ({
         summaryMetrics={printSummaryMetrics}
         defaultOrientation="landscape"
         renderCell={renderPrintStudentCell}
+        fileName="Relacao_de_Estudantes"
+        filterControls={
+          <div className="grid grid-cols-1 gap-2 text-xs">
+            {[
+              {
+                label: 'Escola',
+                value: selectedUnitFilter,
+                set: setSelectedUnitFilter,
+                opts: [{ v: 'ALL', t: 'Todas as escolas' }, ...availableSchoolUnits.map((u) => ({ v: u.id, t: `${u.name} (${u.count})` }))],
+              },
+              {
+                label: 'Série',
+                value: selectedSeriesFilter,
+                set: setSelectedSeriesFilter,
+                opts: [{ v: 'ALL', t: 'Todas as séries' }, ...availableSeries.map((x) => ({ v: x.name, t: `${x.name} (${x.count})` }))],
+              },
+              {
+                label: 'Turma',
+                value: selectedClassFilter,
+                set: setSelectedClassFilter,
+                opts: [{ v: 'ALL', t: 'Todas as turmas' }, ...availableClasses.map((c) => ({ v: c.id, t: `${c.name} (${c.studentCount})` }))],
+              },
+              {
+                label: 'Turno',
+                value: selectedShiftFilter,
+                set: setSelectedShiftFilter,
+                opts: [
+                  { v: 'ALL', t: 'Todos os turnos' },
+                  { v: 'MANHÃ', t: 'Manhã' },
+                  { v: 'TARDE', t: 'Tarde' },
+                  { v: 'INTEGRAL', t: 'Integral' },
+                  { v: 'NOITE', t: 'Noite' },
+                ],
+              },
+              {
+                label: 'Status',
+                value: selectedStatusFilter,
+                set: setSelectedStatusFilter,
+                opts: [
+                  { v: 'ALL', t: 'Todos os status' },
+                  { v: 'ACTIVE', t: 'Ativo / Regular' },
+                  { v: 'EVADIDO', t: 'Evadido' },
+                  { v: 'TRANSFERRED', t: 'Transferido' },
+                  { v: 'CONCLUDED', t: 'Concluído' },
+                  { v: 'SUSPENDED', t: 'Trancado / Suspenso' },
+                ],
+              },
+            ].map((f) => (
+              <label key={f.label} className="flex flex-col gap-0.5">
+                <span className="font-semibold text-slate-600">{f.label}</span>
+                <select
+                  value={f.value}
+                  onChange={(e) => f.set(e.target.value)}
+                  className="px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700"
+                >
+                  {f.opts.map((o) => (
+                    <option key={o.v} value={o.v}>
+                      {o.t}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+        }
       />
 
       {/* Modal de Importação em Lote */}

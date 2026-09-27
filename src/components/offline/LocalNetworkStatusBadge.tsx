@@ -13,6 +13,17 @@ import { getSupabaseClient } from '../../services/datasync/supabaseClient';
 import { supabaseBatchQueue, BatchQueueStatus } from '../../services/supabaseBatchQueue';
 import { shouldKeepCloudSession, setKeepCloudSession } from '../../services/offline/cloudSessionPreference';
 
+declare const __APP_BUILT_AT__: string;
+/** Data e hora em que esta versão foi publicada (mostrada no selo). */
+export function appBuildLabel(): string {
+  try {
+    const t = typeof __APP_BUILT_AT__ === 'string' ? __APP_BUILT_AT__ : '';
+    return t ? new Date(t).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+  } catch {
+    return '';
+  }
+}
+
 /**
  * Indicador (canto inferior esquerdo).
  * - Aberto pelo Servidor Remoto ou da Sede: mostra o servidor da rede local e a nuvem.
@@ -245,6 +256,7 @@ export const LocalNetworkStatusBadge: React.FC = () => {
           }}
         >
           <strong style={{ fontSize: 13 }}>{local.serverName || roleLabel}</strong>
+          {appBuildLabel() && <p style={{ margin: '2px 0 6px', color: '#64748b' }}>Versão do sistema publicada em {appBuildLabel()}</p>}
           <p style={{ margin: '6px 0' }}>{label}</p>
           {local.message && <p style={{ margin: '6px 0', color: '#b45309' }}>{local.message}</p>}
           {local.lastSyncAt && (
@@ -444,6 +456,7 @@ const WebCloudBadge: React.FC<WebCloudBadgeProps> = ({
             }}
           >
             <strong style={{ fontSize: 13 }}>Acesso pelo link (nuvem)</strong>
+            {appBuildLabel() && <p style={{ margin: '2px 0 6px', color: '#64748b' }}>Versão do sistema publicada em {appBuildLabel()}</p>}
             <p style={{ margin: '6px 0' }}>{label}</p>
             <p style={{ margin: '6px 0', color: '#64748b' }}>{detail}</p>
             {queue?.lastSuccessfulSync && (

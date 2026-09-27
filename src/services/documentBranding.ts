@@ -37,6 +37,12 @@ export interface DocumentBrandingState {
   schools: Map<string, BrandingSchool>;
   classSchool: Map<string, string>;
   defaultSchoolUnitId?: string;
+  /** Quem está logado e emite o documento (nome completo e cargo). */
+  issuerName: string;
+  issuerRole: string;
+  /** Titular da Secretaria de Educação (assinatura dos documentos oficiais). */
+  secretaryName: string;
+  secretaryRole: string;
 }
 
 /** Qual escola aparece no timbre. Sem nada, usa a escola do usuário (ou a única da rede). */
@@ -54,6 +60,10 @@ let state: DocumentBrandingState = {
   semedName: 'Secretaria Municipal de Educação',
   schools: new Map(),
   classSchool: new Map(),
+  issuerName: '',
+  issuerRole: '',
+  secretaryName: '',
+  secretaryRole: '',
 };
 
 const cleanUrl = (u?: string | null) => (typeof u === 'string' && /^(data:image\/|https?:\/\/|\/)/i.test(u.trim()) ? u.trim() : '');
@@ -64,6 +74,7 @@ export function setDocumentBranding(input: {
   schoolUnits?: SchoolUnit[] | null;
   classes?: SchoolClass[] | null;
   defaultSchoolUnitId?: string;
+  issuer?: { name?: string; role?: string } | null;
 }): void {
   const s = input.settings || {};
   const sec = input.secretary || {};
@@ -87,7 +98,48 @@ export function setDocumentBranding(input: {
     schools,
     classSchool,
     defaultSchoolUnitId: defaultId,
+    issuerName: String(input.issuer?.name || '').trim(),
+    issuerRole: String(input.issuer?.role || '').trim(),
+    ...splitSecretary(sec.secretaryDirector, sec.secretaryDirectorRole),
   };
+}
+
+/** "Augusta (Secretária Municipal de Educação)" → nome e cargo separados. */
+function splitSecretary(raw?: string, role?: string): { secretaryName: string; secretaryRole: string } {
+  const text = String(raw || '').trim();
+  const m = text.match(/^(.*?)\s*\((.+)\)\s*$/);
+  const name = (m ? m[1] : text).trim();
+  const r = String(role || (m ? m[2] : '') || '').trim() || (name ? 'Secretário(a) Municipal de Educação' : '');
+  return { secretaryName: name, secretaryRole: r };
+}
+
+/** Marca usada para não repetir o rodapé de emissão. */
+export const ISSUER_MARK = 'data-sucessoedu-issuer';
+
+/**
+ * Rodapé dos documentos: quem emitiu (usuário logado, com nome completo e cargo), data e hora,
+ * e o bloco de assinatura do(a) titular da Secretaria de Educação.
+ */
+/** O documento já traz o próprio bloco de assinatura? Então o rodapé não repete o da Secretaria. */
+function hasOwnSignature(html: string): boolean {
+  return /assinatura|_{8,}|border-top:\s*1px solid[^"]*"[^>]*>\s*[^<]{3,}<\/div>\s*<div[^>]*>\s*(diretor|secret|coorden)/i.test(html);
+}
+
+export function issuerFooterHtml(includeSignature = true): string {
+  const now = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const issuer = state.issuerName
+    ? `Emitido por <strong>${escapeHtml(state.issuerName)}</strong>${state.issuerRole ? ` (${escapeHtml(state.issuerRole)})` : ''} em ${escapeHtml(now)}`
+    : `Emitido em ${escapeHtml(now)}`;
+  const sign = includeSignature && state.secretaryName
+    ? `<div style="margin:36px auto 0;width:300px;text-align:center;font-size:11px;line-height:1.3">
+    <div style="border-top:1px solid #0f172a;padding-top:4px;font-weight:700">${escapeHtml(state.secretaryName)}</div>
+    <div>${escapeHtml(state.secretaryRole)}</div>
+  </div>`
+    : '';
+  return `<div ${ISSUER_MARK}="1" style="margin-top:24px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;page-break-inside:avoid">
+  ${sign}
+  <div style="margin-top:16px;border-top:1px solid #cbd5e1;padding-top:4px;font-size:9px;color:#475569">${issuer} • ${escapeHtml(state.semedName)}</div>
+</div>`;
 }
 
 export function getDocumentBranding(): DocumentBrandingState {
@@ -145,17 +197,28 @@ export function letterheadHtml(target?: LetterheadTarget): string {
 
 /** Acrescenta o timbre no começo de um trecho de HTML (se ele ainda não tiver um). */
 export function withLetterhead(contentHtml: string, target?: LetterheadTarget): string {
-  if (!contentHtml || contentHtml.includes(LETTERHEAD_MARK)) return contentHtml;
-  return letterheadHtml(target) + contentHtml;
+  if (!contentHtml) return contentHtml;
+  let out = contentHtml.includes(LETTERHEAD_MARK) ? contentHtml : letterheadHtml(target) + contentHtml;
+  if (!out.includes(ISSUER_MARK)) out += issuerFooterHtml(!hasOwnSignature(contentHtml));
+  return out;
 }
 
 /** Acrescenta o timbre logo depois de <body> num documento completo. */
 export function withLetterheadInDocument(html: string, target?: LetterheadTarget): string {
-  if (!html || html.includes(LETTERHEAD_MARK)) return html;
-  const m = html.match(/<body[^>]*>/i);
-  if (!m || m.index === undefined) return html;
-  const at = m.index + m[0].length;
-  return html.slice(0, at) + letterheadHtml(target) + html.slice(at);
+  if (!html) return html;
+  let out = html;
+  if (!out.includes(LETTERHEAD_MARK)) {
+    const m = out.match(/<body[^>]*>/i);
+    if (m && m.index !== undefined) {
+      const at = m.index + m[0].length;
+      out = out.slice(0, at) + letterheadHtml(target) + out.slice(at);
+    }
+  }
+  if (!out.includes(ISSUER_MARK)) {
+    const end = out.search(/<\/body>/i);
+    if (end >= 0) out = out.slice(0, end) + issuerFooterHtml(!hasOwnSignature(html)) + out.slice(end);
+  }
+  return out;
 }
 
 /**

@@ -173,7 +173,21 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-  const [isTourOpen, setIsTourOpen] = useState(() => !isTourDismissed());
+  const [isTourOpen, setIsTourOpen] = useState(() => {
+    if (isTourDismissed()) return false;
+    // A escolha também fica no cadastro do usuário (vale em qualquer computador).
+    try {
+      const uid = localStorage.getItem('sucessoedu_logged_user_id');
+      const me = uid ? (data.userAccounts || []).find((u: any) => u?.id === uid) : null;
+      if ((me as any)?.tourDismissed) {
+        dismissTourForever();
+        return false;
+      }
+    } catch {
+      /* sem armazenamento */
+    }
+    return true;
+  });
 
   // Desktop Windows Keyboard Shortcuts Layer (Ctrl+Esc para Menu Iniciar, Alt+B para Sidebar)
   useEffect(() => {
@@ -298,8 +312,10 @@ export default function App() {
       schoolUnits: data.schoolUnits,
       classes: data.classes,
       defaultSchoolUnitId: currentUser?.schoolUnitId || getLocalServerInfo()?.schoolUnitId,
+      // Todo documento sai com o nome completo de quem está logado.
+      issuer: { name: currentUser?.name, role: currentUser?.roleTitle || currentUser?.sectorTitle },
     });
-  }, [data.settings, (data as any).municipalSecretary, data.schoolUnits, data.classes, currentUser?.schoolUnitId]);
+  }, [data.settings, (data as any).municipalSecretary, data.schoolUnits, data.classes, currentUser?.schoolUnitId, currentUser?.name, currentUser?.roleTitle, currentUser?.sectorTitle]);
 
   // Correção automática dos vínculos escola ↔ turma ↔ aluno (ex: turma "ESCOLA X - PRÉ I (MANHÃ)"
   // passa a "PRÉ I - MANHÃ" vinculada à escola X). Idempotente: só grava quando algo muda.
@@ -2416,7 +2432,18 @@ export default function App() {
         isOpen={isTourOpen}
         onClose={(neverShowAgain) => {
           setIsTourOpen(false);
-          if (neverShowAgain) dismissTourForever();
+          if (!neverShowAgain) return;
+          dismissTourForever();
+          // Guarda também no cadastro do usuário: a escolha vale em qualquer computador e
+          // não se perde quando o navegador limpa os dados ou o endereço de acesso muda.
+          const uid = currentUser?.id;
+          if (uid && !currentUser?.tourDismissed) {
+            setCurrentUser((u) => (u && u.id === uid ? { ...u, tourDismissed: true } : u));
+            setData((prev: any) => ({
+              ...prev,
+              userAccounts: (prev.userAccounts || []).map((u: any) => (u?.id === uid ? { ...u, tourDismissed: true } : u)),
+            }));
+          }
         }}
         onNavigate={handleNavigate}
       />

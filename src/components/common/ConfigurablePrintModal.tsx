@@ -17,7 +17,11 @@ import {
   Sparkles,
   LayoutTemplate,
   Filter,
+  FileSpreadsheet,
+  FileDown,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { withLetterhead } from '../../services/documentBranding';
 import { SchoolSettings } from '../../types';
 
 export interface PrintColumnConfig {
@@ -51,6 +55,10 @@ export interface ConfigurablePrintModalProps {
   summaryMetrics?: SummaryMetricItem[];
   defaultOrientation?: 'portrait' | 'landscape';
   renderCell?: (item: any, columnId: string, rowIndex: number) => React.ReactNode | string;
+  /** Filtros do relatório (escola, série, turma...). A lista `data` já chega filtrada por eles. */
+  filterControls?: React.ReactNode;
+  /** Nome base dos arquivos exportados. */
+  fileName?: string;
 }
 
 export const ConfigurablePrintModal: React.FC<ConfigurablePrintModalProps> = ({
@@ -65,6 +73,8 @@ export const ConfigurablePrintModal: React.FC<ConfigurablePrintModalProps> = ({
   summaryMetrics = [],
   defaultOrientation = 'portrait',
   renderCell,
+  filterControls,
+  fileName,
 }) => {
   // Estado das colunas visíveis
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
@@ -140,6 +150,63 @@ export const ConfigurablePrintModal: React.FC<ConfigurablePrintModalProps> = ({
   // Disparo da impressão nativa
   const handlePrint = () => {
     window.print();
+  };
+
+  // Texto de cada célula (o mesmo usado na cópia e nos arquivos exportados)
+  const cellText = (item: any, colId: string, idx: number): string => {
+    if (renderCell) {
+      const rendered = renderCell(item, colId, idx);
+      if (typeof rendered === 'string' || typeof rendered === 'number') return String(rendered);
+    }
+    const v = item?.[colId];
+    return v === null || v === undefined ? '' : String(v);
+  };
+
+  const baseName = () =>
+    `${(fileName || title).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 60) || 'relatorio'}_${new Date().toISOString().slice(0, 10)}`;
+
+  const download = (blob: Blob, name: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  };
+
+  const exportRows = () => data.map((item, idx) => activeColumns.map((c) => cellText(item, c.id, idx)));
+
+  const handleExportExcel = () => {
+    if (activeColumns.length === 0) return;
+    const sheet = XLSX.utils.aoa_to_sheet([[title], [], activeColumns.map((c) => c.label), ...exportRows()]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, sheet, 'Relatório');
+    XLSX.writeFile(wb, `${baseName()}.xlsx`);
+  };
+
+  const handleExportCsv = () => {
+    if (activeColumns.length === 0) return;
+    const esc = (v: string) => (/[;"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+    const lines = [activeColumns.map((c) => esc(c.label)).join(';'), ...exportRows().map((r) => r.map(esc).join(';'))];
+    download(new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }), `${baseName()}.csv`);
+  };
+
+  const handleExportWord = () => {
+    if (activeColumns.length === 0) return;
+    const h = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const filtersHtml = appliedFilters.length
+      ? `<p style="font-size:9pt">Filtros: ${appliedFilters.map((f) => `${h(f.label)}: ${h(String(f.value))}`).join(' • ')}</p>`
+      : '';
+    const table = `<table style="border-collapse:collapse;width:100%;font-size:9pt"><thead><tr>${activeColumns
+      .map((c) => `<th style="border:1px solid #000;padding:3px;background:#e2e8f0">${h(c.label)}</th>`)
+      .join('')}</tr></thead><tbody>${exportRows()
+      .map((r) => `<tr>${r.map((v) => `<td style="border:1px solid #000;padding:3px">${h(v)}</td>`).join('')}</tr>`)
+      .join('')}</tbody></table>`;
+    const body = withLetterhead(`<h2 style="text-align:center;font-size:12pt">${h(title)}</h2>${subtitle ? `<p style="text-align:center;font-size:10pt">${h(subtitle)}</p>` : ''}${filtersHtml}${table}<p style="font-size:9pt">Total de registros: ${data.length}</p>`);
+    const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>${h(title)}</title><style>@page{size:${orientation === 'landscape' ? '29.7cm 21cm' : '21cm 29.7cm'};margin:3cm 2cm 2cm 3cm}body{font-family:Arial,Helvetica,sans-serif}</style></head><body>${body}</body></html>`;
+    download(new Blob(['\ufeff' + doc], { type: 'application/msword' }), `${baseName()}.doc`);
   };
 
   // Cópia em formato TSV para colar no Excel/Word
@@ -240,6 +307,31 @@ export const ConfigurablePrintModal: React.FC<ConfigurablePrintModalProps> = ({
             </button>
 
             <button
+              onClick={handleExportExcel}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+              title="Baixar em Excel (.xlsx) com as colunas e filtros escolhidos"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              <span>Excel</span>
+            </button>
+            <button
+              onClick={handleExportWord}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-700 hover:bg-sky-600 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+              title="Baixar em Word (.doc) com timbre e margens ABNT"
+            >
+              <FileDown className="h-3.5 w-3.5" />
+              <span>Word</span>
+            </button>
+            <button
+              onClick={handleExportCsv}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition-colors cursor-pointer"
+              title="Baixar em CSV (abre no Excel e em outros programas)"
+            >
+              <FileDown className="h-3.5 w-3.5" />
+              <span>CSV</span>
+            </button>
+
+            <button
               onClick={handleReset}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 transition-colors cursor-pointer"
               title="Restaurar configurações originais"
@@ -270,6 +362,15 @@ export const ConfigurablePrintModal: React.FC<ConfigurablePrintModalProps> = ({
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
           {/* PAINEL LATERAL: CONTROLES CONFIGURÁVEIS (Esquerda) */}
           <div className="no-print w-full lg:w-80 xl:w-96 bg-slate-50 border-b lg:border-b-0 lg:border-r border-slate-200 p-4 space-y-4 overflow-y-auto max-h-[35vh] lg:max-h-full">
+            {filterControls && (
+              <div className="bg-white p-3.5 rounded-xl border-2 border-indigo-200 shadow-2xs space-y-2" data-testid="report-filters">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                  <Filter className="h-3.5 w-3.5 text-indigo-600" /> Filtros do relatório
+                  <span className="ml-auto text-[10px] font-semibold text-indigo-700">{data.length} registro(s)</span>
+                </div>
+                {filterControls}
+              </div>
+            )}
             {/* Bloco 1: Seleção de Colunas */}
             <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-3">
               <div className="flex items-center justify-between">

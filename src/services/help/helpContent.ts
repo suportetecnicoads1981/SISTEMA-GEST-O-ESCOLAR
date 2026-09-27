@@ -68,6 +68,37 @@ export const HELP_GENERAL: HelpModule = {
       tip: 'Se o navegador não deixar fechar sozinho, aparece a tela "Sessão encerrada": feche a janela no X ou com Alt+F4 (aba do navegador: Ctrl+W).',
     },
     {
+      q: 'Marquei "Não mostrar mais" no Tour e ele voltou a aparecer. O que fazer?',
+      a: 'A escolha agora fica guardada também no seu cadastro de usuário: vale em qualquer computador ligado ao mesmo servidor, mesmo que o navegador limpe os dados. Marque a opção uma vez e feche o Tour. Ele continua disponível no botão "Tour Guiado" do topo.',
+    },
+    {
+      q: 'Para que serve o botão "Atualizar" no topo da tela?',
+      a: 'Ele envia o que estiver pendente e recarrega a tela, trazendo os dados e a versão mais recentes. Use quando algo parecer desatualizado. Nada se perde: as alterações pendentes são enviadas antes de recarregar.',
+    },
+    {
+      q: 'Apareceu o aviso "Nova versão do sistema disponível". O que faço?',
+      steps: [
+        'Pelo link: clique em "Atualizar agora". As alterações pendentes são enviadas e a tela recarrega com a versão nova.',
+        'No servidor (Sede ou escola): o administrador clica em "Aplicar e atualizar". As demais estações recebem o aviso "Recarregar agora".',
+        'Se estiver no meio de um trabalho, clique em "Depois": o aviso volta em 30 minutos.',
+      ],
+      tip: 'A data da versão em uso aparece no selo do rodapé: "Versão do sistema publicada em ...".',
+    },
+    {
+      q: 'Por que os documentos saem com "Emitido por" e a assinatura da Secretária?',
+      a: 'Todo documento oficial traz no rodapé o nome completo e o cargo de quem está logado e emitiu, com data e hora, e o bloco de assinatura do(a) titular da Secretaria de Educação (cadastrado em Rede Municipal & Polos > Secretaria). Se o documento já tiver a própria área de assinatura, o bloco da Secretaria não é repetido. Para o nome sair certo, mantenha o nome completo e o cargo atualizados no cadastro do usuário.',
+    },
+    {
+      q: 'Como gerar um relatório só de uma escola, série ou turma e salvar em Excel ou Word?',
+      steps: [
+        'Em Secretaria > Alunos, clique em "Painel de Impressão".',
+        'No quadro "Filtros do relatório", escolha a escola, a série, a turma, o turno e o status. A pré-visualização ao lado mostra o resultado na hora.',
+        'Escolha as colunas que devem aparecer.',
+        'Clique em "Imprimir / Salvar em PDF", "Excel", "Word" ou "CSV".',
+      ],
+      tip: 'Os mesmos botões de Excel, Word e CSV também estão no Painel de Impressão das Turmas e do Pedagógico.',
+    },
+    {
       q: 'O que é o "Plano de Desenvolvimento"?',
       a: 'É o registro privado das melhorias e correções futuras do sistema, mantido pelo desenvolvedor. Só aparece no menu (Administração & TI) para a conta do desenvolvedor e pede a senha da nuvem para abrir. Os itens ficam guardados na nuvem com acesso exclusivo dessa conta.',
       tip: 'Se a lista aparecer vazia logo depois de abrir, clique em "Atualizar". Os itens só aparecem para a conta do desenvolvedor.',
