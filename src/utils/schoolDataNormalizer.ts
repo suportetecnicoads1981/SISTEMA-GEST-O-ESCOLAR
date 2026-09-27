@@ -164,9 +164,17 @@ function dedupeRegistrationNumbers(students: Student[], now: string, summary: st
     out[i] = { ...out[i], enrollmentNumber: ra, updatedAt: now } as Student;
   };
 
-  groups.forEach((idx, base) => {
+  // Ordem estável (pelo RA e pelo id, nunca pela posição na lista): todos os computadores
+  // chegam ao MESMO resultado. Antes, alunos importados juntos (mesmo horário) desempatavam
+  // pela posição na lista, que muda de um computador para outro, e cada estação renumerava
+  // diferente, desfazendo o trabalho da outra na nuvem sem parar.
+  const byId = (i: number) => String((out[i] as any)?.id || '');
+  const ordered = Array.from(groups.entries()).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  ordered.forEach(([base, idx]) => {
     // Quem foi cadastrado primeiro fica com o número base; os demais recebem o próximo livre
-    const sorted = idx.slice().sort((a, b) => registeredAt(out[a]) - registeredAt(out[b]) || a - b);
+    const sorted = idx
+      .slice()
+      .sort((a, b) => registeredAt(out[a]) - registeredAt(out[b]) || (byId(a) < byId(b) ? -1 : byId(a) > byId(b) ? 1 : 0));
     const [keeper, ...others] = sorted;
     if (String((out[keeper] as any).enrollmentNumber) !== base) setRa(keeper, base, 'RA restaurado');
     others.forEach((i) => {

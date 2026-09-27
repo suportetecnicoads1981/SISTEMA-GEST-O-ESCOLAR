@@ -101,6 +101,11 @@ export const HELP_GENERAL: HelpModule = {
       tip: 'O selo aparece nos dois modos. Se abrir pelo atalho do servidor e ele mostrar "Acesso pelo link", o servidor demorou a responder na abertura: aguarde o aviso "Recarregar agora" no alto da tela, ou aperte F5.',
     },
     {
+      q: 'A nuvem fica em "enviando..." e o número de matrícula (RA) de alguns alunos muda sozinho. Por quê?',
+      a: 'A nuvem não aceita dois alunos com o mesmo RA. Quando isso acontece, o sistema dá o número ao aluno cadastrado primeiro e um número novo ao outro. Todos os computadores fazem essa escolha da mesma forma, então depois de uma ou duas sincronizações os números param de mudar. Se continuar em "enviando..." por mais de 15 minutos, avise o suporte.',
+      tip: 'Evite deixar o sistema aberto em duas janelas no mesmo computador: cada janela é tratada como uma estação separada.',
+    },
+    {
       q: 'O selo mostra "sem resposta (rede local)" o tempo todo. O servidor parou?',
       steps: [
         'Provavelmente sim. Aguarde até 5 minutos: o Windows confere o servidor a cada 5 minutos e o inicia de novo se tiver parado.',

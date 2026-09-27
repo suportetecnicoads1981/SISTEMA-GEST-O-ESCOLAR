@@ -435,8 +435,15 @@ class SupabaseBatchQueue {
       }
       const ras = Array.from(seen.keys());
       if (ras.length === 0) return;
-      const { data, error } = await supabase.from('students').select('id, registration_number').in('registration_number', ras);
-      if (error || !Array.isArray(data)) return;
+      // Consulta em partes: com centenas de RAs o endereço da consulta fica grande demais e a
+      // nuvem responde 400; aí nenhum RA era liberado e o envio ficava travado em 409.
+      const data: { id: string; registration_number: string }[] = [];
+      for (let k = 0; k < ras.length; k += 60) {
+        const part = ras.slice(k, k + 60);
+        const res = await supabase.from('students').select('id, registration_number').in('registration_number', part);
+        if (res.error || !Array.isArray(res.data)) return;
+        data.push(...res.data);
+      }
       for (const remote of data) {
         if (seen.get(remote.registration_number) === remote.id) continue;
         await supabase
