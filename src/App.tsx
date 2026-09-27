@@ -94,7 +94,7 @@ import { QuickJumpSearchModal } from './components/common/QuickJumpSearchModal';
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
 import { KeyboardShortcutsModal } from './components/common/KeyboardShortcutsModal';
 import { ShortcutToast } from './components/common/ShortcutToast';
-import { GuidedTourModal, isTourDismissed, dismissTourForever } from './components/common/GuidedTourModal';
+import { GuidedTourModal, isTourDismissedAsync, dismissTourForever } from './components/common/GuidedTourModal';
 import { ModuleLoadingFallback } from './components/common/ModuleLoadingFallback';
 import { Bell, CheckCircle2, X } from 'lucide-react';
 import { drainMessageQueue, subscribeToMessageQueue } from './services/messageQueueService';
@@ -173,21 +173,33 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-  const [isTourOpen, setIsTourOpen] = useState(() => {
-    if (isTourDismissed()) return false;
-    // A escolha também fica no cadastro do usuário (vale em qualquer computador).
+  // O Tour só abre depois de conferir todas as reservas da escolha "Não mostrar mais"
+  // (navegador, cookie, IndexedDB e cadastro do usuário). Antes abria na hora e reaparecia
+  // quando o armazenamento do navegador estava cheio.
+  const [isTourOpen, setIsTourOpen] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    let userDismissed = false;
     try {
       const uid = localStorage.getItem('sucessoedu_logged_user_id');
       const me = uid ? (data.userAccounts || []).find((u: any) => u?.id === uid) : null;
-      if ((me as any)?.tourDismissed) {
-        dismissTourForever();
-        return false;
-      }
+      userDismissed = !!(me as any)?.tourDismissed;
     } catch {
       /* sem armazenamento */
     }
-    return true;
-  });
+    if (userDismissed) {
+      dismissTourForever();
+      return;
+    }
+    isTourDismissedAsync().then((d) => {
+      if (alive && !d) setIsTourOpen(true);
+    });
+    return () => {
+      alive = false;
+    };
+    // Somente ao abrir o sistema.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Desktop Windows Keyboard Shortcuts Layer (Ctrl+Esc para Menu Iniciar, Alt+B para Sidebar)
   useEffect(() => {

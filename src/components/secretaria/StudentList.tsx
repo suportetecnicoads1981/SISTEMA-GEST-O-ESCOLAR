@@ -389,6 +389,142 @@ export const StudentList: React.FC<StudentListProps> = ({
     });
   }, [classes, students]);
 
+  // ===== Relatório Oficial de Matrículas e Enturmação (filtros próprios) =====
+  const [repUnitFilter, setRepUnitFilter] = useState('ALL');
+  const [repSeriesFilter, setRepSeriesFilter] = useState('ALL');
+  const [repShiftFilter, setRepShiftFilter] = useState('ALL');
+  const [repClassFilter, setRepClassFilter] = useState('ALL');
+  const [repNoClass, setRepNoClass] = useState('SHOW');
+
+  const enrollmentReportColumns: PrintColumnConfig[] = useMemo(
+    () => [
+      { id: 'index', label: 'Nº', align: 'center', width: '34px', defaultVisible: true },
+      { id: 'series', label: 'Série / Etapa', align: 'left', defaultVisible: true },
+      { id: 'className', label: 'Turma', align: 'left', defaultVisible: true },
+      { id: 'shift', label: 'Turno', align: 'center', defaultVisible: true },
+      { id: 'enrolled', label: 'Matriculados', align: 'center', defaultVisible: true },
+      { id: 'active', label: 'Ativos', align: 'center', defaultVisible: true },
+      { id: 'male', label: 'Masc.', align: 'center', defaultVisible: true },
+      { id: 'female', label: 'Fem.', align: 'center', defaultVisible: true },
+      { id: 'transferred', label: 'Transferidos', align: 'center', defaultVisible: false },
+      { id: 'dropout', label: 'Evadidos', align: 'center', defaultVisible: false },
+      { id: 'concluded', label: 'Concluídos', align: 'center', defaultVisible: false },
+      { id: 'suspended', label: 'Trancados', align: 'center', defaultVisible: false },
+      { id: 'capacity', label: 'Capacidade', align: 'center', defaultVisible: true },
+      { id: 'vacancies', label: 'Vagas', align: 'center', defaultVisible: true },
+      { id: 'occupancy', label: 'Ocupação', align: 'center', defaultVisible: true },
+      { id: 'room', label: 'Sala', align: 'center', defaultVisible: false },
+      { id: 'teacher', label: 'Professor(a) regente', align: 'left', defaultVisible: false },
+      { id: 'school', label: 'Escola', align: 'left', defaultVisible: false },
+    ],
+    []
+  );
+
+  const enrollmentReportRows = useMemo(() => {
+    const unitById = new Map((schoolUnits || []).map((u) => [u.id, u]));
+    const byClass = new Map<string, Student[]>();
+    const noClassByUnit = new Map<string, Student[]>();
+    const classIds = new Set(classes.map((c) => c.id));
+    students.forEach((st) => {
+      if (st.classId && classIds.has(st.classId)) {
+        if (!byClass.has(st.classId)) byClass.set(st.classId, []);
+        byClass.get(st.classId)!.push(st);
+      } else {
+        const k = st.schoolUnitId || '';
+        if (!noClassByUnit.has(k)) noClassByUnit.set(k, []);
+        noClassByUnit.get(k)!.push(st);
+      }
+    });
+    const shiftRe: Record<string, RegExp> = { MANH: /MANH|MATUT/, TARDE: /TARDE|VESPERT/, NOIT: /NOIT|NOTURN/, INTEGRAL: /INTEGRAL/ };
+    const shiftOk = (sh: string) => repShiftFilter === 'ALL' || (shiftRe[repShiftFilter] || /$^/).test(String(sh || '').toUpperCase());
+    const stats = (list: Student[]) => ({
+      enrolled: list.length,
+      active: list.filter((s) => s.status === 'ACTIVE').length,
+      male: list.filter((s) => s.gender === 'M').length,
+      female: list.filter((s) => s.gender === 'F').length,
+      transferred: list.filter((s) => s.status === 'TRANSFERRED').length,
+      dropout: list.filter((s) => s.status === 'EVADIDO').length,
+      concluded: list.filter((s) => s.status === 'CONCLUDED').length,
+      suspended: list.filter((s) => s.status === 'SUSPENDED').length,
+    });
+    const unitInfo = (unitId: string) => {
+      const u = unitById.get(unitId);
+      return {
+        unitId,
+        unitKey: unitId || 'sem-escola',
+        school: u?.name || 'Escola não informada',
+        inep: u?.inepCode && /\d/.test(u.inepCode) ? u.inepCode : '',
+      };
+    };
+    const rows: any[] = [];
+    classes.forEach((cls) => {
+      const c: any = cls;
+      const unitId = c.schoolUnitId || '';
+      if (repUnitFilter !== 'ALL' && unitId !== repUnitFilter) return;
+      if (repSeriesFilter !== 'ALL' && String(c.gradeLevel || '').trim() !== repSeriesFilter) return;
+      if (repClassFilter !== 'ALL' && cls.id !== repClassFilter) return;
+      if (!shiftOk(c.shift)) return;
+      const list = byClass.get(cls.id) || [];
+      const st = stats(list);
+      const capacity = Number(c.capacity || c.maxCapacity) || 35;
+      const series = String(c.gradeLevel || '').trim();
+      const className = classMap.get(cls.id) || cls.name;
+      rows.push({
+        ...unitInfo(unitId),
+        ...st,
+        name: `${series} ${className}`,
+        series,
+        className,
+        shift: c.shift || '',
+        capacity,
+        vacancies: Math.max(capacity - st.active, 0),
+        occupancy: Math.round((st.active / capacity) * 100),
+        room: c.roomNumber || '',
+        teacher: c.classTeacher || '',
+      });
+    });
+    if (repNoClass === 'SHOW' && repClassFilter === 'ALL' && repSeriesFilter === 'ALL' && repShiftFilter === 'ALL') {
+      noClassByUnit.forEach((list, unitId) => {
+        if (repUnitFilter !== 'ALL' && unitId !== repUnitFilter) return;
+        rows.push({
+          ...unitInfo(unitId),
+          ...stats(list),
+          name: '\uffff',
+          series: '—',
+          className: 'Sem enturmação',
+          shift: '',
+          capacity: '',
+          vacancies: '',
+          occupancy: '',
+          room: '',
+          teacher: '',
+        });
+      });
+    }
+    return rows;
+  }, [students, classes, schoolUnits, classMap, repUnitFilter, repSeriesFilter, repShiftFilter, repClassFilter, repNoClass]);
+
+  const enrollmentReportFilters: AppliedFilterItem[] = useMemo(() => {
+    const f: AppliedFilterItem[] = [];
+    if (repUnitFilter !== 'ALL') f.push({ label: 'Escola', value: (schoolUnits || []).find((u) => u.id === repUnitFilter)?.name || '' });
+    if (repSeriesFilter !== 'ALL') f.push({ label: 'Série', value: repSeriesFilter });
+    if (repShiftFilter !== 'ALL') f.push({ label: 'Turno', value: { MANH: 'Manhã', TARDE: 'Tarde', INTEGRAL: 'Integral', NOIT: 'Noite' }[repShiftFilter] || repShiftFilter });
+    if (repClassFilter !== 'ALL') f.push({ label: 'Turma', value: classMap.get(repClassFilter) || '' });
+    return f;
+  }, [repUnitFilter, repSeriesFilter, repShiftFilter, repClassFilter, schoolUnits, classMap]);
+
+  const enrollmentReportMetrics: SummaryMetricItem[] = useMemo(() => {
+    const sum = (k: string) => enrollmentReportRows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+    const cap = sum('capacity');
+    return [
+      { label: 'Turmas', value: enrollmentReportRows.filter((r) => r.className !== 'Sem enturmação').length },
+      { label: 'Matriculados', value: sum('enrolled') },
+      { label: 'Ativos', value: sum('active') },
+      { label: 'Vagas livres', value: sum('vacancies') },
+      { label: 'Ocupação média', value: `${cap ? Math.round((sum('active') / cap) * 100) : 0}%` },
+    ];
+  }, [enrollmentReportRows]);
+
   // Contagem de filtros ativos para badge visual
   const activeFiltersCount = useMemo(() => {
     let count = 0;
@@ -608,16 +744,16 @@ export const StudentList: React.FC<StudentListProps> = ({
       { id: 'name', label: 'Nome Completo do Estudante', align: 'left', defaultVisible: true },
       { id: 'series', label: 'Série', align: 'center', width: '80px', defaultVisible: true },
       { id: 'className', label: 'Turma', align: 'center', width: '80px', defaultVisible: true },
-      { id: 'shift', label: 'Turno', align: 'center', width: '70px', defaultVisible: false },
+      { id: 'shift', label: 'Turno', align: 'center', width: '70px', defaultVisible: true },
       { id: 'birthDate', label: 'Data Nasc. (idade)', align: 'center', width: '120px', defaultVisible: true },
-      { id: 'gender', label: 'Sexo', align: 'center', width: '50px', defaultVisible: false },
-      { id: 'race', label: 'Raça/Cor', align: 'center', width: '75px', defaultVisible: false },
-      { id: 'cpf', label: 'CPF', align: 'center', width: '105px', defaultVisible: false },
+      { id: 'gender', label: 'Sexo', align: 'center', width: '50px', defaultVisible: true },
+      { id: 'race', label: 'Raça/Cor', align: 'center', width: '75px', defaultVisible: true },
+      { id: 'cpf', label: 'CPF', align: 'center', width: '105px', defaultVisible: true },
       { id: 'cadastralStatus', label: 'Situação Cadastral', align: 'center', width: '90px', defaultVisible: true },
       { id: 'specialNeeds', label: 'PCD / Condição', align: 'left', width: '90px', defaultVisible: false },
       { id: 'medicalReport', label: 'Laudo', align: 'center', width: '50px', defaultVisible: false },
       { id: 'schoolOrigin', label: 'Escola / Polo', align: 'left', width: '110px', defaultVisible: false },
-      { id: 'guardian', label: 'Responsável', align: 'left', width: '110px', defaultVisible: false },
+      { id: 'guardian', label: 'Responsável', align: 'left', width: '110px', defaultVisible: true },
       { id: 'signature', label: 'Assinatura / Rubrica', align: 'center', width: '130px', defaultVisible: true },
     ],
     []
@@ -2201,113 +2337,103 @@ export const StudentList: React.FC<StudentListProps> = ({
         </div>
       </div>
 
-      {/* Relatório de Matrículas Modal */}
-      {isReportModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden my-6">
-            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white">
-                  <BarChart3 className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-slate-900">
-                    Relatório Oficial de Matrículas e Enturmação
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    Resumo estatístico da ocupação de vagas e situação acadêmica geral
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsReportModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto text-xs">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Total Geral</span>
-                  <p className="text-2xl font-black text-slate-900">{students.length}</p>
-                </div>
-                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200">
-                  <span className="text-[10px] uppercase font-bold text-emerald-700">Taxa de Atividade</span>
-                  <p className="text-2xl font-black text-emerald-700">
-                    {Math.round((activeCount / (students.length || 1)) * 100)}%
-                  </p>
-                </div>
-                <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-200">
-                  <span className="text-[10px] uppercase font-bold text-indigo-700">Turmas Ativas</span>
-                  <p className="text-2xl font-black text-indigo-700">{classes.length}</p>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="font-bold text-slate-800 mb-2">Distribuição de Estudantes por Turma</h4>
-                <div className="overflow-x-auto rounded-xl border border-slate-200">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
-                        <th className="p-2.5">Turma</th>
-                        <th className="p-2.5">Turno</th>
-                        <th className="p-2.5 text-center">Matriculados</th>
-                        <th className="p-2.5 text-center">Capacidade</th>
-                        <th className="p-2.5 text-center">Ocupação</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {classes.map((cls) => {
-                        const inClass = students.filter((s) => s.classId === cls.id).length;
-                        const pct = Math.round((inClass / (cls.capacity || 35)) * 100);
-                        return (
-                          <tr key={cls.id} className="hover:bg-slate-50">
-                            <td className="p-2.5 font-bold text-slate-800">{cls.name}</td>
-                            <td className="p-2.5 text-slate-600">{cls.shift}</td>
-                            <td className="p-2.5 text-center font-bold text-indigo-600">{inClass}</td>
-                            <td className="p-2.5 text-center text-slate-500">{cls.capacity || 35}</td>
-                            <td className="p-2.5 text-center">
-                              <span
-                                className={`font-bold px-2 py-0.5 rounded-full text-[10px] ${
-                                  pct > 90
-                                    ? 'bg-rose-50 text-rose-700'
-                                    : pct > 70
-                                    ? 'bg-emerald-50 text-emerald-700'
-                                    : 'bg-slate-100 text-slate-600'
-                                }`}
-                              >
-                                {pct}%
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
-              <button
-                onClick={handleExportCSV}
-                className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-semibold flex items-center gap-1.5 cursor-pointer text-xs"
-              >
-                <FileSpreadsheet className="h-4 w-4" />
-                <span>Exportar CSV</span>
-              </button>
-              <button
-                onClick={() => setIsReportModalOpen(false)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs cursor-pointer"
-              >
-                Fechar Relatório
-              </button>
-            </div>
+      {/* Relatório Oficial de Matrículas e Enturmação: filtros, escolha das informações e exportação */}
+      <ConfigurablePrintModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        title="Relatório Oficial de Matrículas e Enturmação"
+        subtitle="Distribuição de estudantes por turma, ocupação de vagas e situação da matrícula"
+        columns={enrollmentReportColumns}
+        data={enrollmentReportRows}
+        appliedFilters={enrollmentReportFilters}
+        summaryMetrics={enrollmentReportMetrics}
+        defaultOrientation="landscape"
+        renderCell={(row: any, colId: string) => (colId === 'occupancy' ? `${row.occupancy}%` : row[colId] ?? '')}
+        fileName="Relatorio_Matriculas_Enturmacao"
+        countLabel="Total de turmas nesta relação"
+        groupSummary={(rows: any[]) => {
+          const sum = (k: string) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+          return `Totais da escola: ${sum('enrolled')} matriculados • ${sum('active')} ativos • ${sum('male')} masc. / ${sum('female')} fem. • ${sum('transferred')} transferidos • ${sum('dropout')} evadidos • capacidade ${sum('capacity')} • vagas ${sum('vacancies')}`;
+        }}
+        groupBy={(row: any) => ({
+          key: row.unitKey,
+          schoolUnitId: row.unitId || undefined,
+          lines: [
+            ['Escola', row.school],
+            ['INEP', row.inep],
+          ],
+        })}
+        filterControls={
+          <div className="grid grid-cols-1 gap-2 text-xs">
+            {[
+              {
+                label: 'Escola',
+                value: repUnitFilter,
+                set: setRepUnitFilter,
+                opts: [{ v: 'ALL', t: 'Todas as escolas' }, ...(schoolUnits || []).map((u) => ({ v: u.id, t: u.name }))],
+              },
+              {
+                label: 'Série',
+                value: repSeriesFilter,
+                set: setRepSeriesFilter,
+                opts: [
+                  { v: 'ALL', t: 'Todas as séries' },
+                  ...Array.from(new Set(classes.map((c) => String((c as any).gradeLevel || '').trim()).filter(Boolean)))
+                    .sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true }))
+                    .map((g) => ({ v: g, t: g })),
+                ],
+              },
+              {
+                label: 'Turno',
+                value: repShiftFilter,
+                set: setRepShiftFilter,
+                opts: [
+                  { v: 'ALL', t: 'Todos os turnos' },
+                  { v: 'MANH', t: 'Manhã' },
+                  { v: 'TARDE', t: 'Tarde' },
+                  { v: 'INTEGRAL', t: 'Integral' },
+                  { v: 'NOIT', t: 'Noite' },
+                ],
+              },
+              {
+                label: 'Turma',
+                value: repClassFilter,
+                set: setRepClassFilter,
+                opts: [
+                  { v: 'ALL', t: 'Todas as turmas' },
+                  ...classes
+                    .filter((c) => repUnitFilter === 'ALL' || (c as any).schoolUnitId === repUnitFilter)
+                    .map((c) => ({ v: c.id, t: classMap.get(c.id) || c.name })),
+                ],
+              },
+              {
+                label: 'Alunos sem turma',
+                value: repNoClass,
+                set: setRepNoClass,
+                opts: [
+                  { v: 'SHOW', t: 'Mostrar linha "Sem enturmação"' },
+                  { v: 'HIDE', t: 'Ocultar' },
+                ],
+              },
+            ].map((f) => (
+              <label key={f.label} className="flex flex-col gap-0.5">
+                <span className="font-semibold text-slate-600">{f.label}</span>
+                <select
+                  value={f.value}
+                  onChange={(e) => f.set(e.target.value)}
+                  className="px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700"
+                >
+                  {f.opts.map((o) => (
+                    <option key={o.v} value={o.v}>
+                      {o.t}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
           </div>
-        </div>
-      )}
+        }
+      />
 
       {/* PAINEL DE IMPRESSÃO CONFIGURÁVEL (COLUNAS, FILTROS E CABEÇALHOS) */}
       <ConfigurablePrintModal
@@ -2322,6 +2448,23 @@ export const StudentList: React.FC<StudentListProps> = ({
         defaultOrientation="landscape"
         renderCell={renderPrintStudentCell}
         fileName="Relacao_de_Estudantes"
+        groupBy={(st: Student) => {
+          const cls = classes.find((c) => c.id === st.classId);
+          const unitId = st.schoolUnitId || (cls as any)?.schoolUnitId;
+          const unit = (schoolUnits || []).find((u) => u.id === unitId);
+          return {
+            key: `${unitId || st.schoolOriginName || '-'}|${st.classId || '-'}`,
+            schoolUnitId: unitId,
+            classId: st.classId,
+            lines: [
+              ['Escola', unit?.name || st.schoolOriginName || 'Não informada'],
+              ['INEP', unit?.inepCode && /\d/.test(unit.inepCode) ? unit.inepCode : ''],
+              ['Série', (cls as any)?.gradeLevel || st.series || ''],
+              ['Turma', cls?.name || classMap.get(st.classId) || 'Sem turma'],
+              ['Turno', (cls as any)?.shift || st.shift || ''],
+            ],
+          };
+        }}
         filterControls={
           <div className="grid grid-cols-1 gap-2 text-xs">
             {[

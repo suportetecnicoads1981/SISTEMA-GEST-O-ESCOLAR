@@ -38,7 +38,49 @@ export function isTourDismissed(): boolean {
   }
 }
 
+// Terceira reserva: IndexedDB. Com o banco local grande, o localStorage do navegador enche
+// e recusa gravações; o IndexedDB tem espaço próprio e guarda a escolha com segurança.
+const IDB_NAME = 'sucessoedu_prefs';
+function idb(): Promise<IDBDatabase | null> {
+  return new Promise((resolve) => {
+    try {
+      if (typeof indexedDB === 'undefined') return resolve(null);
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains('kv')) req.result.createObjectStore('kv');
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/** Confere também o IndexedDB (assíncrono). */
+export async function isTourDismissedAsync(): Promise<boolean> {
+  if (isTourDismissed()) return true;
+  const db = await idb();
+  if (!db) return false;
+  return new Promise((resolve) => {
+    try {
+      const r = db.transaction('kv', 'readonly').objectStore('kv').get(TOUR_KEY);
+      r.onsuccess = () => resolve(r.result === 'true');
+      r.onerror = () => resolve(false);
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
 export function dismissTourForever(): void {
+  idb().then((db) => {
+    try {
+      db?.transaction('kv', 'readwrite').objectStore('kv').put('true', TOUR_KEY);
+    } catch {
+      /* sem IndexedDB */
+    }
+  });
   try {
     localStorage.setItem(TOUR_KEY, 'true');
   } catch {

@@ -21,7 +21,7 @@ import {
   FileDown,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { withLetterhead } from '../../services/documentBranding';
+import { letterheadHtml, issuerFooterHtml } from '../../services/documentBranding';
 import { SchoolSettings } from '../../types';
 
 export interface PrintColumnConfig {
@@ -59,6 +59,15 @@ export interface ConfigurablePrintModalProps {
   filterControls?: React.ReactNode;
   /** Nome base dos arquivos exportados. */
   fileName?: string;
+  /**
+   * Agrupa a impressão (ex.: por escola e turma). Cada grupo sai em página própria, com o
+   * cabeçalho da escola e as linhas de identificação (escola, série, turma, turno...).
+   */
+  groupBy?: (item: any) => { key: string; lines: [string, string][]; schoolUnitId?: string; classId?: string };
+  /** Texto do total de cada grupo (padrão: "Total de alunos nesta relação"). */
+  countLabel?: string;
+  /** Linha de totais extra ao fim de cada grupo (ex.: soma de matriculados). */
+  groupSummary?: (rows: any[]) => string;
 }
 
 export const ConfigurablePrintModal: React.FC<ConfigurablePrintModalProps> = ({
@@ -75,6 +84,9 @@ export const ConfigurablePrintModal: React.FC<ConfigurablePrintModalProps> = ({
   renderCell,
   filterControls,
   fileName,
+  groupBy,
+  countLabel = 'Total de alunos nesta relação',
+  groupSummary,
 }) => {
   // Estado das colunas visíveis
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
@@ -148,8 +160,122 @@ export const ConfigurablePrintModal: React.FC<ConfigurablePrintModalProps> = ({
   };
 
   // Disparo da impressão nativa
+  const [printing, setPrinting] = useState(false);
+
+  /**
+   * Impressão padronizada: monta um documento só com o relatório (timbre, identificação da
+   * escola/série/turma, tabela com cabeçalho repetido em cada página e campo de conferência)
+   * e imprime por um quadro oculto. Antes, a tela inteira do sistema ia para a impressão e,
+   * com muitos alunos, a janela de impressão não terminava de carregar.
+   */
+  const buildReportHtml = (): string => {
+    const h = (t: string) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const groups = new Map<string, { lines: [string, string][]; schoolUnitId?: string; classId?: string; rows: any[] }>();
+    for (const item of data) {
+      const g = groupBy ? groupBy(item) : { key: 'todos', lines: [] as [string, string][] };
+      if (!groups.has(g.key)) groups.set(g.key, { lines: g.lines, schoolUnitId: (g as any).schoolUnitId, classId: (g as any).classId, rows: [] });
+      groups.get(g.key)!.rows.push(item);
+    }
+    const now = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const filtersLine = appliedFilters.length ? appliedFilters.map((f) => `${h(f.label)}: ${h(String(f.value))}`).join(' • ') : '';
+    // Ordem de conferência: grupos pelo texto de identificação e alunos em ordem alfabética.
+    const ordered = Array.from(groups.values()).sort((a, b) =>
+      a.lines.map((l) => l[1]).join('|').localeCompare(b.lines.map((l) => l[1]).join('|'), 'pt-BR', { numeric: true })
+    );
+    ordered.forEach((g) => g.rows.sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || ''), 'pt-BR')));
+    const sections = ordered.map((g, gi) => {
+      const ident = g.lines
+        .filter(([, v]) => v)
+        .map(([k, v]) => `<td style="padding:2px 8px 2px 0;white-space:nowrap"><b>${h(k)}:</b> ${h(v)}</td>`)
+        .join('');
+      const head = activeColumns.map((c) => `<th>${h(c.label)}</th>`).join('');
+      const body = g.rows
+        .map((item, idx) => {
+          const tds = activeColumns
+            .map((c) => {
+              if (c.id === 'index') return `<td style="text-align:center">${idx + 1}</td>`;
+              if (c.id === 'signature') return '<td style="min-width:120px"></td>';
+              const i = data.indexOf(item);
+              return `<td style="text-align:${c.align || 'left'}">${h(cellText(item, c.id, i))}</td>`;
+            })
+            .join('');
+          return `<tr>${tds}</tr>`;
+        })
+        .join('');
+      return `<section style="${gi > 0 ? 'page-break-before:always;' : ''}">
+${letterheadHtml({ schoolUnitId: g.schoolUnitId, classId: g.classId })}
+<h1>${h(title)}</h1>
+${subtitle ? `<p class="sub">${h(subtitle)}</p>` : ''}
+${ident ? `<table class="ident"><tr>${ident}</tr></table>` : ''}
+${filtersLine ? `<p class="meta">Filtros aplicados: ${filtersLine}</p>` : ''}
+<table class="grid"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
+${groupSummary ? `<p class="meta"><b>${h(groupSummary(g.rows))}</b></p>` : ''}
+<p class="meta"><b>${h(countLabel)}:</b> ${g.rows.length} • Emitido em ${h(now)}</p>
+<table class="conf"><tr><td>Conferido por: ________________________________________</td><td>Data: ____/____/________</td><td>Assinatura: ______________________________</td></tr></table>
+</section>`;
+    });
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>${h(title)}</title><style>
+@page{size:A4 ${orientation};margin:2cm 1.5cm 1.5cm 2cm}
+*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:Arial,Helvetica,sans-serif;color:#000;font-size:9pt;margin:0}
+h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
+.sub{text-align:center;font-size:9pt;margin:0 0 6px}
+.ident{border:1px solid #000;width:100%;margin:6px 0;font-size:9.5pt;border-collapse:collapse}
+.ident td{padding:4px 8px}
+.meta{font-size:8.5pt;margin:4px 0}
+.grid{width:100%;border-collapse:collapse;margin-top:4px}
+.grid th,.grid td{border:1px solid #000;padding:3px 4px;vertical-align:top}
+.grid th{background:#e5e7eb;font-size:8.5pt;text-transform:uppercase}
+.grid thead{display:table-header-group}
+.grid tr{page-break-inside:avoid}
+.conf{width:100%;margin-top:14px;font-size:9pt}
+.conf td{padding-top:10px}
+</style></head><body>${sections.join('')}${issuerFooterHtml(false)}</body></html>`;
+    return html;
+  };
+
   const handlePrint = () => {
-    window.print();
+    if (activeColumns.length === 0 || printing) return;
+    setPrinting(true);
+    const html = buildReportHtml();
+    const frame = document.createElement('iframe');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+    document.body.appendChild(frame);
+    const doc = frame.contentWindow?.document;
+    if (!doc || !frame.contentWindow) {
+      frame.remove();
+      setPrinting(false);
+      return;
+    }
+    doc.open();
+    doc.write(html);
+    doc.close();
+    const go = () => {
+      try {
+        frame.contentWindow?.focus();
+        frame.contentWindow?.print();
+      } finally {
+        setPrinting(false);
+        setTimeout(() => frame.remove(), 60_000);
+      }
+    };
+    // Espera as logos do timbre carregarem (no máximo 3 s) antes de abrir a impressão.
+    const imgs = Array.from(doc.images);
+    const pending = imgs.filter((im) => !im.complete);
+    if (!pending.length) setTimeout(go, 150);
+    else {
+      let left = pending.length;
+      const done = () => {
+        left -= 1;
+        if (left <= 0) go();
+      };
+      pending.forEach((im) => {
+        im.onload = done;
+        im.onerror = done;
+      });
+      setTimeout(() => left > 0 && ((left = 0), go()), 3000);
+    }
   };
 
   // Texto de cada célula (o mesmo usado na cópia e nos arquivos exportados)
@@ -195,17 +321,8 @@ export const ConfigurablePrintModal: React.FC<ConfigurablePrintModalProps> = ({
 
   const handleExportWord = () => {
     if (activeColumns.length === 0) return;
-    const h = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const filtersHtml = appliedFilters.length
-      ? `<p style="font-size:9pt">Filtros: ${appliedFilters.map((f) => `${h(f.label)}: ${h(String(f.value))}`).join(' • ')}</p>`
-      : '';
-    const table = `<table style="border-collapse:collapse;width:100%;font-size:9pt"><thead><tr>${activeColumns
-      .map((c) => `<th style="border:1px solid #000;padding:3px;background:#e2e8f0">${h(c.label)}</th>`)
-      .join('')}</tr></thead><tbody>${exportRows()
-      .map((r) => `<tr>${r.map((v) => `<td style="border:1px solid #000;padding:3px">${h(v)}</td>`).join('')}</tr>`)
-      .join('')}</tbody></table>`;
-    const body = withLetterhead(`<h2 style="text-align:center;font-size:12pt">${h(title)}</h2>${subtitle ? `<p style="text-align:center;font-size:10pt">${h(subtitle)}</p>` : ''}${filtersHtml}${table}<p style="font-size:9pt">Total de registros: ${data.length}</p>`);
-    const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>${h(title)}</title><style>@page{size:${orientation === 'landscape' ? '29.7cm 21cm' : '21cm 29.7cm'};margin:3cm 2cm 2cm 3cm}body{font-family:Arial,Helvetica,sans-serif}</style></head><body>${body}</body></html>`;
+    // Mesmo documento da impressão (timbre, identificação por escola/turma e conferência).
+    const doc = buildReportHtml().replace('<html lang="pt-BR">', '<html lang="pt-BR" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">');
     download(new Blob(['\ufeff' + doc], { type: 'application/msword' }), `${baseName()}.doc`);
   };
 
@@ -345,7 +462,7 @@ export const ConfigurablePrintModal: React.FC<ConfigurablePrintModalProps> = ({
               className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
             >
               <Printer className="h-4 w-4" />
-              <span>Imprimir / Salvar em PDF</span>
+              <span>{printing ? 'Preparando...' : 'Imprimir / Salvar em PDF'}</span>
             </button>
 
             <button

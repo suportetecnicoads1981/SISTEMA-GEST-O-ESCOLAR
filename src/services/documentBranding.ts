@@ -98,17 +98,32 @@ export function setDocumentBranding(input: {
     schools,
     classSchool,
     defaultSchoolUnitId: defaultId,
-    issuerName: String(input.issuer?.name || '').trim(),
-    issuerRole: String(input.issuer?.role || '').trim(),
+    issuerName: formatPersonName(input.issuer?.name),
+    issuerRole: ((r) => (r && r === r.toLowerCase() ? r.charAt(0).toUpperCase() + r.slice(1) : r))(String(input.issuer?.role || '').trim()),
     ...splitSecretary(sec.secretaryDirector, sec.secretaryDirectorRole),
   };
+}
+
+/**
+ * Nome próprio para assinaturas: "marcia tavares de sousa" → "Marcia Tavares de Sousa".
+ * Só ajusta nomes gravados todos em minúsculas ou todos em maiúsculas (os demais ficam como estão).
+ */
+export function formatPersonName(raw?: string): string {
+  const t = String(raw || '').trim().replace(/\s+/g, ' ');
+  if (!t || (t !== t.toLowerCase() && t !== t.toUpperCase())) return t;
+  const small = new Set(['da', 'das', 'de', 'do', 'dos', 'e', 'di', 'du', 'del']);
+  return t
+    .toLowerCase()
+    .split(' ')
+    .map((w, i) => (i > 0 && small.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(' ');
 }
 
 /** "Augusta (Secretária Municipal de Educação)" → nome e cargo separados. */
 function splitSecretary(raw?: string, role?: string): { secretaryName: string; secretaryRole: string } {
   const text = String(raw || '').trim();
   const m = text.match(/^(.*?)\s*\((.+)\)\s*$/);
-  const name = (m ? m[1] : text).trim();
+  const name = formatPersonName((m ? m[1] : text).trim());
   const r = String(role || (m ? m[2] : '') || '').trim() || (name ? 'Secretário(a) Municipal de Educação' : '');
   return { secretaryName: name, secretaryRole: r };
 }
@@ -128,7 +143,7 @@ export function resolveSignatories(fallback?: {
   return {
     principalName: state.secretaryName || fb.secretaryName,
     principalTitle: state.secretaryRole || fb.secretaryRole,
-    issuerName: state.issuerName || String(fallback?.secretaryName || ''),
+    issuerName: state.issuerName || formatPersonName(fallback?.secretaryName),
     issuerTitle: state.issuerRole || String(fallback?.secretaryRegistration || ''),
   };
 }

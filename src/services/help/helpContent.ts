@@ -69,7 +69,7 @@ export const HELP_GENERAL: HelpModule = {
     },
     {
       q: 'Marquei "Não mostrar mais" no Tour e ele voltou a aparecer. O que fazer?',
-      a: 'A escolha agora fica guardada também no seu cadastro de usuário: vale em qualquer computador ligado ao mesmo servidor, mesmo que o navegador limpe os dados. Marque a opção uma vez e feche o Tour. Ele continua disponível no botão "Tour Guiado" do topo.',
+      a: 'A escolha fica guardada em quatro lugares: no navegador, num cookie, no banco interno do navegador (que continua funcionando mesmo quando o armazenamento comum fica cheio) e no seu cadastro de usuário. Marque a opção uma vez e feche o Tour. Ele continua disponível no botão "Tour Guiado" do topo.',
     },
     {
       q: 'Com o menu lateral recolhido, como sei o que é cada ícone?',
@@ -91,7 +91,7 @@ export const HELP_GENERAL: HelpModule = {
     {
       q: 'Por que os documentos saem com "Emitido por" e a assinatura da Secretária?',
       a: 'Todo documento oficial traz no rodapé o nome completo e o cargo de quem está logado e emitiu, com data e hora, e o bloco de assinatura do(a) titular da Secretaria de Educação (cadastrado em Rede Municipal & Polos > Secretaria). Se o documento já tiver a própria área de assinatura, o bloco da Secretaria não é repetido. Para o nome sair certo, mantenha o nome completo e o cargo atualizados no cadastro do usuário.',
-      tip: 'Nos certificados, declarações e históricos (Documentos Oficiais), a primeira assinatura é do(a) titular da Secretaria e a segunda é de quem está emitindo. Cadastre o nome completo do(a) Secretário(a) em Rede Municipal & Polos > Secretaria, no campo do(a) Secretário(a) de Educação, só com o nome (o cargo vai no campo próprio).',
+      tip: 'Nos certificados, declarações e históricos (Documentos Oficiais), a primeira assinatura é do(a) titular da Secretaria e a segunda é de quem está emitindo. Cadastre o nome completo do(a) Secretário(a) em Rede Municipal & Polos > Secretaria, no campo do(a) Secretário(a) de Educação, só com o nome (o cargo vai no campo próprio). Nomes digitados todos em minúsculas (ou todos em maiúsculas) saem nas assinaturas com as iniciais maiúsculas (ex.: "maria da silva" sai "Maria da Silva"); ainda assim, o ideal é corrigir o nome no cadastro do usuário.',
     },
     {
       q: 'Como gerar um relatório só de uma escola, série ou turma e salvar em Excel ou Word?',
@@ -100,6 +100,7 @@ export const HELP_GENERAL: HelpModule = {
         'No quadro "Filtros do relatório", escolha a escola, a série, a turma, o turno e o status. A pré-visualização ao lado mostra o resultado na hora.',
         'Escolha as colunas que devem aparecer.',
         'Clique em "Imprimir / Salvar em PDF", "Excel", "Word" ou "CSV".',
+        'Na impressão e no Word, cada escola/turma sai em página própria, com o timbre, a identificação (escola, INEP, série, turma e turno), os alunos em ordem alfabética, o total e o campo "Conferido por / Data / Assinatura" para a conferência manual.',
       ],
       tip: 'Os mesmos botões de Excel, Word e CSV também estão no Painel de Impressão das Turmas e do Pedagógico.',
     },
@@ -290,6 +291,16 @@ export const HELP_MODULES: HelpModule[] = [
       { q: 'Como edito ou corrijo o cadastro de um aluno?', a: 'Na lista, clique no lápis (Editar) na linha do aluno, altere e salve.' },
       { q: 'Como encontro alunos com pendências no Censo?', a: 'Use o atalho "Pendências Censo" acima da lista, ou "Mais Filtros" > Situação Cadastral. Clique em "Completar" para corrigir o que falta.' },
       { q: 'Como imprimo ou exporto a lista?', a: 'Filtre a lista como quiser e clique em "Imprimir lista filtrada" ou "Exportar CSV".' },
+      {
+        q: 'Como gero o Relatório de Matrículas e Enturmação só com o que preciso?',
+        steps: [
+          'Em Secretaria & Alunos, clique em "Gerar Relatório".',
+          'Em "Filtros do relatório", escolha Escola, Série, Turno e Turma (ou deixe "Todas"). Escolha também se aparece a linha "Sem enturmação" (alunos sem turma).',
+          'Em "Colunas do Relatório", marque só as informações que devem sair: série, turma, turno, matriculados, ativos, masculino/feminino, transferidos, evadidos, concluídos, trancados, capacidade, vagas, ocupação, sala, professor(a) regente e escola.',
+          'Clique em "Imprimir / Salvar em PDF" (na janela de impressão escolha "Salvar como PDF" para enviar) ou exporte em Excel, Word ou CSV.',
+        ],
+        tip: 'Cada escola sai em página própria, com o timbre, os totais da escola (matriculados, ativos, sexo, vagas) e o campo "Conferido por / Data / Assinatura". Os filtros deste relatório são próprios: não mudam a lista de alunos da tela.',
+      },
       { q: 'Como emito declaração, histórico ou boletim de um aluno?', a: 'Clique no ícone de documentos na linha do aluno. O sistema abre "Documentos & Certificados" já com ele selecionado.' },
       {
         q: 'O CPF do aluno é obrigatório?',
