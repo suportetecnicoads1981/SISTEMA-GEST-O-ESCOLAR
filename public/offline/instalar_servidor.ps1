@@ -91,9 +91,12 @@ Step 'Configurando para iniciar junto com o Windows (mesmo sem ninguem entrar no
 $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $action = New-ScheduledTaskAction -Execute $ps -Argument ('-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + (Join-Path $Dest 'servidor_sucessoedu.ps1') + '"') -WorkingDirectory $Dest
 $trigger = New-ScheduledTaskTrigger -AtStartup
-$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
+# Vigia: a cada 5 minutos a tarefa tenta iniciar o servidor. Se ele ja estiver rodando,
+# o Windows ignora (MultipleInstances IgnoreNew); se tiver parado, volta sozinho.
+$watch = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Days 3650)
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
 $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
-Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null
+Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger @($trigger, $watch) -Settings $settings -Principal $principal -Force | Out-Null
 Ok 'Inicializacao automatica configurada'
 
 Step 'Configurando a verificacao de atualizacoes (so baixa e confere; o administrador aprova no sistema)'

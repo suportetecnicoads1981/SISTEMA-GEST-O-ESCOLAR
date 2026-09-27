@@ -101,6 +101,15 @@ export const HELP_GENERAL: HelpModule = {
       tip: 'O selo aparece nos dois modos. Se abrir pelo atalho do servidor e ele mostrar "Acesso pelo link", o servidor demorou a responder na abertura: aguarde o aviso "Recarregar agora" no alto da tela, ou aperte F5.',
     },
     {
+      q: 'O selo mostra "sem resposta (rede local)" o tempo todo. O servidor parou?',
+      steps: [
+        'Provavelmente sim. Aguarde até 5 minutos: o Windows confere o servidor a cada 5 minutos e o inicia de novo se tiver parado.',
+        'Se não voltar, abra a pasta do SucessoEdu e execute INICIAR_SERVIDOR.bat (aceite a permissão de Administrador).',
+        'Enquanto isso, as alterações ficam guardadas neste computador e são enviadas quando o servidor voltar. Não limpe os dados do navegador.',
+      ],
+      tip: 'Servidores instalados antes desta versão não têm a conferência a cada 5 minutos: reinstale o pacote do Servidor para ganhar essa proteção.',
+    },
+    {
       q: 'Apareceu o aviso "respondeu agora... Recarregue para conectar". O que faço?',
       a: 'O servidor da rede local estava ocupado quando o sistema abriu e só respondeu depois. Salve o que estiver fazendo e clique em "Recarregar agora". Até recarregar, este computador não troca dados com o servidor da rede.',
     },
