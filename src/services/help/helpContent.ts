@@ -70,6 +70,7 @@ export const HELP_GENERAL: HelpModule = {
     {
       q: 'O que é o "Plano de Desenvolvimento"?',
       a: 'É o registro privado das melhorias e correções futuras do sistema, mantido pelo desenvolvedor. Só aparece no menu (Administração & TI) para a conta do desenvolvedor e pede a senha da nuvem para abrir. Os itens ficam guardados na nuvem com acesso exclusivo dessa conta.',
+      tip: 'Se a lista aparecer vazia logo depois de abrir, clique em "Atualizar". Os itens só aparecem para a conta do desenvolvedor.',
     },
     {
       q: 'Os dados vão para a nuvem sozinhos?',
