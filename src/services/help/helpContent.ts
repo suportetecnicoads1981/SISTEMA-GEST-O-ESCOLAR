@@ -112,7 +112,7 @@ export const HELP_GENERAL: HelpModule = {
         'Se não voltar, abra a pasta do SucessoEdu e execute INICIAR_SERVIDOR.bat (aceite a permissão de Administrador).',
         'Enquanto isso, as alterações ficam guardadas neste computador e são enviadas quando o servidor voltar. Não limpe os dados do navegador.',
       ],
-      tip: 'Servidores instalados antes desta versão não têm a conferência a cada 5 minutos: reinstale o pacote do Servidor para ganhar essa proteção.',
+      tip: 'O aviso só aparece quando o servidor fica 45 segundos sem responder e uma conferência extra confirma. Se aparecer "Servidor ocupado", está tudo bem: ele está trabalhando (por exemplo, enviando muitos alunos à nuvem) e responde em instantes. Servidores instalados antes desta versão não têm a conferência a cada 5 minutos: reinstale o pacote do Servidor para ganhar essa proteção.',
     },
     {
       q: 'Apareceu o aviso "respondeu agora... Recarregue para conectar". O que faço?',

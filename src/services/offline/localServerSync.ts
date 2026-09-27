@@ -77,16 +77,47 @@ let syncEpoch = 0;
  * "sem conexão". O aviso só aparece depois de algumas falhas seguidas.
  */
 let failStreak = 0;
+let firstFailAt = 0;
+let confirming = false;
 const FAILS_BEFORE_OFFLINE = 3;
+/** Só avisa "sem resposta" depois de falhas seguidas por pelo menos este tempo. */
+const OFFLINE_AFTER_MS = 45000;
 const OFFLINE_MSG =
   'O servidor desta rede (programa SucessoEdu no computador da Sede) não está respondendo. As alterações ficam guardadas nesta estação e são enviadas quando ele voltar. Isso não tem relação com a internet.';
+function resetFailures() {
+  failStreak = 0;
+  firstFailAt = 0;
+}
+
+/**
+ * Uma consulta que estoura o tempo nem sempre é o servidor fora do ar: com a tela ocupada
+ * (envio de muitos alunos à nuvem, importação de lotes) o navegador demora a processar a
+ * resposta e o relógio da consulta vence antes. Por isso o aviso vermelho só aparece com
+ * falhas seguidas por 45 segundos E depois de uma conferência rápida (/health) também falhar.
+ */
 function markFailure() {
   failStreak++;
-  if (failStreak >= FAILS_BEFORE_OFFLINE) {
-    setStatus({ mode: 'sem-conexao', message: OFFLINE_MSG });
-  } else if (status.mode !== 'sem-conexao') {
-    setStatus({ message: 'Servidor ocupado; tentando de novo em instantes.' });
+  if (!firstFailAt) firstFailAt = Date.now();
+  const longEnough = failStreak >= FAILS_BEFORE_OFFLINE && Date.now() - firstFailAt >= OFFLINE_AFTER_MS;
+  if (!longEnough) {
+    if (status.mode !== 'sem-conexao') setStatus({ message: 'Servidor ocupado; tentando de novo em instantes.' });
+    return;
   }
+  if (confirming || status.mode === 'sem-conexao') return;
+  confirming = true;
+  call('/health', {}, 8000)
+    .then((r) => {
+      if (r.status === 200 && r.body?.app === 'sucessoedu-local') {
+        // O servidor respondeu: está só ocupado. Não mostra "sem resposta".
+        setStatus({ message: 'Servidor ocupado; tentando de novo em instantes.' });
+      } else {
+        setStatus({ mode: 'sem-conexao', message: OFFLINE_MSG });
+      }
+    })
+    .catch(() => setStatus({ mode: 'sem-conexao', message: OFFLINE_MSG }))
+    .finally(() => {
+      confirming = false;
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -538,7 +569,7 @@ export function flushLocalChanges(): Promise<void> {
         const sent = new Set(queue.map((q) => q.seq));
         writeQueue(readQueue().filter((q) => !sent.has(q.seq)));
         adoptServerData(merged, Number(put.body.version) || 0);
-        failStreak = 0;
+        resetFailures();
         setStatus({ mode: 'conectado', lastSyncAt: new Date().toISOString(), message: undefined });
         if (!readQueue().length) return;
       }
@@ -585,7 +616,7 @@ export async function pullFromLocalServer(): Promise<void> {
         adoptServerData(s.body.data, Number(s.body.version) || 0);
       }
     }
-    failStreak = 0;
+    resetFailures();
     if (status.mode !== 'conectado' || (status.message && !storageFull)) setStatus({ mode: 'conectado', message: storageFull ? STORAGE_FULL_MSG : undefined, lastSyncAt: new Date().toISOString() });
   } catch {
     markFailure();
@@ -604,7 +635,7 @@ function startPolling() {
 /** Somente para testes. */
 export function __resetLocalServerForTests() {
   info = null;
-  failStreak = 0;
+  resetFailures();
   status = { mode: 'desativado', pending: 0 };
   if (pollTimer) clearInterval(pollTimer);
   pollTimer = null;
