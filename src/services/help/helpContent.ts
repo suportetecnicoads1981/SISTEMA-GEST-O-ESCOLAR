@@ -72,6 +72,11 @@ export const HELP_GENERAL: HelpModule = {
       a: 'Sim, quando há internet e uma conta da nuvem conectada. No selo do rodapé (canto de baixo à esquerda) você vê a situação e pode clicar em "Enviar à nuvem agora". Sem internet, o trabalho continua normalmente e é enviado depois.',
     },
     {
+      q: 'O selo mostra "Nuvem: erro no envio" depois de importar alunos. O que houve?',
+      a: 'A nuvem não aceita o mesmo aluno (mesmo nome e mesma data de nascimento) duas vezes na mesma escola. Se aparecer esse erro após uma importação, provavelmente o aluno já existia com outro cadastro. Abra a lista de alunos da escola, procure o nome, mantenha o cadastro correto e exclua a cópia. Alunos com o mesmo nome e datas de nascimento diferentes são aceitos normalmente.',
+      tip: 'Acentos, letras maiúsculas e espaços não contam na comparação: "Bep Rôrôti" e "BEP ROROTI" são o mesmo nome.',
+    },
+    {
       q: 'Como faço para não precisar digitar a senha da nuvem toda vez?',
       steps: [
         'Na tela de login (ou no selo do rodapé, em "Entrar na nuvem"), deixe marcada a opção "Manter este computador conectado à nuvem".',
