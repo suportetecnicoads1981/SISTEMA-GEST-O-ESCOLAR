@@ -222,20 +222,49 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
    * Tenta autenticar no Supabase (necessário para acessar os dados da nuvem).
    * Retorna a sessão, ou null se as credenciais não existirem lá ou se estiver offline.
    */
+  // Motivo da última falha do login na nuvem: a senha errada e a falta de conexão
+  // precisam de mensagens diferentes (antes as duas diziam "Credenciais inválidas").
+  const cloudFailRef = React.useRef<'offline' | 'unreachable' | 'invalid' | null>(null);
+
   const trySupabaseSignIn = async (email: string, pwd: string) => {
-    if (!email || !pwd || (typeof navigator !== 'undefined' && navigator.onLine === false)) return null;
-    // Rede local sem internet (escola rural): não espera o tempo máximo a cada tentativa.
-    if (!(await isCloudReachable(2500))) return null;
+    cloudFailRef.current = null;
+    if (!email || !pwd) return null;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      cloudFailRef.current = 'offline';
+      return null;
+    }
+    // Teste novo a cada tentativa (sem aproveitar um "sem nuvem" de segundos atrás) e com
+    // mais folga: internet lenta ou servidor sincronizando atrasam a resposta.
+    if (!(await isCloudReachable(6000, true))) {
+      cloudFailRef.current = 'unreachable';
+      return null;
+    }
     try {
       const attempt = getSupabaseClient().auth.signInWithPassword({ email, password: pwd });
-      const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000));
+      const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000));
       const result = await Promise.race([attempt, timeout]);
-      if (!result || result.error || !result.data?.user) return null;
+      if (!result) {
+        cloudFailRef.current = 'unreachable';
+        return null;
+      }
+      if (result.error || !result.data?.user) {
+        const status = Number((result.error as any)?.status || 0);
+        cloudFailRef.current = status === 400 || status === 401 || status === 422 ? 'invalid' : 'unreachable';
+        return null;
+      }
       return result.data;
     } catch {
+      cloudFailRef.current = 'unreachable';
       return null;
     }
   };
+
+  const cloudFailMessage = () =>
+    cloudFailRef.current === 'offline'
+      ? 'Sem internet: o primeiro acesso desta conta neste computador precisa de conexão para validar a senha na nuvem.'
+      : cloudFailRef.current === 'unreachable'
+        ? 'Não foi possível falar com a nuvem agora (internet lenta ou instável). Sua senha não foi recusada: aguarde alguns segundos e clique em Entrar de novo.'
+        : 'Senha incorreta para esta conta. Use a senha cadastrada pelo administrador.';
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -333,11 +362,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         if (match.cloudSynced) {
           // Conta gerenciada na nuvem: a senha é a cadastrada no Supabase pelo administrador.
           // Permitir "primeiro acesso" aqui deixaria qualquer pessoa definir a senha dela.
-          setErrorMsg(
-            navigator.onLine === false
-              ? 'Sem internet: o primeiro acesso desta conta neste computador precisa de conexão para validar a senha na nuvem.'
-              : 'Credenciais inválidas. Use a senha cadastrada pelo administrador para esta conta.'
-          );
+          setErrorMsg(cloudFailMessage());
           return;
         }
         setFirstAccessUser(match);
@@ -348,7 +373,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
       if (!verifyPassword(match.password, password)) {
         setIsLoading(false);
-        setErrorMsg('Credenciais inválidas ou usuário inativo no banco de dados.');
+        setErrorMsg(
+          cloudFailRef.current === 'unreachable'
+            ? 'Senha diferente da guardada neste computador, e a nuvem não respondeu para conferir. Se a senha foi trocada, aguarde alguns segundos e tente de novo com internet.'
+            : 'Credenciais inválidas ou usuário inativo no banco de dados.'
+        );
         return;
       }
 
@@ -389,7 +418,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         ok = String(cloud?.user?.app_metadata?.role || '').toUpperCase() === 'ADMIN';
       }
       if (!ok) {
-        setAdminError('Login ou senha do administrador incorretos.');
+        setAdminError(
+          cloudFailRef.current === 'unreachable' || cloudFailRef.current === 'offline'
+            ? 'Não foi possível falar com a nuvem para conferir a senha. Aguarde alguns segundos e tente de novo.'
+            : 'Login ou senha do administrador incorretos.'
+        );
         return;
       }
       setUsername(master.login || 'master');
