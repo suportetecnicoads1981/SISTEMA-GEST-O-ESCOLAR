@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   ShieldAlert,
   Info,
+  NotebookPen,
   CheckCircle2,
   GraduationCap,
   Sparkles,
@@ -72,6 +73,8 @@ interface SidebarProps {
   };
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  /** Mostra o Plano de Desenvolvimento (somente para o desenvolvedor). */
+  showDevBacklog?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -85,6 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   counts,
   isCollapsed = false,
   onToggleCollapse,
+  showDevBacklog = false,
 }) => {
   const current = activeTab || currentTab || 'MAIN_DASHBOARD';
   const [isAdminTIExpanded, setIsAdminTIExpanded] = useState(true);
@@ -202,6 +206,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     'USER_CONTROL',
     'SYSTEM_UPDATES',
     'NETWORK_INSTALLER',
+    'DEV_BACKLOG',
     'ABOUT',
   ];
   const isCurrentInAdminTI = adminTITabs.includes(current);
@@ -395,6 +400,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           badge: 'OTA Web',
         },
         { id: 'NETWORK_INSTALLER', label: 'Instaladores & Backup', icon: Network, shortcut: 'Alt+I' },
+        ...(showDevBacklog ? [{ id: 'DEV_BACKLOG', label: 'Plano de Desenvolvimento', icon: NotebookPen, badge: 'Privado' }] : []),
         { id: 'ABOUT', label: 'Sobre o Sistema & Dev', icon: Info, shortcut: 'Alt+A' },
       ],
     },

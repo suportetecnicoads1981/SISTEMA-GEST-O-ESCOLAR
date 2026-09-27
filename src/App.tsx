@@ -77,6 +77,7 @@ import { normalizeRole, getRolePreferenceSafely } from './utils/roleNormalizer';
 import { AuthBarrier } from './components/auth/AuthBarrier';
 import { FeedbackSuggestionsModal } from './components/common/FeedbackSuggestionsModal';
 import { NetworkInstaller } from './components/config/NetworkInstaller';
+import { DevBacklogModule, isDevBacklogOwner } from './components/admin/DevBacklogModule';
 import { SystemUpdateModule } from './components/config/SystemUpdateModule';
 import { AboutSystem } from './components/sobre/AboutSystem';
 import { LoginScreen } from './components/auth/LoginScreen';
@@ -1721,6 +1722,7 @@ export default function App() {
           currentVersion={data.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
+          showDevBacklog={isDevBacklogOwner(currentUser?.email)}
           counts={{
             students: data?.students?.length || 0,
             exams: data?.exams?.length || 0,
@@ -2228,6 +2230,11 @@ export default function App() {
                   onNavigateToTab={handleNavigate}
                 />
               </Suspense>
+            )}
+
+            {/* TAB: PLANO DE DESENVOLVIMENTO (privado, somente o desenvolvedor) */}
+            {activeTab === 'DEV_BACKLOG' && (
+              <DevBacklogModule userEmail={currentUser?.email} onBack={handleGoBack} />
             )}
 
             {/* TAB: SOBRE O SISTEMA & DADOS DO DESENVOLVEDOR */}

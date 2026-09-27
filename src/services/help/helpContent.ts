@@ -68,6 +68,10 @@ export const HELP_GENERAL: HelpModule = {
       tip: 'Se o navegador não deixar fechar sozinho, aparece a tela "Sessão encerrada": feche a janela no X ou com Alt+F4 (aba do navegador: Ctrl+W).',
     },
     {
+      q: 'O que é o "Plano de Desenvolvimento"?',
+      a: 'É o registro privado das melhorias e correções futuras do sistema, mantido pelo desenvolvedor. Só aparece no menu (Administração & TI) para a conta do desenvolvedor e pede a senha da nuvem para abrir. Os itens ficam guardados na nuvem com acesso exclusivo dessa conta.',
+    },
+    {
       q: 'Os dados vão para a nuvem sozinhos?',
       a: 'Sim, quando há internet e uma conta da nuvem conectada. No selo do rodapé (canto de baixo à esquerda) você vê a situação e pode clicar em "Enviar à nuvem agora". Sem internet, o trabalho continua normalmente e é enviado depois.',
     },
