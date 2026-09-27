@@ -103,7 +103,7 @@ export const HELP_GENERAL: HelpModule = {
     {
       q: 'A nuvem fica em "enviando..." e o número de matrícula (RA) de alguns alunos muda sozinho. Por quê?',
       a: 'A nuvem não aceita dois alunos com o mesmo RA. Quando um aluno chega com um RA que já pertence a outro aluno na nuvem, quem já estava lá fica com o número e o que chegou recebe o mesmo número com uma terminação, por exemplo "RA-2026-0364-R8KNM". Essa terminação é sempre a mesma para aquele aluno, então os números param de mudar. Se quiser, corrija o RA desse aluno pela ficha. Se a nuvem continuar em "enviando..." por mais de 15 minutos, avise o suporte.',
-      tip: 'Evite deixar o sistema aberto em duas janelas no mesmo computador: cada janela é tratada como uma estação separada.',
+      tip: 'Evite deixar o sistema aberto em duas janelas no mesmo computador: cada janela é tratada como uma estação separada. Na Sede, cada alteração sobe na hora; a conferência completa de todas as tabelas acontece a cada 30 minutos (ou ao clicar em "Enviar à nuvem agora").',
     },
     {
       q: 'O selo mostra "sem resposta (rede local)" o tempo todo. O servidor parou?',

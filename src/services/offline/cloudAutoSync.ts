@@ -32,7 +32,9 @@ export interface CloudSyncStatus {
 const LAST_PUSH_KEY = 'sucessoedu_cloud_last_push_v1';
 const LAST_LOTE_KEY = 'sucessoedu_cloud_last_lote_v1';
 const TICK_MS = 60_000;
-const MIN_PUSH_INTERVAL_MS = 10 * 60_000;
+// Envio COMPLETO da Sede (todas as tabelas): no máximo a cada 30 minutos, como conferência.
+// As alterações do dia a dia sobem na hora pela fila da nuvem, só com o que mudou.
+const MIN_PUSH_INTERVAL_MS = 30 * 60_000;
 export const LOTES_TABLE = 'lotes_escolas';
 
 let status: CloudSyncStatus = { state: 'inativo' };
@@ -210,7 +212,10 @@ export async function runCloudSyncNow(force = false): Promise<CloudSyncStatus> {
     const isAdmin = String(session.user?.app_metadata?.role || '').toUpperCase() === 'ADMIN';
     const notes = isAdmin ? await importPendingLotes(session.user.id) : [];
 
-    if (force || !recent || last.version !== localVersion || notes.length) {
+    // Antes, qualquer gravação no servidor (a cada poucos minutos) disparava o envio completo
+    // dos 2.011 alunos a cada minuto, e o recebimento logo depois gerava nova gravação: um
+    // ciclo sem fim que deixava a tela da Sede lenta. Agora o completo só roda no intervalo.
+    if (force || !recent || notes.length) {
       const results = await SupabaseDatabaseService.syncAllEntitiesToSupabase();
       const failed = results.filter((r) => !r.success);
       if (failed.length) {
