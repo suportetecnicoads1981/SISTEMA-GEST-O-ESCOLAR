@@ -206,8 +206,127 @@ export function resolveLetterheadSchool(target?: LetterheadTarget): BrandingScho
 /** Marca usada para não repetir o timbre quando o documento já o tem. */
 export const LETTERHEAD_MARK = 'data-sucessoedu-letterhead';
 
+/* ---------- Logos: tamanho real (Word/Excel precisam de largura e altura fixas) ---------- */
+export interface LogoImage {
+  w: number;
+  h: number;
+  /** PNG já reduzido (para o Excel). Vazio se a imagem vier de outro site e o navegador bloquear. */
+  png?: Uint8Array;
+}
+const logoCache = new Map<string, LogoImage | null>();
+
+function loadLogo(src: string): Promise<LogoImage | null> {
+  if (logoCache.has(src)) return Promise.resolve(logoCache.get(src) || null);
+  return new Promise((resolve) => {
+    const img = new Image();
+    if (/^https?:/i.test(src)) img.crossOrigin = 'anonymous';
+    const done = (v: LogoImage | null) => {
+      logoCache.set(src, v);
+      resolve(v);
+    };
+    const timer = setTimeout(() => done(null), 5000);
+    img.onerror = () => {
+      clearTimeout(timer);
+      done(null);
+    };
+    img.onload = () => {
+      clearTimeout(timer);
+      const w = img.naturalWidth || img.width || 0;
+      const h = img.naturalHeight || img.height || 0;
+      if (!w || !h) return done(null);
+      let png: Uint8Array | undefined;
+      try {
+        const scale = Math.min(1, 360 / Math.max(w, h));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(w * scale));
+        canvas.height = Math.max(1, Math.round(h * scale));
+        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const b64 = canvas.toDataURL('image/png').split(',')[1] || '';
+        const bin = atob(b64);
+        png = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) png[i] = bin.charCodeAt(i);
+      } catch {
+        png = undefined;
+      }
+      done({ w, h, png });
+    };
+    img.src = src;
+  });
+}
+
+/** Todas as logos cadastradas (Gestão, SEMED e escolas). */
+function allLogoSources(): string[] {
+  const list = [state.managementLogoUrl, state.semedLogoUrl, ...Array.from(state.schools.values()).map((s) => s.logoUrl || '')];
+  return Array.from(new Set(list.filter(Boolean)));
+}
+
+/** Carrega o tamanho real das logos antes de gerar Word ou Excel. */
+export async function preloadLogos(): Promise<void> {
+  await Promise.all(allLogoSources().map((src) => loadLogo(src)));
+}
+
+/** Logo já carregada (depois de preloadLogos). */
+export function getLoadedLogo(src?: string): LogoImage | null {
+  return src ? logoCache.get(src) || null : null;
+}
+
+/** Cabe a imagem numa caixa, mantendo a proporção. */
+export function fitBox(w: number, h: number, maxW: number, maxH: number): { w: number; h: number } {
+  if (!w || !h) return { w: maxW, h: maxH };
+  const k = Math.min(maxW / w, maxH / h);
+  return { w: Math.max(1, Math.round(w * k)), h: Math.max(1, Math.round(h * k)) };
+}
+
+/** Logos e textos do timbre, para quem monta o próprio cabeçalho (ex.: Excel). */
+export function letterheadParts(target?: LetterheadTarget): {
+  left: string[];
+  right: string[];
+  cityLine: string;
+  semedLine: string;
+  schoolLine: string;
+} {
+  const school = resolveLetterheadSchool(target);
+  const right: string[] = [];
+  if (state.semedLogoUrl) right.push(state.semedLogoUrl);
+  if (school?.logoUrl) right.push(school.logoUrl);
+  return {
+    left: state.managementLogoUrl ? [state.managementLogoUrl] : [],
+    right,
+    cityLine: state.cityName
+      ? `PREFEITURA MUNICIPAL DE ${state.cityName.toUpperCase()}${state.stateCode ? ' – ' + state.stateCode.toUpperCase() : ''}`
+      : 'PREFEITURA MUNICIPAL',
+    semedLine: String(state.semedName || '').toUpperCase(),
+    schoolLine: school?.name ? `${school.name}${school.inepCode && /\d/.test(school.inepCode) ? ` • INEP ${school.inepCode}` : ''}` : '',
+  };
+}
+
+/**
+ * Timbre em tabela, com largura e altura fixas nas logos. O Word não entende o layout
+ * flexível da impressão: sem isso as logos saem no tamanho original, uma embaixo da outra.
+ */
+function letterheadWordHtml(target?: LetterheadTarget): string {
+  const p = letterheadParts(target);
+  const img = (src: string, _i: number, list: string[]) => {
+    const info = getLoadedLogo(src);
+    const maxW = list.length > 1 ? 80 : 110;
+    const box = info ? fitBox(info.w, info.h, maxW, 60) : { w: 0, h: 60 };
+    const size = box.w ? `width="${box.w}" height="${box.h}" style="width:${box.w}px;height:${box.h}px"` : `height="60" style="height:60px"`;
+    return `<img src="${escapeHtml(src)}" ${size} alt="" />`;
+  };
+  const cell = (list: string[], align: string) =>
+    `<td width="22%" valign="middle" align="${align}" style="width:22%;vertical-align:middle;text-align:${align};border:none;padding:0 4px 6px">${list.map(img).join('&nbsp;&nbsp;')}</td>`;
+  return `<table ${LETTERHEAD_MARK}="1" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;border:none;border-bottom:2px solid #0f172a;margin-bottom:10px;font-family:Arial,Helvetica,sans-serif;color:#0f172a">
+<tr>${cell(p.left, 'left')}
+<td width="56%" valign="middle" align="center" style="width:56%;vertical-align:middle;text-align:center;border:none;padding:0 4px 6px;line-height:1.3">
+<p style="margin:0;text-align:center;font-size:12pt;font-weight:bold">${escapeHtml(p.cityLine)}</p>
+<p style="margin:0;text-align:center;font-size:11pt;font-weight:bold">${escapeHtml(p.semedLine)}</p>
+${p.schoolLine ? `<p style="margin:0;text-align:center;font-size:10pt;font-weight:bold">${escapeHtml(p.schoolLine)}</p>` : ''}
+</td>${cell(p.right, 'right')}</tr></table>`;
+}
+
 /** Cabeçalho em HTML (impressões, PDF e Word). Estilos inline para funcionar em qualquer janela. */
-export function letterheadHtml(target?: LetterheadTarget): string {
+export function letterheadHtml(target?: LetterheadTarget, opts?: { word?: boolean }): string {
+  if (opts?.word) return letterheadWordHtml(target);
   const school = resolveLetterheadSchool(target);
   const img = (src: string, alt: string) =>
     `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" style="max-height:64px;max-width:120px;object-fit:contain;display:block" />`;
@@ -231,9 +350,9 @@ export function letterheadHtml(target?: LetterheadTarget): string {
 }
 
 /** Acrescenta o timbre no começo de um trecho de HTML (se ele ainda não tiver um). */
-export function withLetterhead(contentHtml: string, target?: LetterheadTarget): string {
+export function withLetterhead(contentHtml: string, target?: LetterheadTarget, opts?: { word?: boolean }): string {
   if (!contentHtml) return contentHtml;
-  let out = contentHtml.includes(LETTERHEAD_MARK) ? contentHtml : letterheadHtml(target) + contentHtml;
+  let out = contentHtml.includes(LETTERHEAD_MARK) ? contentHtml : letterheadHtml(target, opts) + contentHtml;
   if (!out.includes(ISSUER_MARK)) out += issuerFooterHtml(!hasOwnSignature(contentHtml));
   return out;
 }

@@ -105,6 +105,11 @@ export const HELP_GENERAL: HelpModule = {
       tip: 'Os mesmos botões de Excel, Word e CSV também estão no Painel de Impressão das Turmas e do Pedagógico.',
     },
     {
+      q: 'Como sai o cabeçalho (escola, Gestão e SEMED) no Word e no Excel?',
+      a: 'Igual ao da impressão, já alinhado: logo da Gestão Municipal à esquerda; no centro, Prefeitura, Secretaria de Educação e a escola (com INEP); à direita, as logos da SEMED e da escola, todas em tamanho padronizado. No Word, cada escola/turma começa em página nova com o timbre. No Excel, o timbre fica no topo da planilha, seguido do título, filtros e de quem emitiu; cada escola/turma vem num bloco com a identificação em destaque, o cabeçalho das colunas em fundo escuro, bordas, totais e o campo de conferência. A planilha já sai pronta para imprimir em A4, ajustada à largura, uma escola/turma por página e com rodapé "Emitido por... / Página X de Y".',
+      tip: 'As logos vêm de Rede Municipal & Polos (Secretaria e Escolas). Se uma logo não aparecer, confira se ela está cadastrada ali. O arquivo CSV continua só com os dados, sem cabeçalho, para importar em outros sistemas.',
+    },
+    {
       q: 'O que é o "Plano de Desenvolvimento"?',
       a: 'É o registro privado das melhorias e correções futuras do sistema, mantido pelo desenvolvedor. Só aparece no menu (Administração & TI) para a conta do desenvolvedor e pede a senha da nuvem para abrir. Os itens ficam guardados na nuvem com acesso exclusivo dessa conta.',
       tip: 'Se a lista aparecer vazia logo depois de abrir, clique em "Atualizar". Os itens só aparecem para a conta do desenvolvedor.',

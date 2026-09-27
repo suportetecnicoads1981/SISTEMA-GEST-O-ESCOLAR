@@ -21,7 +21,8 @@ import {
   FileDown,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { letterheadHtml, issuerFooterHtml } from '../../services/documentBranding';
+import { letterheadHtml, issuerFooterHtml, preloadLogos } from '../../services/documentBranding';
+import { downloadStyledXlsx } from '../../services/styledXlsx';
 import { SchoolSettings } from '../../types';
 
 export interface PrintColumnConfig {
@@ -168,21 +169,27 @@ export const ConfigurablePrintModal: React.FC<ConfigurablePrintModalProps> = ({
    * e imprime por um quadro oculto. Antes, a tela inteira do sistema ia para a impressão e,
    * com muitos alunos, a janela de impressão não terminava de carregar.
    */
-  const buildReportHtml = (): string => {
-    const h = (t: string) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  /** Grupos (escola/turma) em ordem de conferência, com as linhas em ordem alfabética. */
+  const buildGroups = () => {
     const groups = new Map<string, { lines: [string, string][]; schoolUnitId?: string; classId?: string; rows: any[] }>();
     for (const item of data) {
       const g = groupBy ? groupBy(item) : { key: 'todos', lines: [] as [string, string][] };
       if (!groups.has(g.key)) groups.set(g.key, { lines: g.lines, schoolUnitId: (g as any).schoolUnitId, classId: (g as any).classId, rows: [] });
       groups.get(g.key)!.rows.push(item);
     }
-    const now = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    const filtersLine = appliedFilters.length ? appliedFilters.map((f) => `${h(f.label)}: ${h(String(f.value))}`).join(' • ') : '';
-    // Ordem de conferência: grupos pelo texto de identificação e alunos em ordem alfabética.
     const ordered = Array.from(groups.values()).sort((a, b) =>
       a.lines.map((l) => l[1]).join('|').localeCompare(b.lines.map((l) => l[1]).join('|'), 'pt-BR', { numeric: true })
     );
     ordered.forEach((g) => g.rows.sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || ''), 'pt-BR')));
+    return ordered;
+  };
+
+  const buildReportHtml = (mode: 'print' | 'word' = 'print'): string => {
+    const word = mode === 'word';
+    const h = (t: string) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const now = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const filtersLine = appliedFilters.length ? appliedFilters.map((f) => `${h(f.label)}: ${h(String(f.value))}`).join(' • ') : '';
+    const ordered = buildGroups();
     const sections = ordered.map((g, gi) => {
       const ident = g.lines
         .filter(([, v]) => v)
@@ -202,8 +209,9 @@ export const ConfigurablePrintModal: React.FC<ConfigurablePrintModalProps> = ({
           return `<tr>${tds}</tr>`;
         })
         .join('');
-      return `<section style="${gi > 0 ? 'page-break-before:always;' : ''}">
-${letterheadHtml({ schoolUnitId: g.schoolUnitId, classId: g.classId })}
+      const pageBreak = gi > 0 ? (word ? `<br clear="all" style="page-break-before:always" />` : '') : '';
+      return `${pageBreak}<${word ? 'div' : 'section'} style="${gi > 0 && !word ? 'page-break-before:always;' : ''}">
+${letterheadHtml({ schoolUnitId: g.schoolUnitId, classId: g.classId }, { word })}
 <h1>${h(title)}</h1>
 ${subtitle ? `<p class="sub">${h(subtitle)}</p>` : ''}
 ${ident ? `<table class="ident"><tr>${ident}</tr></table>` : ''}
@@ -212,10 +220,16 @@ ${filtersLine ? `<p class="meta">Filtros aplicados: ${filtersLine}</p>` : ''}
 ${groupSummary ? `<p class="meta"><b>${h(groupSummary(g.rows))}</b></p>` : ''}
 <p class="meta"><b>${h(countLabel)}:</b> ${g.rows.length} • Emitido em ${h(now)}</p>
 <table class="conf"><tr><td>Conferido por: ________________________________________</td><td>Data: ____/____/________</td><td>Assinatura: ______________________________</td></tr></table>
-</section>`;
+</${word ? 'div' : 'section'}>`;
     });
     const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>${h(title)}</title><style>
-@page{size:A4 ${orientation};margin:2cm 1.5cm 1.5cm 2cm}
+${
+      word
+        ? `@page WordSection1{size:${orientation === 'landscape' ? '841.9pt 595.3pt' : '595.3pt 841.9pt'};mso-page-orientation:${orientation};margin:2cm 1.5cm 1.5cm 2cm}
+div.WordSection1{page:WordSection1}
+p{margin:0}`
+        : `@page{size:A4 ${orientation};margin:2cm 1.5cm 1.5cm 2cm}`
+    }
 *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 body{font-family:Arial,Helvetica,sans-serif;color:#000;font-size:9pt;margin:0}
 h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
@@ -230,7 +244,7 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
 .grid tr{page-break-inside:avoid}
 .conf{width:100%;margin-top:14px;font-size:9pt}
 .conf td{padding-top:10px}
-</style></head><body>${sections.join('')}${issuerFooterHtml(false)}</body></html>`;
+</style></head><body>${word ? '<div class="WordSection1">' : ''}${sections.join('')}${issuerFooterHtml(false)}${word ? '</div>' : ''}</body></html>`;
     return html;
   };
 
@@ -304,12 +318,40 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
 
   const exportRows = () => data.map((item, idx) => activeColumns.map((c) => cellText(item, c.id, idx)));
 
-  const handleExportExcel = () => {
-    if (activeColumns.length === 0) return;
-    const sheet = XLSX.utils.aoa_to_sheet([[title], [], activeColumns.map((c) => c.label), ...exportRows()]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, sheet, 'Relatório');
-    XLSX.writeFile(wb, `${baseName()}.xlsx`);
+  const [exporting, setExporting] = useState<'' | 'xlsx' | 'word'>('');
+
+  /** Excel formatado: timbre com as logos, título, identificação de cada escola/turma, bordas e totais. */
+  const handleExportExcel = async () => {
+    if (activeColumns.length === 0 || exporting) return;
+    setExporting('xlsx');
+    try {
+      const groups = buildGroups();
+      const schools = new Set(groups.map((g) => g.schoolUnitId || ''));
+      await downloadStyledXlsx(`${baseName()}.xlsx`, {
+        title,
+        subtitle,
+        filtersLine: appliedFilters.map((f) => `${f.label}: ${f.value}`).join(' • '),
+        orientation,
+        letterhead: schools.size === 1 ? { schoolUnitId: groups[0]?.schoolUnitId, classId: groups[0]?.classId } : {},
+        columns: activeColumns.map((c) => ({ label: c.label, align: c.id === 'index' ? 'center' : c.align })),
+        sections: groups.map((g) => ({
+          lines: g.lines,
+          rows: g.rows.map((item, idx) =>
+            activeColumns.map((c) => (c.id === 'index' ? idx + 1 : c.id === 'signature' ? '' : cellText(item, c.id, data.indexOf(item))))
+          ),
+          summary: groupSummary ? groupSummary(g.rows) : undefined,
+          countLine: `${countLabel}: ${g.rows.length}`,
+        })),
+      });
+    } catch (err) {
+      console.error('Excel formatado falhou; gerando planilha simples.', err);
+      const sheet = XLSX.utils.aoa_to_sheet([[title], [], activeColumns.map((c) => c.label), ...exportRows()]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, sheet, 'Relatório');
+      XLSX.writeFile(wb, `${baseName()}.xlsx`);
+    } finally {
+      setExporting('');
+    }
   };
 
   const handleExportCsv = () => {
@@ -319,11 +361,20 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
     download(new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }), `${baseName()}.csv`);
   };
 
-  const handleExportWord = () => {
-    if (activeColumns.length === 0) return;
-    // Mesmo documento da impressão (timbre, identificação por escola/turma e conferência).
-    const doc = buildReportHtml().replace('<html lang="pt-BR">', '<html lang="pt-BR" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">');
-    download(new Blob(['\ufeff' + doc], { type: 'application/msword' }), `${baseName()}.doc`);
+  const handleExportWord = async () => {
+    if (activeColumns.length === 0 || exporting) return;
+    setExporting('word');
+    try {
+      // Tamanho real das logos: o Word precisa de largura e altura fixas para alinhar o timbre.
+      await preloadLogos().catch(() => {});
+      const doc = buildReportHtml('word').replace(
+        '<html lang="pt-BR">',
+        '<html lang="pt-BR" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">'
+      );
+      download(new Blob(['\ufeff' + doc], { type: 'application/msword' }), `${baseName()}.doc`);
+    } finally {
+      setExporting('');
+    }
   };
 
   // Cópia em formato TSV para colar no Excel/Word
@@ -429,7 +480,7 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
               title="Baixar em Excel (.xlsx) com as colunas e filtros escolhidos"
             >
               <FileSpreadsheet className="h-3.5 w-3.5" />
-              <span>Excel</span>
+              <span>{exporting === 'xlsx' ? 'Gerando...' : 'Excel'}</span>
             </button>
             <button
               onClick={handleExportWord}
@@ -437,7 +488,7 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
               title="Baixar em Word (.doc) com timbre e margens ABNT"
             >
               <FileDown className="h-3.5 w-3.5" />
-              <span>Word</span>
+              <span>{exporting === 'word' ? 'Gerando...' : 'Word'}</span>
             </button>
             <button
               onClick={handleExportCsv}

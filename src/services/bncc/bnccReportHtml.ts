@@ -4,7 +4,7 @@
  */
 import type { BnccSkill, BnccSkillAssessment } from '../../types';
 import { BNCC_LEVELS, distribution, levelInfo, groupBy } from './bnccAssessmentService';
-import { withLetterhead, type LetterheadTarget } from '../documentBranding';
+import { withLetterhead, preloadLogos, type LetterheadTarget } from '../documentBranding';
 
 const esc = (v: any) =>
   String(v ?? '')
@@ -217,9 +217,11 @@ ${need.length ? `<p style="font-size:11px;margin-top:8px"><b>Alunos com habilida
 }
 
 /** Baixa o HTML como documento que o Word abre (.doc). */
-export function downloadWordDoc(filename: string, bodyHtml: string, letterhead?: LetterheadTarget) {
-  // Mesmo timbre (logos da Gestão, SEMED e escola) da impressão.
-  bodyHtml = withLetterhead(bodyHtml, letterhead);
+export async function downloadWordDoc(filename: string, bodyHtml: string, letterhead?: LetterheadTarget) {
+  // Mesmo timbre (logos da Gestão, SEMED e escola) da impressão, em tabela com as logos no
+  // tamanho certo: o Word não entende o layout da tela e aumentava as imagens.
+  await preloadLogos().catch(() => {});
+  bodyHtml = withLetterhead(bodyHtml, letterhead, { word: true });
   const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>${esc(
     filename
   )}</title></head><body>${bodyHtml}</body></html>`;

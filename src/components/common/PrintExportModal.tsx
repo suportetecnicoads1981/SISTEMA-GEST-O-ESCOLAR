@@ -21,6 +21,7 @@ import {
 import { SchoolSettings } from '../../types';
 import { triggerPrint, downloadPrintableHtml } from '../../utils/printHelper';
 import * as XLSX from 'xlsx';
+import { downloadStyledXlsx } from '../../services/styledXlsx';
 
 export interface ColumnDefinition<T> {
   key: string;
@@ -71,7 +72,33 @@ export function PrintExportModal<T>({
   const [copyFeedback, setCopyFeedback] = useState(false);
   const printSheetRef = useRef<HTMLDivElement>(null);
 
-  const handleExportXLSX = () => {
+  const handleExportXLSX = async () => {
+    // Planilha formatada: timbre com as logos, título, identificação, cabeçalho em destaque e bordas.
+    try {
+      await downloadStyledXlsx(`${defaultFileName}_${new Date().toISOString().split('T')[0]}.xlsx`, {
+        title,
+        subtitle,
+        orientation: pageOrientation,
+        columns: [{ label: 'Nº', align: 'center' }, ...visibleColumns.map((c) => ({ label: c.label }))],
+        sections: [
+          {
+            lines: (extraHeaderInfo || []).map((h) => [h.label, String(h.value ?? '')] as [string, string]),
+            rows: items.map((item, idx) => [
+              idx + 1,
+              ...visibleColumns.map((col) => {
+                const v = col.getValue ? col.getValue(item, idx) : (item as any)[col.key];
+                return v === null || v === undefined ? '' : typeof v === 'number' ? v : String(v);
+              }),
+            ]),
+            countLine: `Total de registros: ${items.length}`,
+          },
+        ],
+        conference: includeSignatures,
+      });
+      return;
+    } catch (err) {
+      console.error('Excel formatado falhou; gerando planilha simples.', err);
+    }
     try {
       const exportRows = items.map((item, idx) => {
         const row: Record<string, any> = { '#': idx + 1 };
