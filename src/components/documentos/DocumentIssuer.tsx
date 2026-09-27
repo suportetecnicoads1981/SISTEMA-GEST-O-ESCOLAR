@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { DocumentLetterhead } from '../common/DocumentLetterhead';
+import { resolveSignatories } from '../../services/documentBranding';
 import {
   Award,
   FileText,
@@ -58,6 +59,8 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
     preSelectedStudentId || students[0]?.id || ''
   );
   const [documentType, setDocumentType] = useState<DocumentType>(preSelectedDocType);
+  // Assinaturas: titular da Secretaria (cadastro da Secretaria) e quem está emitindo (usuário logado).
+  const sig = resolveSignatories(settings);
   const [customObservation, setCustomObservation] = useState('');
   const [copied, setCopied] = useState(false);
 
@@ -326,13 +329,13 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
 
                 <div className="grid grid-cols-2 gap-8 pt-6">
                   <div className="text-center border-t border-slate-700 pt-2">
-                    <p className="text-xs font-bold text-slate-900">{settings.principalName}</p>
-                    <p className="text-[11px] text-slate-600">{settings.principalTitle}</p>
+                    <p className="text-xs font-bold text-slate-900">{sig.principalName}</p>
+                    <p className="text-[11px] text-slate-600">{sig.principalTitle}</p>
                   </div>
 
                   <div className="text-center border-t border-slate-700 pt-2">
-                    <p className="text-xs font-bold text-slate-900">{settings.secretaryName}</p>
-                    <p className="text-[11px] text-slate-600">{settings.secretaryRegistration}</p>
+                    <p className="text-xs font-bold text-slate-900">{sig.issuerName}</p>
+                    <p className="text-[11px] text-slate-600">{sig.issuerTitle}</p>
                   </div>
                 </div>
 
@@ -453,12 +456,12 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
               {/* Signatures */}
               <div className="pt-8 grid grid-cols-2 gap-8 text-center text-xs">
                 <div className="border-t border-slate-700 pt-1">
-                  <p className="font-bold text-slate-900">{settings.secretaryName}</p>
-                  <p className="text-slate-600">{settings.secretaryRegistration}</p>
+                  <p className="font-bold text-slate-900">{sig.issuerName}</p>
+                  <p className="text-slate-600">{sig.issuerTitle}</p>
                 </div>
                 <div className="border-t border-slate-700 pt-1">
-                  <p className="font-bold text-slate-900">{settings.principalName}</p>
-                  <p className="text-slate-600">{settings.principalTitle}</p>
+                  <p className="font-bold text-slate-900">{sig.principalName}</p>
+                  <p className="text-slate-600">{sig.principalTitle}</p>
                 </div>
               </div>
             </div>
@@ -521,8 +524,8 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
                 </p>
 
                 <div className="max-w-xs mx-auto text-center border-t border-slate-800 pt-2">
-                  <p className="text-xs font-bold text-slate-900">{settings.secretaryName}</p>
-                  <p className="text-[11px] text-slate-600">{settings.secretaryRegistration}</p>
+                  <p className="text-xs font-bold text-slate-900">{sig.issuerName}</p>
+                  <p className="text-[11px] text-slate-600">{sig.issuerTitle}</p>
                   <p className="text-[10px] text-slate-400 mt-1">Secretaria Escolar Oficial</p>
                 </div>
               </div>
@@ -620,7 +623,7 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
               <div className="space-y-8 pt-8">
                 <p className="text-center text-xs font-semibold text-slate-700">{settings.city}, {currentDateFormatted}.</p>
                 <div className="max-w-xs mx-auto text-center border-t border-slate-800 pt-2">
-                  <p className="text-xs font-bold text-slate-900">{settings.secretaryName}</p>
+                  <p className="text-xs font-bold text-slate-900">{sig.issuerName}</p>
                   <p className="text-[11px] text-slate-600">Secretário(a) Escolar</p>
                 </div>
               </div>

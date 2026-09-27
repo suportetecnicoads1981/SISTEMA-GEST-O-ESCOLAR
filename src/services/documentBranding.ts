@@ -113,6 +113,26 @@ function splitSecretary(raw?: string, role?: string): { secretaryName: string; s
   return { secretaryName: name, secretaryRole: r };
 }
 
+/**
+ * Quem assina os documentos: o(a) titular da Secretaria (cadastro Rede Municipal & Polos >
+ * Secretaria) e quem está logado e emite. Os valores das Configurações da escola ficam
+ * apenas como reserva, quando esses cadastros estiverem vazios.
+ */
+export function resolveSignatories(fallback?: {
+  principalName?: string;
+  principalTitle?: string;
+  secretaryName?: string;
+  secretaryRegistration?: string;
+}): { principalName: string; principalTitle: string; issuerName: string; issuerTitle: string } {
+  const fb = splitSecretary(fallback?.principalName, fallback?.principalTitle);
+  return {
+    principalName: state.secretaryName || fb.secretaryName,
+    principalTitle: state.secretaryRole || fb.secretaryRole,
+    issuerName: state.issuerName || String(fallback?.secretaryName || ''),
+    issuerTitle: state.issuerRole || String(fallback?.secretaryRegistration || ''),
+  };
+}
+
 /** Marca usada para não repetir o rodapé de emissão. */
 export const ISSUER_MARK = 'data-sucessoedu-issuer';
 

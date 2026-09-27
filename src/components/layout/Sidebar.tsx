@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { isTabAvailable } from '../../config/features';
 import {
   Users,
@@ -92,6 +93,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const current = activeTab || currentTab || 'MAIN_DASHBOARD';
   const [isAdminTIExpanded, setIsAdminTIExpanded] = useState(true);
+  // Dica do menu recolhido: posicionada na altura do ícone sob o ponteiro.
+  const [miniTip, setMiniTip] = useState<{ id: string; top: number; label: string; shortcut?: string; count?: number; danger?: boolean } | null>(null);
+  const showTip = (e: React.MouseEvent<HTMLElement>, tip: { id: string; label: string; shortcut?: string; count?: number; danger?: boolean }) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setMiniTip({ ...tip, top: r.top + r.height / 2 });
+  };
+  const hideTip = (id: string) => setMiniTip((t) => (t?.id === id ? null : t));
   const navRef = useRef<HTMLElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -616,7 +624,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         if (!isExpanded) {
                           /* RENDERIZAÇÃO COMPACTA MINI-RAIL (ÍCONE + TOOLTIP FLUTUANTE) */
                           return (
-                            <div key={item.id} className="relative group flex justify-center py-0.5">
+                            <div
+                              key={item.id}
+                              className="relative group flex justify-center py-0.5"
+                              onMouseEnter={(e) => showTip(e, { id: item.id, label: item.label, shortcut: item.shortcut, count: item.count })}
+                              onMouseLeave={() => hideTip(item.id)}
+                            >
                               <button
                                 id={`sidebar-mini-link-${item.id.toLowerCase()}`}
                                 onClick={() => onSelectTab(item.id)}
@@ -634,20 +647,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 )}
                               </button>
 
-                              {/* Tooltip Popover flutuante no mini-rail */}
-                              <div className="fixed left-16 z-50 bg-slate-950 text-slate-100 text-xs px-3 py-2 rounded-xl shadow-2xl border border-slate-700/80 backdrop-blur-md opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 whitespace-nowrap flex items-center gap-2 -translate-y-1">
-                                <span className="font-bold">{item.label}</span>
-                                {item.shortcut && (
-                                  <kbd className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-bold">
-                                    {item.shortcut}
-                                  </kbd>
-                                )}
-                                {item.count !== undefined && item.count > 0 && (
-                                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-rose-600 text-white">
-                                    {item.count}
-                                  </span>
-                                )}
-                              </div>
                             </div>
                           );
                         }
@@ -772,17 +771,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </kbd>
             </button>
           ) : (
-            <div className="relative group flex justify-center py-0.5">
+            <div
+              className="relative group flex justify-center py-0.5"
+              onMouseEnter={(e) => showTip(e, { id: '__atalhos', label: 'Atalhos de Teclado', shortcut: 'Alt+K' })}
+              onMouseLeave={() => hideTip('__atalhos')}
+            >
               <button
                 onClick={onOpenShortcutsModal}
                 className="w-9 h-9 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                title="Atalhos de Teclado (Alt+K)"
               >
                 <Keyboard className="h-4.5 w-4.5" />
               </button>
-              <div className="fixed left-16 z-50 bg-slate-950 text-slate-100 text-xs px-2.5 py-1.5 rounded-xl shadow-2xl border border-slate-700/80 backdrop-blur-md opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 whitespace-nowrap">
-                Atalhos de Teclado (Alt+K)
-              </div>
             </div>
           )
         )}
@@ -804,21 +803,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </span>
             </button>
           ) : (
-            <div className="relative group flex justify-center py-0.5">
+            <div
+              className="relative group flex justify-center py-0.5"
+              onMouseEnter={(e) => showTip(e, { id: '__sair', label: 'Sair do Sistema', danger: true })}
+              onMouseLeave={() => hideTip('__sair')}
+            >
               <button
                 onClick={onLogout}
                 className="w-9 h-9 rounded-xl bg-rose-950/30 hover:bg-rose-900/50 text-rose-400 hover:text-rose-200 flex items-center justify-center border border-rose-900/30 transition-colors cursor-pointer"
-                title="Sair do Sistema"
               >
                 <LogOut className="h-4.5 w-4.5" />
               </button>
-              <div className="fixed left-16 z-50 bg-slate-950 text-rose-300 text-xs px-2.5 py-1.5 rounded-xl shadow-2xl border border-rose-900/60 backdrop-blur-md opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 whitespace-nowrap font-bold">
-                Sair do Sistema
-              </div>
             </div>
           )
         )}
       </div>
+
+      {/* Dica do menu recolhido: desenhada fora do menu, na altura exata do ícone */}
+      {!isExpanded &&
+        miniTip &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            role="tooltip"
+            style={{ position: 'fixed', left: 68, top: miniTip.top, transform: 'translateY(-50%)', zIndex: 2147483000 }}
+            className={`bg-slate-950 text-xs px-3 py-2 rounded-xl shadow-2xl border pointer-events-none whitespace-nowrap flex items-center gap-2 ${
+              miniTip.danger ? 'text-rose-300 border-rose-900/60 font-bold' : 'text-slate-100 border-slate-700/80'
+            }`}
+          >
+            <span className="font-bold">{miniTip.label}</span>
+            {miniTip.shortcut && (
+              <kbd className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-bold">
+                {miniTip.shortcut}
+              </kbd>
+            )}
+            {miniTip.count !== undefined && miniTip.count > 0 && (
+              <span className="text-[10px] font-bold px-1.5 rounded-full bg-rose-600 text-white">{miniTip.count}</span>
+            )}
+          </div>,
+          document.body
+        )}
 
       {/* Footer Info */}
       <div className={`p-2.5 border-t border-slate-800 text-[11px] text-slate-400 bg-slate-950/40 flex items-center shrink-0 ${isExpanded ? 'justify-between px-3' : 'justify-center'}`}>

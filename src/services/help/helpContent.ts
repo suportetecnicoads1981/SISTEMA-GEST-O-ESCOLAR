@@ -72,6 +72,10 @@ export const HELP_GENERAL: HelpModule = {
       a: 'A escolha agora fica guardada também no seu cadastro de usuário: vale em qualquer computador ligado ao mesmo servidor, mesmo que o navegador limpe os dados. Marque a opção uma vez e feche o Tour. Ele continua disponível no botão "Tour Guiado" do topo.',
     },
     {
+      q: 'Com o menu lateral recolhido, como sei o que é cada ícone?',
+      a: 'Passe o ponteiro do mouse sobre o ícone: o nome do módulo e o atalho de teclado aparecem ao lado, na mesma altura do ícone. Para ver os nomes o tempo todo, expanda o menu pela seta no topo da barra.',
+    },
+    {
       q: 'Para que serve o botão "Atualizar" no topo da tela?',
       a: 'Ele envia o que estiver pendente e recarrega a tela, trazendo os dados e a versão mais recentes. Use quando algo parecer desatualizado. Nada se perde: as alterações pendentes são enviadas antes de recarregar.',
     },
@@ -87,6 +91,7 @@ export const HELP_GENERAL: HelpModule = {
     {
       q: 'Por que os documentos saem com "Emitido por" e a assinatura da Secretária?',
       a: 'Todo documento oficial traz no rodapé o nome completo e o cargo de quem está logado e emitiu, com data e hora, e o bloco de assinatura do(a) titular da Secretaria de Educação (cadastrado em Rede Municipal & Polos > Secretaria). Se o documento já tiver a própria área de assinatura, o bloco da Secretaria não é repetido. Para o nome sair certo, mantenha o nome completo e o cargo atualizados no cadastro do usuário.',
+      tip: 'Nos certificados, declarações e históricos (Documentos Oficiais), a primeira assinatura é do(a) titular da Secretaria e a segunda é de quem está emitindo. Cadastre o nome completo do(a) Secretário(a) em Rede Municipal & Polos > Secretaria, no campo do(a) Secretário(a) de Educação, só com o nome (o cargo vai no campo próprio).',
     },
     {
       q: 'Como gerar um relatório só de uma escola, série ou turma e salvar em Excel ou Word?',
