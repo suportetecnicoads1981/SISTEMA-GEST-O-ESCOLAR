@@ -1,5 +1,6 @@
 import { sanitizeHtmlFragment } from './safeHtml';
 import { withLetterhead } from '../services/documentBranding';
+import { printFileName } from './printIsolated';
 /**
  * Utilitário centralizado e robusto para Impressão e Pré-visualização Oficial no SucessoEdu.
  * Garante compatibilidade total em iframes, navegadores móveis e sandboxes.
@@ -35,14 +36,16 @@ export function buildPrintHtml(contentHtml: string, options?: PrintOptions): str
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${title}</title>
+  <title>${printFileName(title)}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <style>
+    /* Margens ABNT (NBR 14724): 3 cm superior/esquerda, 2 cm inferior/direita; página no alto à direita */
     @page {
       size: A4 ${orientation};
-      margin: 10mm 12mm 12mm 12mm;
+      margin: 3cm 2cm 2cm 3cm;
+      @top-right { content: counter(page); font: 10pt Arial, Helvetica, sans-serif; }
     }
     * {
       box-sizing: border-box;

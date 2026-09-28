@@ -57,6 +57,7 @@ import {
 import { CustomizableChartCard } from '../common/CustomizableChartCard';
 import { BimonthlyAcademicEvolutionCard } from './BimonthlyAcademicEvolutionCard';
 import { ArrowLeft, Home } from 'lucide-react';
+import { printElementIsolated, printFileName, setPrintTitle } from '../../utils/printIsolated';
 
 interface PedagogicalEvolutionProps {
   students?: Student[];
@@ -372,6 +373,7 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
   ]);
 
   const handlePrint = () => {
+    setPrintTitle(printFileName('Evolucao Pedagogica', viewMode));
     window.print();
   };
 

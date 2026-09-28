@@ -1,5 +1,6 @@
 import type { SchoolClass, SchoolUnit, Student } from '../types';
 import { canonicalGrade, normalizeSchoolName } from '../services/dataImportService';
+import { provisionalRaFor, isProvisionalRa } from '../services/raService';
 
 /**
  * Correção automática (idempotente) do vínculo escola ↔ turma ↔ aluno.
@@ -132,60 +133,47 @@ function registeredAt(s: any): number {
 }
 
 function dedupeRegistrationNumbers(students: Student[], now: string, summary: string[]): Student[] {
-  // Agrupa pelo RA "base": "RA-2026-0181-DUP-xxxx" (marca provisória da nuvem) conta como RA-2026-0181
+  // O RA agora é entregue pela nuvem (raService). Aqui NÃO se numera mais nada localmente:
+  //  - RA repetido: quem foi cadastrado primeiro fica com o número; os demais recebem o RA
+  //    provisório (derivado do id, igual em qualquer computador) e a nuvem entrega o definitivo;
+  //  - RA com marca antiga da nuvem ("RA-2026-0181-DUP-xxxx") volta ao número base, se livre;
+  //  - aluno sem RA recebe o provisório.
   const baseOf = (ra: string) => ra.split('-DUP-')[0];
   const groups = new Map<string, number[]>();
+  const out = students.slice();
+  let touched = false;
+  const setRa = (i: number, ra: string, motivo: string) => {
+    summary.push(`${motivo}: "${(out[i] as any).name}" ${(out[i] as any).enrollmentNumber || '(sem RA)'} → ${ra}`);
+    out[i] = { ...out[i], enrollmentNumber: ra, updatedAt: now } as Student;
+    touched = true;
+  };
+
   students.forEach((s, i) => {
+    if (!s) return;
     const ra = String((s as any)?.enrollmentNumber || '').trim();
-    if (!ra) return;
+    if (!ra) {
+      setRa(i, provisionalRaFor(String((s as any).id || i)), 'RA provisório');
+      return;
+    }
+    if (isProvisionalRa(ra)) return;
     const base = baseOf(ra);
     if (!groups.has(base)) groups.set(base, []);
     groups.get(base)!.push(i);
   });
 
-  const needsWork = Array.from(groups.values()).some(
-    (idx) => idx.length > 1 || String((students[idx[0]] as any).enrollmentNumber).includes('-DUP-')
-  );
-  if (!needsWork) return students;
-
-  const year = new Date().getFullYear();
-  let next =
-    Math.max(
-      0,
-      ...Array.from(groups.keys()).map((r) => {
-        const m = r.match(/^RA-\d{4}-(\d+)$/);
-        return m ? parseInt(m[1], 10) : 0;
-      })
-    ) + 1;
-  const used = new Set(groups.keys());
-  const out = students.slice();
-  const setRa = (i: number, ra: string, motivo: string) => {
-    summary.push(`${motivo}: "${(out[i] as any).name}" ${(out[i] as any).enrollmentNumber} → ${ra}`);
-    out[i] = { ...out[i], enrollmentNumber: ra, updatedAt: now } as Student;
-  };
-
-  // Ordem estável (pelo RA e pelo id, nunca pela posição na lista): todos os computadores
-  // chegam ao MESMO resultado. Antes, alunos importados juntos (mesmo horário) desempatavam
-  // pela posição na lista, que muda de um computador para outro, e cada estação renumerava
-  // diferente, desfazendo o trabalho da outra na nuvem sem parar.
+  // Ordem estável (pelo cadastro e pelo id): todos os computadores chegam ao mesmo resultado.
   const byId = (i: number) => String((out[i] as any)?.id || '');
-  const ordered = Array.from(groups.entries()).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  ordered.forEach(([base, idx]) => {
-    // Quem foi cadastrado primeiro fica com o número base; os demais recebem o próximo livre
+  groups.forEach((idx, base) => {
+    const hasDupMark = idx.some((i) => String((out[i] as any).enrollmentNumber).includes('-DUP-'));
+    if (idx.length === 1 && !hasDupMark) return;
     const sorted = idx
       .slice()
       .sort((a, b) => registeredAt(out[a]) - registeredAt(out[b]) || (byId(a) < byId(b) ? -1 : byId(a) > byId(b) ? 1 : 0));
     const [keeper, ...others] = sorted;
     if (String((out[keeper] as any).enrollmentNumber) !== base) setRa(keeper, base, 'RA restaurado');
-    others.forEach((i) => {
-      let ra = `RA-${year}-${String(next).padStart(4, '0')}`;
-      while (used.has(ra)) ra = `RA-${year}-${String(++next).padStart(4, '0')}`;
-      used.add(ra);
-      next++;
-      setRa(i, ra, 'RA repetido');
-    });
+    others.forEach((i) => setRa(i, provisionalRaFor(byId(i) || String(i)), 'RA repetido (aguardando a nuvem)'));
   });
-  return out;
+  return touched ? out : students;
 }
 
 const HEADER_NAME = /^(NOME COMPLETO( DO\(?A?\)? ALUNO\(?A?\)?)?|NOME DO\(?A?\)? ALUNO\(?A?\)?|NOME|ALUNO\(?A?\)?)$/;

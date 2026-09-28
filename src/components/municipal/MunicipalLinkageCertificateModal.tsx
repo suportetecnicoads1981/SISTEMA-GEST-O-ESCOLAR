@@ -11,6 +11,7 @@ import {
   Users,
 } from 'lucide-react';
 import { MunicipalSecretaryInfo, SchoolUnit } from '../../types';
+import { printElementIsolated, printFileName, setPrintTitle } from '../../utils/printIsolated';
 
 interface MunicipalLinkageCertificateModalProps {
   isOpen: boolean;
@@ -27,7 +28,11 @@ export const MunicipalLinkageCertificateModal: React.FC<
   if (!isOpen) return null;
 
   const handlePrint = () => {
-    window.print();
+    const fileName = printFileName('Certidao de Vinculo Municipal', secretary?.name);
+    if (!printElementIsolated(printRef.current, { fileName, abnt: true })) {
+      setPrintTitle(fileName);
+      window.print();
+    }
   };
 
   const totalStudents = schoolUnits.reduce((acc, u) => acc + (u.totalStudents || 0), 0);

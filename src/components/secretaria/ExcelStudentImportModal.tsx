@@ -15,6 +15,7 @@ import {
   Table,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { provisionalRaFor } from '../../services/raService';
 import { Student, SchoolClass } from '../../types';
 
 interface ExcelStudentImportModalProps {
@@ -130,7 +131,7 @@ export const ExcelStudentImportModal: React.FC<ExcelStudentImportModalProps> = (
         const processed: ParsedStudentRow[] = rawData.map((row, index) => {
           const name = String(row['Nome Completo'] || row['Nome'] || row['Aluno'] || '').trim();
           const ra = String(
-            row['Matrícula/RA'] || row['Matricula'] || row['RA'] || `RA-2026-${100 + index}`
+            row['Matrícula/RA'] || row['Matricula'] || row['RA'] || ''
           ).trim();
           const cpf = String(row['CPF do Aluno'] || row['CPF'] || '').trim();
           const birthDate = String(row['Data de Nascimento'] || row['Nascimento'] || '2012-01-01').trim();
@@ -198,10 +199,12 @@ export const ExcelStudentImportModal: React.FC<ExcelStudentImportModalProps> = (
     const validRows = parsedRows.filter((r) => r.isValid);
     if (validRows.length === 0) return;
 
+    const stamp = Date.now();
     const newStudentObjects: Student[] = validRows.map((r, i) => ({
-      id: `std-imp-${Date.now()}-${i}`,
+      id: `std-imp-${stamp}-${i}`,
       name: r.name,
-      enrollmentNumber: r.enrollmentNumber || `MAT-${Date.now().toString().slice(-4)}${i}`,
+      // Sem RA na planilha: provisório, trocado pelo número da nuvem assim que houver conexão.
+      enrollmentNumber: r.enrollmentNumber || provisionalRaFor(`std-imp-${stamp}-${i}`),
       cpf: r.cpf || '',
       birthDate: r.birthDate || '2015-01-01',
       gender: 'M',

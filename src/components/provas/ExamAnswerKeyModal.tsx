@@ -20,6 +20,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { Exam, Question, SchoolClass, SchoolSettings } from '../../types';
+import { printElementIsolated, printFileName, setPrintTitle } from '../../utils/printIsolated';
 
 interface ExamAnswerKeyModalProps {
   isOpen: boolean;
@@ -54,6 +55,7 @@ export const ExamAnswerKeyModal: React.FC<ExamAnswerKeyModalProps> = ({
   });
 
   const handlePrint = () => {
+    setPrintTitle(printFileName('Gabarito', exam.title, schoolClass?.name));
     window.print();
   };
 

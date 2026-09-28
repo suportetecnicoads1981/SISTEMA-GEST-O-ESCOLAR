@@ -28,6 +28,7 @@ import {
 import { writeSafePrintDocument } from '../../utils/safeHtml';
 import { triggerAttendanceAlert } from '../../services/messageQueueService';
 import { promptDialog } from '../../utils/dialogs';
+import { printFileName } from '../../utils/printIsolated';
 
 interface TeacherAttendanceTabProps {
   teacherName: string;
@@ -244,7 +245,7 @@ export const TeacherAttendanceTab: React.FC<TeacherAttendanceTabProps> = ({
       <html lang="pt-BR">
       <head>
         <meta charset="utf-8">
-        <title>Folha Oficial de Frequência - ${activeClass?.name}</title>
+        <title>${printFileName('Folha de Frequencia', activeClass?.name)}</title>
         <style>
           @page { size: A4 portrait; margin: 15mm; }
           body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 11pt; color: #1e293b; margin: 0; padding: 20px; }

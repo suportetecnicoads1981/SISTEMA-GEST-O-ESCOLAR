@@ -8,6 +8,7 @@ import { sanitizeLegacyLocalStorage, applyProductionStartOnce, PRODUCTION_START_
 import { bootstrapLocalServer } from './services/offline/localServerSync';
 import { startCloudAutoSync } from './services/offline/cloudAutoSync';
 import { LocalNetworkStatusBadge } from './components/offline/LocalNetworkStatusBadge';
+import { installPrintTitleGuard } from './utils/printIsolated';
 import { UpdateAvailableNotice } from './components/offline/UpdateAvailableNotice';
 import './index.css';
 import { installApiAuthFetch } from './utils/apiAuthFetch';
@@ -41,7 +42,10 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 function renderApp() {
-  createRoot(document.getElementById('root')!).render(
+  // Impressões que ainda usam a tela inteira: nome de arquivo único ao salvar o PDF.
+installPrintTitleGuard();
+
+createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <ErrorBoundary>
         <AuthProvider>

@@ -26,6 +26,8 @@ import {
   AcademicHistory,
   SchoolSettings,
 } from '../../types';
+import { printElementIsolated, printFileName, setPrintTitle } from '../../utils/printIsolated';
+import { isProvisionalRa } from '../../services/raService';
 
 export type DocumentType =
   | 'CERTIFICADO_CONCLUSAO'
@@ -83,14 +85,44 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
     issuedAt: new Date().toISOString(),
   };
 
+  // Textos do aluno formatados para o documento: CPF vazio/zerado vira "Não informado",
+  // data de nascimento em dd/mm/aaaa e turno sem repetir quando já faz parte do nome da turma.
+  const raText = isProvisionalRa(selectedStudent?.enrollmentNumber)
+    ? 'Aguardando número da nuvem'
+    : selectedStudent?.enrollmentNumber || 'Não informado';
+  const cpfDigits = String(selectedStudent?.cpf || '').replace(/\D/g, '');
+  const cpfText = !cpfDigits || /^0+$/.test(cpfDigits) ? 'Não informado' : selectedStudent?.cpf;
+  const birthRaw = String(selectedStudent?.birthDate || '');
+  const birthMatch = birthRaw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const birthText = birthMatch ? `${birthMatch[3]}/${birthMatch[2]}/${birthMatch[1]}` : birthRaw || 'Não informada';
+  const className = selectedClass?.name || '';
+  const shiftName = selectedClass?.shift || '';
+  const classWithShift =
+    shiftName && !className.toUpperCase().includes(String(shiftName).toUpperCase()) ? `${className} (${shiftName})` : className;
+
   const currentDateFormatted = new Intl.DateTimeFormat('pt-BR', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
   }).format(new Date());
 
+  const DOC_FILE_LABEL: Record<string, string> = {
+    CERTIFICADO_CONCLUSAO: 'Certificado de Conclusao',
+    HISTORICO_ESCOLAR: 'Historico Escolar',
+    DECLARACAO_MATRICULA: 'Declaracao de Matricula',
+    BOLETIM_ESCOLAR: 'Boletim Escolar',
+    DECLARACAO_TRANSFERENCIA: 'Declaracao de Transferencia',
+  };
+
+  // Imprime só a folha do documento (sem a barra de rolagem da tela) e sugere um nome
+  // único ao salvar o PDF: tipo do documento + aluno + data/hora.
   const handlePrint = () => {
-    window.print();
+    const fileName = printFileName(DOC_FILE_LABEL[documentType] || 'Documento', selectedStudent?.name);
+    const ok = printElementIsolated(document.getElementById('printable-official-document'), { fileName, abnt: true });
+    if (!ok) {
+      setPrintTitle(fileName);
+      window.print();
+    }
   };
 
   const handleCopyText = () => {
@@ -305,7 +337,7 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
                     {selectedStudent?.name}
                   </p>
                   <p className="text-xs text-slate-600 mt-1 font-mono">
-                    Matrícula: {selectedStudent?.enrollmentNumber} • CPF: {selectedStudent?.cpf} • RG: {selectedStudent?.rg || 'Não informado'}
+                    Matrícula: {raText} • CPF: {cpfText} • RG: {selectedStudent?.rg || 'Não informado'}
                   </p>
                 </div>
 
@@ -372,19 +404,19 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
                 </div>
                 <div>
                   <span className="text-slate-500 block text-[10px] uppercase font-bold">Matrícula (RA):</span>
-                  <span className="font-mono font-bold text-slate-900">{selectedStudent?.enrollmentNumber}</span>
+                  <span className="font-mono font-bold text-slate-900">{raText}</span>
                 </div>
                 <div>
                   <span className="text-slate-500 block text-[10px] uppercase font-bold">CPF:</span>
-                  <span className="font-mono text-slate-800">{selectedStudent?.cpf}</span>
+                  <span className="font-mono text-slate-800">{cpfText}</span>
                 </div>
                 <div>
                   <span className="text-slate-500 block text-[10px] uppercase font-bold">Nascimento:</span>
-                  <span className="text-slate-800">{selectedStudent?.birthDate}</span>
+                  <span className="text-slate-800">{birthText}</span>
                 </div>
                 <div className="col-span-2">
                   <span className="text-slate-500 block text-[10px] uppercase font-bold">Curso / Série:</span>
-                  <span className="font-semibold text-slate-900">{selectedClass?.name} ({selectedClass?.shift})</span>
+                  <span className="font-semibold text-slate-900">{classWithShift}</span>
                 </div>
                 <div className="col-span-2">
                   <span className="text-slate-500 block text-[10px] uppercase font-bold">Ano Letivo:</span>
@@ -495,7 +527,7 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
                 <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-1 my-4">
                   <p className="text-lg font-bold text-indigo-900">{selectedStudent?.name}</p>
                   <p className="text-xs text-slate-600 font-mono">
-                    Matrícula (RA): <strong>{selectedStudent?.enrollmentNumber}</strong> | CPF: <strong>{selectedStudent?.cpf}</strong>
+                    Matrícula (RA): <strong>{raText}</strong> | CPF: <strong>{cpfText}</strong>
                   </p>
                   <p className="text-xs text-slate-600">
                     Filiação/Responsável: <strong>{selectedStudent?.guardianName}</strong>
@@ -546,7 +578,7 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs flex justify-between">
                 <div>
                   <p className="font-bold text-slate-900">{selectedStudent?.name}</p>
-                  <p className="text-slate-500 font-mono">RA: {selectedStudent?.enrollmentNumber} | CPF: {selectedStudent?.cpf}</p>
+                  <p className="text-slate-500 font-mono">RA: {raText} | CPF: {cpfText}</p>
                 </div>
                 <div className="text-right">
                   <p className="font-bold text-indigo-900">Média Geral: {safeHistory.generalAverage ?? '-'}</p>
@@ -613,7 +645,7 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
 
               <div className="text-sm sm:text-base text-slate-800 leading-relaxed text-justify space-y-4 px-4 sm:px-8">
                 <p>
-                  Declaramos que a pedido do responsável legal, foi expedida a transferência do(a) aluno(a) <strong className="text-slate-900">{selectedStudent?.name}</strong>, matrícula <strong>{selectedStudent?.enrollmentNumber}</strong>, CPF <strong>{selectedStudent?.cpf}</strong>, regularmente enturmado(a) na turma <strong>{selectedClass?.name}</strong>.
+                  Declaramos que a pedido do responsável legal, foi expedida a transferência do(a) aluno(a) <strong className="text-slate-900">{selectedStudent?.name}</strong>, matrícula <strong>{raText}</strong>, CPF <strong>{cpfText}</strong>, regularmente enturmado(a) na turma <strong>{selectedClass?.name}</strong>.
                 </p>
                 <p>
                   O histórico escolar definitivo e a pasta de documentos serão emitidos no prazo regimental de até 30 (trinta) dias.

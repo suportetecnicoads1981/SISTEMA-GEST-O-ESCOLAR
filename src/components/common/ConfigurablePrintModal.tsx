@@ -23,6 +23,7 @@ import {
 import * as XLSX from 'xlsx';
 import { letterheadHtml, issuerFooterHtml, preloadLogos } from '../../services/documentBranding';
 import { downloadStyledXlsx } from '../../services/styledXlsx';
+import { printFileName, setPrintTitle } from '../../utils/printIsolated';
 import { SchoolSettings } from '../../types';
 
 export interface PrintColumnConfig {
@@ -222,7 +223,8 @@ ${groupSummary ? `<p class="meta"><b>${h(groupSummary(g.rows))}</b></p>` : ''}
 <table class="conf"><tr><td>Conferido por: ________________________________________</td><td>Data: ____/____/________</td><td>Assinatura: ______________________________</td></tr></table>
 </${word ? 'div' : 'section'}>`;
     });
-    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>${h(title)}</title><style>
+    const printName = baseName();
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>${h(printName)}</title><style>
 ${
       word
         ? `@page WordSection1{size:${orientation === 'landscape' ? '841.9pt 595.3pt' : '595.3pt 841.9pt'};mso-page-orientation:${orientation};margin:2cm 1.5cm 1.5cm 2cm}
@@ -252,6 +254,7 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
     if (activeColumns.length === 0 || printing) return;
     setPrinting(true);
     const html = buildReportHtml();
+    const restoreTitle = setPrintTitle((html.match(/<title>([^<]*)<\/title>/) || [])[1] || baseName());
     const frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
     frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
@@ -267,6 +270,7 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
     doc.close();
     const go = () => {
       try {
+        frame.contentWindow?.addEventListener('afterprint', restoreTitle, { once: true });
         frame.contentWindow?.focus();
         frame.contentWindow?.print();
       } finally {
@@ -302,8 +306,9 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
     return v === null || v === undefined ? '' : String(v);
   };
 
+  // Nome único: relatório + filtros principais (escola/turma) + data e hora — cada arquivo salvo ganha um nome próprio.
   const baseName = () =>
-    `${(fileName || title).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 60) || 'relatorio'}_${new Date().toISOString().slice(0, 10)}`;
+    printFileName(fileName || title || 'Relatorio', ...appliedFilters.slice(0, 2).map((f) => f.value));
 
   const download = (blob: Blob, name: string) => {
     const url = URL.createObjectURL(blob);

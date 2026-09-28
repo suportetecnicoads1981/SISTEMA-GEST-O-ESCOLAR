@@ -16,6 +16,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { OmniDeployPrintDevice } from '../../types';
+import { printElementIsolated, printFileName, setPrintTitle } from '../../utils/printIsolated';
 
 interface PrintCanvasProps {
   documentTitle?: string;
@@ -77,7 +78,15 @@ export const PrintCanvas: React.FC<PrintCanvasProps> = ({
   const printAreaRef = useRef<HTMLDivElement>(null);
 
   const handleTriggerPrint = () => {
-    window.print();
+    const fileName = printFileName('Impressao SucessoEdu');
+    const ok = printElementIsolated(printAreaRef.current, {
+      fileName,
+      orientation: paperOrientation === 'LANDSCAPE' ? 'landscape' : 'portrait',
+    });
+    if (!ok) {
+      setPrintTitle(fileName);
+      window.print();
+    }
   };
 
   return (

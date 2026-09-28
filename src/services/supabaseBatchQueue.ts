@@ -1,5 +1,6 @@
 import { getSupabaseClient } from './supabaseClient';
 import { toRemoteRow } from './datasync/supabaseRowMapper';
+import { provisionalRaFor } from './raService';
 
 export interface QueuedBatchItem {
   id: string;
@@ -263,7 +264,7 @@ class SupabaseBatchQueue {
       return records.map((s: any, idx: number) => ({
         id: s.id || ('std_' + idx),
         name: s.name,
-        registration_number: s.enrollmentNumber || s.registrationNumber || s.registration_number || ('RA-2026-' + idx),
+        registration_number: s.enrollmentNumber || s.registrationNumber || s.registration_number || provisionalRaFor(String(s.id || idx)),
         status: s.status || 'ACTIVE',
         class_id: s.classId || s.class_id || null,
         birth_date: toIsoDateOrNull(s.birthDate || s.birth_date) || '2015-01-01',

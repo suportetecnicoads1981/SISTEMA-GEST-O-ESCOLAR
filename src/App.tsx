@@ -118,6 +118,7 @@ import { getLocalServerInfo } from './services/offline/localServerSync';
 import { setDocumentBranding } from './services/documentBranding';
 import { runCloudSyncNow } from './services/offline/cloudAutoSync';
 import { normalizeSchoolLinks } from './utils/schoolDataNormalizer';
+import { isProvisionalRa, resolveProvisionalRas } from './services/raService';
 
 export default function App() {
   const [data, setData] = useState(() => getStoredData());
@@ -338,6 +339,49 @@ export default function App() {
       setData(result.data);
     }
   }, [data.schoolUnits, data.classes, data.students]);
+
+  // RA gerado pela nuvem: alunos com RA provisório recebem o número definitivo assim que
+  // houver login na nuvem. A nuvem devolve o mesmo número para o mesmo aluno, então vários
+  // computadores podem pedir ao mesmo tempo sem gerar RAs diferentes. Tenta de novo a cada minuto.
+  const raResolveBusyRef = useRef(false);
+  const latestStudentsRef = useRef(data.students);
+  latestStudentsRef.current = data.students;
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (raResolveBusyRef.current || cancelled) return;
+      const list = latestStudentsRef.current || [];
+      if (!list.some((s) => s && isProvisionalRa(s.enrollmentNumber))) return;
+      raResolveBusyRef.current = true;
+      try {
+        const fresh = await resolveProvisionalRas(list as any[]);
+        // Mescla por id no estado mais recente (a lista pode ter mudado durante o pedido).
+        if (fresh.resolved && !cancelled) {
+          console.info(`[SucessoEdu] RA definitivo recebido da nuvem para ${fresh.resolved} aluno(s).`);
+          setData((prev) => {
+            const map = new Map(fresh.students.map((s: any) => [s.id, s.enrollmentNumber]));
+            let changed = false;
+            const students = (prev.students || []).map((s) => {
+              const ra = s && isProvisionalRa(s.enrollmentNumber) ? map.get(s.id) : undefined;
+              if (!ra || isProvisionalRa(ra)) return s;
+              changed = true;
+              return { ...s, enrollmentNumber: ra, updatedAt: new Date().toISOString() };
+            });
+            return changed ? { ...prev, students } : prev;
+          });
+        }
+      } finally {
+        raResolveBusyRef.current = false;
+      }
+    };
+    const t = setTimeout(run, 1500);
+    const iv = setInterval(run, 60_000);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+      clearInterval(iv);
+    };
+  }, [data.students]);
 
   // Supabase Batched Queue Upsert
   useEffect(() => {
@@ -691,21 +735,13 @@ export default function App() {
     explicitClasses?: SchoolClass[]
   ) => {
     setData((prev) => {
-      // Escola já cadastrada que veio com a ficha da planilha padrão (mesmo id): o cadastro é atualizado
-      const unitUpdates = new Map(
-        (explicitUnits || [])
-          .filter((u) => u && (prev.schoolUnits || []).some((eu) => eu && eu.id === u.id))
-          .map((u) => [u.id, u] as [string, SchoolUnit])
-      );
-      const existingUnits = (prev.schoolUnits || []).map((eu) =>
-        eu && unitUpdates.has(eu.id) ? ({ ...eu, ...unitUpdates.get(eu.id)!, updatedAt: new Date().toISOString() } as SchoolUnit) : eu
-      );
+      const existingUnits = prev.schoolUnits || [];
       const newUnits: SchoolUnit[] = [];
 
       // Se explicitUnits foi passado (gerado pelo módulo de importação com detecção de séries atendidas)
       if (explicitUnits && explicitUnits.length > 0) {
         explicitUnits.forEach((u) => {
-          if (!u || unitUpdates.has(u.id)) return;
+          if (!u) return;
           const uName = (u.name || '').toLowerCase().trim();
           if (
             !existingUnits.some(
@@ -804,12 +840,10 @@ export default function App() {
     });
 
     const incompleteCount = imported.filter((s) => s.cadastralStatus !== 'OK').length;
-    const knownUnitIds = new Set((data?.schoolUnits || []).map((u) => u?.id));
-    const unitsCreatedCount = (explicitUnits || []).filter((u) => u && !knownUnitIds.has(u.id)).length;
-    const unitsUpdatedCount = (explicitUnits || []).length - unitsCreatedCount;
+    const unitsCreatedCount = explicitUnits?.length || 0;
     triggerPushNotification(
       '📥 Importação Concluída com Sucesso',
-      `${imported.length} estudantes integrados ao sistema. ${unitsUpdatedCount > 0 ? `Cadastro de ${unitsUpdatedCount} escola(s) atualizado com a ficha da planilha. ` : ''}${unitsCreatedCount > 0 ? `${unitsCreatedCount} unidade(s) escolar(es) e séries cadastradas com pendências a regularizar. ` : ''}${incompleteCount > 0 ? `${incompleteCount} cadastros com dados incompletos destacados na Dashbox de Pendências para regularização.` : ''}`
+      `${imported.length} estudantes integrados ao sistema. ${unitsCreatedCount > 0 ? `${unitsCreatedCount} unidade(s) escolar(es) e séries cadastradas com pendências a regularizar. ` : ''}${incompleteCount > 0 ? `${incompleteCount} cadastros com dados incompletos destacados na Dashbox de Pendências para regularização.` : ''}`
     );
   };
 

@@ -18,6 +18,7 @@ import {
   downloadWordTemplate,
   downloadWriterTemplate,
 } from './officeDocumentParser';
+import { provisionalRaFor } from './raService';
 
 export interface ImportFilterOptions {
   // Filtros de Informações a Importar (Campos)
@@ -111,8 +112,6 @@ export interface FileImportResult {
   sourceContext?: ImportBlockContext; // Contexto do bloco (escola anexa)
   sourceFileName?: string; // Nome do arquivo original (quando o arquivo tem várias escolas)
   sections?: Array<{ series: string; count: number; header: string }>; // Tabelas (séries) encontradas
-  schoolRegistration?: SchoolRegistrationSheet; // Aba "DADOS DA ESCOLA" da planilha padrão
-  updatedSchoolUnit?: SchoolUnit; // Escola já cadastrada com os dados da ficha aplicados (gravada na importação)
 }
 
 // Colunas esperadas no levantamento municipal, da ESQUERDA para a DIREITA
@@ -142,7 +141,6 @@ export interface ImportColumnCheck {
 
 /** Contexto de um bloco do arquivo (ex: escola anexa dentro do mesmo documento). */
 export interface ImportBlockContext {
-  schoolRegistration?: SchoolRegistrationSheet; // Ficha da escola lida da aba "DADOS DA ESCOLA"
   isAnnex?: boolean;
   parentUnit?: SchoolUnit; // Escola principal (bloco anterior do mesmo documento)
   schoolName?: string; // Nome do bloco quando a linha não tem "ESCOLA:" (ex: linha "ANEXO NGÔNH-RE")
@@ -745,194 +743,6 @@ function parseMedicalReport(val: any): { hasReport: boolean; text: string } {
   return { hasReport: false, text: str };
 }
 
-// ===================== Ficha da escola (aba "DADOS DA ESCOLA" da planilha padrão) =====================
-
-/** Marcador na coluna A (oculta) da aba de dados da escola: a aba não é lida como lista de alunos. */
-export const SCHOOL_SHEET_MARKER = 'SUCESSOEDU_FICHA_ESCOLA';
-
-export interface SchoolRegistrationSheet {
-  schoolName: string;
-  parentSchoolName?: string; // Escola sede (quando a escola é anexa)
-  fields: Partial<SchoolUnit>;
-  filled: string[]; // Campos preenchidos (rótulos)
-  missing: string[]; // Campos obrigatórios em branco
-  warnings: string[];
-}
-
-// Campos da ficha: chave (coluna A oculta) -> rótulo e se é obrigatório para o cadastro ficar completo
-const SCHOOL_SHEET_FIELDS: Record<string, { label: string; required?: boolean }> = {
-  name: { label: 'Nome oficial da escola', required: true },
-  tradeName: { label: 'Nome como a escola é conhecida' },
-  inepCode: { label: 'Código INEP', required: true },
-  cnpjOrDecree: { label: 'CNPJ ou decreto de criação', required: true },
-  type: { label: 'Tipo da unidade', required: true },
-  parentSchool: { label: 'Escola sede (se for anexa)' },
-  locationZone: { label: 'Localização (urbana/rural)', required: true },
-  address: { label: 'Endereço', required: true },
-  district: { label: 'Bairro / localidade', required: true },
-  zipCode: { label: 'CEP' },
-  city: { label: 'Município' },
-  state: { label: 'UF' },
-  phone: { label: 'Telefone', required: true },
-  email: { label: 'E-mail' },
-  directorName: { label: 'Diretor(a)', required: true },
-  coordinatorName: { label: 'Coordenador(a) pedagógico(a)' },
-  secretaryName: { label: 'Secretário(a) escolar' },
-  totalClassrooms: { label: 'Salas de aula' },
-  operatingHours: { label: 'Horário de funcionamento' },
-  hasInternet: { label: 'Internet na escola' },
-};
-
-export function isSchoolRegistrationSheet(rows: any[][]): boolean {
-  return (rows || []).slice(0, 5).some((r) => String(r?.[0] ?? '').trim() === SCHOOL_SHEET_MARKER);
-}
-
-const isYes = (v: any) => /^(SIM|S|X|1|TRUE|VERDADEIRO)$/.test(stripAccentsUpper(v).trim());
-
-function parseSchoolType(v: string): { type?: SchoolUnit['type']; isAnnex?: boolean } {
-  const t = stripAccentsUpper(v);
-  if (!t) return {};
-  if (t.includes('ANEXA') || t.includes('SATELITE') || t.includes('EXTENSAO')) return { type: 'ESCOLA_SATELITE', isAnnex: true };
-  if (t.includes('CRECHE') || t.includes('INFANTIL')) return { type: 'CRECHE_INFANTIL', isAnnex: false };
-  if (t.includes('RURAL')) return { type: 'ESCOLA_RURAL', isAnnex: false };
-  if (t.includes('SEDE') && t.includes('SECRETARIA')) return { type: 'SEDE_CENTRAL', isAnnex: false };
-  return { type: 'ESCOLA_POLO', isAnnex: false };
-}
-
-function normalizeShiftName(v: any): ClassShift | '' {
-  const t = stripAccentsUpper(v);
-  if (!t) return '';
-  if (t.startsWith('MANHA') || t.startsWith('MATUTINO')) return 'MANHÃ';
-  if (t.startsWith('TARDE') || t.startsWith('VESPERTINO')) return 'TARDE';
-  if (t.startsWith('NOITE') || t.startsWith('NOTURNO')) return 'NOITE';
-  if (t.startsWith('INTEGRAL')) return 'INTEGRAL';
-  return '';
-}
-
-/** Lê a aba "DADOS DA ESCOLA": coluna A (oculta) = chave do campo, coluna C = valor. */
-export function parseSchoolRegistrationSheet(rows: any[][]): SchoolRegistrationSheet {
-  const fields: Partial<SchoolUnit> = {};
-  const filled: string[] = [];
-  const warnings: string[] = [];
-  const grades: string[] = [];
-  const shifts: ClassShift[] = [];
-  let parentSchoolName: string | undefined;
-
-  (rows || []).forEach((row) => {
-    const key = String(row?.[0] ?? '').trim();
-    if (!key || key === SCHOOL_SHEET_MARKER) return;
-    const raw = row?.[2];
-    const text = cleanPlaceholder(raw).replace(/\s+/g, ' ');
-
-    if (key.startsWith('grade:')) {
-      if (isYes(raw)) grades.push(canonicalGrade(key.slice(6)));
-      return;
-    }
-    if (key.startsWith('shift:')) {
-      const sh = normalizeShiftName(key.slice(6));
-      if (isYes(raw) && sh) shifts.push(sh);
-      return;
-    }
-    const def = SCHOOL_SHEET_FIELDS[key];
-    if (!def || !text) return;
-
-    switch (key) {
-      case 'name':
-        fields.name = text.toUpperCase();
-        break;
-      case 'tradeName':
-        fields.tradeName = text.toUpperCase();
-        break;
-      case 'inepCode': {
-        const digits = text.replace(/\D/g, '');
-        fields.inepCode = digits || text;
-        if (digits.length !== 8) warnings.push(`Código INEP "${text}" não tem 8 dígitos. Confira com a escola.`);
-        break;
-      }
-      case 'type': {
-        const parsed = parseSchoolType(text);
-        if (parsed.type) fields.type = parsed.type;
-        if (parsed.isAnnex !== undefined) fields.isAnnex = parsed.isAnnex;
-        break;
-      }
-      case 'parentSchool':
-        parentSchoolName = text.toUpperCase();
-        break;
-      case 'locationZone': {
-        const z = stripAccentsUpper(text).includes('URBAN') ? 'ZONA_URBANA' : 'ZONA_RURAL';
-        fields.locationZone = z;
-        fields.zone = z;
-        break;
-      }
-      case 'zipCode': {
-        const d = text.replace(/\D/g, '');
-        fields.zipCode = d.length === 8 ? `${d.slice(0, 5)}-${d.slice(5)}` : text;
-        break;
-      }
-      case 'state':
-        fields.state = text.toUpperCase().slice(0, 2);
-        break;
-      case 'email':
-        fields.email = text.toLowerCase();
-        break;
-      case 'totalClassrooms': {
-        const n = parseInt(text.replace(/\D/g, ''), 10);
-        if (!isNaN(n)) fields.totalClassrooms = n;
-        break;
-      }
-      case 'hasInternet':
-        fields.hasInternet = isYes(text);
-        break;
-      default:
-        (fields as any)[key] = key.endsWith('Name') ? text.toUpperCase() : text;
-    }
-    filled.push(def.label);
-  });
-
-  if (grades.length > 0) {
-    fields.gradesServed = Array.from(new Set(grades));
-    fields.gradesServedText = fields.gradesServed.join(', ');
-    filled.push('Séries atendidas');
-  }
-  if (shifts.length > 0) {
-    fields.offeredShifts = Array.from(new Set(shifts));
-    filled.push('Turnos');
-  }
-
-  const missing = Object.entries(SCHOOL_SHEET_FIELDS)
-    .filter(([k, d]) => d.required && !filled.includes(d.label) && !(k === 'type' && fields.type))
-    .map(([, d]) => d.label);
-  if (grades.length === 0) missing.push('Séries atendidas');
-  if (fields.isAnnex && !parentSchoolName) missing.push('Escola sede (se for anexa)');
-
-  return { schoolName: fields.name || '', parentSchoolName, fields, filled, missing, warnings };
-}
-
-/**
- * Aplica a ficha sobre o cadastro da escola: campos preenchidos na planilha substituem os atuais;
- * campos em branco mantêm o que já estava cadastrado. O nome da escola não é trocado.
- */
-export function applySchoolRegistration(
-  unit: SchoolUnit,
-  reg: SchoolRegistrationSheet,
-  units: SchoolUnit[] = []
-): SchoolUnit {
-  const { name: _ignoredName, ...fields } = reg.fields;
-  const merged: SchoolUnit = { ...unit, ...fields } as SchoolUnit;
-  if (reg.parentSchoolName) {
-    const parent = findRegisteredSchoolUnit(reg.parentSchoolName, units.filter((u) => u.id !== unit.id));
-    if (parent) {
-      merged.parentUnitId = parent.id;
-      merged.isAnnex = true;
-    }
-  }
-  merged.pendingFields = reg.missing.slice();
-  merged.cadastralStatus = reg.missing.length === 0 ? 'OK' : 'INCOMPLETE';
-  // Mais recente que a cópia da nuvem: a alteração não é revertida na próxima carga
-  (merged as any).updatedAt = new Date().toISOString();
-  return merged;
-}
-
 const SCHOOL_LINE_RE = /\bESCOLA(\s+ANEXO)?\s*:\s*(.+?)(?=\s*\|?\s*(?:TURMAS?|S[EÉ]RIES?|DATA)\s*:|\s*\||$)/i;
 
 /**
@@ -990,8 +800,7 @@ function processMatrixBlocks(
   filters: ImportFilterOptions,
   classes: SchoolClass[],
   schoolUnits: SchoolUnit[],
-  documentType: FileImportResult['documentType'],
-  schoolRegistration?: SchoolRegistrationSheet
+  documentType: FileImportResult['documentType']
 ): FileImportResult[] {
   const blocks = splitMatrixBySchool(matrix);
   const results: FileImportResult[] = [];
@@ -1001,8 +810,6 @@ function processMatrixBlocks(
       isAnnex: block.isAnnex,
       parentUnit: block.isAnnex ? parentUnit : undefined,
       schoolName: block.isAnnex ? block.displayName : undefined,
-      // A ficha é da escola principal do arquivo (anexa tem arquivo e ficha próprios)
-      schoolRegistration: !block.isAnnex ? schoolRegistration : undefined,
     });
     res.documentType = documentType;
     res.sourceFileName = fileName;
@@ -1067,20 +874,14 @@ export async function parseFileResults(
     const buffer = await file.arrayBuffer();
     const wb = XLSX.read(buffer, { type: 'array' });
     const allRows: any[][] = [];
-    let schoolRegistration: SchoolRegistrationSheet | undefined;
     wb.SheetNames.forEach((name) => {
       const rows = XLSX.utils.sheet_to_json<any>(wb.Sheets[name], { header: 1, defval: '' });
-      // Aba "DADOS DA ESCOLA" da planilha padrão: é a ficha da escola, não uma lista de alunos
-      if (isSchoolRegistrationSheet(rows)) {
-        if (!schoolRegistration) schoolRegistration = parseSchoolRegistrationSheet(rows);
-        return;
-      }
       if (rows.length > 0) {
         allRows.push(...rows, []);
       }
     });
     const docType = ext === 'ods' ? 'CALC' : ext === 'xls' || ext === 'xlsx' ? 'EXCEL' : 'GENERIC';
-    return processMatrixBlocks(allRows, fileName, fileSize, filters, classes, schoolUnits, docType, schoolRegistration);
+    return processMatrixBlocks(allRows, fileName, fileSize, filters, classes, schoolUnits, docType);
   } catch (error: any) {
     return [
       {
@@ -1294,11 +1095,6 @@ export function processSheetWithHeaders(
     }
   }
 
-  // Planilha padrão: o nome da escola vem da aba "DADOS DA ESCOLA"
-  if (!schoolNameDetected && context.schoolRegistration?.schoolName) {
-    schoolNameDetected = context.schoolRegistration.schoolName;
-  }
-
   // Bloco de escola anexa aberto por uma linha "ANEXO ..." (sem "ESCOLA:")
   if (!schoolNameDetected && context.schoolName) {
     schoolNameDetected = context.schoolName;
@@ -1394,33 +1190,7 @@ export function processSheetWithHeaders(
     errors.push('Nome da escola não encontrado na planilha (linha "ESCOLA: ..."). Selecione a escola de destino antes de importar.');
   }
 
-  // Ficha da escola (planilha padrão): atualiza o cadastro da escola junto com a importação
-  const registration = context.schoolRegistration;
-  let updatedSchoolUnit: SchoolUnit | undefined;
-  if (registration && targetUnit) {
-    if (
-      registration.schoolName &&
-      normalizeSchoolName(registration.schoolName) !== normalizeSchoolName(targetUnit.name) &&
-      !findRegisteredSchoolUnit(registration.schoolName, [targetUnit])
-    ) {
-      schoolMessages.push(
-        `A ficha da escola é de "${registration.schoolName}", mas os alunos vão para "${targetUnit.name}". A ficha será aplicada a "${targetUnit.name}".`
-      );
-    }
-    const applied = applySchoolRegistration(targetUnit, registration, schoolUnits);
-    if (schoolStatus === 'CADASTRADA') updatedSchoolUnit = applied;
-    else targetUnit = { ...applied, createdViaImport: true };
-    schoolMessages.push(
-      `Ficha da escola: ${registration.filled.length} campo(s) preenchido(s) serão gravados no cadastro da escola.` +
-        (registration.missing.length > 0 ? ` Ainda faltam: ${registration.missing.join(', ')}.` : ' Cadastro completo.')
-    );
-    registration.warnings.forEach((w) => schoolMessages.push(w));
-  }
-
-  // Séries atendidas: as marcadas na ficha (planilha padrão) valem sobre o cadastro atual
-  const gradesRegistered =
-    registration?.fields.gradesServed ||
-    (schoolStatus === 'CADASTRADA' ? targetUnit?.gradesServed || [] : gradesInFile);
+  const gradesRegistered = schoolStatus === 'CADASTRADA' ? targetUnit?.gradesServed || [] : gradesInFile;
   const gradesMissingInRegistry =
     schoolStatus === 'CADASTRADA' ? gradesInFile.filter((g) => !gradesRegistered.some((r) => sameGrade(r, g))) : [];
 
@@ -1654,22 +1424,12 @@ export function processSheetWithHeaders(
       schoolMessages.push(`${renamed} turma(s) já existente(s) terão o nome ajustado para "SÉRIE - TURNO" (sem o nome da escola).`);
     }
     // Uma turma por série + letra (1º ANO A, 1º ANO B...). Sem letra, uma turma por série.
-    const combos = new Map<string, { serie: string; letter: string; shifts: string[] }>();
-    students.forEach((s) => {
-      const k = `${s.series}|${s.classLetter || ''}`;
-      const entry = combos.get(k) || { serie: s.series, letter: s.classLetter || '', shifts: [] };
-      const sh = colMap.shift !== undefined ? normalizeShiftName(s.shift) : '';
-      if (sh) entry.shifts.push(sh);
-      combos.set(k, entry);
-    });
-    combos.forEach(({ serie, letter, shifts }) => {
+    const combos = new Map<string, { serie: string; letter: string }>();
+    students.forEach((s) => combos.set(`${s.series}|${s.classLetter || ''}`, { serie: s.series, letter: s.classLetter || '' }));
+    combos.forEach(({ serie, letter }) => {
       const found = findClassForSeries(targetUnit!.id, serie, allClasses, unlinkedAllowed, letter);
       if (!found && filters.autoRegisterSchoolUnit) {
-        // Turno mais informado pelos alunos da turma (coluna TURNO); sem a coluna, o turno padrão
-        const counts = new Map<string, number>();
-        shifts.forEach((x) => counts.set(x, (counts.get(x) || 0) + 1));
-        const shiftForClass = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || filters.defaultShift || 'MANHÃ';
-        const cls = buildClassForSeries(targetUnit!, serie, shiftForClass, suggestedClasses.length, letter);
+        const cls = buildClassForSeries(targetUnit!, serie, filters.defaultShift || 'MANHÃ', suggestedClasses.length, letter);
         suggestedClasses.push(cls);
         allClasses.push(cls);
       }
@@ -1736,8 +1496,7 @@ export function processSheetWithHeaders(
   }
 
   if (schoolStatus === 'CADASTRADA' && gradesRegistered.length > 0) {
-    // Pela série de cada aluno (a série pode vir na própria linha, sem título de tabela)
-    const notServed = Array.from(new Set(students.map((st) => st.series).filter(Boolean))).filter(
+    const notServed = Array.from(new Set(usedSections.map((sec) => sec.series))).filter(
       (serie) => !gradesRegistered.some((g) => sameGrade(g, serie))
     );
     if (notServed.length > 0) {
@@ -1787,8 +1546,6 @@ export function processSheetWithHeaders(
     sourceMatrix: matrix,
     sourceContext: context,
     sections: usedSections,
-    schoolRegistration: registration,
-    updatedSchoolUnit,
   };
 }
 
@@ -1873,31 +1630,12 @@ export function convertImportedStudentsToOfficial(
       return true;
     });
 
-  // RA novo = próximo número livre acima do maior já usado (antes era quantidade + posição,
-  // o que repetia RAs já existentes quando havia lacunas na numeração).
-  const usedRas = new Set(existingStudents.map((s) => String(s?.enrollmentNumber || '').trim()).filter(Boolean));
-  let nextRaNumber =
-    Math.max(
-      existingStudentsCount,
-      ...Array.from(usedRas).map((r) => {
-        const m = r.match(/^RA-\d{4}-(\d+)$/);
-        return m ? parseInt(m[1], 10) : 0;
-      })
-    ) + 1;
-  const takeNextRa = () => {
-    let candidate = `RA-${year}-${String(nextRaNumber).padStart(4, '0')}`;
-    while (usedRas.has(candidate)) {
-      nextRaNumber++;
-      candidate = `RA-${year}-${String(nextRaNumber).padStart(4, '0')}`;
-    }
-    usedRas.add(candidate);
-    nextRaNumber++;
-    return candidate;
-  };
-
+  // RA: aluno novo recebe um RA provisório (derivado do id) e a nuvem troca pelo número
+  // definitivo assim que houver conexão (raService). Nenhum computador numera sozinho.
   return studentsToImport.map((item, index) => {
     // Aluno já cadastrado mantém o RA dele; só aluno novo recebe número
-    const ra = findExistingStudent(item, existingStudents) ? '' : takeNextRa();
+    const newId = `std-imp-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`;
+    const ra = findExistingStudent(item, existingStudents) ? '' : provisionalRaFor(newId);
 
     const effectiveSeries = filters.importSeries
       ? (filters.overrideSeriesWithDefault && filters.defaultSeries
@@ -1938,7 +1676,7 @@ export function convertImportedStudentsToOfficial(
     }
 
     const officialStudent: Student = {
-      id: `std-imp-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`,
+      id: newId,
       name: finalName,
       enrollmentNumber: ra,
       cpf: '000.000.000-00',

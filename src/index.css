@@ -15,6 +15,22 @@
     margin: 10mm 12mm 12mm 12mm;
   }
 
+  /* Sem barra de rolagem no papel/PDF e sem cortar o conteúdo da área rolável */
+  * {
+    scrollbar-width: none !important;
+  }
+  *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+  #root,
+  main {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
   html, body {
     background-color: white !important;
     color: #0f172a !important;

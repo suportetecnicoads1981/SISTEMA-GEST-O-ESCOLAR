@@ -37,6 +37,7 @@ import {
 } from '../../types';
 import { SchoolUnitModal } from '../municipal/SchoolUnitModal';
 import { PhotoUploadInput } from '../common/PhotoUploadInput';
+import { provisionalRaFor, isProvisionalRa } from '../../services/raService';
 
 interface StudentModalProps {
   isOpen: boolean;
@@ -134,11 +135,10 @@ export const StudentModal: React.FC<StudentModalProps> = ({
         },
       });
     } else {
-      const year = new Date().getFullYear();
-      const randNum = Math.floor(100 + Math.random() * 900);
+      // RA em branco: ao salvar recebe o provisório e a nuvem entrega o número definitivo.
       setFormData({
         name: '',
-        enrollmentNumber: `MAT-${year}-${randNum}`,
+        enrollmentNumber: '',
         cpf: '',
         rg: '',
         birthDate: '',
@@ -253,10 +253,6 @@ export const StudentModal: React.FC<StudentModalProps> = ({
       setError('O nome do estudante é obrigatório.');
       return;
     }
-    if (!formData.enrollmentNumber?.trim()) {
-      setError('O número de matrícula é obrigatório.');
-      return;
-    }
     // CPF: pode ficar em branco por enquanto (vira pendência), mas se for informado precisa ser válido.
     const cpfNow = cpfState(formData.cpf);
     if (cpfNow === 'INVALIDO') {
@@ -277,10 +273,11 @@ export const StudentModal: React.FC<StudentModalProps> = ({
       return;
     }
 
+    const studentId = studentToEdit?.id || `std-${Date.now()}`;
     const student: Student = {
-      id: studentToEdit?.id || `std-${Date.now()}`,
+      id: studentId,
       name: formData.name.trim(),
-      enrollmentNumber: formData.enrollmentNumber.trim(),
+      enrollmentNumber: formData.enrollmentNumber.trim() || provisionalRaFor(studentId),
       cpf: cpfNow === 'OK' ? formatCpf(formData.cpf) : '',
       rg: formData.rg?.trim() || '',
       birthDate: formData.birthDate || '',
@@ -431,14 +428,22 @@ export const StudentModal: React.FC<StudentModalProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Número de Matrícula (RA) *
+                  Número de Matrícula (RA)
                 </label>
+                {/* O RA é entregue pela nuvem (sem repetição entre computadores); não é digitado. */}
                 <input
                   type="text"
-                  value={formData.enrollmentNumber || ''}
-                  onChange={(e) => setFormData({ ...formData, enrollmentNumber: e.target.value })}
-                  placeholder="Ex: MAT-2026-101"
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono"
+                  readOnly
+                  value={
+                    !formData.enrollmentNumber
+                      ? ''
+                      : isProvisionalRa(formData.enrollmentNumber)
+                        ? 'Provisório — aguardando a nuvem'
+                        : formData.enrollmentNumber
+                  }
+                  placeholder="Gerado pela nuvem ao salvar"
+                  title="O RA é gerado pela nuvem, sem repetição entre os computadores."
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 text-slate-600 cursor-not-allowed font-mono"
                 />
               </div>
 

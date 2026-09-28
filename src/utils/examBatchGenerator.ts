@@ -1,5 +1,6 @@
 import { Exam, Question, SchoolSettings } from '../types';
 import { letterheadHtml } from '../services/documentBranding';
+import { printFileName } from './printIsolated';
 
 export interface ExamOptionVariant {
   originalIndex: number;
@@ -444,7 +445,7 @@ export function generateBatchPrintHtml(
     <html lang="pt-BR">
     <head>
       <meta charset="utf-8">
-      <title>Provas em Lote - ${config.subjectName} - ${config.className}</title>
+      <title>${printFileName('Provas em Lote', config.subjectName, config.className)}</title>
       <style>
         @page {
           size: A4 portrait;

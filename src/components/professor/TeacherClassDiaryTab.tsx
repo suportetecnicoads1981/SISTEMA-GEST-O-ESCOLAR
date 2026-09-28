@@ -26,6 +26,7 @@ import {
 } from '../../types';
 import { writeSafePrintDocument } from '../../utils/safeHtml';
 import { confirmDialog, notify } from '../../utils/dialogs';
+import { printFileName } from '../../utils/printIsolated';
 
 interface TeacherClassDiaryTabProps {
   teacherName: string;
@@ -183,7 +184,7 @@ export const TeacherClassDiaryTab: React.FC<TeacherClassDiaryTabProps> = ({
       <html lang="pt-BR">
       <head>
         <meta charset="utf-8">
-        <title>Diário de Classe Oficial - ${activeClass?.name}</title>
+        <title>${printFileName('Diario de Classe', activeClass?.name)}</title>
         <style>
           @page { size: A4 landscape; margin: 15mm; }
           body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 9.5pt; color: #0f172a; margin: 0; padding: 15px; }

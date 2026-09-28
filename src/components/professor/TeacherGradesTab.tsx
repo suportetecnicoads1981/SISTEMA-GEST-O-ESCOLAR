@@ -26,6 +26,7 @@ import {
 } from '../../types';
 import { writeSafePrintDocument } from '../../utils/safeHtml';
 import { triggerGradePublished } from '../../services/messageQueueService';
+import { printFileName } from '../../utils/printIsolated';
 
 interface TeacherGradesTabProps {
   teacherName: string;
@@ -316,7 +317,7 @@ export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
       <html lang="pt-BR">
       <head>
         <meta charset="utf-8">
-        <title>Mapa Oficial de Rendimento Escolar - ${activeClass?.name}</title>
+        <title>${printFileName('Mapa de Rendimento', activeClass?.name)}</title>
         <style>
           @page { size: A4 landscape; margin: 12mm; }
           body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 9pt; color: #0f172a; margin: 0; padding: 15px; }

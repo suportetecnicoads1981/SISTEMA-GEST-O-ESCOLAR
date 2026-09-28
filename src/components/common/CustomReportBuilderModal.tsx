@@ -48,6 +48,7 @@ import {
   CustomReportTemplate,
 } from '../../types';
 import { notify } from '../../utils/dialogs';
+import { printElementIsolated, printFileName, setPrintTitle } from '../../utils/printIsolated';
 
 interface CustomReportBuilderModalProps {
   isOpen: boolean;
@@ -668,6 +669,7 @@ export const CustomReportBuilderModal: React.FC<CustomReportBuilderModalProps> =
 
   // Imprimir / Salvar em PDF
   const handlePrint = () => {
+    setPrintTitle(printFileName(reportTitle || 'Relatorio Personalizado'));
     window.print();
   };
 

@@ -148,9 +148,14 @@ export const HELP_GENERAL: HelpModule = {
       tip: 'O selo aparece nos dois modos. Se abrir pelo atalho do servidor e ele mostrar "Acesso pelo link", o servidor demorou a responder na abertura: aguarde o aviso "Recarregar agora" no alto da tela, ou aperte F5.',
     },
     {
-      q: 'A nuvem fica em "enviando..." e o número de matrícula (RA) de alguns alunos muda sozinho. Por quê?',
-      a: 'A nuvem não aceita dois alunos com o mesmo RA. Quando um aluno chega com um RA que já pertence a outro aluno na nuvem, quem já estava lá fica com o número e o que chegou recebe o mesmo número com uma terminação, por exemplo "RA-2026-0364-R8KNM". Essa terminação é sempre a mesma para aquele aluno, então os números param de mudar. Se quiser, corrija o RA desse aluno pela ficha. Se a nuvem continuar em "enviando..." por mais de 15 minutos, avise o suporte.',
-      tip: 'Evite deixar o sistema aberto em duas janelas no mesmo computador: cada janela é tratada como uma estação separada. Na Sede, cada alteração sobe na hora; a conferência completa de todas as tabelas acontece a cada 30 minutos (ou ao clicar em "Enviar à nuvem agora").',
+      q: 'Quem gera o número de matrícula (RA)? Por que aparece "Aguardando número da nuvem"?',
+      a: 'O RA agora é gerado pela nuvem, e não mais por cada computador. Todo aluno novo (cadastro, importação ou planilha) nasce com um RA provisório, que começa com "RA-PROV-". Assim que o computador estiver conectado à nuvem, ele recebe o número definitivo (ex.: RA-2026-2196), em até 1 minuto. A nuvem guarda qual número cada aluno recebeu: se dois computadores pedirem para o mesmo aluno, os dois recebem o mesmo número. Por isso os RAs não mudam mais sozinhos nem se repetem. Nos documentos, enquanto o número não chega, aparece "Aguardando número da nuvem".',
+      steps: [
+        'Cadastre ou importe os alunos normalmente.',
+        'Confira se o selo mostra que você está na nuvem ("Entrar na nuvem" se estiver desconectado).',
+        'Em até 1 minuto os RAs provisórios são trocados pelos definitivos. Sem internet, o provisório fica até a conexão voltar.',
+      ],
+      tip: 'O RA não é digitado na ficha do aluno. Se dois alunos aparecerem com o mesmo RA (dado antigo), o cadastrado primeiro fica com o número e o outro recebe um novo da nuvem. Evite deixar o sistema aberto em duas janelas no mesmo computador. Na Sede, a conferência completa das tabelas acontece a cada 30 minutos (ou ao clicar em "Enviar à nuvem agora").',
     },
     {
       q: 'O selo mostra "sem resposta (rede local)" o tempo todo. O servidor parou?',
@@ -251,7 +256,7 @@ export const HELP_MODULES: HelpModule[] = [
       {
         q: 'Como matriculo um aluno novo?',
         steps: ['Clique em "Nova Matrícula".', 'Preencha os dados do aluno e do responsável.', 'Escolha a escola e a turma.', 'Salve.'],
-        tip: 'Antes, confira se o aluno já não está cadastrado usando a busca (nome, RA ou CPF), para não duplicar.',
+        tip: 'Antes, confira se o aluno já não está cadastrado usando a busca (nome, RA ou CPF), para não duplicar. O RA não é digitado: a nuvem entrega o número logo após salvar (até lá aparece como provisório).',
       },
       {
         q: 'Como importo a lista de alunos de uma planilha ou documento?',
@@ -264,25 +269,9 @@ export const HELP_MODULES: HelpModule[] = [
         tip: 'No Word, cada tabela deve ter um título com a série (ex.: "1º ANO"). Arquivos com escola principal e escolas anexas são separados por escola.',
       },
       {
-        q: 'Existe uma planilha padrão para as escolas preencherem?',
-        a: 'Sim: "SucessoEdu_Planilha_Padrao_Alunos.xlsx", distribuída pela SEMED. Ela tem duas abas. Em DADOS DA ESCOLA vai a ficha da unidade: nome, INEP, CNPJ ou decreto, tipo, escola sede (se for anexa), endereço, zona, contatos, equipe gestora, salas, turnos e séries atendidas. Em ALUNOS vai uma linha por aluno, com listas para escolher sexo, raça/cor, PCD, laudo, série e turma e turno. Assim não entram nomes de série, escola ou deficiência escritos de jeitos diferentes.',
-        steps: [
-          'Envie a planilha para a escola: um arquivo por unidade (a escola anexa preenche um arquivo próprio).',
-          'A escola preenche primeiro DADOS DA ESCOLA e depois ALUNOS. Célula vermelha é campo obrigatório em branco ou dado errado.',
-          'Na Secretaria, clique em "Importar Planilhas / Polos" e escolha o arquivo. A conferência mostra quantos campos da ficha serão gravados e o que ainda falta.',
-          'Confirme: os alunos entram e o cadastro da escola é atualizado com a ficha.',
-        ],
-        tip: 'TEA (com o nível), TDAH e TOD são escolhidos na coluna PCD / DEFICIÊNCIA. Aluno sem deficiência fica com "-" (traço). Não crie outras abas nem mude a ordem das colunas.',
-      },
-      {
-        q: 'A ficha da escola muda o cadastro de uma escola que já existe?',
-        a: 'Sim. Os campos preenchidos na aba DADOS DA ESCOLA substituem os do cadastro, e os campos deixados em branco mantêm o que já estava cadastrado. O nome da escola não é trocado. As séries marcadas na ficha passam a ser as séries atendidas. Com todos os obrigatórios preenchidos, a escola sai das pendências cadastrais; senão, a conferência mostra o que falta.',
-        tip: 'Os dados da escola (endereço, bairro, zona, CNPJ, equipe gestora, séries e turnos) agora também vão para a nuvem e aparecem nos outros computadores.',
-      },
-      {
         q: 'Como a importação separa as turmas A, B, C de uma mesma série?',
         a: 'Pela letra escrita logo depois da série: no título da tabela ("1º ANO A Nº", "3 ANO B") ou na linha acima dela ("TURMA: PRÉ-ESCOLA I C"). Cada letra vira uma turma própria (ex.: "1º ANO A - MANHÃ", "1º ANO B - MANHÃ"). Sem letra, a série fica numa turma só.',
-        tip: 'Na planilha padrão, a coluna TURNO define o turno das turmas novas (ex.: "1º ANO B - TARDE"). Nos levantamentos antigos, sem essa coluna, as turmas entram como MANHÃ: para as da tarde, abra Turmas & Matrizes, clique em editar e troque o turno.',
+        tip: 'O turno não vem nos levantamentos: as turmas entram como MANHÃ. Para as turmas da tarde, abra Turmas & Matrizes, clique em editar e troque o turno.',
       },
       {
         q: 'Importei antes da correção e as turmas A, B, C ficaram juntas. Como arrumo?',
@@ -363,6 +352,11 @@ export const HELP_MODULES: HelpModule[] = [
     summary: 'Emissão de declaração de matrícula, declaração de transferência, histórico escolar, boletim e certificado de conclusão.',
     faq: [
       { q: 'Como emito um documento?', steps: ['Escolha o aluno.', 'Escolha o tipo de documento.', 'Confira os dados na prévia.', 'Clique em "Imprimir / Gerar PDF".'] },
+      {
+        q: 'Como sai o documento impresso ou em PDF? Qual o nome do arquivo?',
+        a: 'Só a folha do documento é impressa, sem a tela do sistema em volta (sem barra de rolagem e sem cortar o topo). A folha segue a ABNT: margens de 3 cm em cima e à esquerda e 2 cm embaixo e à direita, letra Arial 12, entrelinha 1,5, texto justificado e número da página no alto à direita. Ao escolher "Salvar como PDF", o nome já vem pronto e diferente a cada documento: tipo + aluno + data e hora, por exemplo "Historico_Escolar_BEKORO_KAYAPO_28-09-2026_064712.pdf".',
+        tip: 'A data de nascimento sai no formato dd/mm/aaaa e o CPF em branco aparece como "Não informado". Os relatórios (Excel, Word, CSV e PDF) também ganham nome com o relatório, a escola/turma filtrada e a data e hora, para um arquivo não substituir o outro.',
+      },
       { q: 'O nome da escola ou do diretor está errado no documento.', a: 'Corrija os dados da escola em Secretaria & Alunos > "Editar Dados da Escola". O documento usa esses dados.' },
       {
         q: 'Quais logos aparecem nos documentos e relatórios?',

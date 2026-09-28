@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { formatAge } from '../../utils/studentDocuments';
 import { displayClassName } from '../../utils/schoolDataNormalizer';
+import { provisionalRaFor } from '../../services/raService';
 import {
   Search,
   UserPlus,
@@ -917,10 +918,12 @@ export const StudentList: React.FC<StudentListProps> = ({
   const handleOpenAddModal = (presetUnit?: SchoolUnit) => {
     const targetUnit = presetUnit || activeSelectedSchoolUnit;
     if (targetUnit) {
+      const newId = `std-new-${Date.now()}`;
       setStudentToEdit({
-        id: `std-new-${Date.now()}`,
+        id: newId,
         name: '',
-        enrollmentNumber: `RA-${Math.floor(100000 + Math.random() * 900000)}`,
+        // RA provisório; a nuvem entrega o número definitivo logo após salvar (com conexão).
+        enrollmentNumber: provisionalRaFor(newId),
         status: 'ACTIVE',
         schoolUnitId: targetUnit.id,
         schoolOriginName: targetUnit.name,
@@ -1006,7 +1009,7 @@ export const StudentList: React.FC<StudentListProps> = ({
 
           imported.push({
             id: `std-imp-${Date.now()}-${idx}`,
-            enrollmentNumber: `2026-${Math.floor(1000 + Math.random() * 9000)}`,
+            enrollmentNumber: provisionalRaFor(`std-imp-${Date.now()}-${idx}`),
             name,
             cpf,
             birthDate: '2008-05-15',
