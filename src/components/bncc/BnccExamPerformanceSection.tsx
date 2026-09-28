@@ -61,11 +61,18 @@ const badge = (level: BnccMasteryLevel) => {
   return <span className={`inline-block px-1.5 py-0.5 rounded-md border text-[10px] font-black ${info?.bg || ''}`}>{info?.sigla}</span>;
 };
 
-async function downloadXlsxSheets(filename: string, sheets: Array<{ name: string; rows: Array<Record<string, any>> }>) {
-  const XLSX = await import('xlsx');
-  const wb = XLSX.utils.book_new();
-  for (const sh of sheets) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sh.rows.length ? sh.rows : [{}]), sh.name.slice(0, 31));
-  XLSX.writeFile(wb, filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`);
+/** Excel com timbre e uma aba por tabela (resumo por habilidade, por aluno...). */
+async function downloadXlsxSheets(
+  filename: string,
+  sheets: Array<{ name: string; rows: Array<Record<string, any>>; title?: string }>,
+  subtitle?: string
+) {
+  const { downloadStyledWorkbook, objectRowsSheet } = await import('../../services/styledXlsx');
+  const { fileStamp } = await import('../../utils/printIsolated');
+  await downloadStyledWorkbook(
+    `${filename}_${fileStamp()}.xlsx`,
+    sheets.map((sh) => objectRowsSheet(sh.title || `Desempenho nas provas — ${sh.name}`, sh.rows, { sheetName: sh.name, subtitle }))
+  );
 }
 
 export const BnccExamPerformanceSection: React.FC<Props> = ({
@@ -463,7 +470,7 @@ export const BnccExamPerformanceSection: React.FC<Props> = ({
               downloadXlsxSheets(`Desempenho_Habilidades_${(grade || 'todas').replace(/\s+/g, '_')}_${year}`, [
                 { name: 'Resumo por habilidade', rows: summaryRows },
                 { name: 'Por aluno', rows: studentRows },
-              ])
+              ], `Série/Ano: ${grade || 'Todas'} • Ano letivo ${year}`)
             }
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-xs font-semibold cursor-pointer"
           >

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { DocumentLetterhead } from '../common/DocumentLetterhead';
 import { resolveSignatories } from '../../services/documentBranding';
 import {
@@ -28,6 +28,8 @@ import {
 } from '../../types';
 import { printElementIsolated, printFileName, setPrintTitle } from '../../utils/printIsolated';
 import { isProvisionalRa } from '../../services/raService';
+import { mergeGradeHistories, isNum } from '../../services/gradeAnalytics';
+import type { AttendanceSheet, ClassGradeSheet } from '../../types';
 
 export type DocumentType =
   | 'CERTIFICADO_CONCLUSAO'
@@ -40,6 +42,10 @@ interface DocumentIssuerProps {
   students: Student[];
   classes: SchoolClass[];
   histories: AcademicHistory[];
+  /** Diário de Notas: notas lançadas pelos professores (usadas no boletim e no histórico). */
+  classGradeSheets?: ClassGradeSheet[];
+  /** Chamadas: para a frequência do aluno no boletim/histórico. */
+  attendanceSheets?: AttendanceSheet[];
   settings: SchoolSettings;
   preSelectedStudentId?: string;
   preSelectedDocType?: DocumentType;
@@ -51,6 +57,8 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
   students,
   classes,
   histories,
+  classGradeSheets = [],
+  attendanceSheets = [],
   settings,
   preSelectedStudentId,
   preSelectedDocType = 'CERTIFICADO_CONCLUSAO',
@@ -68,7 +76,45 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
 
   const selectedStudent = (students || []).find((s) => s.id === selectedStudentId) || students?.[0];
   const selectedClass = (classes || []).find((c) => c.id === selectedStudent?.classId);
-  const matchedHistory = (histories || []).find((h) => h.studentId === selectedStudent?.id) || histories?.[0];
+  // Notas do aluno: Diário de Notas da turma + histórico escolar. Nunca usa o histórico de
+  // outro aluno (antes, sem histórico, o documento pegava o do primeiro aluno da lista).
+  const matchedHistory = useMemo(() => {
+    if (!selectedStudent) return null;
+    const own = (histories || []).filter((h) => h?.studentId === selectedStudent.id);
+    const sheets = (classGradeSheets || []).filter((sh) => sh?.classId === selectedStudent.classId);
+    return mergeGradeHistories(own, sheets, [selectedStudent])[0] || null;
+  }, [histories, classGradeSheets, selectedStudent]);
+
+  // Frequência pelas chamadas lançadas (presença + falta justificada ÷ aulas registradas).
+  const attendancePct = useMemo(() => {
+    if (!selectedStudent) return null;
+    let total = 0;
+    let present = 0;
+    (attendanceSheets || []).forEach((sh) => {
+      if (sh?.classId !== selectedStudent.classId) return;
+      const e = (sh.entries || []).find((x: any) => x?.studentId === selectedStudent.id);
+      if (!e) return;
+      total++;
+      if (e.status === 'PRESENTE' || e.status === 'FALTA_JUSTIFICADA') present++;
+    });
+    if (total) return Math.round((present / total) * 1000) / 10;
+    const h = matchedHistory?.attendanceRate;
+    return isNum(h) && h > 0 && !String(matchedHistory?.id || '').startsWith('hist-diario-') ? h : null;
+  }, [attendanceSheets, selectedStudent, matchedHistory]);
+
+  // Nota no documento: 7,5 ou "-" quando não lançada.
+  const g = (v: unknown) => (isNum(v) ? v.toFixed(1).replace('.', ',') : '-');
+  const STATUS_LABEL: Record<string, string> = {
+    APROVADO: 'Aprovado',
+    REPROVADO_NOTA: 'Reprovado (nota)',
+    REPROVADO_FALTA: 'Reprovado (falta)',
+    RECUPERACAO: 'Recuperação',
+    EM_ANDAMENTO: 'Em andamento',
+    REPROVADO: 'Reprovado',
+    EM_CURSO: 'Em curso',
+  };
+  const statusText = (v: unknown) => STATUS_LABEL[String(v || 'EM_ANDAMENTO')] || String(v);
+  const totalWorkload = (matchedHistory?.records || []).reduce((acc, r) => acc + (Number(r?.workloadHours) || 0), 0);
 
   const safeHistory: AcademicHistory = matchedHistory || {
     id: `hist-fallback-${selectedStudent?.id || 'empty'}`,
@@ -78,8 +124,8 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
     schoolName: settings?.name || 'Instituição de Ensino',
     cityState: `${settings?.city || 'Brasil'} - ${settings?.state || 'BR'}`,
     records: [],
-    generalAverage: 0,
-    attendanceRate: 100,
+    generalAverage: NaN as any,
+    attendanceRate: NaN as any,
     finalResult: 'EM_CURSO',
     observations: 'Registro acadêmico em processamento ou aguardando consolidação das avaliações do período.',
     issuedAt: new Date().toISOString(),
@@ -450,15 +496,15 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
                       safeHistory.records.map((rec) => (
                         <tr key={rec.id} className="hover:bg-slate-50/50">
                           <td className="border border-slate-300 p-2 font-medium text-slate-900">{rec.subjectName}</td>
-                          <td className="border border-slate-300 p-2 text-center">{rec.workloadHours}h</td>
-                          <td className="border border-slate-300 p-2 text-center">{rec.bimonthlyGrades?.b1 ?? '-'}</td>
-                          <td className="border border-slate-300 p-2 text-center">{rec.bimonthlyGrades?.b2 ?? '-'}</td>
-                          <td className="border border-slate-300 p-2 text-center">{rec.bimonthlyGrades?.b3 ?? '-'}</td>
-                          <td className="border border-slate-300 p-2 text-center">{rec.bimonthlyGrades?.b4 ?? '-'}</td>
-                          <td className="border border-slate-300 p-2 text-center font-bold text-indigo-900">{rec.finalGrade ?? '-'}</td>
+                          <td className="border border-slate-300 p-2 text-center">{Number(rec.workloadHours) > 0 ? `${rec.workloadHours}h` : '-'}</td>
+                          <td className="border border-slate-300 p-2 text-center">{g(rec.bimonthlyGrades?.b1)}</td>
+                          <td className="border border-slate-300 p-2 text-center">{g(rec.bimonthlyGrades?.b2)}</td>
+                          <td className="border border-slate-300 p-2 text-center">{g(rec.bimonthlyGrades?.b3)}</td>
+                          <td className="border border-slate-300 p-2 text-center">{g(rec.bimonthlyGrades?.b4)}</td>
+                          <td className="border border-slate-300 p-2 text-center font-bold text-indigo-900">{g(rec.finalGrade)}</td>
                           <td className="border border-slate-300 p-2 text-center">{rec.totalAbsences ?? 0}</td>
                           <td className="border border-slate-300 p-2 text-center font-semibold text-emerald-700">
-                            {rec.status || 'EM_ANDAMENTO'}
+                            {statusText(rec.status)}
                           </td>
                         </tr>
                       ))
@@ -473,11 +519,11 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
                   <tfoot className="bg-slate-50 font-bold">
                     <tr>
                       <td className="border border-slate-300 p-2 text-right">Resultado Global:</td>
-                      <td className="border border-slate-300 p-2 text-center">880h</td>
+                      <td className="border border-slate-300 p-2 text-center">{totalWorkload > 0 ? `${totalWorkload}h` : '-'}</td>
                       <td colSpan={4} className="border border-slate-300 p-2 text-right">Média Geral:</td>
-                      <td className="border border-slate-300 p-2 text-center text-indigo-900">{safeHistory.generalAverage ?? '-'}</td>
-                      <td className="border border-slate-300 p-2 text-center">{safeHistory.attendanceRate ?? 100}% freq.</td>
-                      <td className="border border-slate-300 p-2 text-center text-emerald-700">{safeHistory.finalResult || 'EM_CURSO'}</td>
+                      <td className="border border-slate-300 p-2 text-center text-indigo-900">{g(safeHistory.generalAverage)}</td>
+                      <td className="border border-slate-300 p-2 text-center">{attendancePct === null ? '-' : `${String(attendancePct).replace('.', ',')}% freq.`}</td>
+                      <td className="border border-slate-300 p-2 text-center text-emerald-700">{statusText(safeHistory.finalResult || 'EM_CURSO')}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -586,8 +632,8 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
                   <p className="text-slate-500 font-mono">RA: {raText} | CPF: {cpfText}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-indigo-900">Média Geral: {safeHistory.generalAverage ?? '-'}</p>
-                  <p className="text-emerald-700 font-semibold">Frequência: {safeHistory.attendanceRate ?? 100}%</p>
+                  <p className="font-bold text-indigo-900">Média Geral: {g(safeHistory.generalAverage)}</p>
+                  <p className="text-emerald-700 font-semibold">Frequência: {attendancePct === null ? 'sem registro' : `${String(attendancePct).replace('.', ',')}%`}</p>
                 </div>
               </div>
 
@@ -609,13 +655,13 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
                     safeHistory.records.map((r) => (
                       <tr key={r.id} className="border-b">
                         <td className="p-2 border font-medium">{r.subjectName}</td>
-                        <td className="p-2 border text-center">{r.bimonthlyGrades?.b1 ?? '-'}</td>
-                        <td className="p-2 border text-center">{r.bimonthlyGrades?.b2 ?? '-'}</td>
-                        <td className="p-2 border text-center">{r.bimonthlyGrades?.b3 ?? '-'}</td>
-                        <td className="p-2 border text-center">{r.bimonthlyGrades?.b4 ?? '-'}</td>
-                        <td className="p-2 border text-center font-bold text-indigo-900">{r.finalGrade ?? '-'}</td>
+                        <td className="p-2 border text-center">{g(r.bimonthlyGrades?.b1)}</td>
+                        <td className="p-2 border text-center">{g(r.bimonthlyGrades?.b2)}</td>
+                        <td className="p-2 border text-center">{g(r.bimonthlyGrades?.b3)}</td>
+                        <td className="p-2 border text-center">{g(r.bimonthlyGrades?.b4)}</td>
+                        <td className="p-2 border text-center font-bold text-indigo-900">{g(r.finalGrade)}</td>
                         <td className="p-2 border text-center">{r.totalAbsences ?? 0}</td>
-                        <td className="p-2 border text-center font-semibold text-emerald-700">{r.status || 'EM_ANDAMENTO'}</td>
+                        <td className="p-2 border text-center font-semibold text-emerald-700">{statusText(r.status)}</td>
                       </tr>
                     ))
                   ) : (

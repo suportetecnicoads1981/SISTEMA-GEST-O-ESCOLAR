@@ -37,6 +37,11 @@ export const HELP_GENERAL: HelpModule = {
   summary: 'Entrar, sair, sincronizar com a nuvem, atalhos e o que fazer quando algo parece errado.',
   faq: [
       {
+        q: 'Como filtro os gráficos por escola, série ou turno?',
+        a: 'Acima dos gráficos há a barra "Filtrar": escolha a escola, a etapa/série e o turno. Os gráficos e indicadores passam a mostrar só aquele recorte, e ao lado aparece quantos registros entraram. "Limpar" volta para a rede toda. Isso vale para Evasão & Busca Ativa e Evolução Pedagógica.',
+        tip: 'Em cada gráfico ainda dá para trocar o tipo (colunas, barras, linhas, pizza), a ordem e quantos itens mostrar. Quando não há dados para o filtro, aparece "Sem dados para mostrar" em vez de um gráfico vazio.',
+      },
+      {
         q: 'O que aparece embaixo do meu nome, no alto da tela?',
         a: 'Aparece o seu cargo, do jeito que foi cadastrado em Usuários & Permissões, no campo "Título / Cargo Personalizado" (ex.: Coordenação Pedagógica). Se o campo estiver vazio, aparece o perfil de acesso (ex.: Administrador(a)). No quadradinho ficam as iniciais do nome e do último sobrenome.',
         tip: 'Para mudar o cargo, peça ao administrador para editar o seu usuário e salvar. A mudança aparece no próximo acesso.',
@@ -236,6 +241,10 @@ export const HELP_MODULES: HelpModule[] = [
     summary: 'Área do professor: turmas, diário, chamada, notas, provas e prontuário dos alunos.',
     faq: [
       {
+        q: 'Onde foi parar o botão "Preencher Notas Exemplo"?',
+        a: 'Foi retirado. Ele lançava notas fictícias para a turma inteira e, com um clique por engano seguido de "Salvar", essas notas iriam para o boletim. As notas agora são sempre digitadas pelo professor.',
+      },
+      {
         q: 'Por onde começo?',
         steps: ['Abra "Minhas Turmas" e escolha a turma.', 'Use as abas: Diário de Classe & Aulas, Frequência & Chamada, Pauta & Lançamento de Notas, Provas & Gabaritos Oficiais e Prontuário dos Alunos.'],
       },
@@ -361,6 +370,10 @@ export const HELP_MODULES: HelpModule[] = [
     summary: 'Acompanhamento de alunos evadidos ou em risco, visitas, resgate e exportação para o Educacenso.',
     faq: [
       {
+        q: 'Como vejo os gráficos de evasão de uma escola só?',
+        a: 'Acima dos gráficos há a barra "Filtrar": escolha a escola, a etapa/série e o turno. Os gráficos e indicadores passam a mostrar só aquele recorte, e ao lado aparece quantos registros entraram. "Limpar" volta para a rede toda. O gráfico "por turma" mostra só as turmas que têm evadidos, da maior para a menor (até 25), com o nome da escola quando há mais de uma.',
+      },
+      {
         q: 'Como gero a relação de evadidos por escola?',
         steps: ['Aplique os filtros da tela (busca, escola, turma, situação etc.).', 'Clique no botão verde "Relatório".', 'Marque as colunas que quer no relatório (as mais usadas já vêm marcadas).', 'Confira a pré-visualização.', 'Escolha: "Imprimir / Salvar em PDF", "Excel", "Word" ou "CSV".'],
         a: 'Clique no botão verde "Relatório / Exportar". Os estudantes evadidos (conforme os filtros da tela) saem separados por escola, cada uma com o seu timbre, com turma, responsável, telefone, data e motivo da evasão, situação da busca ativa e aviso ao Conselho Tutelar. O CSV do Censo agora traz a escola real de cada aluno.',
@@ -377,6 +390,10 @@ export const HELP_MODULES: HelpModule[] = [
     where: 'Menu > Secretaria & Ensino (Alt+O)',
     summary: 'Emissão de declaração de matrícula, declaração de transferência, histórico escolar, boletim e certificado de conclusão.',
     faq: [
+      {
+        q: 'O boletim sai sem disciplinas. De onde vêm as notas?',
+        a: 'O boletim e o histórico usam as notas do Diário de Notas da turma do aluno (lançadas pelos professores por bimestre) e, quando houver, as do histórico escolar. Nota não lançada aparece como "-". A frequência é calculada pelas chamadas registradas; sem chamadas, aparece "sem registro". O documento nunca usa as notas de outro aluno.',
+      },
       {
         q: 'O boletim (ou a declaração) está saindo em duas páginas.',
         a: 'Foi corrigido. Boletim, declarações e certificado agora cabem sempre em uma folha A4: quando o conteúdo passa da página (por exemplo, um boletim com muitas disciplinas), o documento é reduzido na medida certa, mantendo o layout, o timbre e as margens. O histórico escolar continua podendo ter mais de uma página. O rodapé do boletim passou a trazer "Emitido eletronicamente pelo SucessoEdu".',
@@ -401,6 +418,20 @@ export const HELP_MODULES: HelpModule[] = [
     where: 'Menu > Pedagógico & Avaliações (Alt+R)',
     summary: 'Painel com médias, aprovação, acertos por questão e evolução dos alunos e turmas.',
     faq: [
+      {
+        q: 'De onde vêm as notas dos gráficos da Evolução Pedagógica?',
+        a: 'Das notas que os professores lançam no Diário de Notas (Portal do Professor > Notas), por turma, disciplina e bimestre, somadas às do histórico escolar quando houver. Onde não há nota lançada, aparece "—" ou "Sem notas lançadas": o sistema não mostra mais números de exemplo. A média mínima usada é 6,0.',
+        tip: 'Se um aluno ou turma aparece sem notas, confira se o professor salvou a folha de notas do bimestre.',
+      },
+      {
+        q: 'Como comparo as turmas de uma escola?',
+        steps: ['Abra "Matriz Comparativa".', 'Na barra "Filtrar", escolha a escola (e, se quiser, a série e o turno).', 'O gráfico mostra a média de cada turma, da maior para a menor.', 'A tabela abaixo traz a média de cada bimestre, a média geral e a % de alunos com média 6,0 ou mais.'],
+        a: 'Só entram no gráfico as turmas que já têm notas lançadas; as demais aparecem na tabela com "—".',
+      },
+      {
+        q: 'O que mostra o diagnóstico do aluno?',
+        a: 'Em "Por Estudante", o quadro de diagnóstico lista as disciplinas com média 8,0 ou mais (melhores resultados) e as que estão abaixo de 6,0 (precisam de reforço), com as médias do aluno. A frequência vem do histórico escolar; sem registro, aparece "—".',
+      },
       { q: 'Por que o painel está vazio?', a: 'O painel usa as provas corrigidas. Monte a prova em "Elaboração de Provas" e lance as respostas ("Lançar respostas") ou aplique pelo computador.' },
       { q: 'Posso escolher o que aparece no painel?', a: 'Sim. Use "Configurar Dash Boxes" para mostrar ou esconder os cartões, e "Gerar Gráficos Personalizados" para montar gráficos.' },
     ],
@@ -411,6 +442,11 @@ export const HELP_MODULES: HelpModule[] = [
     where: 'Menu > Pedagógico & Avaliações',
     summary: 'Lançamento do nível de cada habilidade por aluno e bimestre, desempenho nas provas, relatórios, gráficos e catálogo.',
     faq: [
+      {
+        q: 'As planilhas do BNCC saem com o timbre?',
+        a: 'Sim. O relatório de habilidades da turma, o catálogo, os lançamentos e o desempenho nas provas saem em Excel com o timbre da Prefeitura, SEMED e escola, título e data. O desempenho nas provas tem uma aba "Resumo por habilidade" e outra "Por aluno". Os modelos para preencher (catálogo e lançamento) continuam simples.',
+        tip: 'Uma planilha de lançamentos exportada pelo sistema pode ser importada de volta: a importação encontra sozinha a linha do cabeçalho, abaixo do timbre.',
+      },
       {
         q: 'Como lanço as habilidades de uma turma?',
         steps: ['Aba "Lançamento": escolha escola, turma, componente, bimestre e ano.', 'Marque o nível de cada aluno em cada habilidade: ND, ED, D ou PD.', 'Salve.'],

@@ -190,19 +190,30 @@ export const CustomizableChartCard: React.FC<CustomizableChartCardProps> = ({
     }
   };
 
+  // Layout conforme a quantidade de itens: barras horizontais crescem em altura (um item por
+  // linha, sem sobrepor nomes) e colunas com muitos itens inclinam mais os rótulos.
+  const isEmpty = !data.length || data.every((d) => !Number(d.value) && !Number(d.secondaryValue));
+  const manyItems = data.length > 10;
+  const stageHeight = chartType === 'BAR_HORIZONTAL' ? Math.max(height, data.length * 30 + 60) : height;
+
+  // Rótulo sobre a barra/ponto: "75%", "7.5 pts"; unidades longas ficam só na legenda.
+  const labelWithUnit = (v: any) => (unit === '%' ? `${v}%` : unit && unit.length <= 3 ? `${v} ${unit}` : `${v}`);
+
   const gradientId = useMemo(() => `area-grad-${Math.random().toString(36).substr(2, 9)}`, []);
 
   return (
     <div
       ref={cardPrintRef}
-      className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-2xs space-y-3.5 hover:shadow-xs transition-all relative overflow-hidden min-w-0"
+      className="@container bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-2xs space-y-3.5 hover:shadow-xs transition-all relative overflow-hidden min-w-0"
     >
       {/* Top Header with Title, Insights & Quick Customizer Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 min-w-0">
+      {/* Título em cima e controles embaixo (lado a lado só em telas bem largas): assim o
+          título não fica cortado nos cartões que dividem a linha com outro gráfico. */}
+      <div className="flex flex-col @4xl:flex-row @4xl:items-center justify-between gap-3 pb-3 border-b border-slate-100 min-w-0">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap min-w-0">
             <span className="h-2 w-2 rounded-full bg-indigo-600 shrink-0" />
-            <h3 className="text-sm font-black text-slate-900 tracking-tight truncate">
+            <h3 className="text-sm font-black text-slate-900 tracking-tight leading-snug break-words">
               {title}
             </h3>
             {benchmarkValue !== undefined && (
@@ -212,7 +223,7 @@ export const CustomizableChartCard: React.FC<CustomizableChartCardProps> = ({
               </span>
             )}
           </div>
-          {subtitle && <p className="text-xs text-slate-500 mt-0.5 leading-relaxed truncate">{subtitle}</p>}
+          {subtitle && <p className="text-xs text-slate-500 mt-0.5 leading-relaxed line-clamp-2" title={subtitle}>{subtitle}</p>}
         </div>
 
         {/* Action Controls & Interactive Selectors (Hidden when printing) */}
@@ -376,7 +387,7 @@ export const CustomizableChartCard: React.FC<CustomizableChartCardProps> = ({
       )}
 
       {/* Summary Stat Pills Bar for Instant Context & High Clarity */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs min-w-0">
+      <div className="grid grid-cols-2 @3xl:grid-cols-4 gap-2 text-xs min-w-0">
         <div className="p-2 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between min-w-0">
           <span className="text-slate-500 text-[10px] sm:text-[11px] font-medium truncate">Média Global:</span>
           <span className="font-mono font-black text-slate-900 shrink-0 ml-1">
@@ -408,12 +419,27 @@ export const CustomizableChartCard: React.FC<CustomizableChartCardProps> = ({
       </div>
 
       {/* Render Chart Stage */}
-      <div style={{ height }} className="w-full pt-1 relative min-w-0 overflow-hidden">
+      {isEmpty && (
+        <div
+          style={{ height: Math.min(height, 180) }}
+          className="w-full flex flex-col items-center justify-center text-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-slate-500"
+        >
+          <BarChart3 className="h-6 w-6 text-slate-300 mb-1.5" />
+          <p className="text-xs font-bold">Sem dados para mostrar</p>
+          <p className="text-[11px]">Não há registros para os filtros selecionados.</p>
+        </div>
+      )}
+      <div style={{ height: stageHeight, display: isEmpty ? 'none' : undefined }} className="w-full pt-1 relative min-w-0 overflow-hidden">
         <ResponsiveContainer width="100%" height="100%">
           {chartType === 'BAR_VERTICAL' ? (
-            <BarChart data={data} margin={{ top: 16, right: 16, left: 0, bottom: 44 }}>
+            <BarChart data={data} margin={{ top: 16, right: 16, left: 0, bottom: manyItems ? 70 : 44 }}>
               {showGrid && <CartesianGrid {...getScalableGridProps('LIGHT', false)} />}
-              <XAxis {...getScalableXAxisProps({ angle: -20, height: 44, maxLength: 22 })} />
+              <XAxis
+                {...getScalableXAxisProps(
+                  manyItems ? { angle: -40, height: 70, maxLength: 18 } : { angle: -20, height: 44, maxLength: 22 }
+                )}
+                interval={0}
+              />
               <YAxis {...getScalableYAxisProps({ unit })} />
               <Tooltip
                 content={
@@ -468,7 +494,7 @@ export const CustomizableChartCard: React.FC<CustomizableChartCardProps> = ({
                   <LabelList
                     dataKey="value"
                     position="top"
-                    formatter={(v: any) => `${v}${unit}`}
+                    formatter={(v: any) => labelWithUnit(v)}
                     style={{ fontSize: 10, fontWeight: 800, fill: '#1e293b' }}
                   />
                 )}
@@ -504,12 +530,13 @@ export const CustomizableChartCard: React.FC<CustomizableChartCardProps> = ({
               <YAxis
                 type="category"
                 dataKey="name"
-                width={135}
+                width={175}
+                interval={0}
                 tick={{ fontSize: 10.5, fill: '#334155', fontWeight: 600 }}
                 tickLine={{ stroke: '#94a3b8' }}
                 axisLine={{ stroke: '#cbd5e1', strokeWidth: 1.5 }}
                 tickFormatter={(val: string) =>
-                  val.length > 20 ? val.substring(0, 19) + '…' : val
+                  String(val).length > 28 ? String(val).substring(0, 27) + '…' : val
                 }
               />
               <Tooltip
@@ -564,7 +591,7 @@ export const CustomizableChartCard: React.FC<CustomizableChartCardProps> = ({
                   <LabelList
                     dataKey="value"
                     position="right"
-                    formatter={(v: any) => `${v}${unit}`}
+                    formatter={(v: any) => labelWithUnit(v)}
                     style={{ fontSize: 10, fontWeight: 800, fill: '#1e293b' }}
                   />
                 )}
@@ -639,7 +666,7 @@ export const CustomizableChartCard: React.FC<CustomizableChartCardProps> = ({
                   <LabelList
                     dataKey="value"
                     position="top"
-                    formatter={(v: any) => `${v}${unit}`}
+                    formatter={(v: any) => labelWithUnit(v)}
                     style={{ fontSize: 10, fontWeight: 800, fill: colors[0] }}
                   />
                 )}
@@ -720,7 +747,7 @@ export const CustomizableChartCard: React.FC<CustomizableChartCardProps> = ({
                   <LabelList
                     dataKey="value"
                     position="top"
-                    formatter={(v: any) => `${v}${unit}`}
+                    formatter={(v: any) => labelWithUnit(v)}
                     style={{ fontSize: 10, fontWeight: 800, fill: colors[0] }}
                   />
                 )}

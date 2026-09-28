@@ -49,6 +49,7 @@ import {
 } from '../common/CustomizableChartModal';
 import { CustomizableChartCard } from '../common/CustomizableChartCard';
 import { ModuleReportButton } from '../common/ModuleReportButton';
+import { ChartScopeBar, useChartScope } from '../common/ChartScopeBar';
 
 interface DropoutCensusReportProps {
   students: Student[];
@@ -95,6 +96,21 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
   const droppedOutStudents = useMemo(() => {
     return students.filter((s) => s.status === 'EVADIDO');
   }, [students]);
+
+  // Recorte dos gráficos e indicadores (Escola, Etapa/Série e Turno).
+  const chartScope = useChartScope(classes, schoolUnits);
+  const chartStudents = useMemo(
+    () => students.filter((s) => chartScope.studentInScope(s)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [students, chartScope.scope, classes]
+  );
+  const chartDropped = useMemo(() => chartStudents.filter((s) => s.status === 'EVADIDO'), [chartStudents]);
+  const chartClasses = useMemo(
+    () => classes.filter((c) => chartScope.classInScope(c)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [classes, chartScope.scope]
+  );
+  const chartDroppedCount = chartDropped.length;
 
   // Filtragem dos estudantes evadidos
   const filteredDroppedOut = useMemo(() => {
@@ -183,13 +199,13 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
       counts[key] = 0;
     });
 
-    droppedOutStudents.forEach((s) => {
+    chartDropped.forEach((s) => {
       const reasonKey = s.dropoutReason || 'OUTROS';
       counts[reasonKey] = (counts[reasonKey] || 0) + 1;
     });
 
     return counts;
-  }, [droppedOutStudents]);
+  }, [chartDropped]);
 
   // Estatísticas por Status de Busca Ativa
   const statsBySearchStatus = useMemo(() => {
@@ -200,12 +216,12 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
       NOTIFICADO_CONSELHO: 0,
       EVASAO_CONFIRMADA: 0,
     };
-    droppedOutStudents.forEach((s) => {
+    chartDropped.forEach((s) => {
       const st = s.dropoutIntervention?.searchStatus || 'EM_BUSCA_ATIVA';
       counts[st] = (counts[st] || 0) + 1;
     });
     return counts;
-  }, [droppedOutStudents]);
+  }, [chartDropped]);
 
   // Estatísticas de Evasão por Zona (Rural vs Urbana)
   const statsByZone = useMemo(() => {
@@ -220,7 +236,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
       return addr.includes('rural') || addr.includes('sitio') || addr.includes('fazenda') || addr.includes('vila') || addr.includes('povoado') || addr.includes('assentamento');
     };
 
-    students.forEach((s) => {
+    chartStudents.forEach((s) => {
       if (isRural(s)) {
         ruralTotal++;
         if (s.status === 'EVADIDO') ruralDropped++;
@@ -241,7 +257,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
       urbanDropped,
       urbanRate: Number(urbanRate.toFixed(1)),
     };
-  }, [students]);
+  }, [chartStudents]);
 
   // Estatísticas de Evasão por Faixa Etária
   const statsByAgeGroup = useMemo(() => {
@@ -264,7 +280,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
     };
 
     return groups.map((g) => {
-      const inGroupStudents = students.filter((s) => {
+      const inGroupStudents = chartStudents.filter((s) => {
         const age = getAge(s.birthDate);
         return age >= g.min && age <= g.max;
       });
@@ -280,7 +296,41 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
         secondaryValue: Number(rate.toFixed(1)),
       };
     });
-  }, [students]);
+  }, [chartStudents]);
+
+  // Evasão por turma: só turmas do recorte que têm evadidos, da maior para a menor.
+  // Com a rede inteira eram 90 turmas no mesmo gráfico; o nome leva a escola quando há mais de uma.
+  const dropoutByClassData = useMemo(() => {
+    const total = new Map<string, number>();
+    const dropped = new Map<string, number>();
+    chartStudents.forEach((st) => {
+      if (!st.classId) return;
+      total.set(st.classId, (total.get(st.classId) || 0) + 1);
+      if (st.status === 'EVADIDO') dropped.set(st.classId, (dropped.get(st.classId) || 0) + 1);
+    });
+    const unitName = new Map((schoolUnits || []).map((u) => [u.id, u.name]));
+    const manySchools = new Set(chartClasses.map((c) => (c as any).schoolUnitId)).size > 1;
+    const shortSchool = (name: string) =>
+      name
+        .replace(/^(ESCOLA|E\.?\s?M\.?\s?E\.?\s?I?\.?\s?F\.?|EMEIF|EMEF|EMEI|EMIEIF)\s+/i, '')
+        .split(/\s+/)
+        .slice(0, 2)
+        .join(' ');
+    return chartClasses
+      .filter((c) => (dropped.get(c.id) || 0) > 0)
+      .map((c) => {
+        const t = total.get(c.id) || 0;
+        const d = dropped.get(c.id) || 0;
+        const school = unitName.get((c as any).schoolUnitId) || '';
+        return {
+          name: manySchools && school ? `${c.name} • ${shortSchool(school)}` : c.name,
+          value: d,
+          secondaryValue: Number((t > 0 ? (d / t) * 100 : 0).toFixed(1)),
+        };
+      })
+      .sort((a, b) => b.value - a.value || b.secondaryValue - a.secondaryValue)
+      .slice(0, 25);
+  }, [chartStudents, chartClasses, schoolUnits]);
 
   // Datasets para Gráficos Personalizados
   const availableChartDatasets: ChartDatasetOption[] = useMemo(() => {
@@ -291,7 +341,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
         subtitle: 'Classificação oficial por motivo de desligamento no censo municipal',
         data: Object.entries(DROPOUT_REASON_INFO).map(([key, info]) => {
           const count = statsByReason[key] || 0;
-          const percentage = totalDroppedOutCount > 0 ? (count / totalDroppedOutCount) * 100 : 0;
+          const percentage = chartDroppedCount > 0 ? (count / chartDroppedCount) * 100 : 0;
           return {
             name: info.label.length > 25 ? info.label.substring(0, 25) + '...' : info.label,
             value: count,
@@ -309,7 +359,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
         subtitle: 'Casos em acompanhamento pelas equipes multiprofissionais da SME',
         data: Object.entries(ACTIVE_SEARCH_STATUS_INFO).map(([key, info]) => {
           const count = statsBySearchStatus[key] || 0;
-          const percentage = totalDroppedOutCount > 0 ? (count / totalDroppedOutCount) * 100 : 0;
+          const percentage = chartDroppedCount > 0 ? (count / chartDroppedCount) * 100 : 0;
           return {
             name: info.label,
             value: count,
@@ -364,16 +414,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
         id: 'dropout_by_class',
         title: 'Taxa de Evasão Escolar por Turma',
         subtitle: 'Estudantes evadidos distribuídos por turma e segmento',
-        data: classes.map((c) => {
-          const inClassTotal = students.filter((s) => s.classId === c.id).length;
-          const inClassDropped = droppedOutStudents.filter((s) => s.classId === c.id).length;
-          const rate = inClassTotal > 0 ? (inClassDropped / inClassTotal) * 100 : 0;
-          return {
-            name: c.name,
-            value: inClassDropped,
-            secondaryValue: Number(rate.toFixed(1)),
-          };
-        }),
+        data: dropoutByClassData,
         valueLabel: 'Evadidos na Turma',
         secondaryValueLabel: 'Taxa de Evasão (%)',
         unit: 'alunos',
@@ -388,15 +429,15 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
         data: [
           {
             name: 'Masculino',
-            value: droppedOutStudents.filter((s) => s.gender === 'M' || (s.gender as any) === 'MASCULINO').length,
+            value: chartDropped.filter((s) => s.gender === 'M' || (s.gender as any) === 'MASCULINO').length,
           },
           {
             name: 'Feminino',
-            value: droppedOutStudents.filter((s) => s.gender === 'F' || (s.gender as any) === 'FEMININO').length,
+            value: chartDropped.filter((s) => s.gender === 'F' || (s.gender as any) === 'FEMININO').length,
           },
           {
             name: 'Outro / Não Declarado',
-            value: droppedOutStudents.filter((s) => s.gender === 'OTHER' || (s.gender as any) === 'OUTRO').length,
+            value: chartDropped.filter((s) => s.gender === 'OTHER' || (s.gender as any) === 'OUTRO').length,
           },
         ],
         valueLabel: 'Total Evadidos',
@@ -409,10 +450,9 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
     statsBySearchStatus,
     statsByZone,
     statsByAgeGroup,
-    totalDroppedOutCount,
-    classes,
-    students,
-    droppedOutStudents,
+    chartDroppedCount,
+    dropoutByClassData,
+    chartDropped,
   ]);
 
   // Escola do aluno (cadastro da Rede Municipal): usada no CSV e no relatório.
@@ -823,6 +863,16 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
           </div>
         </div>
 
+        {/* Recorte dos gráficos: escola, etapa/série e turno */}
+        <ChartScopeBar
+          scope={chartScope.scope}
+          onChange={chartScope.setScope}
+          classes={classes}
+          schoolUnits={schoolUnits}
+          appliesTo="gráficos e indicadores"
+          countText={`${chartDroppedCount} evadido(s) de ${chartStudents.length} aluno(s) no recorte`}
+        />
+
         {/* Grade de Gráficos */}
         <div className={`grid grid-cols-1 ${chartViewTab === 'TODOS_GRAFICOS' ? 'lg:grid-cols-2' : 'lg:grid-cols-2'} gap-6`}>
           {(chartViewTab === 'VISAO_GERAL' || chartViewTab === 'TODOS_GRAFICOS') && (
@@ -833,7 +883,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
                   subtitle="Classificação oficial por motivo de desligamento no censo municipal"
                   data={Object.entries(DROPOUT_REASON_INFO).map(([key, info]) => {
                     const count = statsByReason[key] || 0;
-                    const percentage = totalDroppedOutCount > 0 ? (count / totalDroppedOutCount) * 100 : 0;
+                    const percentage = chartDroppedCount > 0 ? (count / chartDroppedCount) * 100 : 0;
                     return {
                       name: info.label.length > 24 ? info.label.substring(0, 24) + '...' : info.label,
                       value: count,
@@ -858,7 +908,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
                   subtitle="Casos em acompanhamento pelas equipes da SME"
                   data={Object.entries(ACTIVE_SEARCH_STATUS_INFO).map(([key, info]) => {
                     const count = statsBySearchStatus[key] || 0;
-                    const percentage = totalDroppedOutCount > 0 ? (count / totalDroppedOutCount) * 100 : 0;
+                    const percentage = chartDroppedCount > 0 ? (count / chartDroppedCount) * 100 : 0;
                     return {
                       name: info.label,
                       value: count,
@@ -885,16 +935,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
                 <CustomizableChartCard
                   title="Evasão Escolar por Turma & Segmento"
                   subtitle="Estudantes evadidos distribuídos por turma e segmento"
-                  data={classes.map((c) => {
-                    const inClassTotal = students.filter((s) => s.classId === c.id).length;
-                    const inClassDropped = droppedOutStudents.filter((s) => s.classId === c.id).length;
-                    const rate = inClassTotal > 0 ? (inClassDropped / inClassTotal) * 100 : 0;
-                    return {
-                      name: c.name,
-                      value: inClassDropped,
-                      secondaryValue: Number(rate.toFixed(1)),
-                    };
-                  })}
+                  data={dropoutByClassData}
                   valueLabel="Evadidos na Turma"
                   secondaryValueLabel="Taxa de Evasão (%)"
                   unit="alunos"
@@ -916,15 +957,15 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
                   data={[
                     {
                       name: 'Masculino',
-                      value: droppedOutStudents.filter((s) => s.gender === 'M' || (s.gender as any) === 'MASCULINO').length,
+                      value: chartDropped.filter((s) => s.gender === 'M' || (s.gender as any) === 'MASCULINO').length,
                     },
                     {
                       name: 'Feminino',
-                      value: droppedOutStudents.filter((s) => s.gender === 'F' || (s.gender as any) === 'FEMININO').length,
+                      value: chartDropped.filter((s) => s.gender === 'F' || (s.gender as any) === 'FEMININO').length,
                     },
                     {
                       name: 'Outro / Não Declarado',
-                      value: droppedOutStudents.filter((s) => s.gender === 'OTHER' || (s.gender as any) === 'OUTRO').length,
+                      value: chartDropped.filter((s) => s.gender === 'OTHER' || (s.gender as any) === 'OUTRO').length,
                     },
                   ]}
                   valueLabel="Total Evadidos"
@@ -1023,7 +1064,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
           {Object.entries(DROPOUT_REASON_INFO).map(([key, info]) => {
             const count = statsByReason[key] || 0;
-            const percentage = totalDroppedOutCount > 0 ? (count / totalDroppedOutCount) * 100 : 0;
+            const percentage = chartDroppedCount > 0 ? (count / chartDroppedCount) * 100 : 0;
             const isSelected = selectedReasonFilter === key;
 
             return (

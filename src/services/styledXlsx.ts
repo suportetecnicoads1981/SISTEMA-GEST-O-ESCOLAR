@@ -133,8 +133,10 @@ const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 const colPx = (w: number) => Math.trunc(w * 7 + 5);
 const EMU = 9525;
 
-export async function buildStyledXlsx(opts: StyledXlsxOptions): Promise<Blob> {
-  await preloadLogos().catch(() => {});
+type SheetImage = { w: number; h: number; png: Uint8Array; x: number; y: number };
+
+/** Monta o XML de uma aba (timbre, título, blocos) e as logos a desenhar nela. */
+function renderSheet(opts: StyledXlsxOptions): { sheet: string; images: SheetImage[]; anchor: (xPx: number) => { col: number; off: number } } {
   const ncol = Math.max(opts.columns.length, 1);
   const last = colName(ncol - 1);
 
@@ -284,8 +286,29 @@ ${merges.length ? `<mergeCells count="${merges.length}">${merges.map((m) => `<me
 <pageSetup paperSize="9" orientation="${orientation}" fitToWidth="1" fitToHeight="0"/>
 <headerFooter><oddFooter>${footer}</oddFooter></headerFooter>
 ${breaks.length ? `<rowBreaks count="${breaks.length}" manualBreakCount="${breaks.length}">${breaks.map((r) => `<brk id="${r}" max="16383" man="1"/>`).join('')}</rowBreaks>` : ''}
-${images.length ? '<drawing r:id="rId1"/>' : ''}
+${images.length ? '<drawing r:id="rIdDrw"/>' : ''}
 </worksheet>`;
+  return { sheet, images, anchor };
+}
+
+/**
+ * Planilha formatada com uma ou várias abas (cada aba com timbre, título e blocos).
+ * Usada pelos relatórios e pelas exportações do BNCC, que têm várias abas.
+ */
+export async function buildStyledWorkbook(sheets: StyledXlsxOptions[]): Promise<Blob> {
+  await preloadLogos().catch(() => {});
+  const list = sheets.length ? sheets : [{ title: 'Relatório', columns: [], sections: [] } as StyledXlsxOptions];
+  const rendered = list.map((o) => renderSheet(o));
+  const used = new Set<string>();
+  const names = list.map((o, i) => {
+    const base = (o.sheetName || (list.length > 1 ? `Aba ${i + 1}` : 'Relatório')).replace(/[\\/?*[\]:]/g, ' ').trim().slice(0, 31) || `Aba ${i + 1}`;
+    let n = base;
+    let k = 2;
+    while (used.has(n.toLowerCase())) n = `${base.slice(0, 28)} ${k++}`;
+    used.add(n.toLowerCase());
+    return xml(n);
+  });
+  const withImages = rendered.map((r, i) => ({ ...r, i })).filter((r) => r.images.length);
 
   const zip = new JSZip();
   zip.file(
@@ -296,9 +319,9 @@ ${images.length ? '<drawing r:id="rId1"/>' : ''}
 <Default Extension="xml" ContentType="application/xml"/>
 <Default Extension="png" ContentType="image/png"/>
 <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
-<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+${rendered.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('\n')}
 <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
-${images.length ? '<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>' : ''}
+${withImages.map((r) => `<Override PartName="/xl/drawings/drawing${r.i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`).join('\n')}
 </Types>`
   );
   zip.file(
@@ -306,24 +329,30 @@ ${images.length ? '<Override PartName="/xl/drawings/drawing1.xml" ContentType="a
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`
   );
-  const sheetName = xml((opts.sheetName || 'Relatório').replace(/[\\/?*[\]:]/g, ' ').slice(0, 31));
   zip.file(
     'xl/workbook.xml',
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${sheetName}" sheetId="1" r:id="rId1"/></sheets></workbook>`
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${names
+      .map((n, i) => `<sheet name="${n}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`)
+      .join('')}</sheets></workbook>`
   );
   zip.file(
     'xl/_rels/workbook.xml.rels',
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rendered
+      .map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`)
+      .join('')}<Relationship Id="rId${rendered.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`
   );
   zip.file('xl/styles.xml', STYLES);
-  zip.file('xl/worksheets/sheet1.xml', sheet);
-  if (images.length) {
+  let media = 0;
+  rendered.forEach(({ sheet, images, anchor }, si) => {
+    const n = si + 1;
+    zip.file(`xl/worksheets/sheet${n}.xml`, sheet);
+    if (!images.length) return;
     zip.file(
-      'xl/worksheets/_rels/sheet1.xml.rels',
+      `xl/worksheets/_rels/sheet${n}.xml.rels`,
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>`
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdDrw" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing${n}.xml"/></Relationships>`
     );
     const pics = images
       .map((im, i) => {
@@ -332,20 +361,25 @@ ${images.length ? '<Override PartName="/xl/drawings/drawing1.xml" ContentType="a
       })
       .join('');
     zip.file(
-      'xl/drawings/drawing1.xml',
+      `xl/drawings/drawing${n}.xml`,
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${pics}</xdr:wsDr>`
     );
+    const ids = images.map(() => ++media);
     zip.file(
-      'xl/drawings/_rels/drawing1.xml.rels',
+      `xl/drawings/_rels/drawing${n}.xml.rels`,
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${images
-        .map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image${i + 1}.png"/>`)
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${ids
+        .map((m, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image${m}.png"/>`)
         .join('')}</Relationships>`
     );
-    images.forEach((im, i) => zip.file(`xl/media/image${i + 1}.png`, im.png));
-  }
+    images.forEach((im, i) => zip.file(`xl/media/image${ids[i]}.png`, im.png));
+  });
   return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+
+export async function buildStyledXlsx(opts: StyledXlsxOptions): Promise<Blob> {
+  return buildStyledWorkbook([opts]);
 }
 
 /** Gera e baixa a planilha formatada. */
@@ -359,4 +393,39 @@ export async function downloadStyledXlsx(fileName: string, opts: StyledXlsxOptio
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+/** Gera e baixa uma planilha formatada com várias abas. */
+export async function downloadStyledWorkbook(fileName: string, sheets: StyledXlsxOptions[]): Promise<void> {
+  const blob = await buildStyledWorkbook(sheets);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName.endsWith('.xlsx') ? fileName : `${fileName}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+/**
+ * Converte linhas simples ({ Coluna: valor }) em uma aba formatada: as colunas são as
+ * chaves da primeira linha; números e textos curtos ficam centralizados.
+ */
+export function objectRowsSheet(
+  title: string,
+  rows: Array<Record<string, any>>,
+  extra: Partial<StyledXlsxOptions> = {}
+): StyledXlsxOptions {
+  const keySet = new Set<string>();
+  rows.forEach((r) => Object.keys(r || {}).forEach((k) => keySet.add(k)));
+  const keys = Array.from(keySet);
+  const shortCol = (k: string) => rows.every((r) => String(r?.[k] ?? '').length <= 8);
+  return {
+    title,
+    columns: keys.map((k) => ({ label: k, align: shortCol(k) ? 'center' : 'left' })),
+    sections: [{ rows: rows.map((r) => keys.map((k) => (r?.[k] ?? '') as string | number)), countLine: `Total de linhas: ${rows.length}` }],
+    conference: false,
+    ...extra,
+  };
 }

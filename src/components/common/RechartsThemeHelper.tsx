@@ -260,7 +260,7 @@ export function getScalableYAxisProps(options?: {
   return {
     unit: unit === '%' ? '%' : '',
     domain: options?.domain,
-    width: options?.width ?? (unit ? 42 : 36),
+    width: options?.width ?? (unit && unit !== '%' && unit.length <= 3 ? 46 : 36),
     tick: {
       fontSize: 10.5,
       fill: isDark ? '#94a3b8' : '#475569',
@@ -268,9 +268,11 @@ export function getScalableYAxisProps(options?: {
     },
     tickLine: { stroke: isDark ? '#475569' : '#94a3b8' },
     axisLine: { stroke: isDark ? '#475569' : '#cbd5e1', strokeWidth: 1.5 },
+    // Unidades longas ("alunos", "casos") não cabem ao lado de cada número do eixo:
+    // só unidades curtas (até 3 letras, ex.: "pts") acompanham o número.
     tickFormatter: (v: any) => {
       if (typeof v !== 'number') return v;
-      if (unit && unit !== '%') return `${v} ${unit}`;
+      if (unit && unit !== '%' && unit.length <= 3) return `${v} ${unit}`;
       return `${v}`;
     },
   };

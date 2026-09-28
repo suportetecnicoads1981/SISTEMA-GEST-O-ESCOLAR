@@ -49,6 +49,8 @@ import {
   Question,
   ExamSubmission,
   AcademicHistory,
+  ClassGradeSheet,
+  SchoolUnit,
 } from '../../types';
 import {
   CustomizableChartModal,
@@ -58,6 +60,9 @@ import { CustomizableChartCard } from '../common/CustomizableChartCard';
 import { BimonthlyAcademicEvolutionCard } from './BimonthlyAcademicEvolutionCard';
 import { ArrowLeft, Home } from 'lucide-react';
 import { printElementIsolated, printFileName, setPrintTitle } from '../../utils/printIsolated';
+import { mergeGradeHistories, studentBimesters, studentFinal, groupStats, BIMESTER_LABELS, fmtGrade, isNum, PASSING_GRADE } from '../../services/gradeAnalytics';
+import { ChartScopeBar, useChartScope } from '../common/ChartScopeBar';
+import { classLabelWithSchool } from '../../utils/schoolDataNormalizer';
 
 interface PedagogicalEvolutionProps {
   students?: Student[];
@@ -67,6 +72,9 @@ interface PedagogicalEvolutionProps {
   questions?: Question[];
   submissions?: ExamSubmission[];
   academicHistories?: AcademicHistory[];
+  /** Diário de Notas dos professores (fonte principal das notas). */
+  classGradeSheets?: ClassGradeSheet[];
+  schoolUnits?: SchoolUnit[];
   onBack?: () => void;
   onNavigate?: (tab: string, payload?: any) => void;
 }
@@ -79,9 +87,33 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
   questions = [],
   submissions = [],
   academicHistories = [],
+  classGradeSheets = [],
+  schoolUnits = [],
   onBack,
   onNavigate,
 }) => {
+  // Notas reais: Diário de Notas + histórico escolar, por aluno.
+  const mergedHistories = useMemo(
+    () => mergeGradeHistories(academicHistories, classGradeSheets, students),
+    [academicHistories, classGradeSheets, students]
+  );
+  const histByStudent = useMemo(() => new Map(mergedHistories.map((h) => [h.studentId, h])), [mergedHistories]);
+  const studentsByClass = useMemo(() => {
+    const m = new Map<string, string[]>();
+    (students || []).forEach((st) => {
+      if (!st?.classId) return;
+      if (!m.has(st.classId)) m.set(st.classId, []);
+      m.get(st.classId)!.push(st.id);
+    });
+    return m;
+  }, [students]);
+  // Recorte por escola/etapa/turno (turmas do filtro e do comparativo).
+  const chartScope = useChartScope(classes, schoolUnits);
+  const scopedClasses = useMemo(
+    () => (classes || []).filter((c) => chartScope.classInScope(c)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [classes, chartScope.scope]
+  );
   // Mode: 'STUDENT' | 'CLASS' | 'COMPARATIVE' | 'BIMONTHLY_MULTIDISCIPLINARY'
   const [viewMode, setViewMode] = useState<
     'STUDENT' | 'CLASS' | 'COMPARATIVE' | 'BIMONTHLY_MULTIDISCIPLINARY'
@@ -102,14 +134,15 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
   const filteredStudents = useMemo(() => {
     return (students || []).filter((s) => {
       if (!s) return false;
-      const matchClass = selectedClassId === 'ALL' || s.classId === selectedClassId;
+      const matchClass = selectedClassId === 'ALL' ? chartScope.studentInScope(s) : s.classId === selectedClassId;
       const matchSearch =
         !searchStudentTerm ||
         (s.name && s.name.toLowerCase().includes(searchStudentTerm.toLowerCase())) ||
         (s.enrollmentNumber && s.enrollmentNumber.includes(searchStudentTerm));
       return matchClass && matchSearch;
     });
-  }, [students, selectedClassId, searchStudentTerm]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [students, selectedClassId, searchStudentTerm, chartScope.scope]);
 
   // Selected student object
   const currentStudent = useMemo(() => {
@@ -125,20 +158,13 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
   const currentClass = useMemo(() => {
     return (
       (classes || []).find((c) => c.id === selectedClassId) ||
-      classes[0] ||
+      scopedClasses[0] ||
       null
     );
-  }, [classes, selectedClassId]);
+  }, [classes, selectedClassId, scopedClasses]);
 
-  // Academic history for current student
-  const studentHistory = useMemo(() => {
-    if (!currentStudent) return (academicHistories || [])[0] || null;
-    return (
-      (academicHistories || []).find((h) => h.studentId === currentStudent.id) ||
-      (academicHistories || [])[0] ||
-      null
-    );
-  }, [currentStudent, academicHistories]);
+  // Notas do aluno selecionado (nunca as de outro aluno).
+  const studentHistory = useMemo(() => (currentStudent ? histByStudent.get(currentStudent.id) || null : null), [currentStudent, histByStudent]);
 
   // Student submissions across exams
   const studentSubmissions = useMemo(() => {
@@ -147,152 +173,102 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
   }, [currentStudent, submissions]);
 
   // -------------------------------------------------------------
-  // DATA CALCULATION: STUDENT BIMONTHLY EVOLUTION
+  // NOTAS REAIS (Diário de Notas + histórico). Sem nota → não aparece (nada inventado).
   // -------------------------------------------------------------
+  const classmateIds = useMemo(
+    () => (currentStudent?.classId ? studentsByClass.get(currentStudent.classId) || [] : []),
+    [currentStudent, studentsByClass]
+  );
+
   const studentBimonthlyChartData = useMemo(() => {
-    const defaultData = [
-      { bimestre: '1º Bimestre', notaAluno: 6.8, mediaTurma: 6.5, metaEscola: 6.0 },
-      { bimestre: '2º Bimestre', notaAluno: 7.5, mediaTurma: 6.8, metaEscola: 6.0 },
-      { bimestre: '3º Bimestre', notaAluno: 8.2, mediaTurma: 7.0, metaEscola: 6.0 },
-      { bimestre: '4º Bimestre', notaAluno: 8.8, mediaTurma: 7.2, metaEscola: 6.0 },
-    ];
+    const mine = studentBimesters(studentHistory, selectedSubject);
+    const cls = groupStats(classmateIds, histByStudent, selectedSubject).bimesters;
+    return BIMESTER_LABELS.map((bimestre, i) => ({ bimestre, notaAluno: mine[i], mediaTurma: cls[i], metaEscola: PASSING_GRADE }))
+      .filter((d) => isNum(d.notaAluno))
+      .map((d) => ({ ...d, notaAluno: d.notaAluno as number, mediaTurma: isNum(d.mediaTurma) ? d.mediaTurma : undefined }));
+  }, [studentHistory, selectedSubject, classmateIds, histByStudent]);
 
-    if (!studentHistory || !studentHistory.records || studentHistory.records.length === 0) {
-      return defaultData;
-    }
-
-    const records =
-      selectedSubject === 'ALL'
-        ? studentHistory.records
-        : studentHistory.records.filter((r) => r && r.subjectName === selectedSubject);
-
-    if (records.length === 0) return defaultData;
-
-    const b1Vals = records
-      .map((r) => r?.bimonthlyGrades?.b1)
-      .filter((v): v is number => typeof v === 'number' && !isNaN(v));
-    const b2Vals = records
-      .map((r) => r?.bimonthlyGrades?.b2)
-      .filter((v): v is number => typeof v === 'number' && !isNaN(v));
-    const b3Vals = records
-      .map((r) => r?.bimonthlyGrades?.b3)
-      .filter((v): v is number => typeof v === 'number' && !isNaN(v));
-    const b4Vals = records
-      .map((r) => r?.bimonthlyGrades?.b4)
-      .filter((v): v is number => typeof v === 'number' && !isNaN(v));
-
-    const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
-
-    return [
-      {
-        bimestre: '1º Bimestre',
-        notaAluno: Number((avg(b1Vals) || 6.8).toFixed(1)),
-        mediaTurma: 6.5,
-        metaEscola: 6.0,
-      },
-      {
-        bimestre: '2º Bimestre',
-        notaAluno: Number((avg(b2Vals) || 7.2).toFixed(1)),
-        mediaTurma: 6.8,
-        metaEscola: 6.0,
-      },
-      {
-        bimestre: '3º Bimestre',
-        notaAluno: Number((avg(b3Vals) || 7.9).toFixed(1)),
-        mediaTurma: 7.1,
-        metaEscola: 6.0,
-      },
-      {
-        bimestre: '4º Bimestre',
-        notaAluno: Number((avg(b4Vals) || 8.5).toFixed(1)),
-        mediaTurma: 7.3,
-        metaEscola: 6.0,
-      },
-    ];
-  }, [studentHistory, selectedSubject]);
-
-  // -------------------------------------------------------------
-  // DATA CALCULATION: STUDENT SUBJECT PERFORMANCE (RADAR / BAR)
-  // -------------------------------------------------------------
   const studentSubjectPerformanceData = useMemo(() => {
-    if (!studentHistory?.records || studentHistory.records.length === 0) {
-      return [
-        { subject: 'Matemática', nota: 8.5, turma: 7.1, proficiencia: 85 },
-        { subject: 'Português', nota: 9.0, turma: 7.5, proficiencia: 90 },
-        { subject: 'Física', nota: 7.5, turma: 6.2, proficiencia: 75 },
-        { subject: 'Química', nota: 8.0, turma: 6.8, proficiencia: 80 },
-        { subject: 'História', nota: 8.8, turma: 7.8, proficiencia: 88 },
-        { subject: 'Biologia', nota: 9.2, turma: 7.4, proficiencia: 92 },
-      ];
-    }
+    return (studentHistory?.records || [])
+      .filter((r) => r && isNum(r.finalGrade))
+      .map((r) => {
+        const turma = groupStats(classmateIds, histByStudent, r.subjectName).average;
+        return {
+          subject: r.subjectName.length > 14 ? r.subjectName.slice(0, 13) + '…' : r.subjectName,
+          fullName: r.subjectName,
+          nota: r.finalGrade,
+          turma: isNum(turma) ? turma : undefined,
+          proficiencia: Math.min(100, Math.round((r.finalGrade / 10) * 100)),
+        };
+      });
+  }, [studentHistory, classmateIds, histByStudent]);
 
-    return studentHistory.records.map((r) => ({
-      subject: (r?.subjectName || 'Disciplina').slice(0, 12),
-      fullName: r?.subjectName || 'Disciplina',
-      nota: typeof r?.finalGrade === 'number' ? r.finalGrade : 7.5,
-      turma: 6.8,
-      proficiencia: Math.min(100, Math.round(((r?.finalGrade || 7) / 10) * 100)),
-    }));
-  }, [studentHistory]);
+  const currentClassStats = useMemo(
+    () => (currentClass ? groupStats(studentsByClass.get(currentClass.id) || [], histByStudent, selectedSubject) : null),
+    [currentClass, studentsByClass, histByStudent, selectedSubject]
+  );
 
-  // -------------------------------------------------------------
-  // DATA CALCULATION: CLASS GENERAL EVOLUTION
-  // -------------------------------------------------------------
   const classEvolutionData = useMemo(() => {
-    return [
-      {
-        periodo: '1º Bimestre',
-        mediaGeral: 6.7,
-        taxaAprovacao: 78,
-        matematica: 6.2,
-        portugues: 7.2,
-        ciencias: 6.8,
-      },
-      {
-        periodo: '2º Bimestre',
-        mediaGeral: 7.1,
-        taxaAprovacao: 84,
-        matematica: 6.8,
-        portugues: 7.5,
-        ciencias: 7.2,
-      },
-      {
-        periodo: '3º Bimestre',
-        mediaGeral: 7.6,
-        taxaAprovacao: 89,
-        matematica: 7.3,
-        portugues: 7.8,
-        ciencias: 7.7,
-      },
-      {
-        periodo: '4º Bimestre',
-        mediaGeral: 8.1,
-        taxaAprovacao: 93,
-        matematica: 7.9,
-        portugues: 8.3,
-        ciencias: 8.2,
-      },
-    ];
-  }, []);
+    if (!currentClassStats) return [];
+    return BIMESTER_LABELS.map((periodo, i) => ({
+      periodo,
+      mediaGeral: currentClassStats.bimesters[i],
+      taxaAprovacao: currentClassStats.bimesterApproval[i],
+    }))
+      .filter((d) => isNum(d.mediaGeral))
+      .map((d) => ({ ...d, mediaGeral: d.mediaGeral as number, taxaAprovacao: isNum(d.taxaAprovacao) ? d.taxaAprovacao : undefined }));
+  }, [currentClassStats]);
+
+  // Comparativo entre turmas do recorte (só turmas com notas lançadas), da maior média para a menor.
+  const classComparisonRows = useMemo(() => {
+    const manySchools = new Set(scopedClasses.map((c) => (c as any).schoolUnitId)).size > 1;
+    return scopedClasses
+      .map((c) => ({
+        cls: c,
+        label: manySchools ? classLabelWithSchool(c, schoolUnits) : c.name,
+        st: groupStats(studentsByClass.get(c.id) || [], histByStudent, selectedSubject),
+      }))
+      .sort((a, b) => (b.st.average ?? -1) - (a.st.average ?? -1));
+  }, [scopedClasses, schoolUnits, studentsByClass, histByStudent, selectedSubject]);
+  const classComparisonChart = useMemo(
+    () =>
+      classComparisonRows
+        .filter((r) => isNum(r.st.average))
+        .map((r) => ({ name: r.label, value: r.st.average as number })),
+    [classComparisonRows]
+  );
 
   // -------------------------------------------------------------
-  // STATS HIGHLIGHTS
+  // INDICADORES DO ALUNO
   // -------------------------------------------------------------
   const stats = useMemo(() => {
-    const b1 = studentBimonthlyChartData[0]?.notaAluno || 0;
-    const b4 = studentBimonthlyChartData[3]?.notaAluno || 0;
-    const delta = b4 - b1;
-    const currentAverage = studentHistory?.generalAverage || 8.0;
-    const attendance = studentHistory?.attendanceRate || 95;
-
+    const vals = studentBimonthlyChartData.map((d) => d.notaAluno);
+    const delta = vals.length >= 2 ? Math.round((vals[vals.length - 1] - vals[0]) * 10) / 10 : null;
+    const currentAverage = studentFinal(studentHistory, selectedSubject);
+    const attendance = studentHistory && isNum(studentHistory.attendanceRate) && studentHistory.attendanceRate > 0 ? studentHistory.attendanceRate : null;
     return {
       delta,
       currentAverage,
       attendance,
-      examsCount: studentSubmissions.length || 3,
-      isPositive: delta >= 0,
+      examsCount: studentSubmissions.length,
+      isPositive: (delta ?? 0) >= 0,
     };
-  }, [studentBimonthlyChartData, studentHistory, studentSubmissions]);
+  }, [studentBimonthlyChartData, studentHistory, studentSubmissions, selectedSubject]);
+
+  // Diagnóstico a partir das notas lançadas (disciplinas fortes e as que precisam de reforço).
+  const diagnosis = useMemo(() => {
+    const recs = studentSubjectPerformanceData;
+    const strong = recs.filter((r) => r.nota >= 8).sort((a, b) => b.nota - a.nota).slice(0, 3);
+    const weak = recs.filter((r) => r.nota < PASSING_GRADE).sort((a, b) => a.nota - b.nota);
+    const list = (arr: typeof recs) => arr.map((r) => `${r.fullName} (${fmtGrade(r.nota)})`).join(', ');
+    return {
+      hasData: recs.length > 0,
+      strengths: strong.length ? `Melhores resultados em ${list(strong)}.` : 'Nenhuma disciplina com média 8,0 ou mais até agora.',
+      improve: weak.length
+        ? `Abaixo da média ${fmtGrade(PASSING_GRADE)} em ${list(weak)}. Sugere-se recuperação paralela e acompanhamento.`
+        : `Todas as disciplinas com média ${fmtGrade(PASSING_GRADE)} ou mais.`,
+    };
+  }, [studentSubjectPerformanceData]);
 
   // Available Datasets for Customizer Modal
   const availableChartDatasets: ChartDatasetOption[] = useMemo(() => {
@@ -332,14 +308,12 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
       {
         id: 'class_evolution',
         title: `Evolução Coletiva da Turma — ${currentClass?.name || 'Turma'}`,
-        subtitle: 'Média geral e evolução nas principais disciplinas por bimestre',
+        subtitle: "Média geral da turma (0 a 10) por bimestre, com as notas do Diário de Notas",
         data: classEvolutionData.map((c) => ({
           name: c.periodo,
           value: c.mediaGeral,
-          secondaryValue: c.taxaAprovacao,
         })),
         valueLabel: 'Média Geral',
-        secondaryValueLabel: 'Taxa de Aprovação (%)',
         unit: 'pts',
         defaultChartType: 'LINE',
         benchmarkValue: 6.0,
@@ -349,17 +323,13 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
         id: 'class_comparison',
         title: 'Matriz Comparativa de Médias entre Turmas',
         subtitle: 'Comparativo de média geral e taxa de aprovação das turmas cadastradas',
-        data: classes.map((c, idx) => ({
-          name: c.name,
-          value: Number((7.4 + idx * 0.2).toFixed(1)),
-          secondaryValue: 92 + idx,
-        })),
+        data: classComparisonChart,
         valueLabel: 'Média Geral da Turma',
         secondaryValueLabel: 'Taxa de Aprovação (%)',
         unit: 'pts',
         defaultChartType: 'BAR_VERTICAL',
-        benchmarkValue: 7.0,
-        benchmarkLabel: 'Meta Institucional (7.0)',
+        benchmarkValue: 6.0,
+        benchmarkLabel: 'Média mínima (6,0)',
       },
     ];
   }, [
@@ -368,7 +338,7 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
     studentBimonthlyChartData,
     studentSubjectPerformanceData,
     classEvolutionData,
-    classes,
+    classComparisonChart,
     selectedSubject,
   ]);
 
@@ -539,6 +509,19 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
         </div>
       </div>
 
+      {/* RECORTE: escola, etapa/série e turno */}
+      <ChartScopeBar
+        scope={chartScope.scope}
+        onChange={(next) => {
+          chartScope.setScope(next);
+          setSelectedClassId('ALL');
+        }}
+        classes={classes}
+        schoolUnits={schoolUnits}
+        appliesTo="turmas e gráficos"
+        countText={`${scopedClasses.length} turma(s) no recorte`}
+      />
+
       {/* FILTROS DINÂMICOS */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
         <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-100 text-xs font-bold text-slate-700">
@@ -560,9 +543,9 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
               className="w-full text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
             >
               <option value="ALL">Todas as Turmas</option>
-              {classes.map((c) => (
+              {scopedClasses.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name} ({c.shift})
+                  {classLabelWithSchool(c, schoolUnits)} ({c.shift})
                 </option>
               ))}
             </select>
@@ -638,8 +621,12 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
                   <div>
                     <h3 className="font-bold text-slate-900 text-sm">{currentStudent.name}</h3>
                     <p className="text-xs text-slate-500 font-mono">RA: {currentStudent.enrollmentNumber}</p>
-                    <span className="inline-block px-2 py-0.5 mt-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                      Matrícula Ativa
+                    <span
+                      className={`inline-block px-2 py-0.5 mt-1 rounded-full text-[10px] font-bold ${
+                        currentStudent.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
+                      {currentStudent.status === 'ACTIVE' ? 'Matrícula Ativa' : 'Matrícula não ativa'}
                     </span>
                   </div>
                 </div>
@@ -648,7 +635,7 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
                   <div className="flex justify-between">
                     <span className="text-slate-400">Turma:</span>
                     <span className="font-semibold text-slate-800">
-                      {classes.find((c) => c.id === currentStudent.classId)?.name || '3º Ano'}
+                      {classes.find((c) => c.id === currentStudent.classId)?.name || '—'}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -675,13 +662,17 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
                 Média Geral Acumulada
               </span>
               <div className="my-2">
-                <span className="text-3xl font-black text-slate-900">{stats.currentAverage.toFixed(1)}</span>
-                <span className="text-xs text-slate-400 ml-1.5">/ 10.0</span>
+                <span className="text-3xl font-black text-slate-900">{fmtGrade(stats.currentAverage)}</span>
+                <span className="text-xs text-slate-400 ml-1.5">/ 10,0</span>
               </div>
-              <div className="flex items-center gap-1 text-xs text-emerald-600 font-bold">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                <span>Acima da meta mínima escolar (6.0)</span>
-              </div>
+              {isNum(stats.currentAverage) ? (
+                <div className={`flex items-center gap-1 text-xs font-bold ${stats.currentAverage >= PASSING_GRADE ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {stats.currentAverage >= PASSING_GRADE ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
+                  <span>{stats.currentAverage >= PASSING_GRADE ? 'Na média mínima (6,0) ou acima' : 'Abaixo da média mínima (6,0)'}</span>
+                </div>
+              ) : (
+                <div className="text-xs text-slate-500 font-semibold">Sem notas lançadas no Diário de Notas</div>
+              )}
             </div>
 
             {/* Evolução Bimestral (Delta) */}
@@ -695,9 +686,9 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
                     stats.isPositive ? 'text-emerald-600' : 'text-rose-600'
                   }`}
                 >
-                  {stats.delta >= 0 ? `+${stats.delta.toFixed(1)}` : stats.delta.toFixed(1)}
+                  {stats.delta === null ? '—' : stats.delta >= 0 ? `+${fmtGrade(stats.delta)}` : fmtGrade(stats.delta)}
                 </span>
-                <span className="text-xs text-slate-500">pontos no ano</span>
+                <span className="text-xs text-slate-500">{stats.delta === null ? 'precisa de 2 bimestres' : 'do 1º ao último bimestre lançado'}</span>
               </div>
               <div
                 className={`flex items-center gap-1 text-xs font-bold ${
@@ -709,7 +700,7 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
                 ) : (
                   <ArrowDownRight className="h-3.5 w-3.5" />
                 )}
-                <span>{stats.isPositive ? 'Trajetória ascendente contínua' : 'Requer intervenção de reforço'}</span>
+                <span>{stats.delta === null ? 'Aguardando notas' : stats.isPositive ? 'Evolução positiva ou estável' : 'Queda: avaliar reforço'}</span>
               </div>
             </div>
 
@@ -719,8 +710,8 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
                 Taxa de Frequência
               </span>
               <div className="my-2">
-                <span className="text-3xl font-black text-indigo-600">{stats.attendance}%</span>
-                <span className="text-xs text-slate-400 ml-1.5">presença</span>
+                <span className="text-3xl font-black text-indigo-600">{stats.attendance === null ? '—' : `${stats.attendance}%`}</span>
+                <span className="text-xs text-slate-400 ml-1.5">{stats.attendance === null ? 'sem registro no histórico' : 'presença'}</span>
               </div>
               <div className="flex items-center gap-1 text-xs text-slate-500">
                 <Calendar className="h-3.5 w-3.5 text-indigo-500" />
@@ -792,9 +783,7 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
                     <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                     Pontos Fortes & Altas Habilidades:
                   </span>
-                  <p className="leading-relaxed">
-                    Excelente desenvolvimento em Português e Biologia com notas consistentes acima de 9.0 e alta compreensão de leitura crítica e interpretação de textos.
-                  </p>
+                  <p className="leading-relaxed">{diagnosis.hasData ? diagnosis.strengths : 'Sem notas lançadas para este estudante.'}</p>
                 </div>
 
                 <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1">
@@ -802,9 +791,7 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
                     <AlertCircle className="h-4 w-4 text-amber-600" />
                     Oportunidades de Melhoria:
                   </span>
-                  <p className="leading-relaxed">
-                    Reforçar exercícios de cinemática e estequiometria em Física e Química para consolidar a fixação antes das provas finais.
-                  </p>
+                  <p className="leading-relaxed">{diagnosis.hasData ? diagnosis.improve : 'O diagnóstico aparece quando houver notas no Diário de Notas.'}</p>
                 </div>
               </div>
 
@@ -839,12 +826,16 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
                 <div className="p-3 bg-white/10 rounded-xl text-center backdrop-blur-xs">
                   <span className="text-[10px] text-slate-300 block uppercase">Alunos na Turma</span>
                   <span className="text-xl font-black text-white">
-                    {students.filter((s) => s.classId === currentClass.id).length || 32}
+                    {(studentsByClass.get(currentClass.id) || []).length}
                   </span>
                 </div>
                 <div className="p-3 bg-white/10 rounded-xl text-center backdrop-blur-xs">
+                  <span className="text-[10px] text-slate-300 block uppercase">Alunos com média ≥ 6,0</span>
+                  <span className="text-xl font-black text-white">{isNum(currentClassStats?.approval) ? `${currentClassStats?.approval}%` : '—'}</span>
+                </div>
+                <div className="p-3 bg-white/10 rounded-xl text-center backdrop-blur-xs">
                   <span className="text-[10px] text-slate-300 block uppercase">Média Geral da Turma</span>
-                  <span className="text-xl font-black text-emerald-400">7.6</span>
+                  <span className="text-xl font-black text-emerald-400">{fmtGrade(currentClassStats?.average)}</span>
                 </div>
               </div>
             </div>
@@ -858,10 +849,8 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
               data={classEvolutionData.map((c) => ({
                 name: c.periodo,
                 value: c.mediaGeral,
-                secondaryValue: c.taxaAprovacao,
               }))}
               valueLabel="Média Geral"
-              secondaryValueLabel="Taxa de Aprovação (%)"
               unit="pts"
               defaultChartType="LINE"
               benchmarkValue={6.0}
@@ -884,18 +873,14 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
           <div>
             <CustomizableChartCard
               title="Comparativo de Médias Gerais entre Turmas"
-              subtitle="Rendimento médio e taxa de aproveitamento de todas as turmas"
-              data={classes.map((c, idx) => ({
-                name: c.name,
-                value: Number((7.4 + idx * 0.2).toFixed(1)),
-                secondaryValue: 92 + idx,
-              }))}
+              subtitle={`Média geral (0 a 10) das turmas com notas lançadas: ${classComparisonChart.length} de ${scopedClasses.length}. A % de alunos com média ≥ 6,0 está na tabela abaixo.`}
+              data={classComparisonChart}
               valueLabel="Média Geral"
               secondaryValueLabel="Taxa de Aprovação (%)"
               unit="pts"
               defaultChartType="BAR_VERTICAL"
-              benchmarkValue={7.0}
-              benchmarkLabel="Meta SME (7.0)"
+              benchmarkValue={PASSING_GRADE}
+              benchmarkLabel="Média mínima (6,0)"
               height={300}
               onOpenFullCustomizer={() => {
                 setChartCustomizerInitialDataset('class_comparison');
@@ -910,7 +895,7 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
               Matriz Comparativa de Turmas & Disciplinas
             </h4>
             <p className="text-xs text-slate-500">
-              Comparativo de proficiência média entre todas as turmas cadastradas na instituição
+              Médias por bimestre calculadas com as notas do Diário de Notas (e do histórico escolar, quando houver). "—" = sem nota lançada.
             </p>
 
             <div className="overflow-x-auto rounded-xl border border-slate-200">
@@ -925,28 +910,36 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
                     <th className="p-3 text-center">Média 3º Bim</th>
                     <th className="p-3 text-center">Média 4º Bim</th>
                     <th className="p-3 text-center font-black text-indigo-700">Média Geral</th>
-                    <th className="p-3 text-center">Taxa Aprovação</th>
+                    <th className="p-3 text-center">Média ≥ 6,0</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {classes.map((c, idx) => (
+                  {classComparisonRows.length === 0 && (
+                    <tr>
+                      <td colSpan={9} className="p-6 text-center text-slate-400">Nenhuma turma no filtro selecionado.</td>
+                    </tr>
+                  )}
+                  {classComparisonRows.map(({ cls: c, label, st }) => (
                     <tr key={c.id} className="hover:bg-slate-50">
-                      <td className="p-3 font-bold text-slate-800">{c.name}</td>
+                      <td className="p-3 font-bold text-slate-800">{label}</td>
                       <td className="p-3 text-slate-500">{c.shift}</td>
-                      <td className="p-3 text-center font-semibold">
-                        {students.filter((s) => s.classId === c.id).length || 28 + idx}
-                      </td>
-                      <td className="p-3 text-center text-slate-700">6.8</td>
-                      <td className="p-3 text-center text-slate-700">7.2</td>
-                      <td className="p-3 text-center text-slate-700">7.7</td>
-                      <td className="p-3 text-center text-slate-700">8.1</td>
-                      <td className="p-3 text-center font-bold text-indigo-700 bg-indigo-50/50">
-                        {(7.4 + idx * 0.2).toFixed(1)}
-                      </td>
+                      <td className="p-3 text-center font-semibold">{st.students}</td>
+                      {st.bimesters.map((b, i) => (
+                        <td key={i} className="p-3 text-center text-slate-700">{fmtGrade(b)}</td>
+                      ))}
+                      <td className="p-3 text-center font-bold text-indigo-700 bg-indigo-50/50">{fmtGrade(st.average)}</td>
                       <td className="p-3 text-center">
-                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                          {92 + idx}%
-                        </span>
+                        {isNum(st.approval) ? (
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              st.approval >= 75 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                            }`}
+                          >
+                            {st.approval}%
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">sem notas</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -966,7 +959,7 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
             students={students}
             classes={classes}
             subjects={subjects}
-            academicHistories={academicHistories}
+            academicHistories={mergedHistories}
             onNavigate={onNavigate}
           />
         </div>

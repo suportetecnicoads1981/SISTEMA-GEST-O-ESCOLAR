@@ -109,9 +109,6 @@ export const BimonthlyAcademicEvolutionCard: React.FC<BimonthlyAcademicEvolution
       if (s.name) set.add(s.name.trim());
     });
 
-    if (set.size === 0) {
-      return ['Matemática', 'Língua Portuguesa', 'Física', 'História', 'Biologia'];
-    }
     return Array.from(set);
   }, [academicHistories, subjects]);
 
@@ -149,6 +146,8 @@ export const BimonthlyAcademicEvolutionCard: React.FC<BimonthlyAcademicEvolution
   };
 
   // Histórico do estudante selecionado ou cálculo da média geral
+  const studentById = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
+
   const currentHistory = useMemo(() => {
     if (selectedStudentId === 'ALL') return null;
     return academicHistories.find((h) => h.studentId === selectedStudentId) || null;
@@ -172,9 +171,8 @@ export const BimonthlyAcademicEvolutionCard: React.FC<BimonthlyAcademicEvolution
             const val = record.bimonthlyGrades[bKey];
             point[subName] = typeof val === 'number' && !isNaN(val) ? Number(val.toFixed(1)) : null;
           } else {
-            // Valor de estimativa se não houver registro formal
-            const fallback = Number((6.8 + (idx * 0.4) + ((subName.length % 3) * 0.3)).toFixed(1));
-            point[subName] = fallback;
+            // Sem nota lançada: fica em branco no gráfico (nada de valor estimado).
+            point[subName] = null;
           }
         });
 
@@ -196,13 +194,13 @@ export const BimonthlyAcademicEvolutionCard: React.FC<BimonthlyAcademicEvolution
       const bKey = `b${idx + 1}` as 'b1' | 'b2' | 'b3' | 'b4';
       const point: Record<string, any> = { bimestre: bName };
 
-      activeSubjects.forEach((subName, subIdx) => {
+      activeSubjects.forEach((subName) => {
         // Coleta notas de todos os históricos para esta disciplina
         const values: number[] = [];
         academicHistories.forEach((h) => {
           // Filtra por turma se selecionada
           if (selectedClassId !== 'ALL') {
-            const st = students.find((s) => s.id === h.studentId);
+            const st = studentById.get(h.studentId);
             if (st && st.classId !== selectedClassId) return;
           }
           const rec = h.records.find(
@@ -216,10 +214,8 @@ export const BimonthlyAcademicEvolutionCard: React.FC<BimonthlyAcademicEvolution
         if (values.length > 0) {
           point[subName] = Number((values.reduce((a, b) => a + b, 0) / values.length).toFixed(1));
         } else {
-          // Curva pedagógica realista (ligeira melhora ao longo dos bimestres)
-          const seed = (subIdx * 0.5) % 1.5;
-          const val = 6.4 + seed + idx * 0.35;
-          point[subName] = Number(Math.min(9.5, Math.max(5.0, val)).toFixed(1));
+          // Sem nota lançada: fica em branco no gráfico (nada de valor estimado).
+          point[subName] = null;
         }
       });
 
@@ -229,7 +225,7 @@ export const BimonthlyAcademicEvolutionCard: React.FC<BimonthlyAcademicEvolution
       point['Média Global'] =
         validValues.length > 0
           ? Number((validValues.reduce((a, b) => a + b, 0) / validValues.length).toFixed(1))
-          : 7.2;
+          : null;
 
       return point;
     });
@@ -546,8 +542,19 @@ export const BimonthlyAcademicEvolutionCard: React.FC<BimonthlyAcademicEvolution
         </div>
       </div>
 
+      {/* Sem notas lançadas: aviso no lugar de um gráfico vazio */}
+      {!chartData.some((pt) => activeSubjects.some((sub) => typeof pt[sub] === 'number')) && (
+        <div className="h-40 w-full flex flex-col items-center justify-center text-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-slate-500">
+          <p className="text-xs font-bold">Sem notas lançadas para este filtro</p>
+          <p className="text-[11px]">As notas aparecem aqui assim que os professores lançarem no Diário de Notas.</p>
+        </div>
+      )}
+
       {/* Main Recharts Visualization Canvas */}
-      <div className="h-72 w-full pt-2">
+      <div
+        className="h-72 w-full pt-2"
+        style={{ display: chartData.some((pt) => activeSubjects.some((sub) => typeof pt[sub] === 'number')) ? undefined : 'none' }}
+      >
         <ResponsiveContainer width="100%" height="100%">
           {chartType === 'LINE' ? (
             <LineChart data={chartData} margin={{ top: 15, right: 20, left: -20, bottom: 5 }}>

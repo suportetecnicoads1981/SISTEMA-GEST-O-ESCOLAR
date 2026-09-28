@@ -56,6 +56,7 @@ import {
 } from '../../services/bncc/bnccAssessmentService';
 import { studentReportHtml, classReportHtml, downloadWordDoc, StudentReportOptions } from '../../services/bncc/bnccReportHtml';
 import { FlexChart, downloadCsv } from '../common/FlexChart';
+import { fileStamp } from '../../utils/printIsolated';
 import { triggerPrint } from '../../utils/printHelper';
 import { displayClassName } from '../../utils/schoolDataNormalizer';
 import { BnccExamPerformanceSection } from './BnccExamPerformanceSection';
@@ -103,8 +104,27 @@ async function readSheet(file: File): Promise<Array<Record<string, any>>> {
   const wb = isCsv
     ? XLSX.read(new TextDecoder('utf-8').decode(buf).replace(/^﻿/, ''), { type: 'string' })
     : XLSX.read(buf, { type: 'array' });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  return XLSX.utils.sheet_to_json(ws, { defval: '' }) as Array<Record<string, any>>;
+  // Aceita também planilhas exportadas pelo sistema com timbre: procura a aba "Dados" (ou a
+  // primeira) e a linha de cabeçalho (a que tem Código, Aluno ou Matrícula) antes dos dados.
+  const name = wb.SheetNames.find((n) => /^dados/i.test(n)) || wb.SheetNames[0];
+  const ws = wb.Sheets[name];
+  const matrix = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as any[][];
+  const isHeader = (r: any[]) => r.some((c) => /^(c[oó]digo|aluno|matr[ií]cula)$/i.test(String(c).trim()));
+  const h = matrix.findIndex(isHeader);
+  if (h <= 0) return XLSX.utils.sheet_to_json(ws, { defval: '' }) as Array<Record<string, any>>;
+  const head = matrix[h].map((c) => String(c).trim());
+  return matrix
+    .slice(h + 1)
+    .filter((r) => r.some((c) => String(c).trim() !== '') && !/^(total de linhas|conferido por)/i.test(String(r[0]).trim()))
+    .map((r) => Object.fromEntries(head.map((k, i) => [k, r[i] ?? ''])) as Record<string, any>)
+    .filter((o) => Object.keys(o).some((k) => k));
+}
+
+/** Relatório em Excel com timbre (para exportações; os modelos de preenchimento usam downloadXlsx). */
+async function downloadReportXlsx(filename: string, title: string, rows: Array<Record<string, any>>, sheetName = 'Dados', subtitle?: string) {
+  const { downloadStyledWorkbook, objectRowsSheet } = await import('../../services/styledXlsx');
+  const name = filename.endsWith('.xlsx') ? filename : `${filename}_${fileStamp()}.xlsx`;
+  await downloadStyledWorkbook(name, [objectRowsSheet(title, rows, { sheetName, subtitle })]);
 }
 
 async function downloadXlsx(filename: string, rows: Array<Record<string, any>>, sheetName = 'Dados') {
@@ -806,14 +826,16 @@ const ReportsSection: React.FC<{
               </button>
               <button
                 onClick={() =>
-                  downloadXlsx(
+                  downloadReportXlsx(
                     fileBase,
+                    'Avaliação das Habilidades BNCC',
                     assessmentsToRows(term ? yearList.filter((a) => a.term === term) : yearList, {
                       students: classStudents,
                       classes: [{ id: selectedClass.id, name: displayClassName(selectedClass) }],
                       skills: Array.from(skillsByCode.values()),
                     }),
-                    'Habilidades'
+                    'Dados',
+                    `Turma: ${displayClassName(selectedClass)}${schoolName ? ' • ' + schoolName : ''}${term ? ` • ${term}º bimestre` : ''}`
                   )
                 }
                 className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-semibold cursor-pointer"
@@ -1057,7 +1079,7 @@ const CatalogSection: React.FC<{
         <button onClick={() => fileRef.current?.click()} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-xs font-semibold cursor-pointer">
           <Upload className="h-4 w-4" /> Importar (Excel/CSV)
         </button>
-        <button onClick={() => downloadXlsx('Catalogo_Habilidades_BNCC', exportRows, 'Habilidades')} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-xs font-semibold cursor-pointer">
+        <button onClick={() => downloadReportXlsx('Catalogo_Habilidades_BNCC', 'Catálogo de Habilidades BNCC', exportRows, 'Dados')} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-xs font-semibold cursor-pointer">
           <Download className="h-4 w-4" /> Excel
         </button>
         <button onClick={() => downloadCsv('Catalogo_Habilidades_BNCC', exportRows, csvCols(exportRows))} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-xs font-semibold cursor-pointer">
@@ -1232,7 +1254,7 @@ const FilesSection: React.FC<{
           </h3>
           <p className="text-slate-500">{rows.length} lançamento(s) nos filtros atuais.</p>
           <div className="flex flex-wrap gap-2">
-            <button disabled={!rows.length} onClick={() => downloadXlsx(fileBase, rows, 'Lançamentos')} className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer disabled:opacity-50">
+            <button disabled={!rows.length} onClick={() => downloadReportXlsx(fileBase, 'Lançamentos das Habilidades BNCC', rows, 'Dados')} className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer disabled:opacity-50">
               Excel (.xlsx)
             </button>
             <button disabled={!rows.length} onClick={() => downloadCsv(fileBase, rows, csvCols(rows))} className="px-3 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 font-semibold cursor-pointer disabled:opacity-50">

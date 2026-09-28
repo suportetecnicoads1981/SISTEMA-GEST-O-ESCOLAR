@@ -1960,6 +1960,8 @@ export default function App() {
                 students={data?.students || []}
                 classes={data?.classes || []}
                 histories={data?.academicHistories || []}
+                classGradeSheets={data?.classGradeSheets || []}
+                attendanceSheets={data?.attendanceSheets || []}
                 settings={data?.settings || DEFAULT_SCHOOL_SETTINGS}
                 preSelectedStudentId={documentSelectedStudentId}
                 preSelectedDocType={documentSelectedType}
@@ -1982,6 +1984,7 @@ export default function App() {
                   subjects={data.subjects || []}
                   settings={data.settings}
                   academicHistories={data.academicHistories || []}
+                  classGradeSheets={data.classGradeSheets || []}
                   onBack={() => handleNavigate('MAIN_DASHBOARD')}
                   onNavigate={handleNavigate}
                 />

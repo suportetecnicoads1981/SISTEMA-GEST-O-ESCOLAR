@@ -13,7 +13,6 @@ import {
   Percent,
   Sliders,
   Check,
-  Sparkles,
   Info,
 } from 'lucide-react';
 import {
@@ -207,35 +206,6 @@ export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
         ...prev,
         [studentId]: updated,
       };
-    });
-  };
-
-  // Quick action: Pre-fill demo grades for all students
-  const handlePrefillDemoGrades = () => {
-    setLocalGrades((prev) => {
-      const next = { ...prev };
-      classStudents.forEach((st, idx) => {
-        const a1 = Number((7.0 + (idx % 3) * 1.0).toFixed(1));
-        const a2 = Number((8.0 - (idx % 2) * 0.5).toFixed(1));
-        const act = 9.0;
-        const exam = Number((6.5 + (idx % 4) * 0.8).toFixed(1));
-        const { average, status } = calculateStudentAverage(a1, a2, act, exam, null);
-
-        next[st.id] = {
-          studentId: st.id,
-          studentName: st.name,
-          enrollmentNumber: st.enrollmentNumber,
-          assessment1: a1,
-          assessment2: a2,
-          activitiesScore: act,
-          examScore: exam,
-          recoveryScore: status === 'RECUPERACAO' ? 7.0 : null,
-          termAverage: average,
-          status,
-          descriptiveFeedback: 'Apresenta participação contínua e compreensão dos conteúdos curriculares propostos.',
-        };
-      });
-      return next;
     });
   };
 
@@ -471,15 +441,6 @@ export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={handlePrefillDemoGrades}
-              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-              title="Preenche notas de demonstração para agilizar testes"
-            >
-              <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
-              Preencher Notas Exemplo
-            </button>
-
             <button
               onClick={handlePrintGradeMap}
               className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer"

@@ -63,7 +63,9 @@ import {
   Subject,
   SchoolSettings,
   AcademicHistory,
+  ClassGradeSheet,
 } from '../../types';
+import { mergeGradeHistories } from '../../services/gradeAnalytics';
 import { generatePedagogicalReport } from '../../data/storage';
 import { EnvironmentService } from '../../services/environmentService';
 import { AssessmentResultsReport } from './AssessmentResultsReport';
@@ -91,6 +93,8 @@ interface PedagogicalDashboardProps {
   subjects?: Subject[];
   settings?: SchoolSettings;
   academicHistories?: AcademicHistory[];
+  /** Diário de Notas (notas lançadas pelos professores). */
+  classGradeSheets?: ClassGradeSheet[];
   initialSection?: 'DASHBOARD' | 'RESULTS_BY_SCHOOL_LEVEL' | 'EVOLUTION';
   onBack?: () => void;
   onNavigate?: (tab: string, payload?: any) => void;
@@ -136,6 +140,7 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
   subjects = [],
   settings,
   academicHistories = [],
+  classGradeSheets = [],
   initialSection = 'DASHBOARD',
   onBack,
   onNavigate,
@@ -143,6 +148,11 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
   const [activeSection, setActiveSection] = useState<'DASHBOARD' | 'RESULTS_BY_SCHOOL_LEVEL' | 'EVOLUTION'>(initialSection);
   const [selectedExamId, setSelectedExamId] = useState<string>(exams?.[0]?.id || '');
   const [selectedClassId, setSelectedClassId] = useState<string>('ALL');
+  // Notas reais para o painel bimestral: Diário de Notas + histórico escolar.
+  const mergedGradeHistories = useMemo(
+    () => mergeGradeHistories(academicHistories, classGradeSheets, students),
+    [academicHistories, classGradeSheets, students]
+  );
 
   useEffect(() => {
     if (initialSection) {
@@ -652,6 +662,8 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
           subjects={subjects}
           submissions={submissions}
           academicHistories={academicHistories}
+          classGradeSheets={classGradeSheets}
+          schoolUnits={schoolUnits}
           onBack={() => setActiveSection('DASHBOARD')}
           onNavigate={onNavigate}
         />
@@ -1088,7 +1100,7 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
               students={students}
               classes={classes}
               subjects={subjects}
-              academicHistories={academicHistories}
+              academicHistories={mergedGradeHistories}
               theme={theme}
               onNavigate={onNavigate}
             />
