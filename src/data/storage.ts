@@ -40,9 +40,8 @@ import {
   SystemUpdatePackage,
   SecurityAuditLog,
 } from '../types';
-import { SupabasePersistenceService } from '../services/supabasePersistenceService';
-import { recordDeletions, clearRecreated, PENDING_DELETES_KEY } from '../services/datasync/deletionTracker';
-import { enqueueLocalChanges, enqueueFullReplace, isLocalServerMode, getLocalServerInfo } from '../services/offline/localServerSync';
+import { PENDING_DELETES_KEY } from '../services/datasync/deletionTracker';
+import { enqueueLocalChanges, enqueueFullReplace, getLocalServerInfo } from '../services/offline/localServerSync';
 import { loteDeletionsBetween } from '../services/offline/batchPacket';
 import { recordLoteDeletions } from '../services/offline/loteDeletions';
 import {
@@ -538,19 +537,8 @@ export function isDatabaseClean(data?: AppStateData): boolean {
 export function getStoredData(): AppStateData {
   // Com servidor da rede local (Servidor Remoto / Sede), os dados vêm dele; a nuvem
   // é tratada pelo envio automático (cloudAutoSync), não por esta carga inicial.
-  if (typeof window !== 'undefined' && !(window as any).__sucessoedu_supabase_realtime_initialized && !isLocalServerMode()) {
-    (window as any).__sucessoedu_supabase_realtime_initialized = true;
-    SupabasePersistenceService.initRealtimeSync((freshData) => {
-      safeLocalStorageSet(KEYS.DATA, JSON.stringify(freshData));
-      window.dispatchEvent(new CustomEvent('sucessoedu_db_changed', { detail: freshData }));
-    });
-    SupabasePersistenceService.fetchAppStateFromSupabase().then((remoteData) => {
-      if (remoteData) {
-        safeLocalStorageSet(KEYS.DATA, JSON.stringify(remoteData));
-        window.dispatchEvent(new CustomEvent('sucessoedu_db_changed', { detail: remoteData }));
-      }
-    }).catch(() => {});
-  }
+  // A troca com a nuvem é feita pelo motor de sincronização (services/sync/cloudSync),
+  // iniciado pelo App: recebe só o que mudou, sem recarregar a base inteira.
 
   const CLEAN_SECRETARIA_ONLY_FLAG = 'sucessoedu_clean_cumaru_do_norte_prod_v544';
   if (typeof window !== 'undefined' && localStorage.getItem(CLEAN_SECRETARIA_ONLY_FLAG) !== 'true') {
@@ -678,23 +666,30 @@ export function applyProductionStartOnce(): boolean {
   }
 }
 
+/** Chamado depois de cada gravação feita no sistema (o motor da nuvem agenda o envio). */
+let afterLocalSave: (() => void) | null = null;
+export function setAfterLocalSave(fn: (() => void) | null): void {
+  afterLocalSave = fn;
+}
+
 /**
  * Persists entire master application state
+ *
+ * origin 'cloud': dados recebidos da nuvem pelo motor de sincronização. Vão para o servidor
+ * da rede local (as outras estações recebem), mas não disparam novo envio à nuvem.
  */
 export function saveStoredData(
   data: AppStateData,
-  options?: { skipCloudSync?: boolean; bulkReplace?: boolean; authoritative?: boolean }
+  options?: { skipCloudSync?: boolean; bulkReplace?: boolean; authoritative?: boolean; origin?: 'cloud' }
 ): void {
-  // Exclusões feitas nas telas precisam ser enviadas à nuvem (ver deletionTracker).
-  // Substituições completas (limpar base, restaurar backup, dados vindos da nuvem)
-  // não geram exclusões remotas.
+  // Exclusões e alterações vão à nuvem pelo motor de sincronização, que compara cada registro
+  // com a última versão enviada/recebida. Substituições completas (limpar base, restaurar
+  // backup) só valem para a nuvem pela "Conferência completa" do administrador.
   if (!options?.skipCloudSync && !options?.bulkReplace) {
     let previous: any = null;
     try {
       const previousRaw = localStorage.getItem(KEYS.DATA);
       previous = previousRaw ? JSON.parse(previousRaw) : null;
-      if (previous) recordDeletions(previous, data);
-      clearRecreated(data);
     } catch {
       /* estado anterior ilegível: nada a propagar */
     }
@@ -705,10 +700,12 @@ export function saveStoredData(
       console.warn('[SucessoEdu] Falha ao preparar envio ao servidor local:', err);
     }
     // Exclusões escolares também viajam no lote para a Sede.
-    try {
-      recordLoteDeletions(loteDeletionsBetween(previous, data as any));
-    } catch {
-      /* não impede a gravação */
+    if (options?.origin !== 'cloud') {
+      try {
+        recordLoteDeletions(loteDeletionsBetween(previous, data as any));
+      } catch {
+        /* não impede a gravação */
+      }
     }
   } else if (options?.authoritative) {
     // Ação explícita do usuário (restaurar backup, limpar base): vale para toda a rede local.
@@ -719,11 +716,14 @@ export function saveStoredData(
     }
   }
   safeLocalStorageSet(KEYS.DATA, JSON.stringify(data));
-  if (options?.skipCloudSync) return;
-  // Servidor Remoto (escola): a nuvem recebe somente o lote da escola (cloudAutoSync),
-  // nunca a base inteira desta estação (evita sobrescrever configurações e contas da rede).
+  if (options?.skipCloudSync || options?.origin === 'cloud') return;
+  // Servidor Remoto (escola): a nuvem recebe somente o lote da escola (cloudAutoSync).
   if (getLocalServerInfo()?.role === 'REMOTO') return;
-  SupabasePersistenceService.saveAppStateToSupabase(data).catch(() => {});
+  try {
+    afterLocalSave?.();
+  } catch {
+    /* o envio é tentado de novo na próxima rodada */
+  }
 }
 
 /**

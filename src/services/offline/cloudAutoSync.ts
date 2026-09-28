@@ -6,15 +6,12 @@
  *    e deixa na nuvem (tabela lotes_escolas). Nada mais da escola vai direto para
  *    as tabelas da nuvem: assim uma escola nunca sobrescreve configurações, contas
  *    ou dados de outra.
- *  - Servidor da Sede: importa os lotes pendentes (mesma mescla do pendrive), envia
- *    a base consolidada para a nuvem e, por último, recebe o que foi lançado
- *    direto na nuvem. Enviar antes de receber impede que uma cópia antiga da nuvem
- *    desfaça alterações feitas na Sede sem internet.
+ *  - Servidor da Sede: importa os lotes pendentes (mesma mescla do pendrive) e roda uma
+ *    rodada do motor de sincronização v2 (só o que mudou, com trava de versão).
  * Sem internet, nada acontece e o trabalho segue normalmente na rede local.
  */
 import { getSupabaseClient } from '../datasync/supabaseClient';
-import { SupabaseDatabaseService } from '../datasync/SupabaseDatabaseService';
-import { SupabasePersistenceService } from '../supabasePersistenceService';
+import { syncNow } from '../sync/cloudSync';
 import { getStoredData, saveStoredData } from '../../data/storage';
 import { sha256Hex } from '../../utils/passwordHasher';
 import { isCloudReachable } from './connectivity';
@@ -32,8 +29,8 @@ export interface CloudSyncStatus {
 const LAST_PUSH_KEY = 'sucessoedu_cloud_last_push_v1';
 const LAST_LOTE_KEY = 'sucessoedu_cloud_last_lote_v1';
 const TICK_MS = 60_000;
-// Envio COMPLETO da Sede (todas as tabelas): no máximo a cada 30 minutos, como conferência.
-// As alterações do dia a dia sobem na hora pela fila da nuvem, só com o que mudou.
+// Servidor Remoto: intervalo mínimo entre reenvios do mesmo lote. (A Sede usa o motor v2,
+// services/sync/cloudSync, que envia só o que mudou a cada rodada.)
 const MIN_PUSH_INTERVAL_MS = 30 * 60_000;
 export const LOTES_TABLE = 'lotes_escolas';
 
@@ -212,38 +209,22 @@ export async function runCloudSyncNow(force = false): Promise<CloudSyncStatus> {
     const isAdmin = String(session.user?.app_metadata?.role || '').toUpperCase() === 'ADMIN';
     const notes = isAdmin ? await importPendingLotes(session.user.id) : [];
 
-    // Antes, qualquer gravação no servidor (a cada poucos minutos) disparava o envio completo
-    // dos 2.011 alunos a cada minuto, e o recebimento logo depois gerava nova gravação: um
-    // ciclo sem fim que deixava a tela da Sede lenta. Agora o completo só roda no intervalo.
-    if (force || !recent || notes.length) {
-      const results = await SupabaseDatabaseService.syncAllEntitiesToSupabase();
-      const failed = results.filter((r) => !r.success);
-      if (failed.length) {
-        setStatus({
-          state: 'erro',
-          message: `Envio à nuvem incompleto (${failed.length} tabela(s) com erro): ${failed
-            .map((f) => f.table)
-            .slice(0, 4)
-            .join(', ')}. Nova tentativa automática em instantes.`,
-        });
-        return status;
-      }
-      // Depois de enviar, recebe o que foi lançado direto na nuvem (mescla sem apagar).
-      const remote = await SupabasePersistenceService.fetchAppStateFromSupabase();
-      if (remote) {
-        saveStoredData(remote);
-        window.dispatchEvent(new CustomEvent('sucessoedu_db_changed', { detail: remote }));
-      }
-      writeJson(LAST_PUSH_KEY, { at: new Date().toISOString(), version: localStorage.getItem(LOCAL_VERSION_KEY) || '' });
+    // Sincronização v2: o motor único envia só o que mudou (inclusive o que chegou dos lotes)
+    // e recebe só o que é novo, com a trava de versão. Não há mais envio completo periódico.
+    const st = await syncNow();
+    if (st.state === 'erro') {
+      setStatus({ state: 'erro', message: st.message || 'Falha na sincronização. Nova tentativa em instantes.' });
+      return status;
     }
+    writeJson(LAST_PUSH_KEY, { at: new Date().toISOString(), version: localStorage.getItem(LOCAL_VERSION_KEY) || '' });
     setStatus({
       state: 'enviado',
       lastPushAt: readJson(LAST_PUSH_KEY).at,
       message: notes.length
         ? `Lotes importados: ${notes.join('; ')}.`
         : isAdmin
-          ? 'Base da Sede sincronizada com a nuvem.'
-          : 'Base enviada. Para importar os lotes das escolas, entre com uma conta de administrador.',
+          ? 'Sede sincronizada com a nuvem (só o que mudou).'
+          : 'Alterações enviadas. Para importar os lotes das escolas, entre com uma conta de administrador.',
     });
     return status;
   } catch (err: any) {

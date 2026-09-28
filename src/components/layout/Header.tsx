@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { getLocalServerInfo, flushLocalChanges } from '../../services/offline/localServerSync';
 import { supabaseBatchQueue } from '../../services/supabaseBatchQueue';
+import { CloudSyncIndicator } from '../offline/CloudSyncIndicator';
 import { NotificationItem, UserRole, UserAccount } from '../../types';
 import { NotificationPopover } from '../notificacoes/NotificationPopover';
 import { formatPersonName } from '../../services/documentBranding';
@@ -382,6 +383,9 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden sm:inline">Tira-dúvidas</span>
           </button>
         )}
+
+        {/* Situação da sincronização com a nuvem (motor v2) */}
+        <CloudSyncIndicator isAdmin={currentUser?.role === 'ADMIN'} />
 
         {/* Botão Atualizar: envia o que estiver pendente e recarrega a tela */}
         <button

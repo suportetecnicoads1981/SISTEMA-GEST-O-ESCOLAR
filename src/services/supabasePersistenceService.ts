@@ -1,5 +1,4 @@
 import { getSupabaseClient } from './datasync/supabaseClient';
-import { SupabaseDatabaseService } from './datasync/SupabaseDatabaseService';
 import type { AppStateData } from '../data/storage';
 import { DEFAULT_SCHOOL_SETTINGS } from '../data/defaultData';
 import { fromRemoteRow, mergeRemoteIntoLocal } from './datasync/supabaseRowMapper';
@@ -30,12 +29,6 @@ export class SupabasePersistenceService {
       return null;
     }
   }
-  private static readonly SAVE_DEBOUNCE_MS = 1500;
-  private static readonly REALTIME_DEBOUNCE_MS = 2000;
-  private static pendingSave: Promise<void> | null = null;
-  private static isSyncing = false;
-  private static resyncRequested = false;
-  private static realtimeRefetchTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * Fetch all app state entities from Supabase PostgreSQL tables and map to AppStateData
@@ -238,80 +231,18 @@ export class SupabasePersistenceService {
   }
 
   /**
-   * Save app state to Supabase PostgreSQL database
+   * Sincronização v2: o envio é feito pelo motor único (services/sync/cloudSync), só com o
+   * que mudou. Esta função apenas agenda uma rodada (antes, disparava a cópia completa).
    */
   public static saveAppStateToSupabase(_data?: AppStateData): Promise<void> {
-    // Cada gravação local dispara uma sincronização completa de todas as tabelas.
-    // Várias gravações seguidas (ex.: ao abrir módulos) geravam dezenas de upserts
-    // simultâneos (ERR_INSUFFICIENT_RESOURCES). Aqui as chamadas são agrupadas:
-    // aguarda-se um intervalo curto e executa-se uma única sincronização por vez,
-    // sempre lendo o estado mais recente do localStorage.
-    if (!this.pendingSave) {
-      this.pendingSave = new Promise<void>((resolve) => {
-        setTimeout(async () => {
-          this.pendingSave = null;
-          await this.runSync();
-          resolve();
-        }, SupabasePersistenceService.SAVE_DEBOUNCE_MS);
-      });
-    }
-    return this.pendingSave;
-  }
-
-  private static async runSync(): Promise<void> {
-    if (this.isSyncing) {
-      // Já existe uma sincronização em andamento: agenda mais uma ao final dela.
-      this.resyncRequested = true;
-      return;
-    }
-    this.isSyncing = true;
-    try {
-      await SupabaseDatabaseService.syncAllEntitiesToSupabase();
-    } catch (err) {
-      console.warn('Failed to push state to Supabase:', err);
-    } finally {
-      this.isSyncing = false;
-      if (this.resyncRequested) {
-        this.resyncRequested = false;
-        this.saveAppStateToSupabase().catch(() => {});
-      }
-    }
+    return import('./sync/cloudSync').then((m) => m.schedule(1500));
   }
 
   /**
-   * Initialize Realtime subscription to synchronize across instances in real-time
+   * Antes: a cada alteração na nuvem, recarregava TODAS as tabelas. Agora o motor escuta a
+   * nuvem e recebe só o que mudou; esta função ficou sem efeito.
    */
-  public static initRealtimeSync(onUpdate: (data: AppStateData) => void): void {
-    if (this.isSubscribed) return;
-    try {
-      const supabase = getSupabaseClient();
-      supabase
-        .channel('sucessoedu-realtime-global')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public' },
-          (payload) => {
-            console.log('🔄 [Supabase Realtime] Change detected in table:', payload.table);
-            // Um upsert em lote gera um evento por linha; sem agrupamento cada evento
-            // recarregava todas as tabelas. Recarrega uma única vez após a rajada.
-            if (this.realtimeRefetchTimer) clearTimeout(this.realtimeRefetchTimer);
-            this.realtimeRefetchTimer = setTimeout(async () => {
-              this.realtimeRefetchTimer = null;
-              const fresh = await this.fetchAppStateFromSupabase();
-              if (fresh) {
-                onUpdate(fresh);
-              }
-            }, SupabasePersistenceService.REALTIME_DEBOUNCE_MS);
-          }
-        )
-        .subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            this.isSubscribed = true;
-            console.log('🟢 [Supabase Realtime] Conectado e ouvindo sincronizações entre instâncias.');
-          }
-        });
-    } catch (err) {
-      console.warn('Supabase Realtime initialization warning:', err);
-    }
+  public static initRealtimeSync(_onUpdate: (data: AppStateData) => void): void {
+    this.isSubscribed = true;
   }
 }

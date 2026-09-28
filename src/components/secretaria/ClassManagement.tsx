@@ -464,6 +464,13 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
             <span>Importar Turmas</span>
           </button>
           <button
+            onClick={() => window.dispatchEvent(new CustomEvent('sucessoedu_review_school_links'))}
+            className="px-3.5 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 rounded-xl border border-slate-300 transition-colors flex items-center gap-1.5 cursor-pointer"
+            title="Procura turmas sem escola, alunos sem escola e nomes de turma com o nome da escola, e mostra as correções antes de aplicar (somente administrador)"
+          >
+            <span>Revisar vínculos</span>
+          </button>
+          <button
             onClick={handleOpenAdd}
             className="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md shadow-indigo-200 transition-all flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
           >

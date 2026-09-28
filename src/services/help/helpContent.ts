@@ -37,6 +37,26 @@ export const HELP_GENERAL: HelpModule = {
   summary: 'Entrar, sair, sincronizar com a nuvem, atalhos e o que fazer quando algo parece errado.',
   faq: [
       {
+        q: 'Como funciona a sincronização com a nuvem agora?',
+        a: 'Cada computador envia só os registros que mudaram nele e recebe só o que mudou na nuvem, em até 1 minuto (ou na hora, com "Sincronizar agora"). Cada registro tem um número de versão controlado pela nuvem: se um computador tentar gravar a partir de uma cópia desatualizada, a nuvem recusa e ele recebe a versão atual. Por isso o sistema pode ficar aberto pelo link e pela Sede ao mesmo tempo, e uma cópia antiga não apaga mais o trabalho de ninguém. A nuvem passou a guardar o cadastro completo (série, turno, raça/cor, PCD, filiação etc.) e também o cadastro da SEMED, planos de aula e anotações do professor.',
+        tip: 'A regra antiga "não abrir pelo link enquanto a Sede estiver em uso" não é mais necessária.',
+      },
+      {
+        q: 'O que é o botão "Nuvem" no alto da tela?',
+        a: 'Mostra a situação da sincronização: verde = em dia; azul girando = sincronizando; âmbar = há alterações aguardando envio ou avisos; vermelho = erro (tenta de novo sozinho). Clique para ver a hora da última sincronização, quantos registros aguardam envio, os recusados e os avisos recentes, e para "Sincronizar agora".',
+        tip: 'O administrador também vê "Conferência completa": compara todos os registros deste computador com a nuvem. Onde houver diferença, fica a da nuvem; o que só existe aqui é enviado. Use só se o suporte pedir.',
+      },
+      {
+        q: 'Apareceu um aviso de que minha alteração foi substituída. O que houve?',
+        a: 'Outra pessoa alterou o mesmo registro (por exemplo, o mesmo aluno) em outro computador antes de a sua alteração chegar à nuvem. Para não apagar o trabalho dela, a nuvem ficou com a versão que chegou primeiro e o seu computador recebeu essa versão. Abra o registro, confira e, se precisar, refaça a sua alteração.',
+        tip: 'Alterações em registros diferentes (alunos diferentes, por exemplo) nunca se atrapalham.',
+      },
+      {
+        q: 'Apareceu "A Secretaria reiniciou a base na nuvem". E agora?',
+        a: 'Quando a Secretaria recomeça a base (por exemplo, para reimportar todas as escolas pela planilha padrão), cada computador, na próxima sincronização, faz um backup automático e retira os cadastros antigos (alunos, turmas, escolas, notas, chamadas...) que foram alterados antes do reinício. O que foi cadastrado ou importado depois do reinício continua. Nada precisa ser apagado à mão.',
+        tip: 'O backup automático fica em Backup/Restauração, caso seja preciso consultar algo antigo.',
+      },
+      {
         q: 'Como filtro os gráficos por escola, série ou turno?',
         a: 'Acima dos gráficos há a barra "Filtrar": escolha a escola, a etapa/série e o turno. Os gráficos e indicadores passam a mostrar só aquele recorte, e ao lado aparece quantos registros entraram. "Limpar" volta para a rede toda. Isso vale para Evasão & Busca Ativa e Evolução Pedagógica.',
         tip: 'Em cada gráfico ainda dá para trocar o tipo (colunas, barras, linhas, pizza), a ordem e quantos itens mostrar. Quando não há dados para o filtro, aparece "Sem dados para mostrar" em vez de um gráfico vazio.',
@@ -176,7 +196,7 @@ export const HELP_GENERAL: HelpModule = {
         'Confira se o selo mostra que você está na nuvem ("Entrar na nuvem" se estiver desconectado).',
         'Em até 1 minuto os RAs provisórios são trocados pelos definitivos. Sem internet, o provisório fica até a conexão voltar.',
       ],
-      tip: 'O RA não é digitado na ficha do aluno. Se dois alunos aparecerem com o mesmo RA (dado antigo), o cadastrado primeiro fica com o número e o outro recebe um novo da nuvem. Evite deixar o sistema aberto em duas janelas no mesmo computador. Na Sede, a conferência completa das tabelas acontece a cada 30 minutos (ou ao clicar em "Enviar à nuvem agora").',
+      tip: 'O RA não é digitado na ficha do aluno. Se dois alunos aparecerem com o mesmo RA (dado antigo), o cadastrado primeiro fica com o número e o outro recebe um novo da nuvem. A sincronização envia só o que mudou; não há mais conferência completa automática.',
     },
     {
       q: 'O selo mostra "sem resposta (rede local)" o tempo todo. O servidor parou?',
@@ -194,8 +214,8 @@ export const HELP_GENERAL: HelpModule = {
     {
       q: 'Fiz uma alteração e não apareceu em outro computador. O que faço?',
       steps: [
-        'No computador onde alterou, clique no selo do rodapé e em "Sincronizar agora".',
-        'No outro computador, aperte Ctrl+F5 ou clique em "Sincronizar agora".',
+        'No computador onde alterou, clique no botão "Nuvem" no alto da tela e em "Sincronizar agora".',
+        'No outro computador, faça o mesmo (ou aguarde até 1 minuto: ele recebe sozinho o que mudou).',
         'Se continuar diferente, anote o que alterou e avise o suporte.',
       ],
     },
@@ -356,6 +376,11 @@ export const HELP_MODULES: HelpModule[] = [
     where: 'Menu > Secretaria & Ensino (Alt+T)',
     summary: 'Cadastro das turmas, vagas, professor regente e matriz curricular (disciplinas).',
     faq: [
+      {
+        q: 'O que faz o botão "Revisar vínculos"?',
+        a: 'Procura turmas sem escola, alunos sem escola ou com escola inexistente, nomes de turma que levam o nome da escola ("ESCOLA X - PRÉ I") e registros repetidos de importação. Mostra a lista do que seria corrigido e só aplica se você confirmar. Somente o administrador pode aplicar.',
+        tip: 'Antes essa arrumação rodava sozinha em todos os computadores a cada alteração; agora roda na importação e quando o administrador pede.',
+      },
       { q: 'Como cadastro uma turma?', steps: ['Clique em "Cadastrar Nova Turma".', 'Informe escola, série, turno, sala e capacidade.', 'Salve.'], tip: 'Use sempre o mesmo padrão de série (ex.: "1º ANO"). Provas e relatórios agrupam as turmas pela série.' },
       { q: 'Por que a lista de disciplinas das provas está incompleta?', a: 'As disciplinas vêm da Matriz Curricular. Cadastre aqui as disciplinas oficiais da rede. Enquanto isso, o sistema oferece os componentes padrão da BNCC.' },
       { q: 'Como vejo as vagas livres?', a: 'A tabela mostra matriculados, capacidade e vagas remanescentes de cada turma.' },
@@ -687,6 +712,11 @@ export const HELP_MODULES: HelpModule[] = [
     where: 'Menu > Administração & TI (Alt+I)',
     summary: 'Pacotes do Servidor da Sede, do Servidor Remoto (escola) e das estações, atualização do servidor e cópias de segurança.',
     faq: [
+      {
+        q: 'Como crio a conta da nuvem do Servidor Remoto de uma escola?',
+        steps: ['Em Instaladores & Backup, no quadro "Servidor Remoto (escola)", escolha a escola.', 'Em "Conta do servidor na nuvem", clique em "Criar / renovar conta" (é preciso estar na nuvem como administrador).', 'Anote o e-mail e a senha que aparecem (a senha não aparece de novo).', 'No servidor da escola, clique no selo do servidor e em "Entrar na nuvem" com esse e-mail e senha.'],
+        a: 'A conta é da escola, não de uma pessoa: envia só o lote daquela escola e recebe só os dados dela. "Desligar" corta o acesso daquele servidor sem afetar as outras escolas; "Criar / renovar" gera uma nova senha.',
+      },
       {
         q: 'Como instalo o Servidor Remoto de uma escola?',
         steps: [

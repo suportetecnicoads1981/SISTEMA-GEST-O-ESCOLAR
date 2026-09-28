@@ -5,11 +5,8 @@
  * Anon Key: sb_publishable_MdH_s87GSHw3HXEShUwy4Q_1JVMunnu
  */
 
-import { flushPendingDeletes } from './deletionTracker';
-import { supabaseBatchQueue, toIsoDateOrNull } from '../supabaseBatchQueue';
 import { getSupabaseClient, SUPABASE_CONFIG } from './supabaseClient';
-import { getStoredData, AppStateData } from '../../data/storage';
-import { toRemoteRow, SUPABASE_TABLE_COLUMNS, ADMIN_ONLY_TABLES } from './supabaseRowMapper';
+import type { AppStateData } from '../../data/storage';
 
 export interface SupabaseSyncResult {
   success: boolean;
@@ -761,215 +758,44 @@ END $$;
   /**
    * Sincroniza alunos locais com a tabela students no Supabase
    */
-  public static async syncStudentsToSupabase(students: any[]): Promise<SupabaseSyncResult> {
+  /**
+   * Sincronização v2: todo envio à nuvem passa pelo motor único (services/sync/cloudSync),
+   * que manda só o que mudou e respeita a trava de versão. As funções abaixo existem para
+   * as telas técnicas que as chamam.
+   */
+  private static async runEngine(table: string, full = false): Promise<SupabaseSyncResult> {
     const start = performance.now();
-    try {
-      const supabase = getSupabaseClient();
-      
-      const payload = students
-        .filter((s) => s && s.id && String(s.name || '').trim())
-        .map((s) => ({
-        id: s.id,
-        name: s.name,
-        registration_number: s.enrollmentNumber || s.registration_number || `REG-${s.id}`,
-        cpf: s.cpf || null,
-        rg: s.rg || null,
-        // Data inválida (ex: texto do cabeçalho "DATA DE NASCIMENTO") vira vazia em vez de travar o envio
-        birth_date: toIsoDateOrNull(s.birthDate),
-        school_unit_id: s.schoolUnitId || s.school_unit_id || null,
-        gender: s.gender || 'OTHER',
-        email: s.email || null,
-        phone: s.phone || null,
-        guardian_name: s.guardianName || null,
-        guardian_phone: s.guardianPhone || null,
-        address: s.address || null,
-        city: s.city || null,
-        state: s.state || null,
-        class_id: s.classId || null,
-        status: s.status || 'ACTIVE',
-        cadastral_status: s.cadastralStatus || 'OK',
-        medical_observations: s.medicalObservations || null,
-        has_aee: Boolean(s.hasAEE || s.hasAeeSupport),
-        location_zone: s.locationZone || 'URBANA',
-        updated_at: new Date().toISOString(),
-      }));
+    const m = await import('../sync/cloudSync');
+    const st = full ? await m.fullResync() : await m.syncNow();
+    const ok = st.state === 'ok';
+    return {
+      success: ok,
+      table,
+      count: st.lastPushed + st.lastPulled,
+      latencyMs: Math.round(performance.now() - start),
+      message: ok
+        ? `Sincronizado: ${st.lastPushed} enviado(s), ${st.lastPulled} recebido(s)${st.pending ? `, ${st.pending} aguardando` : ''}.`
+        : st.message || 'Sincronização não concluída.',
+      error: ok ? undefined : st.message,
+    };
+  }
 
-      // RA ocupado por outro registro na nuvem é liberado antes (mesma regra da fila de envio)
-      await supabaseBatchQueue.releaseConflictingRegistrations(supabase, payload);
-
-      const { data, error } = await supabase
-        .from('students')
-        .upsert(payload, { onConflict: 'id' })
-        .select();
-
-      const latencyMs = Math.round(performance.now() - start);
-
-      if (error) {
-        return {
-          success: false,
-          table: 'students',
-          count: 0,
-          latencyMs,
-          message: `Falha na sincronização de estudantes: ${error.message}`,
-          error: error.message,
-        };
-      }
-
-      return {
-        success: true,
-        table: 'students',
-        count: data?.length || payload.length,
-        latencyMs,
-        message: `${payload.length} alunos sincronizados com sucesso no Supabase!`,
-      };
-    } catch (err: any) {
-      return {
-        success: false,
-        table: 'students',
-        count: 0,
-        latencyMs: Math.round(performance.now() - start),
-        message: `Erro ao conectar com ${SUPABASE_CONFIG.restEndpoint}: ${err.message}`,
-        error: err.message,
-      };
-    }
+  public static async syncStudentsToSupabase(_students: any[]): Promise<SupabaseSyncResult> {
+    return this.runEngine('students');
   }
 
   /**
    * Sincroniza turmas locais com a tabela school_classes no Supabase
    */
-  public static async syncClassesToSupabase(classes: any[]): Promise<SupabaseSyncResult> {
-    const start = performance.now();
-    try {
-      const supabase = getSupabaseClient();
-      
-      const payload = classes.map((c) => ({
-        id: c.id,
-        name: c.name,
-        grade_level: c.gradeLevel || 'Ensino Fundamental',
-        segment: c.segment || 'ENSINO_FUNDAMENTAL',
-        shift: c.shift || 'MATUTINO',
-        school_year: c.schoolYear || 2026,
-        capacity: c.maxCapacity || c.capacity || 35,
-        room_number: c.roomNumber || null,
-        class_teacher: c.classTeacher || null,
-        school_unit_id: c.schoolUnitId || null,
-        updated_at: new Date().toISOString(),
-      }));
-
-      const { data, error } = await supabase
-        .from('school_classes')
-        .upsert(payload, { onConflict: 'id' })
-        .select();
-
-      const latencyMs = Math.round(performance.now() - start);
-
-      if (error) {
-        return {
-          success: false,
-          table: 'school_classes',
-          count: 0,
-          latencyMs,
-          message: `Falha na sincronização de turmas: ${error.message}`,
-          error: error.message,
-        };
-      }
-
-      return {
-        success: true,
-        table: 'school_classes',
-        count: data?.length || payload.length,
-        latencyMs,
-        message: `${payload.length} turmas sincronizadas com sucesso no Supabase!`,
-      };
-    } catch (err: any) {
-      return {
-        success: false,
-        table: 'school_classes',
-        count: 0,
-        latencyMs: Math.round(performance.now() - start),
-        message: `Erro na sincronização de turmas: ${err.message}`,
-        error: err.message,
-      };
-    }
+  public static async syncClassesToSupabase(_classes: any[]): Promise<SupabaseSyncResult> {
+    return this.runEngine('school_classes');
   }
 
   /**
    * Sincroniza qualquer tabela arbitrária para o Supabase
    */
-  public static async syncTableGeneric(tableName: string, records: any[]): Promise<SupabaseSyncResult> {
-    const start = performance.now();
-    try {
-      const supabase = getSupabaseClient();
-
-      if (!records || records.length === 0) {
-        return {
-          success: true,
-          table: tableName,
-          count: 0,
-          latencyMs: 0,
-          message: `Nenhum registro local na tabela '${tableName}' para sincronizar.`,
-        };
-      }
-
-      // Converte para as colunas reais da tabela (snake_case) e descarta registros sem
-      // os campos obrigatórios, que fariam o lote inteiro ser recusado.
-      const nowIso = new Date().toISOString();
-      const payload = records
-        .filter((r) => typeof r === 'object' && r !== null)
-        .map((r, idx) => {
-          const withMeta: Record<string, any> = { ...r, id: r.id || `auto_${idx}_${Date.now()}` };
-          if (SUPABASE_TABLE_COLUMNS[tableName]?.includes('updated_at')) {
-            withMeta.updated_at = nowIso;
-          }
-          return toRemoteRow(tableName, withMeta);
-        })
-        .filter((r): r is Record<string, any> => r !== null);
-
-      if (payload.length === 0) {
-        return {
-          success: true,
-          table: tableName,
-          count: 0,
-          latencyMs: 0,
-          message: `Nenhum registro válido na tabela '${tableName}' para sincronizar.`,
-        };
-      }
-
-      const { data, error } = await supabase
-        .from(tableName)
-        .upsert(payload, { onConflict: 'id' })
-        .select();
-
-      const latencyMs = Math.round(performance.now() - start);
-
-      if (error) {
-        return {
-          success: false,
-          table: tableName,
-          count: 0,
-          latencyMs,
-          message: `Tabela '${tableName}': ${error.message}`,
-          error: error.message,
-        };
-      }
-
-      return {
-        success: true,
-        table: tableName,
-        count: data?.length || payload.length,
-        latencyMs,
-        message: `${payload.length} registros sincronizados na tabela '${tableName}'!`,
-      };
-    } catch (err: any) {
-      return {
-        success: false,
-        table: tableName,
-        count: 0,
-        latencyMs: Math.round(performance.now() - start),
-        message: `Erro na tabela '${tableName}': ${err.message}`,
-        error: err.message,
-      };
-    }
+  public static async syncTableGeneric(tableName: string, _records: any[]): Promise<SupabaseSyncResult> {
+    return this.runEngine(tableName);
   }
 
   /**
@@ -978,264 +804,9 @@ END $$;
   public static async syncAllEntitiesToSupabase(
     onProgress?: (current: number, total: number, tableName: string) => void
   ): Promise<SupabaseSyncResult[]> {
-    // As políticas RLS só permitem gravação para usuários autenticados da equipe.
-    const { data: sessionData } = await getSupabaseClient().auth.getSession();
-    const session = sessionData?.session;
-    if (!session) {
-      return [{
-        success: false,
-        table: '*',
-        count: 0,
-        latencyMs: 0,
-        message: 'Sincronização em nuvem aguardando login: entre com uma conta cadastrada no Supabase.',
-        error: 'NO_SESSION',
-      }];
-    }
-    const isAdmin = String(session.user?.app_metadata?.role || '').toUpperCase() === 'ADMIN';
-
-    // Exclusões feitas nas telas vão antes dos upserts, para não haver mistura de estados.
-    try {
-      const { deleted, failed } = await flushPendingDeletes(getSupabaseClient() as any, isAdmin);
-      if (deleted || failed) console.info(`[SucessoEdu] Exclusões enviadas à nuvem: ${deleted} ok, ${failed} com falha.`);
-    } catch (err) {
-      console.warn('[SucessoEdu] Não foi possível enviar exclusões pendentes:', err);
-    }
-
-    const stored = getStoredData();
-    const results: SupabaseSyncResult[] = [];
-
-    const allTasks = [
-      { name: 'students', data: stored.students, customSync: () => this.syncStudentsToSupabase(stored.students) },
-      { name: 'school_classes', data: stored.classes, customSync: () => this.syncClassesToSupabase(stored.classes) },
-      { 
-        name: 'subjects', 
-        data: stored.subjects, 
-        customSync: () => this.syncTableGeneric(
-          'subjects', 
-          (stored.subjects || []).map((s: any, idx: number) => ({
-            id: s.id || ('sub_' + idx),
-            name: s.name,
-            code: s.code || ('COD-' + idx),
-            segment: s.segment || 'ENSINO_FUNDAMENTAL',
-            teacher_name: s.teacherName || null,
-            workload_hours: s.workloadHours || 80,
-          }))
-        ) 
-      },
-      { 
-        name: 'courses', 
-        data: stored.courses, 
-        customSync: () => this.syncTableGeneric(
-          'courses', 
-          (stored.courses || []).map((c: any, idx: number) => ({
-            id: c.id || ('course_' + idx),
-            name: c.name,
-            segment: c.segment || 'ENSINO_FUNDAMENTAL',
-            duration_years: c.durationYears || 1,
-            description: c.description || null,
-          }))
-        ) 
-      },
-      { 
-        name: 'questions', 
-        data: stored.questions, 
-        customSync: () => this.syncTableGeneric(
-          'questions', 
-          (stored.questions || []).map((q: any, idx: number) => ({
-            id: q.id || ('q_' + idx),
-            code: q.code || ('Q-' + (idx + 100)),
-            subject: q.subject || q.subjectId || 'Matemática',
-            topic: q.topic || null,
-            grade_level: q.gradeLevel || '6º Ano',
-            bncc_skill: q.bnccSkill || null,
-            difficulty: q.difficulty || 'MEDIO',
-            type: q.type || 'MULTIPLE_CHOICE',
-            stem: q.statement || q.stem || q.text || 'Enunciado da questão',
-            options: q.options || [],
-            explanation: q.explanation || null,
-          }))
-        ) 
-      },
-      { 
-        name: 'exams', 
-        data: stored.exams, 
-        customSync: () => this.syncTableGeneric(
-          'exams', 
-          (stored.exams || []).map((e: any, idx: number) => ({
-            id: e.id || ('exam_' + idx),
-            title: e.title || ('Avaliação ' + (idx + 1)),
-            description: e.description || null,
-            subject: e.subject || e.subjectId || 'Geral',
-            class_id: e.classId || null,
-            teacher_name: e.teacherName || null,
-            school_year: e.schoolYear || 2026,
-            term: e.term || '1º Bimestre',
-            total_points: e.totalPoints || 10.0,
-            passing_score: e.passingScore || 6.0,
-            time_limit_minutes: e.timeLimitMinutes || 60,
-            questions: e.questions || [],
-            status: e.status || 'PUBLISHED',
-          }))
-        ) 
-      },
-      { name: 'exam_submissions', data: stored.submissions, customSync: () => this.syncTableGeneric('exam_submissions', stored.submissions) },
-      { name: 'attendance_sheets', data: stored.attendanceSheets, customSync: () => this.syncTableGeneric('attendance_sheets', stored.attendanceSheets) },
-      { name: 'lesson_registries', data: stored.lessonRegistries, customSync: () => this.syncTableGeneric('lesson_registries', stored.lessonRegistries) },
-      { name: 'bncc_skills', data: stored.bnccSkills, customSync: () => this.syncTableGeneric('bncc_skills', stored.bnccSkills) },
-      { name: 'bncc_skill_assessments', data: stored.bnccAssessments, customSync: () => this.syncTableGeneric('bncc_skill_assessments', stored.bnccAssessments) },
-      { name: 'academic_histories', data: stored.academicHistories, customSync: () => this.syncTableGeneric('academic_histories', stored.academicHistories) },
-      { 
-        name: 'school_units', 
-        data: stored.schoolUnits, 
-        customSync: () => this.syncTableGeneric(
-          'school_units', 
-          (stored.schoolUnits || []).map((u: any, idx: number) => ({
-            id: u.id || ('unit_' + idx),
-            name: u.name,
-            code: u.code || ('UNID-' + idx),
-            type: u.type || 'SEDE_CENTRAL',
-            inep_code: u.inepCode || null,
-            city: u.city || 'São Paulo',
-            state: u.state || 'SP',
-            principal_name: u.principalName || null,
-            phone: u.phone || null,
-            email: u.email || null,
-            active: u.active !== undefined ? u.active : true,
-            logo_url: u.logoUrl || null,
-            management_logo_url: u.managementLogoUrl || null,
-          }))
-        ) 
-      },
-      { 
-        name: 'user_accounts', 
-        data: stored.userAccounts, 
-        customSync: () => this.syncTableGeneric(
-          'user_accounts', 
-          (stored.userAccounts || []).map((u: any, idx: number) => ({
-            id: u.id || ('user_' + idx),
-            name: u.name,
-            login: u.login || (u.email ? u.email.split('@')[0] : ('user_' + idx)),
-            email: u.email,
-            role: u.role || 'TEACHER',
-            sector: u.sector || 'SECRETARIA',
-            sector_title: u.sectorTitle || null,
-            active: u.active !== undefined ? u.active : true,
-            permissions: u.permissions || {},
-            phone: u.phone || null,
-          }))
-        ) 
-      },
-      { name: 'communications', data: stored.communications, customSync: () => this.syncTableGeneric('communications', stored.communications) },
-      { name: 'notifications', data: stored.notifications, customSync: () => this.syncTableGeneric('notifications', stored.notifications) },
-      {
-        name: 'whatsapp_messages',
-        data: stored.whatsappLogs,
-        // Registros de demonstração antigos (wpp-001…) não vão para a nuvem.
-        customSync: () => this.syncTableGeneric('whatsapp_messages', (stored.whatsappLogs || []).filter((l: any) => !/^wpp-\d{3}$/.test(String(l?.id || '')))),
-      },
-      { 
-        name: 'school_settings', 
-        data: [stored.settings], 
-        customSync: () => {
-          const s = stored.settings || {} as any;
-          return this.syncTableGeneric('school_settings', [{
-            id: 'school_settings_main',
-            name: s.name || 'SucessoEdu Escola Modelo',
-            trade_name: s.tradeName || s.name || 'SucessoEdu',
-            inep_code: s.inepCode || '12345678',
-            cnpj: s.cnpj || null,
-            accreditation_decree: s.accreditationDecree || null,
-            address: s.address || null,
-            city: s.city || 'São Paulo',
-            state: s.state || 'SP',
-            phone: s.phone || null,
-            email: s.email || null,
-            principal_name: s.principalName || null,
-            secretary_name: s.secretaryName || null,
-            logo_url: s.logoUrl || null,
-            management_logo_url: s.managementLogoUrl || null,
-            neighborhood: s.neighborhood || null,
-            zip_code: s.zipCode || null,
-            website: s.website || null,
-            principal_title: s.principalTitle || null,
-            secretary_registration: s.secretaryRegistration || null,
-            system_version: 'v5.2.0',
-          }]);
-        } 
-      },
-      { 
-        name: 'sync_audit_logs', 
-        data: stored.syncLogs, 
-        customSync: () => this.syncTableGeneric(
-          'sync_audit_logs',
-          (stored.syncLogs || []).map((l: any, idx: number) => ({
-            id: l.id || ('log_' + idx),
-            table_name: 'municipal_sync',
-            operation: 'SYNC_SNAPSHOT',
-            station_id: l.schoolUnitId || 'SEMED_CENTRAL',
-            records_count: ((l.recordsMerged?.students || 0) + (l.recordsMerged?.submissions || 0)) || 1,
-            latency_ms: 120,
-            status: l.status || 'SUCESSO',
-            details: typeof l.notes === 'string' ? l.notes : JSON.stringify({
-              schoolUnitName: l.schoolUnitName,
-              operatorName: l.operatorName,
-              recordsMerged: l.recordsMerged,
-              importedAt: l.importedAt
-            }),
-            created_at: l.importedAt || new Date().toISOString()
-          }))
-        ) 
-      },
-      {
-        name: 'system_updates',
-        data: stored.systemUpdates,
-        customSync: () => this.syncTableGeneric(
-          'system_updates',
-          (stored.systemUpdates || []).map((u: any, idx: number) => ({
-            id: u.id || ('update_' + idx),
-            version: u.version,
-            title: u.title,
-            summary: u.summary || u.description || '',
-            description: u.description || u.summary || '',
-            release_date: u.releaseDate || u.release_date || new Date().toISOString().split('T')[0],
-            severity: u.severity || 'MAJOR',
-            size_formatted: u.sizeFormatted || u.size_formatted || '58.4 MB',
-            sha256_checksum: u.sha256Checksum || u.sha256_checksum || '',
-            author: u.author || 'SEDUC / SucessoEdu',
-            is_installed: Boolean(u.isInstalled || u.is_installed),
-            improvements: u.improvements || [],
-          }))
-        )
-      },
-    ];
-
-    // Tabelas administrativas só são gravadas por ADMIN (as demais contas recebem erro de RLS).
-    const tasks = allTasks.filter((t) => isAdmin || !ADMIN_ONLY_TABLES.has(t.name));
-
-    for (let i = 0; i < tasks.length; i++) {
-      const task = tasks[i];
-      onProgress?.(i + 1, tasks.length, task.name);
-      try {
-        const res = await SupabaseDatabaseService.executeWithExponentialBackoff(
-          () => task.customSync(),
-          3,
-          400,
-          2
-        );
-        results.push(res);
-      } catch (err: any) {
-        results.push({
-          success: false,
-          table: task.name,
-          count: 0,
-          latencyMs: 0,
-          message: `Erro inesperado na sincronização da tabela '${task.name}': ${err.message}`,
-          error: err.message,
-        });
-      }
-    }
-
-    return results;
+    // Conferência completa pelo motor v2 (na Sede a base da Sede prevalece; nos demais, a nuvem).
+    onProgress?.(1, 1, 'todas as tabelas');
+    return [await this.runEngine('*', true)];
   }
 
   /**

@@ -107,16 +107,29 @@ export function mergeDown(
   return { list: order.map((id) => byId.get(id)!).filter(Boolean), added, updated, keptLocal, hashes };
 }
 
+/** Registro completo gravado pela sincronização v2 (coluna doc), quando existir. */
+function fromDoc(row: Rec): Rec | null {
+  if (!row?.doc || typeof row.doc !== 'object' || Array.isArray(row.doc)) return null;
+  const m = { ...row.doc };
+  for (const k of ['doc', 'rowVersion', 'baseVersion', 'serverUpdatedAt']) delete m[k];
+  return m;
+}
+
 function mapStudent(row: Rec): Rec {
+  const full = fromDoc(row);
+  if (full) return full;
   const m = fromRemoteRow(row);
   if (row.registration_number) m.enrollmentNumber = row.registration_number;
   if (typeof row.has_aee === 'boolean') m.hasAEE = row.has_aee;
   delete m.registrationNumber;
   delete m.hasAee;
   delete m.createdAt;
+  for (const k of ['rowVersion', 'baseVersion', 'serverUpdatedAt']) delete m[k];
   return m;
 }
 function mapClass(row: Rec): Rec {
+  const full = fromDoc(row);
+  if (full) return full;
   const m = fromRemoteRow(row);
   if (row.capacity) m.maxCapacity = row.capacity;
   delete m.capacity;
@@ -124,6 +137,8 @@ function mapClass(row: Rec): Rec {
   return m;
 }
 function mapUnit(row: Rec): Rec {
+  const full = fromDoc(row);
+  if (full) return full;
   const m = fromRemoteRow(row);
   delete m.createdAt;
   return m;

@@ -10,6 +10,7 @@ import { startCloudAutoSync } from './services/offline/cloudAutoSync';
 import { LocalNetworkStatusBadge } from './components/offline/LocalNetworkStatusBadge';
 import { installPrintTitleGuard } from './utils/printIsolated';
 import { UpdateAvailableNotice } from './components/offline/UpdateAvailableNotice';
+import { CloudSyncNoticeToast } from './components/offline/CloudSyncIndicator';
 import './index.css';
 import { installApiAuthFetch } from './utils/apiAuthFetch';
 
@@ -55,6 +56,7 @@ createRoot(document.getElementById('root')!).render(
         </AuthProvider>
         <LocalNetworkStatusBadge />
         <UpdateAvailableNotice />
+        <CloudSyncNoticeToast />
       </ErrorBoundary>
     </StrictMode>,
   );

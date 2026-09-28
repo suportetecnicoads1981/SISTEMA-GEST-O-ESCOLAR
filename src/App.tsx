@@ -44,8 +44,7 @@ import {
   DEFAULT_DEVELOPER_CONTACT,
 } from './data/defaultData';
 import { getSupabaseClient } from './services/supabaseClient';
-import { SupabasePersistenceService } from './services/supabasePersistenceService';
-import { supabaseBatchQueue } from './services/supabaseBatchQueue';
+import { startCloudSync, syncNow as syncCloudNow } from './services/sync/cloudSync';
 import { shouldKeepCloudSession } from './services/offline/cloudSessionPreference';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
@@ -113,7 +112,7 @@ import { DataSyncProHub } from './components/datasync/DataSyncProHub';
 import { DebugFlowHub } from './components/debugflow/DebugFlowHub';
 import { AdminTIHub } from './components/admin/AdminTIHub';
 import { isTabAvailable } from './config/features';
-import { notify } from './utils/dialogs';
+import { notify, confirmDialog } from './utils/dialogs';
 import { getLocalServerInfo } from './services/offline/localServerSync';
 import { setDocumentBranding } from './services/documentBranding';
 import { runCloudSyncNow } from './services/offline/cloudAutoSync';
@@ -125,6 +124,9 @@ export default function App() {
   // Estado que acabou de chegar do Supabase: é gravado apenas localmente, sem ser
   // reenviado à nuvem (evita o ciclo upsert → evento realtime → recarga → upsert).
   const remoteOriginDataRef = useRef<unknown>(null);
+  // Estado mais recente (para ações disparadas por eventos, ex.: revisar vínculos).
+  const dataRef = useRef(data);
+  dataRef.current = data;
   const [activeTab, setActiveTab] = useState('MAIN_DASHBOARD');
   const [openTabs, setOpenTabs] = useState<string[]>(['MAIN_DASHBOARD']);
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -330,15 +332,34 @@ export default function App() {
     });
   }, [data.settings, (data as any).municipalSecretary, data.schoolUnits, data.classes, currentUser?.schoolUnitId, currentUser?.name, currentUser?.roleTitle, currentUser?.sectorTitle]);
 
-  // Correção automática dos vínculos escola ↔ turma ↔ aluno (ex: turma "ESCOLA X - PRÉ I (MANHÃ)"
-  // passa a "PRÉ I - MANHÃ" vinculada à escola X). Idempotente: só grava quando algo muda.
+  // Arrumação dos vínculos escola ↔ turma ↔ aluno (ex.: turma "ESCOLA X - PRÉ I (MANHÃ)" passa a
+  // "PRÉ I - MANHÃ" vinculada à escola X). Antes rodava sozinha a cada alteração em TODOS os
+  // computadores e cada correção automática subia para a nuvem. Agora roda só na importação
+  // (handleBatchImportStudents) ou quando o administrador pede (botão "Revisar vínculos" em Turmas).
   useEffect(() => {
-    const result = normalizeSchoolLinks(data);
-    if (result.changed) {
-      console.info('[SucessoEdu] Vínculos escola/turma/aluno corrigidos:', result.summary);
-      setData(result.data);
-    }
-  }, [data.schoolUnits, data.classes, data.students]);
+    const onReview = async () => {
+      const uid = localStorage.getItem('sucessoedu_logged_user_id');
+      const me = (dataRef.current.userAccounts || []).find((u) => u.id === uid);
+      if (me?.role !== 'ADMIN') {
+        notify('Somente o administrador pode revisar e corrigir os vínculos escola/turma/aluno.', 'Revisar vínculos');
+        return;
+      }
+      const result = normalizeSchoolLinks(dataRef.current);
+      if (!result.changed) {
+        notify('Nenhum vínculo escola/turma/aluno precisa de correção.', 'Revisar vínculos');
+        return;
+      }
+      const lines = result.summary.slice(0, 12).map((l) => `• ${l}`).join('\n');
+      const more = result.summary.length > 12 ? `\n… e mais ${result.summary.length - 12} correção(ões).` : '';
+      const ok = await confirmDialog(`Correções encontradas:\n${lines}${more}\n\nAplicar?`, {
+        title: 'Revisar vínculos escola/turma/aluno',
+        confirmLabel: 'Aplicar correções',
+      });
+      if (ok) setData(normalizeSchoolLinks(dataRef.current).data);
+    };
+    window.addEventListener('sucessoedu_review_school_links', onReview);
+    return () => window.removeEventListener('sucessoedu_review_school_links', onReview);
+  }, []);
 
   // RA gerado pela nuvem: alunos com RA provisório recebem o número definitivo assim que
   // houver login na nuvem. A nuvem devolve o mesmo número para o mesmo aluno, então vários
@@ -383,50 +404,23 @@ export default function App() {
     };
   }, [data.students]);
 
-  // Supabase Batched Queue Upsert
+  // Envio à nuvem: feito pelo motor de sincronização v2 (services/sync/cloudSync), que
+  // detecta sozinho o que mudou. Antes, aqui as listas inteiras eram enfileiradas a cada mudança.
   useEffect(() => {
-    if (data === remoteOriginDataRef.current) return;
-    // Servidor Remoto (escola): nada vai direto à nuvem; o envio é feito pelo lote.
-    if (getLocalServerInfo()?.role === 'REMOTO') return;
-    function syncTablesToSupabase() {
-      try {
-        // Escolas e turmas antes dos alunos: a nuvem precisa conhecer as turmas novas (ex: PRÉ I)
-        if (data.schoolUnits && data.schoolUnits.length > 0) {
-          supabaseBatchQueue.enqueue('school_units', data.schoolUnits);
-        }
-        if (data.classes && data.classes.length > 0) {
-          supabaseBatchQueue.enqueue('school_classes', data.classes);
-        }
-        if (data.students && data.students.length > 0) {
-          supabaseBatchQueue.enqueue('students', data.students);
-        }
-        if (data.exams && data.exams.length > 0) {
-          supabaseBatchQueue.enqueue('exams', data.exams);
-        }
-        if (data.notifications && data.notifications.length > 0) {
-          supabaseBatchQueue.enqueue('notifications', data.notifications);
-        }
-      } catch (err) {
-        console.warn('Supabase batch queue enqueue error:', err);
-      }
-    }
-    syncTablesToSupabase();
-  }, [data.students, data.exams, data.notifications, data.classes, data.schoolUnits]);
+    startCloudSync();
+  }, []);
 
   // Recarrega o estado da nuvem quando o login no Supabase é concluído (a carga
   // inicial já é feita por getStoredData). A mesclagem é não destrutiva.
   useEffect(() => {
     const loadFromCloud = async () => {
-      // Rede local (Servidor Remoto ou Sede): o envio/recebimento da nuvem segue a ordem
-      // segura do cloudAutoSync (primeiro envia, depois recebe), nunca a carga direta.
-      if (getLocalServerInfo()) {
+      // Servidor Remoto (escola): lote pela nuvem (cloudAutoSync). Demais: motor v2 (envia e
+      // recebe só o que mudou; na primeira vez a nuvem prevalece, exceto na Sede).
+      if (getLocalServerInfo()?.role === 'REMOTO') {
         runCloudSyncNow(true).catch(() => {});
         return;
       }
-      const remote = await SupabasePersistenceService.fetchAppStateFromSupabase();
-      if (remote) {
-        window.dispatchEvent(new CustomEvent('sucessoedu_db_changed', { detail: remote }));
-      }
+      syncCloudNow().catch(() => {});
     };
     const { data: authListener } = getSupabaseClient().auth.onAuthStateChange((event) => {
       // Adiado: chamar o Supabase dentro deste callback trava o cliente de autenticação.
@@ -831,12 +825,17 @@ export default function App() {
         .filter((s) => s && !(prev.students || []).some((ps) => ps.id === s.id))
         .map((s) => importedById.get(s.id) || s);
 
-      return {
+      const merged = {
         ...prev,
         students: [...addedStudents, ...updatedStudents],
-        schoolUnits: [...existingUnits, ...newUnits],
+        // Escolas novas carimbadas com a data da importação (o marco de reinício da base usa a data).
+        schoolUnits: [...existingUnits, ...newUnits.map((u) => ({ ...u, createdAt: (u as any).createdAt || stamp, updatedAt: stamp }) as SchoolUnit)],
         classes: [...existingClasses, ...newClasses],
       };
+      // Arrumação dos vínculos escola/turma/aluno: feita aqui, na importação.
+      const normalized = normalizeSchoolLinks(merged);
+      if (normalized.changed) console.info('[SucessoEdu] Vínculos ajustados na importação:', normalized.summary);
+      return normalized.data;
     });
 
     const incompleteCount = imported.filter((s) => s.cadastralStatus !== 'OK').length;

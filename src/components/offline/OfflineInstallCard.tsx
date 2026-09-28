@@ -3,6 +3,7 @@ import { Building2, Download, Monitor, RefreshCw, School, WifiOff } from 'lucide
 import { buildSchoolSeed, buildServerPackage, buildStationPackage, generateAccessKey, saveBlob } from '../../services/offline/offlinePackageBuilder';
 import { getStoredData } from '../../data/storage';
 import { getLocalServerInfo } from '../../services/offline/localServerSync';
+import { ServerCloudAccountBox } from './ServerCloudAccountBox';
 
 /**
  * Instalação sem internet: Servidor Remoto (escola), Servidor da Sede e estações.
@@ -94,6 +95,7 @@ export const OfflineInstallCard: React.FC<{ schoolName?: string }> = ({ schoolNa
           <p className="text-[10px] text-slate-500 mt-1">
             O servidor já sai com a escola, as turmas e os alunos dela, e depois recebe da Sede o que mudar.
           </p>
+          <ServerCloudAccountBox schoolUnitId={remoteSchoolId} schoolName={schoolOptions.find((u) => u.id === remoteSchoolId)?.name} />
           <button
             type="button"
             className={`${btn} bg-emerald-600 hover:bg-emerald-700`}
