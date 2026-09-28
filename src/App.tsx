@@ -691,13 +691,21 @@ export default function App() {
     explicitClasses?: SchoolClass[]
   ) => {
     setData((prev) => {
-      const existingUnits = prev.schoolUnits || [];
+      // Escola já cadastrada que veio com a ficha da planilha padrão (mesmo id): o cadastro é atualizado
+      const unitUpdates = new Map(
+        (explicitUnits || [])
+          .filter((u) => u && (prev.schoolUnits || []).some((eu) => eu && eu.id === u.id))
+          .map((u) => [u.id, u] as [string, SchoolUnit])
+      );
+      const existingUnits = (prev.schoolUnits || []).map((eu) =>
+        eu && unitUpdates.has(eu.id) ? ({ ...eu, ...unitUpdates.get(eu.id)!, updatedAt: new Date().toISOString() } as SchoolUnit) : eu
+      );
       const newUnits: SchoolUnit[] = [];
 
       // Se explicitUnits foi passado (gerado pelo módulo de importação com detecção de séries atendidas)
       if (explicitUnits && explicitUnits.length > 0) {
         explicitUnits.forEach((u) => {
-          if (!u) return;
+          if (!u || unitUpdates.has(u.id)) return;
           const uName = (u.name || '').toLowerCase().trim();
           if (
             !existingUnits.some(
@@ -796,10 +804,12 @@ export default function App() {
     });
 
     const incompleteCount = imported.filter((s) => s.cadastralStatus !== 'OK').length;
-    const unitsCreatedCount = explicitUnits?.length || 0;
+    const knownUnitIds = new Set((data?.schoolUnits || []).map((u) => u?.id));
+    const unitsCreatedCount = (explicitUnits || []).filter((u) => u && !knownUnitIds.has(u.id)).length;
+    const unitsUpdatedCount = (explicitUnits || []).length - unitsCreatedCount;
     triggerPushNotification(
       '📥 Importação Concluída com Sucesso',
-      `${imported.length} estudantes integrados ao sistema. ${unitsCreatedCount > 0 ? `${unitsCreatedCount} unidade(s) escolar(es) e séries cadastradas com pendências a regularizar. ` : ''}${incompleteCount > 0 ? `${incompleteCount} cadastros com dados incompletos destacados na Dashbox de Pendências para regularização.` : ''}`
+      `${imported.length} estudantes integrados ao sistema. ${unitsUpdatedCount > 0 ? `Cadastro de ${unitsUpdatedCount} escola(s) atualizado com a ficha da planilha. ` : ''}${unitsCreatedCount > 0 ? `${unitsCreatedCount} unidade(s) escolar(es) e séries cadastradas com pendências a regularizar. ` : ''}${incompleteCount > 0 ? `${incompleteCount} cadastros com dados incompletos destacados na Dashbox de Pendências para regularização.` : ''}`
     );
   };
 

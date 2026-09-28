@@ -368,12 +368,19 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
       });
     }
 
+    // Ficha da escola (planilha padrão): escolas já cadastradas recebem os dados da aba "DADOS DA ESCOLA"
+    fileResults.forEach((fr) => {
+      if (fr.updatedSchoolUnit && !newSchoolUnits.some((u) => u.id === fr.updatedSchoolUnit!.id)) {
+        newSchoolUnits.push(fr.updatedSchoolUnit);
+      }
+    });
+
     // Unidade de destino escolhida manualmente (usada só para alunos sem escola identificada)
     const selectedUnit = schoolUnits.find(
       (u) => u.id === filters.selectedSchoolUnitId || u.name === filters.selectedSchoolUnitId
     );
     const touchedUnits = fileResults
-      .map((fr) => fr.suggestedSchoolUnit)
+      .map((fr) => fr.updatedSchoolUnit || fr.suggestedSchoolUnit)
       .filter((u, i, arr): u is SchoolUnit => !!u && arr.findIndex((x) => x?.id === u.id) === i);
     const primaryUnit = selectedUnit || touchedUnits[0];
 

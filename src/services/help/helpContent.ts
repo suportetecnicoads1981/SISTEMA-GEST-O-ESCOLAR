@@ -264,9 +264,25 @@ export const HELP_MODULES: HelpModule[] = [
         tip: 'No Word, cada tabela deve ter um título com a série (ex.: "1º ANO"). Arquivos com escola principal e escolas anexas são separados por escola.',
       },
       {
+        q: 'Existe uma planilha padrão para as escolas preencherem?',
+        a: 'Sim: "SucessoEdu_Planilha_Padrao_Alunos.xlsx", distribuída pela SEMED. Ela tem duas abas. Em DADOS DA ESCOLA vai a ficha da unidade: nome, INEP, CNPJ ou decreto, tipo, escola sede (se for anexa), endereço, zona, contatos, equipe gestora, salas, turnos e séries atendidas. Em ALUNOS vai uma linha por aluno, com listas para escolher sexo, raça/cor, PCD, laudo, série e turma e turno. Assim não entram nomes de série, escola ou deficiência escritos de jeitos diferentes.',
+        steps: [
+          'Envie a planilha para a escola: um arquivo por unidade (a escola anexa preenche um arquivo próprio).',
+          'A escola preenche primeiro DADOS DA ESCOLA e depois ALUNOS. Célula vermelha é campo obrigatório em branco ou dado errado.',
+          'Na Secretaria, clique em "Importar Planilhas / Polos" e escolha o arquivo. A conferência mostra quantos campos da ficha serão gravados e o que ainda falta.',
+          'Confirme: os alunos entram e o cadastro da escola é atualizado com a ficha.',
+        ],
+        tip: 'TEA (com o nível), TDAH e TOD são escolhidos na coluna PCD / DEFICIÊNCIA. Aluno sem deficiência fica com "-" (traço). Não crie outras abas nem mude a ordem das colunas.',
+      },
+      {
+        q: 'A ficha da escola muda o cadastro de uma escola que já existe?',
+        a: 'Sim. Os campos preenchidos na aba DADOS DA ESCOLA substituem os do cadastro, e os campos deixados em branco mantêm o que já estava cadastrado. O nome da escola não é trocado. As séries marcadas na ficha passam a ser as séries atendidas. Com todos os obrigatórios preenchidos, a escola sai das pendências cadastrais; senão, a conferência mostra o que falta.',
+        tip: 'Os dados da escola (endereço, bairro, zona, CNPJ, equipe gestora, séries e turnos) agora também vão para a nuvem e aparecem nos outros computadores.',
+      },
+      {
         q: 'Como a importação separa as turmas A, B, C de uma mesma série?',
         a: 'Pela letra escrita logo depois da série: no título da tabela ("1º ANO A Nº", "3 ANO B") ou na linha acima dela ("TURMA: PRÉ-ESCOLA I C"). Cada letra vira uma turma própria (ex.: "1º ANO A - MANHÃ", "1º ANO B - MANHÃ"). Sem letra, a série fica numa turma só.',
-        tip: 'O turno não vem nos levantamentos: as turmas entram como MANHÃ. Para as turmas da tarde, abra Turmas & Matrizes, clique em editar e troque o turno.',
+        tip: 'Na planilha padrão, a coluna TURNO define o turno das turmas novas (ex.: "1º ANO B - TARDE"). Nos levantamentos antigos, sem essa coluna, as turmas entram como MANHÃ: para as da tarde, abra Turmas & Matrizes, clique em editar e troque o turno.',
       },
       {
         q: 'Importei antes da correção e as turmas A, B, C ficaram juntas. Como arrumo?',
