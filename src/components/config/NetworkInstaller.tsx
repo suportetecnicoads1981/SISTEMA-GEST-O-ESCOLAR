@@ -1211,7 +1211,7 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
                     <div>
                       <h3 className="text-base font-black text-slate-900">Módulo Hospedagem em Nuvem & Site Web</h3>
                       <p className="text-xs text-slate-500">
-                        Disponibilize o EduGestão Pro online em servidores na nuvem (Google Cloud Run, VPS Linux, Docker, AWS, Render) com HTTPS e domínio próprio.
+                        Disponibilize o SucessoEdu online em servidores na nuvem (Google Cloud Run, VPS Linux, Docker, AWS, Render) com HTTPS e domínio próprio.
                       </p>
                     </div>
                   </div>
@@ -1515,7 +1515,7 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
                 </div>
                 <h3 className="text-xl font-black">Instalação Isolada & Sincronização via Pendrive</h3>
                 <p className="text-xs text-amber-100 max-w-2xl">
-                  Permite instalar o EduGestão Pro em escolas sem internet nem rede municipal. A secretaria local lança matrículas, notas e provas, e depois gera um pacote <code>.edusync</code> para entrega na Secretaria Municipal.
+                  Permite instalar o SucessoEdu em escolas sem internet nem rede municipal. A secretaria local lança matrículas, notas e provas, e depois gera um pacote <code>.edusync</code> para entrega na Secretaria Municipal.
                 </p>
               </div>
 

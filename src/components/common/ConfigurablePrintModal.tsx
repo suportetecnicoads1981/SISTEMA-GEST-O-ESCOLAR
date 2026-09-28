@@ -21,10 +21,13 @@ import {
   FileDown,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { letterheadHtml, issuerFooterHtml, preloadLogos } from '../../services/documentBranding';
+import { letterheadHtml, issuerFooterHtml, preloadLogos, dedupeImagesForPrint } from '../../services/documentBranding';
 import { downloadStyledXlsx } from '../../services/styledXlsx';
 import { printFileName, setPrintTitle } from '../../utils/printIsolated';
 import { SchoolSettings } from '../../types';
+
+/** A tela mostra só uma amostra: desenhar 2.000 linhas a cada clique deixava o relatório lento. */
+const PREVIEW_LIMIT = 150;
 
 export interface PrintColumnConfig {
   id: string;
@@ -178,10 +181,14 @@ export const ConfigurablePrintModal: React.FC<ConfigurablePrintModalProps> = ({
       if (!groups.has(g.key)) groups.set(g.key, { lines: g.lines, schoolUnitId: (g as any).schoolUnitId, classId: (g as any).classId, rows: [] });
       groups.get(g.key)!.rows.push(item);
     }
-    const ordered = Array.from(groups.values()).sort((a, b) =>
-      a.lines.map((l) => l[1]).join('|').localeCompare(b.lines.map((l) => l[1]).join('|'), 'pt-BR', { numeric: true })
-    );
-    ordered.forEach((g) => g.rows.sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || ''), 'pt-BR')));
+    // Um comparador só (localeCompare com idioma cria um novo a cada comparação: lento com 2.000 alunos).
+    const byGroup = new Intl.Collator('pt-BR', { numeric: true }).compare;
+    const byName = new Intl.Collator('pt-BR').compare;
+    const ordered = Array.from(groups.values())
+      .map((g) => ({ g, k: g.lines.map((l) => l[1]).join('|') }))
+      .sort((a, b) => byGroup(a.k, b.k))
+      .map((x) => x.g);
+    ordered.forEach((g) => g.rows.sort((a, b) => byName(String(a?.name || ''), String(b?.name || ''))));
     return ordered;
   };
 
@@ -191,6 +198,9 @@ export const ConfigurablePrintModal: React.FC<ConfigurablePrintModalProps> = ({
     const now = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     const filtersLine = appliedFilters.length ? appliedFilters.map((f) => `${h(f.label)}: ${h(String(f.value))}`).join(' • ') : '';
     const ordered = buildGroups();
+    // Posição de cada linha nos dados (antes era um indexOf por célula: lento com 2.000 alunos).
+    const indexOfItem = new Map<any, number>();
+    data.forEach((it, i) => indexOfItem.set(it, i));
     const sections = ordered.map((g, gi) => {
       const ident = g.lines
         .filter(([, v]) => v)
@@ -203,7 +213,7 @@ export const ConfigurablePrintModal: React.FC<ConfigurablePrintModalProps> = ({
             .map((c) => {
               if (c.id === 'index') return `<td style="text-align:center">${idx + 1}</td>`;
               if (c.id === 'signature') return '<td style="min-width:120px"></td>';
-              const i = data.indexOf(item);
+              const i = indexOfItem.get(item) ?? -1;
               return `<td style="text-align:${c.align || 'left'}">${h(cellText(item, c.id, i))}</td>`;
             })
             .join('');
@@ -250,10 +260,13 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
     return html;
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (activeColumns.length === 0 || printing) return;
     setPrinting(true);
-    const html = buildReportHtml();
+    // Logos reduzidas no timbre (já ficam prontas em segundo plano; aqui só garante).
+    await Promise.race([preloadLogos().catch(() => {}), new Promise((r) => setTimeout(r, 1500))]);
+    // Logos repetidas em cada timbre entram uma vez só (relatório de 90 turmas: de ~25 MB para KB).
+    const { html, release: releaseImages } = dedupeImagesForPrint(buildReportHtml());
     const restoreTitle = setPrintTitle((html.match(/<title>([^<]*)<\/title>/) || [])[1] || baseName());
     const frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
@@ -262,20 +275,28 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
     const doc = frame.contentWindow?.document;
     if (!doc || !frame.contentWindow) {
       frame.remove();
+      releaseImages();
       setPrinting(false);
       return;
     }
     doc.open();
     doc.write(html);
     doc.close();
+    let fired = false;
     const go = () => {
+      // Só uma vez: logo atrasada que termina depois dos 3 s não reabre a impressão.
+      if (fired) return;
+      fired = true;
       try {
         frame.contentWindow?.addEventListener('afterprint', restoreTitle, { once: true });
         frame.contentWindow?.focus();
         frame.contentWindow?.print();
       } finally {
         setPrinting(false);
-        setTimeout(() => frame.remove(), 60_000);
+        setTimeout(() => {
+          frame.remove();
+          releaseImages();
+        }, 60_000);
       }
     };
     // Espera as logos do timbre carregarem (no máximo 3 s) antes de abrir a impressão.
@@ -331,6 +352,8 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
     setExporting('xlsx');
     try {
       const groups = buildGroups();
+      const indexOfItem = new Map<any, number>();
+      data.forEach((it, i) => indexOfItem.set(it, i));
       const schools = new Set(groups.map((g) => g.schoolUnitId || ''));
       await downloadStyledXlsx(`${baseName()}.xlsx`, {
         title,
@@ -342,7 +365,7 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
         sections: groups.map((g) => ({
           lines: g.lines,
           rows: g.rows.map((item, idx) =>
-            activeColumns.map((c) => (c.id === 'index' ? idx + 1 : c.id === 'signature' ? '' : cellText(item, c.id, data.indexOf(item))))
+            activeColumns.map((c) => (c.id === 'index' ? idx + 1 : c.id === 'signature' ? '' : cellText(item, c.id, indexOfItem.get(item) ?? -1)))
           ),
           summary: groupSummary ? groupSummary(g.rows) : undefined,
           countLine: `${countLabel}: ${g.rows.length}`,
@@ -869,7 +892,7 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
                           </td>
                         </tr>
                       ) : (
-                        data.map((row, rowIdx) => (
+                        data.slice(0, PREVIEW_LIMIT).map((row, rowIdx) => (
                           <tr
                             key={rowIdx}
                             className={showZebraStripes && rowIdx % 2 === 1 ? 'bg-slate-50/70' : 'bg-white'}
@@ -899,6 +922,14 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
                             })}
                           </tr>
                         ))
+                      )}
+                      {data.length > PREVIEW_LIMIT && (
+                        <tr className="no-print">
+                          <td colSpan={activeColumns.length || 1} className="text-center py-3 text-[11px] font-semibold text-indigo-700 bg-indigo-50">
+                            Pré-visualização com os primeiros {PREVIEW_LIMIT} de {data.length} registros. A impressão e as
+                            exportações trazem todos.
+                          </td>
+                        </tr>
                       )}
                     </tbody>
                   </table>

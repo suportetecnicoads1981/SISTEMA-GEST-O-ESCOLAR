@@ -102,6 +102,8 @@ export function setDocumentBranding(input: {
     issuerRole: ((r) => (r && r === r.toLowerCase() ? r.charAt(0).toUpperCase() + r.slice(1) : r))(String(input.issuer?.role || '').trim()),
     ...splitSecretary(sec.secretaryDirector, sec.secretaryDirectorRole),
   };
+  // Prepara as versões reduzidas das logos em segundo plano (uma vez por logo).
+  if (typeof document !== 'undefined') setTimeout(() => void preloadLogos().catch(() => {}), 0);
 }
 
 /**
@@ -212,6 +214,15 @@ export interface LogoImage {
   h: number;
   /** PNG já reduzido (para o Excel). Vazio se a imagem vier de outro site e o navegador bloquear. */
   png?: Uint8Array;
+  /**
+   * Versão reduzida (data URL) usada no HTML dos documentos e relatórios.
+   * As logos cadastradas passam de 100 KB cada e se repetem no timbre de cada
+   * escola/turma: um relatório com 100 turmas chegava a dezenas de MB de HTML,
+   * e era isso que deixava a geração lenta.
+   */
+  small?: string;
+  /** Mesma versão reduzida em PNG (o Word não abre WebP). */
+  smallPng?: string;
 }
 const logoCache = new Map<string, LogoImage | null>();
 
@@ -235,6 +246,27 @@ function loadLogo(src: string): Promise<LogoImage | null> {
       const h = img.naturalHeight || img.height || 0;
       if (!w || !h) return done(null);
       let png: Uint8Array | undefined;
+      let small: string | undefined;
+      let smallPng: string | undefined;
+      try {
+        // Timbre: 64 px de altura na folha; 3x isso mantém a nitidez na impressão.
+        const k = Math.min(1, 200 / h, 360 / w);
+        if (k < 1 || src.length > 60_000) {
+          const c2 = document.createElement('canvas');
+          c2.width = Math.max(1, Math.round(w * k));
+          c2.height = Math.max(1, Math.round(h * k));
+          c2.getContext('2d')!.drawImage(img, 0, 0, c2.width, c2.height);
+          const outPng = c2.toDataURL('image/png');
+          if (outPng.length < src.length) smallPng = outPng;
+          // WebP com transparência é bem menor que PNG; o Chrome/Edge imprimem normalmente.
+          const outWebp = c2.toDataURL('image/webp', 0.92);
+          const best = outWebp.startsWith('data:image/webp') && outWebp.length < outPng.length ? outWebp : outPng;
+          if (best.length < src.length) small = best;
+        }
+      } catch {
+        small = undefined;
+        smallPng = undefined;
+      }
       try {
         const scale = Math.min(1, 360 / Math.max(w, h));
         const canvas = document.createElement('canvas');
@@ -248,7 +280,7 @@ function loadLogo(src: string): Promise<LogoImage | null> {
       } catch {
         png = undefined;
       }
-      done({ w, h, png });
+      done({ w, h, png, small, smallPng });
     };
     img.src = src;
   });
@@ -263,6 +295,12 @@ function allLogoSources(): string[] {
 /** Carrega o tamanho real das logos antes de gerar Word ou Excel. */
 export async function preloadLogos(): Promise<void> {
   await Promise.all(allLogoSources().map((src) => loadLogo(src)));
+}
+
+/** Endereço da logo para o HTML: a versão reduzida, quando já estiver pronta. */
+export function printLogoSrc(src: string, forWord = false): string {
+  const info = logoCache.get(src);
+  return (forWord ? info?.smallPng : info?.small) || src;
 }
 
 /** Logo já carregada (depois de preloadLogos). */
@@ -311,7 +349,7 @@ function letterheadWordHtml(target?: LetterheadTarget): string {
     const maxW = list.length > 1 ? 80 : 110;
     const box = info ? fitBox(info.w, info.h, maxW, 60) : { w: 0, h: 60 };
     const size = box.w ? `width="${box.w}" height="${box.h}" style="width:${box.w}px;height:${box.h}px"` : `height="60" style="height:60px"`;
-    return `<img src="${escapeHtml(src)}" ${size} alt="" />`;
+    return `<img src="${escapeHtml(printLogoSrc(src, true))}" ${size} alt="" />`;
   };
   const cell = (list: string[], align: string) =>
     `<td width="22%" valign="middle" align="${align}" style="width:22%;vertical-align:middle;text-align:${align};border:none;padding:0 4px 6px">${list.map(img).join('&nbsp;&nbsp;')}</td>`;
@@ -329,7 +367,7 @@ export function letterheadHtml(target?: LetterheadTarget, opts?: { word?: boolea
   if (opts?.word) return letterheadWordHtml(target);
   const school = resolveLetterheadSchool(target);
   const img = (src: string, alt: string) =>
-    `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" style="max-height:64px;max-width:120px;object-fit:contain;display:block" />`;
+    `<img src="${escapeHtml(printLogoSrc(src))}" alt="${escapeHtml(alt)}" style="max-height:64px;max-width:120px;object-fit:contain;display:block" />`;
   const left = state.managementLogoUrl ? img(state.managementLogoUrl, 'Gestão Municipal') : '';
   const rightParts: string[] = [];
   if (state.semedLogoUrl) rightParts.push(img(state.semedLogoUrl, 'SEMED'));
@@ -406,4 +444,39 @@ export function readLogoFile(file: File, maxSize = 480): Promise<string> {
     };
     reader.readAsDataURL(file);
   });
+}
+
+/**
+ * Impressão de relatórios grandes: cada timbre repete as logos (data URL de dezenas
+ * de KB). Aqui cada logo distinta vira um endereço interno (blob:) criado uma vez só,
+ * e o HTML passa a carregar só esse endereço curto — o relatório de 90 turmas cai de
+ * ~25 MB para poucos KB de texto e abre bem mais rápido. Use só para imprimir na
+ * própria tela (o endereço blob: não vale em arquivo baixado ou no Word).
+ * Devolve o HTML novo e uma função que libera os endereços depois da impressão.
+ */
+export function dedupeImagesForPrint(html: string): { html: string; release: () => void } {
+  const urls = new Map<string, string>();
+  if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') return { html, release: () => {} };
+  const out = html.replace(/data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+/gi, (dataUrl) => {
+    if (dataUrl.length < 2048) return dataUrl; // pequeno: não compensa
+    let blobUrl = urls.get(dataUrl);
+    if (!blobUrl) {
+      try {
+        const comma = dataUrl.indexOf(',');
+        const mime = dataUrl.slice(5, dataUrl.indexOf(';'));
+        const bin = atob(dataUrl.slice(comma + 1));
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        blobUrl = URL.createObjectURL(new Blob([bytes], { type: mime }));
+        urls.set(dataUrl, blobUrl);
+      } catch {
+        return dataUrl;
+      }
+    }
+    return blobUrl;
+  });
+  return {
+    html: out,
+    release: () => urls.forEach((u) => URL.revokeObjectURL(u)),
+  };
 }

@@ -45,6 +45,7 @@ import {
 } from '../../types';
 import { PrintExportModal, ColumnDefinition } from '../common/PrintExportModal';
 import { confirmDialog, notify } from '../../utils/dialogs';
+import { ModuleReportButton } from '../common/ModuleReportButton';
 
 interface ClassDiaryModuleProps {
   students: Student[];
@@ -402,6 +403,35 @@ export function ClassDiaryModule({
       atRiskCount,
     };
   }, [attendanceSheets, selectedClassId, activeRegulation]);
+
+  // Quadro de frequência por aluno (mesmo cálculo da tela), para o relatório padrão.
+  const frequencyReportRows = useMemo(() => {
+    const sheets = attendanceSheets.filter((sh) => sh.classId === selectedClassId);
+    const total = sheets.length || 1;
+    const minPct = activeRegulation?.minAttendancePercentage ?? 75;
+    return classStudents.map((st) => {
+      let p = 0;
+      let f = 0;
+      let j = 0;
+      sheets.forEach((sheet) => {
+        const e = sheet.entries.find((x) => x.studentId === st.id);
+        if (e?.status === 'PRESENTE') p++;
+        else if (e?.status === 'FALTA') f++;
+        else if (e?.status === 'FALTA_JUSTIFICADA') j++;
+      });
+      const rate = Math.round(((p + j) / total) * 100);
+      return {
+        name: st.name,
+        ra: st.enrollmentNumber || '',
+        lessons: sheets.length,
+        present: p,
+        absent: f,
+        justified: j,
+        rate: `${rate}%`,
+        status: rate < minPct ? `Abaixo de ${minPct}%` : 'Regular',
+      };
+    });
+  }, [attendanceSheets, selectedClassId, classStudents, activeRegulation]);
 
   const handleDiaryBack = () => {
     if (activeTab !== 'ATTENDANCE') {
@@ -1208,6 +1238,26 @@ export function ClassDiaryModule({
               <Printer className="h-4 w-4" />
               <span>Imprimir Folha do Diário Oficial (A4)</span>
             </button>
+            <ModuleReportButton
+              title="Quadro Resumo de Frequência dos Alunos"
+              subtitle={`Turma: ${activeClass?.name || ''}${activeClass?.shift ? ' • ' + activeClass.shift : ''}`}
+              fileName={`Frequencia_${activeClass?.name || 'Turma'}`}
+              countLabel="Total de alunos"
+              label="Relatório / Exportar"
+              rows={frequencyReportRows}
+              columns={[
+                { id: 'index', label: 'Nº', align: 'center' },
+                { id: 'name', label: 'Aluno' },
+                { id: 'ra', label: 'RA', defaultVisible: false },
+                { id: 'lessons', label: 'Aulas dadas', align: 'center' },
+                { id: 'present', label: 'Presenças', align: 'center' },
+                { id: 'absent', label: 'Faltas', align: 'center' },
+                { id: 'justified', label: 'Justificadas', align: 'center' },
+                { id: 'rate', label: '% Frequência', align: 'center' },
+                { id: 'status', label: 'Situação', align: 'center' },
+              ]}
+              disabled={!selectedClassId || classStudents.length === 0}
+            />
           </div>
 
           {/* Consolidated Attendance Matrix */}

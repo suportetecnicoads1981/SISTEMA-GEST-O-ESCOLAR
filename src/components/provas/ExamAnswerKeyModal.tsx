@@ -615,7 +615,7 @@ export const ExamAnswerKeyModal: React.FC<ExamAnswerKeyModalProps> = ({
                   </div>
                   <div className="text-right flex flex-col justify-end text-[10px] text-slate-400">
                     <p className="font-mono font-bold text-slate-700">HASH: {exam.id.toUpperCase()}-AUTENTICADO</p>
-                    <p>EduGestão Pro • Sistema de Avaliações Institucionais</p>
+                    <p>SucessoEdu • Sistema de Avaliações Institucionais</p>
                   </div>
                 </div>
               </div>

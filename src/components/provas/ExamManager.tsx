@@ -41,6 +41,7 @@ import { ExamAnswerKeyModal } from './ExamAnswerKeyModal';
 import { PaperAnswersModal } from './PaperAnswersModal';
 import { classLabelWithSchool } from '../../utils/schoolDataNormalizer';
 import { confirmDialog } from '../../utils/dialogs';
+import { ModuleReportButton, reportDate } from '../common/ModuleReportButton';
 
 interface ExamManagerProps {
   exams: Exam[];
@@ -323,6 +324,49 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
             <Printer className="h-4 w-4 text-slate-600" />
             <span>Imprimir Relação</span>
           </button>
+          <ModuleReportButton
+            title="Relação de Avaliações"
+            subtitle="Provas conforme os filtros da tela"
+            fileName="Relacao_de_Avaliacoes"
+            orientation="landscape"
+            groupBySchool
+            countLabel="Total de avaliações"
+            label="Relatório"
+            rows={filteredExams.map((e) => {
+              const cls = classes.find((c) => c.id === e.classId);
+              const unit = (schoolUnits || []).find((u) => u.id === (cls as any)?.schoolUnitId);
+              return {
+                schoolUnitId: unit?.id || '',
+                schoolName: unit?.name || 'Não informada',
+                title: e.title,
+                subject: e.subject,
+                className: cls?.name || e.classId,
+                teacher: e.teacherName || '',
+                questions: e.questions?.length ?? (e as any).questionIds?.length ?? 0,
+                points: e.totalPoints ?? (e as any).totalScore ?? 10,
+                time: `${e.timeLimitMinutes || 45} min`,
+                date: reportDate(e.scheduledDate),
+                due: reportDate(e.dueDateTime || (e as any).deadline, true) || 'Sem prazo',
+                status: ({ DRAFT: 'Rascunho', PUBLISHED: 'Publicada', IN_PROGRESS: 'Em aplicação', FINISHED: 'Encerrada', ARCHIVED: 'Arquivada' } as Record<string, string>)[e.status] || e.status || '',
+                answered: submissions.filter((sb) => sb.examId === e.id).length,
+              };
+            })}
+            columns={[
+              { id: 'index', label: 'Nº', align: 'center' },
+              { id: 'title', label: 'Avaliação' },
+              { id: 'subject', label: 'Disciplina' },
+              { id: 'className', label: 'Turma' },
+              { id: 'teacher', label: 'Professor(a)' },
+              { id: 'questions', label: 'Questões', align: 'center' },
+              { id: 'points', label: 'Valor', align: 'center' },
+              { id: 'time', label: 'Tempo', align: 'center', defaultVisible: false },
+              { id: 'date', label: 'Data', align: 'center' },
+              { id: 'due', label: 'Prazo', align: 'center', defaultVisible: false },
+              { id: 'status', label: 'Situação', align: 'center' },
+              { id: 'answered', label: 'Respostas', align: 'center' },
+            ]}
+            className="px-3 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+          />
           <button
             onClick={handleExportCSV}
             className="px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"

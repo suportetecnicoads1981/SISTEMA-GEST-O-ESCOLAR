@@ -58,6 +58,7 @@ import {
   saveOpenMode,
   studentsForAudience,
 } from '../../services/whatsapp/whatsappAssist';
+import { ModuleReportButton } from '../common/ModuleReportButton';
 
 /** Pedido de envio vindo de outro módulo (ex.: Mural de Comunicados). */
 export interface WhatsAppPrefill {
@@ -839,6 +840,40 @@ export const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({
                 <option value="ENVIADO">Aberto no WhatsApp</option>
                 <option value="DESCARTADO">Descartado</option>
               </select>
+              <ModuleReportButton
+                title="Histórico de Envios pelo WhatsApp"
+                subtitle="Envios conforme a busca e a situação selecionadas"
+                fileName="Historico_WhatsApp"
+                orientation="landscape"
+                countLabel="Total de envios"
+                label="Relatório"
+                rows={historyShown.map((l) => ({
+                  date: fmtDateTime(l.sentAt),
+                  recipient: l.recipientName,
+                  phone: l.recipientPhone ? formatPhoneBR(normalizeWhatsAppPhone(l.recipientPhone) || l.recipientPhone) : '',
+                  student: l.studentName || 'Equipe',
+                  className: l.studentClass || '',
+                  type: TYPE_LABEL[l.messageType] || l.messageType,
+                  source: SOURCE_LABEL[l.source || 'MANUAL'],
+                  content: l.content.length > 200 ? l.content.slice(0, 197) + '...' : l.content,
+                  status: (STATUS_LABEL[l.status] || STATUS_LABEL.ENVIADO).text,
+                  operator: l.operatorName || '',
+                }))}
+                columns={[
+                  { id: 'index', label: 'Nº', align: 'center' },
+                  { id: 'date', label: 'Data', align: 'center' },
+                  { id: 'recipient', label: 'Destinatário' },
+                  { id: 'phone', label: 'Telefone' },
+                  { id: 'student', label: 'Aluno' },
+                  { id: 'className', label: 'Turma', defaultVisible: false },
+                  { id: 'type', label: 'Tipo' },
+                  { id: 'source', label: 'Origem', defaultVisible: false },
+                  { id: 'content', label: 'Mensagem', defaultVisible: false },
+                  { id: 'status', label: 'Situação' },
+                  { id: 'operator', label: 'Quem enviou' },
+                ]}
+                className="py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+              />
             </div>
           </div>
           <div className="overflow-x-auto">

@@ -36,6 +36,22 @@ export const HELP_GENERAL: HelpModule = {
   where: 'Vale para todo o sistema',
   summary: 'Entrar, sair, sincronizar com a nuvem, atalhos e o que fazer quando algo parece errado.',
   faq: [
+      {
+        q: 'O que aparece embaixo do meu nome, no alto da tela?',
+        a: 'Aparece o seu cargo, do jeito que foi cadastrado em Usuários & Permissões, no campo "Título / Cargo Personalizado" (ex.: Coordenação Pedagógica). Se o campo estiver vazio, aparece o perfil de acesso (ex.: Administrador(a)). No quadradinho ficam as iniciais do nome e do último sobrenome.',
+        tip: 'Para mudar o cargo, peça ao administrador para editar o seu usuário e salvar. A mudança aparece no próximo acesso.',
+      },
+      {
+        q: 'Os relatórios estão demorando. O que foi feito?',
+        a: 'A geração ficou mais rápida. Antes, cada escola ou turma do relatório repetia as logos em tamanho original (mais de 250 KB por timbre): um relatório da rede com 90 turmas passava de 25 MB e o computador levava bastante tempo para montar a impressão. Agora as logos entram reduzidas e uma vez só. A tela mostra uma pré-visualização com os primeiros 150 registros; a impressão e os arquivos (Excel, Word, CSV) trazem todos.',
+        tip: 'Se ainda demorar, anote o nome do relatório e a quantidade de registros e avise o suporte.',
+      },
+      {
+        q: 'Onde encontro o botão de relatório nos módulos?',
+        steps: ['Aplique os filtros da tela (busca, escola, turma, situação etc.).', 'Clique no botão verde "Relatório".', 'Marque as colunas que quer no relatório (as mais usadas já vêm marcadas).', 'Confira a pré-visualização.', 'Escolha: "Imprimir / Salvar em PDF", "Excel", "Word" ou "CSV".'],
+        a: 'Os módulos de dados têm o botão verde "Relatório" (ou "Relatório / Exportar"): Alunos, Turmas, Evasão & Busca Ativa, Diário de Classe (frequência), Avaliações, Banco de Questões, Resultados das Avaliações, Comunicados, Histórico do WhatsApp, Rede Municipal (escolas) e Usuários. Todos abrem o mesmo painel, com escolha de colunas, pré-visualização, impressão com timbre, Excel formatado, Word e CSV.',
+        tip: 'O relatório sai com o timbre da Prefeitura, SEMED e escola, e o arquivo recebe nome com a data e a hora.',
+      },
     {
       q: 'Como abro o Tira-dúvidas?',
       a: 'Clique no botão "Tira-dúvidas" no alto da tela ou aperte F1. Ele abre nas perguntas do módulo em que você está. Use a busca para procurar em todos os módulos.',
@@ -234,6 +250,11 @@ export const HELP_MODULES: HelpModule[] = [
     summary: 'Chamada diária, registro das aulas com habilidades BNCC e impressão do diário oficial.',
     faq: [
       {
+        q: 'Como imprimo ou exporto o quadro de frequência da turma?',
+        a: 'Na aba de frequência, escolha a turma e clique em "Relatório / Exportar", ao lado de "Imprimir Folha do Diário Oficial". O relatório traz, por aluno, as aulas dadas, presenças, faltas, faltas justificadas, o % de frequência e a situação (abaixo do mínimo ou regular).',
+        tip: 'O relatório sai com o timbre da Prefeitura, SEMED e escola, e o arquivo recebe nome com a data e a hora.',
+      },
+      {
         q: 'Como faço a chamada do dia?',
         steps: [
           'Abra a aba "Chamada & Frequência Diária".',
@@ -339,6 +360,11 @@ export const HELP_MODULES: HelpModule[] = [
     where: 'Menu > Secretaria & Ensino (Alt+C)',
     summary: 'Acompanhamento de alunos evadidos ou em risco, visitas, resgate e exportação para o Educacenso.',
     faq: [
+      {
+        q: 'Como gero a relação de evadidos por escola?',
+        steps: ['Aplique os filtros da tela (busca, escola, turma, situação etc.).', 'Clique no botão verde "Relatório".', 'Marque as colunas que quer no relatório (as mais usadas já vêm marcadas).', 'Confira a pré-visualização.', 'Escolha: "Imprimir / Salvar em PDF", "Excel", "Word" ou "CSV".'],
+        a: 'Clique no botão verde "Relatório / Exportar". Os estudantes evadidos (conforme os filtros da tela) saem separados por escola, cada uma com o seu timbre, com turma, responsável, telefone, data e motivo da evasão, situação da busca ativa e aviso ao Conselho Tutelar. O CSV do Censo agora traz a escola real de cada aluno.',
+      },
       { q: 'Como registro uma visita ou contato com a família?', steps: ['Abra a ficha do aluno ("Ficha & Resgate").', 'Clique em "Registrar Nova Ação / Visita Domiciliar".', 'Descreva o que foi feito e clique em "Salvar Registro na Ficha".'] },
       { q: 'O aluno voltou a estudar. O que faço?', a: 'Na ficha, use "Resgatar & Reinserir". O aluno volta a ficar ativo.' },
       { q: 'Quando acionar o Conselho Tutelar?', a: 'Use "Acionar Conselho" quando as faltas passarem do limite da normativa e as tentativas de contato não resolverem. O registro fica guardado na ficha.' },
@@ -351,6 +377,10 @@ export const HELP_MODULES: HelpModule[] = [
     where: 'Menu > Secretaria & Ensino (Alt+O)',
     summary: 'Emissão de declaração de matrícula, declaração de transferência, histórico escolar, boletim e certificado de conclusão.',
     faq: [
+      {
+        q: 'O boletim (ou a declaração) está saindo em duas páginas.',
+        a: 'Foi corrigido. Boletim, declarações e certificado agora cabem sempre em uma folha A4: quando o conteúdo passa da página (por exemplo, um boletim com muitas disciplinas), o documento é reduzido na medida certa, mantendo o layout, o timbre e as margens. O histórico escolar continua podendo ter mais de uma página. O rodapé do boletim passou a trazer "Emitido eletronicamente pelo SucessoEdu".',
+      },
       { q: 'Como emito um documento?', steps: ['Escolha o aluno.', 'Escolha o tipo de documento.', 'Confira os dados na prévia.', 'Clique em "Imprimir / Gerar PDF".'] },
       {
         q: 'Como sai o documento impresso ou em PDF? Qual o nome do arquivo?',
@@ -411,6 +441,12 @@ export const HELP_MODULES: HelpModule[] = [
     where: 'Menu > Pedagógico & Avaliações',
     summary: 'Resultados das avaliações por escola, série e nível de proficiência, com relatório oficial para impressão.',
     faq: [
+      {
+        q: 'Como imprimo os resultados por estudante?',
+        steps: ['Aplique os filtros da tela (busca, escola, turma, situação etc.).', 'Clique no botão verde "Relatório".', 'Marque as colunas que quer no relatório (as mais usadas já vêm marcadas).', 'Confira a pré-visualização.', 'Escolha: "Imprimir / Salvar em PDF", "Excel", "Word" ou "CSV".'],
+        a: 'Clique em "Relatório". Os resultados filtrados saem separados por escola, com estudante, turma, avaliação, disciplina, nota, aproveitamento e proficiência.',
+        tip: 'O relatório sai com o timbre da Prefeitura, SEMED e escola, e o arquivo recebe nome com a data e a hora.',
+      },
       { q: 'Como comparo escolas ou séries?', a: 'Use os filtros de Unidade Escolar, Nível / Etapa e Instrumento de Avaliação. A área "Comparativo por Nível Escolar" mostra lado a lado.' },
       { q: 'Como imprimo?', a: 'Clique em "Imprimir Relatório Oficial (A4)" ou "Exportar CSV".' },
     ],
@@ -421,6 +457,12 @@ export const HELP_MODULES: HelpModule[] = [
     where: 'Menu > Pedagógico & Avaliações (Alt+P)',
     summary: 'Montar provas a partir do banco de questões, imprimir caderno e gabarito, lançar as respostas da prova de papel e ver resultados.',
     faq: [
+      {
+        q: 'Como tiro a relação das provas?',
+        steps: ['Aplique os filtros da tela (busca, escola, turma, situação etc.).', 'Clique no botão verde "Relatório".', 'Marque as colunas que quer no relatório (as mais usadas já vêm marcadas).', 'Confira a pré-visualização.', 'Escolha: "Imprimir / Salvar em PDF", "Excel", "Word" ou "CSV".'],
+        a: 'Clique em "Relatório". As provas listadas na tela saem separadas por escola, com disciplina, turma, professor(a), número de questões, valor, data, situação e quantas respostas já foram lançadas.',
+        tip: 'O relatório sai com o timbre da Prefeitura, SEMED e escola, e o arquivo recebe nome com a data e a hora.',
+      },
       {
         q: 'Como monto uma prova?',
         steps: [
@@ -457,6 +499,11 @@ export const HELP_MODULES: HelpModule[] = [
     summary: 'Cadastro de questões com gabarito e habilidades BNCC, impressão e importação.',
     faq: [
       {
+        q: 'Como exporto a relação de questões?',
+        steps: ['Aplique os filtros da tela (busca, escola, turma, situação etc.).', 'Clique no botão verde "Relatório".', 'Marque as colunas que quer no relatório (as mais usadas já vêm marcadas).', 'Confira a pré-visualização.', 'Escolha: "Imprimir / Salvar em PDF", "Excel", "Word" ou "CSV".'],
+        a: 'Clique em "Relatório". As questões filtradas na tela saem com código, disciplina, tópico, dificuldade, tipo e habilidade BNCC. O enunciado e o gabarito podem ser incluídos marcando essas colunas.',
+      },
+      {
         q: 'Como cadastro uma questão?',
         steps: [
           'Clique em "Nova Questão".',
@@ -478,6 +525,11 @@ export const HELP_MODULES: HelpModule[] = [
     where: 'Menu > Gestão Municipal & Polos',
     summary: 'Escolas da rede, envio de lotes das escolas para a Sede e consolidação na Secretaria.',
     faq: [
+      {
+        q: 'Como tiro a relação das escolas da rede?',
+        steps: ['Aplique os filtros da tela (busca, escola, turma, situação etc.).', 'Clique no botão verde "Relatório".', 'Marque as colunas que quer no relatório (as mais usadas já vêm marcadas).', 'Confira a pré-visualização.', 'Escolha: "Imprimir / Salvar em PDF", "Excel", "Word" ou "CSV".'],
+        a: 'Na lista de unidades escolares, clique em "Relatório". Saem as escolas filtradas na tela com INEP, zona, diretor(a), telefone e a quantidade de turmas e de alunos ativos contada pelos cadastros atuais. Endereço, e-mail, coordenação e secretaria podem ser incluídos marcando as colunas.',
+      },
       {
         q: 'Onde cadastro as logos da Prefeitura (gestão atual), da SEMED e das escolas?',
         steps: [
@@ -511,6 +563,11 @@ export const HELP_MODULES: HelpModule[] = [
     where: 'Menu > Comunicação & Avisos > Mural de Comunicados & Mensagens (ou botão Início > Mural & Mensagens)',
     summary: 'Mural de comunicados para professores, alunos e famílias, com anexos e confirmação de leitura.',
     faq: [
+      {
+        q: 'Como imprimo a relação de comunicados?',
+        steps: ['Aplique os filtros da tela (busca, escola, turma, situação etc.).', 'Clique no botão verde "Relatório".', 'Marque as colunas que quer no relatório (as mais usadas já vêm marcadas).', 'Confira a pré-visualização.', 'Escolha: "Imprimir / Salvar em PDF", "Excel", "Word" ou "CSV".'],
+        a: 'Clique em "Relatório". Os comunicados filtrados na tela saem com data, título, categoria, prioridade, remetente, destinatários e número de leituras. O texto do comunicado pode ser incluído marcando a coluna "Texto".',
+      },
       { q: 'Como publico um comunicado?', steps: ['Clique em "Novo Comunicado".', 'Escolha o público e escreva a mensagem (ou use um dos "Modelos Prontos").', 'Anexe arquivos se quiser e marque "Exigir Confirmação de Leitura" se precisar.', 'Publique.'] },
       { q: 'Como vejo quem leu?', a: 'Abra o comunicado em "Ver Detalhes & Auditoria".' },
       {
@@ -532,6 +589,11 @@ export const HELP_MODULES: HelpModule[] = [
     summary:
       'Envio assistido: o sistema monta a lista e abre cada conversa com a mensagem pronta; você aperta Enviar no WhatsApp da escola.',
     faq: [
+      {
+        q: 'Como imprimo ou exporto o histórico de envios?',
+        steps: ['Aplique os filtros da tela (busca, escola, turma, situação etc.).', 'Clique no botão verde "Relatório".', 'Marque as colunas que quer no relatório (as mais usadas já vêm marcadas).', 'Confira a pré-visualização.', 'Escolha: "Imprimir / Salvar em PDF", "Excel", "Word" ou "CSV".'],
+        a: 'Na aba Histórico, use a busca e a situação e clique em "Relatório". Saem data, destinatário, telefone, aluno, tipo, situação e quem enviou. A mensagem pode ser incluída marcando a coluna "Mensagem".',
+      },
       {
         q: 'Como envio uma mensagem para uma turma?',
         steps: [
@@ -568,6 +630,15 @@ export const HELP_MODULES: HelpModule[] = [
     where: 'Menu > Administração & TI',
     summary: 'Contas de acesso, perfis (Secretaria, Professor, Coordenação, Direção, SME) e permissões por módulo.',
     faq: [
+      {
+        q: 'Como tiro a relação de usuários do sistema?',
+        steps: ['Aplique os filtros da tela (busca, escola, turma, situação etc.).', 'Clique no botão verde "Relatório".', 'Marque as colunas que quer no relatório (as mais usadas já vêm marcadas).', 'Confira a pré-visualização.', 'Escolha: "Imprimir / Salvar em PDF", "Excel", "Word" ou "CSV".'],
+        a: 'Clique em "Relatório", ao lado de "Adicionar Novo Usuário". Saem os usuários da busca/setor escolhidos, com login, e-mail, setor, cargo e situação (ativo/inativo).',
+      },
+      {
+        q: 'Onde defino o cargo que aparece embaixo do nome, no alto da tela?',
+        a: 'Edite o usuário e preencha "Título / Cargo Personalizado" (ex.: Coordenação Pedagógica, Secretária Escolar, Diretor). É esse texto que aparece embaixo do nome no alto da tela e na assinatura dos documentos.',
+      },
       { q: 'Como crio o acesso de um professor ou funcionário?', steps: ['Clique em "Novo Usuário".', 'Informe nome, login, e-mail e perfil.', 'Escolha a escola.', 'Defina uma senha (ou gere uma) e salve.', 'Entregue o login e a senha à pessoa.'] },
       { q: 'Como tiro o acesso de alguém?', a: 'Edite o usuário e desative, ou exclua. Prefira desativar: o histórico continua ligado ao nome.' },
       { q: 'Como mudo o que cada perfil pode ver?', a: 'Use "Gestão de Permissões (RBAC)" / "Matriz de Níveis de Acesso" e marque os módulos permitidos para cada perfil.' },

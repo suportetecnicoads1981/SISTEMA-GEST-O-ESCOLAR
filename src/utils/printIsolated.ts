@@ -68,7 +68,23 @@ export interface IsolatedPrintOptions {
    * da página no canto superior direito.
    */
   abnt?: boolean;
+  /**
+   * Documento de uma página só (boletim, declarações, certificado): se o conteúdo
+   * passar da folha A4, ele é reduzido proporcionalmente para caber em uma página,
+   * mantendo o layout. Abaixo de minScale o documento segue para a página seguinte.
+   */
+  fitToPage?: boolean;
+  /** Menor redução aceita no fitToPage (padrão 0,62). */
+  minScale?: number;
 }
+
+/** Área útil da folha A4 em milímetros, conforme as margens usadas. */
+function printableAreaMm(orientation: 'portrait' | 'landscape', abnt?: boolean) {
+  const [w, h] = orientation === 'landscape' ? [297, 210] : [210, 297];
+  // ABNT: 3 cm sup./esq. e 2 cm inf./dir.; padrão: 10/12/12/12 mm.
+  return abnt ? { width: w - 50, height: h - 50 } : { width: w - 24, height: h - 22 };
+}
+const MM_TO_PX = 96 / 25.4;
 
 export const ABNT_PRINT_CSS = `
 @page{size:A4 portrait;margin:3cm 2cm 2cm 3cm;@top-right{content:counter(page);font:10pt Arial,Helvetica,sans-serif}}
@@ -102,7 +118,10 @@ export function printElementIsolated(element: HTMLElement | null, options: Isola
   const orientation = options.orientation || 'portrait';
   const frame = document.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
-  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  const area = printableAreaMm(orientation, options.abnt);
+  // O quadro fica invisível, mas com a largura útil da folha: assim dá para medir
+  // a altura real do documento antes de imprimir (fitToPage).
+  frame.style.cssText = `position:fixed;left:-10000px;top:0;width:${Math.round(area.width * MM_TO_PX)}px;height:10px;border:0;visibility:hidden`;
   document.body.appendChild(frame);
   const win = frame.contentWindow;
   const doc = win?.document;
@@ -119,6 +138,7 @@ html,body{margin:0!important;padding:0!important;background:#fff!important;heigh
 *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;scrollbar-width:none!important}
 *::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
 .no-print{display:none!important}
+.print-watermark{position:fixed!important;inset:0!important;overflow:hidden!important}
 .print-isolated-root>*{width:100%!important;max-width:100%!important;min-height:0!important;margin:0!important;box-shadow:none!important;border:0!important;border-radius:0!important;overflow:visible!important}
 ${options.abnt ? ABNT_PRINT_CSS : ''}
 ${options.extraCss || ''}
@@ -133,6 +153,7 @@ ${options.extraCss || ''}
   const go = () => {
     if (fired) return;
     fired = true;
+    if (options.fitToPage) fitRootToOnePage(doc, area.height, options.minScale ?? 0.62);
     try {
       win.addEventListener('afterprint', restoreTitle, { once: true });
       win.focus();
@@ -162,6 +183,23 @@ ${options.extraCss || ''}
     setTimeout(go, 3000);
   }
   return true;
+}
+
+/**
+ * Reduz o documento para caber em uma folha, sem mudar o layout.
+ * Usa zoom (o navegador refaz a quebra de linhas na escala nova, e a impressão respeita).
+ */
+function fitRootToOnePage(doc: Document, areaHeightMm: number, minScale: number): void {
+  const page = doc.querySelector('.print-isolated-root > *') as HTMLElement | null;
+  if (!page) return;
+  const available = areaHeightMm * MM_TO_PX - 6; // folga para arredondamentos
+  const height = page.scrollHeight;
+  if (!height || height <= available) return;
+  const scale = available / height;
+  if (scale < minScale) return; // grande demais: deixa seguir para a próxima página
+  (page.style as any).zoom = String(Math.floor(scale * 1000) / 1000);
+  page.style.setProperty('overflow', 'hidden', 'important');
+  page.style.setProperty('max-height', `${Math.floor(available / scale)}px`, 'important');
 }
 
 /**

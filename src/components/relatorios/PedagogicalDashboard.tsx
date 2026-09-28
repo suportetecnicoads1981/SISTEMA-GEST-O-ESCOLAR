@@ -1113,7 +1113,7 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
 
             <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-800">
               <div>
-                <p className="text-xs font-bold text-white">EduGestão Pro Enterprise</p>
+                <p className="text-xs font-bold text-white">SucessoEdu Gestão Educacional</p>
                 <p className="text-[10px] text-slate-400 font-mono">
                   suportetecnicoads@gmail.com | Versão 2.4.0
                 </p>

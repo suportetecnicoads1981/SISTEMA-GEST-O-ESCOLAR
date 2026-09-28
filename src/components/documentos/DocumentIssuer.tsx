@@ -118,7 +118,12 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
   // único ao salvar o PDF: tipo do documento + aluno + data/hora.
   const handlePrint = () => {
     const fileName = printFileName(DOC_FILE_LABEL[documentType] || 'Documento', selectedStudent?.name);
-    const ok = printElementIsolated(document.getElementById('printable-official-document'), { fileName, abnt: true });
+    const ok = printElementIsolated(document.getElementById('printable-official-document'), {
+      fileName,
+      abnt: true,
+      // Boletim, declarações e certificado cabem em uma folha; o histórico pode ter mais.
+      fitToPage: documentType !== 'HISTORICO_ESCOLAR',
+    });
     if (!ok) {
       setPrintTitle(fileName);
       window.print();
@@ -296,7 +301,7 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
           style={{ minHeight: '1050px' }}
         >
           {/* Watermark */}
-          <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none">
+          <div className="print-watermark absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none">
             <Award className="w-[500px] h-[500px] text-slate-900" />
           </div>
 
@@ -373,7 +378,7 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
 
                 <div className="flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-200 pt-3">
                   <span>Autenticidade: Chave SHA256-{Math.random().toString(36).substring(2, 10).toUpperCase()}</span>
-                  <span>EduGestão Pro • Sistema de Chancelaria Digital</span>
+                  <span>SucessoEdu • Gestão Educacional</span>
                 </div>
               </div>
             </div>
@@ -624,7 +629,7 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
               </table>
 
               <div className="text-[11px] text-slate-500 pt-4 flex justify-between border-t border-slate-200">
-                <span>Emitido eletronicamente via EduGestão Pro</span>
+                <span>Emitido eletronicamente pelo SucessoEdu</span>
                 <span>Data: {currentDateFormatted}</span>
               </div>
             </div>

@@ -52,6 +52,7 @@ import { UserManagementTable } from './UserManagementTable';
 import { hashPassword, PASSWORD_MASK } from '../../utils/passwordHasher';
 import { getSupabaseClient } from '../../services/datasync/supabaseClient';
 import { confirmDialog, notify } from '../../utils/dialogs';
+import { ModuleReportButton, reportDate } from '../common/ModuleReportButton';
 
 interface UserAccessControlProps {
   users: UserAccount[];
@@ -759,6 +760,40 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <ModuleReportButton
+                title="Relação de Usuários do Sistema"
+                subtitle="Usuários conforme a busca e o setor selecionados"
+                fileName="Usuarios_do_Sistema"
+                orientation="landscape"
+                countLabel="Total de usuários"
+                label="Relatório"
+                rows={filteredUsers.map((u) => ({
+                  name: u.name,
+                  login: u.login || u.username || '',
+                  email: u.email || '',
+                  phone: u.phone || '',
+                  sector: SECTOR_LABELS[u.sector as UserSector]?.label || u.sector || '',
+                  title: u.sectorTitle || u.roleTitle || '',
+                  school: u.schoolUnitName || schoolUnits.find((su) => su.id === u.schoolUnitId)?.name || '',
+                  profile: u.role === 'ADMIN' ? 'Administrador' : u.role === 'TEACHER' ? 'Professor(a)' : String(u.role || ''),
+                  active: u.active ? 'Ativo' : 'Inativo',
+                  lastLogin: reportDate(u.lastLogin, true),
+                }))}
+                columns={[
+                  { id: 'index', label: 'Nº', align: 'center' },
+                  { id: 'name', label: 'Nome' },
+                  { id: 'login', label: 'Login' },
+                  { id: 'email', label: 'E-mail' },
+                  { id: 'phone', label: 'Telefone', defaultVisible: false },
+                  { id: 'sector', label: 'Setor' },
+                  { id: 'title', label: 'Cargo' },
+                  { id: 'school', label: 'Escola', defaultVisible: false },
+                  { id: 'profile', label: 'Perfil', defaultVisible: false },
+                  { id: 'active', label: 'Situação', align: 'center' },
+                  { id: 'lastLogin', label: 'Último acesso', align: 'center', defaultVisible: false },
+                ]}
+                className="px-4 py-2 rounded-xl bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-xs sm:text-sm flex items-center gap-2 cursor-pointer"
+              />
               <button
                 onClick={handleOpenCreateModal}
                 className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-xs transition-colors cursor-pointer"

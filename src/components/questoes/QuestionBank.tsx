@@ -32,6 +32,7 @@ import {
 import { Question, Subject } from '../../types';
 import { QuestionModal } from './QuestionModal';
 import { QuestionImportModal } from './QuestionImportModal';
+import { ModuleReportButton } from '../common/ModuleReportButton';
 import { triggerPrint } from '../../utils/printHelper';
 import { confirmDialog } from '../../utils/dialogs';
 
@@ -309,6 +310,38 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
             <Printer className="h-4 w-4 text-slate-600" />
             <span>Imprimir Caderno</span>
           </button>
+          <ModuleReportButton
+            title="Relação de Questões do Banco"
+            subtitle="Questões conforme os filtros da tela"
+            fileName="Banco_de_Questoes"
+            orientation="landscape"
+            countLabel="Total de questões"
+            label="Relatório"
+            rows={filteredQuestions.map((q) => ({
+              code: q.code,
+              subject: q.subject,
+              topic: q.topic,
+              difficulty: ({ FACIL: 'Fácil', MEDIO: 'Médio', DIFICIL: 'Difícil' } as Record<string, string>)[q.difficulty] || q.difficulty,
+              type:
+                ({ MULTIPLE_CHOICE: 'Múltipla escolha', TRUE_FALSE: 'Verdadeiro ou falso', ESSAY_KEYWORD: 'Discursiva' } as Record<string, string>)[q.type] ||
+                q.type,
+              bncc: q.bnccSkill || '',
+              stem: q.stem.length > 180 ? q.stem.slice(0, 177) + '...' : q.stem,
+              answer: q.type === 'ESSAY_KEYWORD' ? q.essayKeywords?.join('; ') || '' : q.options?.find((o) => o.isCorrect)?.text || '',
+            }))}
+            columns={[
+              { id: 'index', label: 'Nº', align: 'center' },
+              { id: 'code', label: 'Código' },
+              { id: 'subject', label: 'Disciplina' },
+              { id: 'topic', label: 'Tópico' },
+              { id: 'difficulty', label: 'Dificuldade', align: 'center' },
+              { id: 'type', label: 'Tipo' },
+              { id: 'bncc', label: 'BNCC' },
+              { id: 'stem', label: 'Enunciado', defaultVisible: false },
+              { id: 'answer', label: 'Gabarito', defaultVisible: false },
+            ]}
+            className="px-3 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+          />
           <button
             onClick={() => handleExportCSV(false)}
             className="px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"

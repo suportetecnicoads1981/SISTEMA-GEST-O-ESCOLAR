@@ -43,6 +43,8 @@ import {
   SchoolSettings,
 } from '../../types';
 
+import { ModuleReportButton, reportDate } from '../common/ModuleReportButton';
+
 interface CommunicationModuleProps {
   messages: CommunicationMessage[];
   classes: SchoolClass[];
@@ -548,6 +550,48 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
             <Printer className="h-4 w-4 text-slate-600" />
             <span>Imprimir Mural</span>
           </button>
+
+          <ModuleReportButton
+            title="Relatório de Comunicados"
+            subtitle="Comunicados conforme os filtros da tela"
+            fileName="Relatorio_de_Comunicados"
+            orientation="landscape"
+            countLabel="Total de comunicados"
+            label="Relatório"
+            rows={filteredMessages.map((m) => ({
+              date: reportDate(m.createdAt, true),
+              title: m.title,
+              category:
+                ({ GERAL: 'Geral', PEDAGOGICO: 'Pedagógico', SECRETARIA_FINANCEIRO: 'Secretaria', EVENTO: 'Evento', URGENTE: 'Urgente' } as Record<string, string>)[m.category] ||
+                m.category,
+              priority: ({ NORMAL: 'Normal', URGENTE: 'Urgente', INFORMATIVO: 'Informativo' } as Record<string, string>)[m.priority] || m.priority,
+              sender: m.senderName,
+              recipients:
+                m.recipientType === 'ALL'
+                  ? 'Toda a escola'
+                  : m.recipientType === 'CLASS'
+                    ? classes.find((c) => c.id === m.targetClassId)?.name || 'Turma'
+                    : m.recipientType === 'INDIVIDUAL'
+                      ? m.targetStudentName || 'Individual'
+                      : (m.targetRoles || []).join(', '),
+              reads: (m.readConfirmations || []).length,
+              status: ({ ENVIADO: 'Enviado', RASCUNHO: 'Rascunho', PROGRAMADO: 'Programado' } as Record<string, string>)[m.status] || m.status || '',
+              content: m.content.length > 200 ? m.content.slice(0, 197) + '...' : m.content,
+            }))}
+            columns={[
+              { id: 'index', label: 'Nº', align: 'center' },
+              { id: 'date', label: 'Data', align: 'center' },
+              { id: 'title', label: 'Título' },
+              { id: 'category', label: 'Categoria' },
+              { id: 'priority', label: 'Prioridade', align: 'center' },
+              { id: 'sender', label: 'Remetente' },
+              { id: 'recipients', label: 'Destinatários' },
+              { id: 'reads', label: 'Leituras', align: 'center' },
+              { id: 'status', label: 'Situação', align: 'center', defaultVisible: false },
+              { id: 'content', label: 'Texto', defaultVisible: false },
+            ]}
+            className="px-3 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+          />
 
           <button
             onClick={handleExportCSV}

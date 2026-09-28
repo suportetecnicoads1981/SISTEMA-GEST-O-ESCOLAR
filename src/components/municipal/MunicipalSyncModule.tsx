@@ -70,6 +70,7 @@ import { confirmDialog, notify } from '../../utils/dialogs';
 import { parseLoteFile, ParsedLote, LoteMergeReport, LOTE_LABELS, LOTE_KEYS, isOlderThanLastImport } from '../../services/offline/batchPacket';
 import { generateLote, downloadLote, importLote } from '../../services/offline/loteService';
 import { getLocalServerInfo } from '../../services/offline/localServerSync';
+import { ModuleReportButton } from '../common/ModuleReportButton';
 
 interface MunicipalSyncModuleProps {
   schoolUnits?: SchoolUnit[];
@@ -1087,6 +1088,57 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
               <span className="text-xs text-slate-500 font-semibold hidden md:inline">
                 {filteredUnits.length} de {schoolUnits.length} escolas
               </span>
+              <ModuleReportButton
+                title="Relação de Unidades Escolares da Rede Municipal"
+                subtitle="Escolas conforme os filtros da tela"
+                fileName="Unidades_Escolares_Rede_Municipal"
+                orientation="landscape"
+                countLabel="Total de escolas"
+                label="Relatório"
+                rows={(() => {
+                  // Alunos e turmas contados pelos cadastros atuais (não pelo total gravado na escola).
+                  const stCount = new Map<string, number>();
+                  (students || []).forEach((st: any) => {
+                    if (st?.status && st.status !== 'ACTIVE') return;
+                    const k = st?.schoolUnitId || '';
+                    stCount.set(k, (stCount.get(k) || 0) + 1);
+                  });
+                  const clCount = new Map<string, number>();
+                  (classes || []).forEach((c: any) => clCount.set(c?.schoolUnitId || '', (clCount.get(c?.schoolUnitId || '') || 0) + 1));
+                  return filteredUnits.map((u) => ({
+                    name: u.name,
+                    inep: u.inepCode && /\d/.test(u.inepCode) ? u.inepCode : '',
+                    zone: (u.locationZone || u.zone || '') === 'ZONA_RURAL' ? 'Rural' : (u.locationZone || u.zone) ? 'Urbana' : '',
+                    district: u.district || '',
+                    address: [u.address, u.city].filter(Boolean).join(' - '),
+                    director: u.directorName || '',
+                    coordinator: u.coordinatorName || '',
+                    secretary: u.secretaryName || '',
+                    phone: u.phone || '',
+                    email: u.email || '',
+                    classes: clCount.get(u.id) || 0,
+                    students: stCount.get(u.id) || 0,
+                    annex: u.isAnnex ? 'Anexo' : 'Sede',
+                  }));
+                })()}
+                columns={[
+                  { id: 'index', label: 'Nº', align: 'center' },
+                  { id: 'name', label: 'Unidade escolar' },
+                  { id: 'inep', label: 'INEP', align: 'center' },
+                  { id: 'zone', label: 'Zona', align: 'center' },
+                  { id: 'district', label: 'Localidade', defaultVisible: false },
+                  { id: 'address', label: 'Endereço', defaultVisible: false },
+                  { id: 'director', label: 'Diretor(a)' },
+                  { id: 'coordinator', label: 'Coordenador(a)', defaultVisible: false },
+                  { id: 'secretary', label: 'Secretário(a)', defaultVisible: false },
+                  { id: 'phone', label: 'Telefone' },
+                  { id: 'email', label: 'E-mail', defaultVisible: false },
+                  { id: 'annex', label: 'Tipo', align: 'center', defaultVisible: false },
+                  { id: 'classes', label: 'Turmas', align: 'center' },
+                  { id: 'students', label: 'Alunos ativos', align: 'center' },
+                ]}
+                className="w-full sm:w-auto px-4 py-2 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
+              />
               <button
                 onClick={handleOpenAddSchoolUnit}
                 className="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-sm shadow-emerald-200"
@@ -1792,7 +1844,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                   Clique para selecionar ou arraste o arquivo .edusync aqui
                 </span>
                 <span className="text-[11px] text-slate-400">
-                  Formatos suportados: .edusync, .json gerados pelo EduGestão Pro
+                  Formatos suportados: .edusync, .json gerados pelo SucessoEdu
                 </span>
               </div>
             </label>

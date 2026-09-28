@@ -48,6 +48,7 @@ import {
   ChartDatasetOption,
 } from '../common/CustomizableChartModal';
 import { CustomizableChartCard } from '../common/CustomizableChartCard';
+import { ModuleReportButton } from '../common/ModuleReportButton';
 
 interface DropoutCensusReportProps {
   students: Student[];
@@ -414,6 +415,44 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
     droppedOutStudents,
   ]);
 
+  // Escola do aluno (cadastro da Rede Municipal): usada no CSV e no relatório.
+  const unitMap = useMemo(() => new Map((schoolUnits || []).map((u) => [u.id, u])), [schoolUnits]);
+  const schoolOf = (s: Student) => {
+    const cls = classMap.get(s.classId);
+    const unitId = s.schoolUnitId || (cls as any)?.schoolUnitId || '';
+    const unit = unitMap.get(unitId);
+    return { unitId, name: unit?.name || s.schoolOriginName || 'Não informada', inep: unit?.inepCode || '' };
+  };
+
+  // Linhas do relatório padrão (mesmos filtros da tela).
+  const dropoutReportRows = useMemo(
+    () =>
+      filteredDroppedOut.map((s) => {
+        const cls = classMap.get(s.classId);
+        const sc = schoolOf(s);
+        const reasonInfo = s.dropoutReason ? DROPOUT_REASON_INFO[s.dropoutReason] : null;
+        const interv = s.dropoutIntervention;
+        const d = String(s.dropoutDate || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+        return {
+          schoolUnitId: sc.unitId,
+          schoolName: sc.name,
+          name: s.name,
+          ra: s.enrollmentNumber || '',
+          className: cls?.name || '',
+          shift: cls?.shift || s.shift || '',
+          guardian: s.guardianName || '',
+          phone: s.phone || s.guardianPhone || '',
+          dropoutDate: d ? `${d[3]}/${d[2]}/${d[1]}` : s.dropoutDate || '',
+          reason: reasonInfo?.label || 'Outros',
+          searchStatus: String(interv?.searchStatus || 'EM_BUSCA_ATIVA').replace(/_/g, ' '),
+          agent: interv?.responsibleAgent || '',
+          conselho: interv?.conselhoTutelarNotified ? 'Sim' : 'Não',
+        };
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredDroppedOut, classMap, unitMap]
+  );
+
   // Exportar Relatório do Censo Municipal em CSV
   const handleExportCensusCSV = () => {
     const headers = [
@@ -444,7 +483,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
       const reasonInfo = s.dropoutReason ? DROPOUT_REASON_INFO[s.dropoutReason] : null;
       const interv = s.dropoutIntervention;
       return [
-        `"35012345 - EMEF Central Municipal"`,
+        `"${((sc) => (sc.inep && /\d/.test(sc.inep) ? sc.inep + ' - ' : '') + sc.name)(schoolOf(s))}"`,
         `"${s.enrollmentNumber}"`,
         `"${s.name}"`,
         `"${s.cpf}"`,
@@ -630,6 +669,31 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
             <Printer className="h-3.5 w-3.5 text-slate-600" />
             <span>Imprimir Censo (.PDF)</span>
           </button>
+
+          <ModuleReportButton
+            title="Relatório de Evasão Escolar e Busca Ativa"
+            subtitle="Estudantes evadidos, motivo e acompanhamento da busca ativa"
+            fileName="Relatorio_Evasao_Busca_Ativa"
+            orientation="landscape"
+            groupBySchool
+            countLabel="Total de estudantes evadidos"
+            rows={dropoutReportRows}
+            columns={[
+              { id: 'index', label: 'Nº', align: 'center' },
+              { id: 'name', label: 'Estudante' },
+              { id: 'ra', label: 'RA' },
+              { id: 'className', label: 'Turma' },
+              { id: 'shift', label: 'Turno', defaultVisible: false },
+              { id: 'guardian', label: 'Responsável' },
+              { id: 'phone', label: 'Telefone' },
+              { id: 'dropoutDate', label: 'Data da evasão', align: 'center' },
+              { id: 'reason', label: 'Motivo' },
+              { id: 'searchStatus', label: 'Busca ativa' },
+              { id: 'agent', label: 'Agente responsável', defaultVisible: false },
+              { id: 'conselho', label: 'Conselho Tutelar', align: 'center' },
+            ]}
+            className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+          />
 
           <button
             onClick={handleExportCensusCSV}

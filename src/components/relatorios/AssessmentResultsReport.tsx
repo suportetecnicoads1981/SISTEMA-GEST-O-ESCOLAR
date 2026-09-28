@@ -58,6 +58,7 @@ import {
   ChartDatasetOption,
 } from '../common/CustomizableChartModal';
 import { CustomizableChartCard } from '../common/CustomizableChartCard';
+import { ModuleReportButton } from '../common/ModuleReportButton';
 
 interface AssessmentResultsReportProps {
   exams: Exam[];
@@ -658,6 +659,44 @@ export const AssessmentResultsReport: React.FC<AssessmentResultsReportProps> = (
             <Sparkles className="h-4 w-4 text-indigo-600" />
             <span>Gerar Gráficos Personalizados</span>
           </button>
+
+          <ModuleReportButton
+            title="Resultados das Avaliações por Estudante"
+            subtitle="Notas e proficiência conforme os filtros da tela"
+            fileName="Resultados_das_Avaliacoes"
+            orientation="landscape"
+            groupBySchool
+            countLabel="Total de resultados"
+            label="Relatório"
+            rows={filteredSubmissions.map((s) => ({
+              schoolUnitId: s.schoolUnitId === 'unit-default' ? '' : s.schoolUnitId,
+              schoolName: s.schoolUnitName,
+              student: s.studentName,
+              ra: s.enrollmentNumber,
+              className: s.className,
+              grade: s.gradeLevel,
+              exam: s.examTitle,
+              subject: s.subjectName,
+              score: `${s.score} / ${s.totalPoints}`,
+              pct: `${s.scorePct}%`,
+              proficiency: s.proficiency,
+              zone: s.schoolZone,
+            }))}
+            columns={[
+              { id: 'index', label: 'Nº', align: 'center' },
+              { id: 'student', label: 'Estudante' },
+              { id: 'ra', label: 'RA', defaultVisible: false },
+              { id: 'className', label: 'Turma' },
+              { id: 'grade', label: 'Etapa/Série', defaultVisible: false },
+              { id: 'exam', label: 'Avaliação' },
+              { id: 'subject', label: 'Disciplina' },
+              { id: 'score', label: 'Nota', align: 'center' },
+              { id: 'pct', label: 'Aproveitamento', align: 'center' },
+              { id: 'proficiency', label: 'Proficiência', align: 'center' },
+              { id: 'zone', label: 'Zona', defaultVisible: false },
+            ]}
+            className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-xs"
+          />
 
           <button
             type="button"

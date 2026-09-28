@@ -31,6 +31,7 @@ import { getLocalServerInfo, flushLocalChanges } from '../../services/offline/lo
 import { supabaseBatchQueue } from '../../services/supabaseBatchQueue';
 import { NotificationItem, UserRole, UserAccount } from '../../types';
 import { NotificationPopover } from '../notificacoes/NotificationPopover';
+import { formatPersonName } from '../../services/documentBranding';
 
 interface HeaderProps {
   schoolName: string;
@@ -86,6 +87,30 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenTour,
   onOpenHelp,
 }) => {
+  // Cargo exibido abaixo do nome: o que foi cadastrado para o usuário (Título / Cargo),
+  // e só na falta dele o perfil de acesso.
+  const ROLE_FALLBACK: Record<string, string> = {
+    ADMIN: 'Administrador(a)',
+    SECRETARY: 'Secretaria Escolar',
+    TEACHER: 'Professor(a)',
+    COORDINATOR: 'Coordenação',
+    DIRECTOR: 'Direção',
+  };
+  const userJobTitle =
+    String(currentUser?.sectorTitle || currentUser?.roleTitle || '').trim() ||
+    ROLE_FALLBACK[String(currentUser?.role || '')] ||
+    'Usuário';
+  // Iniciais do nome e do último sobrenome (ex.: Marcia Tavares de Sousa → MS).
+  const userInitials = (() => {
+    const words = String(currentUser?.name || '')
+      .trim()
+      .split(/\s+/)
+      .filter((w) => w && !/^(d[aeo]s?|e)$/i.test(w));
+    if (!words.length) return 'AD';
+    const first = words[0].charAt(0);
+    const last = words.length > 1 ? words[words.length - 1].charAt(0) : words[0].charAt(1);
+    return (first + last).toUpperCase();
+  })();
   const [currentDateTime, setCurrentDateTime] = useState('');
   const [serverPingOk, setServerPingOk] = useState(true);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -394,7 +419,7 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         )}
 
-        {/* Card do Usuário Ativo (AD Admin Master ADS / ADMIN - TI) */}
+        {/* Card do Usuário Ativo: nome e cargo do cadastro do usuário */}
         <div className="relative">
           <button
             id="btn-header-user-profile"
@@ -403,14 +428,18 @@ export const Header: React.FC<HeaderProps> = ({
             title="Alternar perfil de operador ou ver permissões"
           >
             <div className="h-8 w-8 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs font-black shrink-0">
-              {currentUser?.isMaster ? 'AD' : currentUser?.name ? currentUser.name.substring(0, 2).toUpperCase() : 'AD'}
+              {userInitials}
             </div>
             <div className="hidden lg:block leading-tight">
               <div className="text-xs font-black text-slate-900 truncate max-w-[140px]">
-                {currentUser?.name || 'Admin Master ADS'}
+                {formatPersonName(currentUser?.name) || 'Administrador'}
               </div>
-              <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wider leading-none">
-                {currentUser?.role === 'ADMIN' ? 'ADMIN - TI' : currentUser?.sector || 'ADMIN - TI'}
+              {/* Cargo/função do cadastro do usuário (Usuários & Permissões > Título / Cargo) */}
+              <div
+                className="text-[10px] font-bold text-blue-600 tracking-wide leading-none truncate max-w-[160px]"
+                title={userJobTitle}
+              >
+                {userJobTitle}
               </div>
             </div>
           </button>
@@ -441,7 +470,7 @@ export const Header: React.FC<HeaderProps> = ({
                         {u.isMaster && <span>👑</span>}
                         <span>{u.name}</span>
                       </div>
-                      <div className="text-[10px] text-slate-400">{u.roleTitle} ({u.sector})</div>
+                      <div className="text-[10px] text-slate-400">{u.sectorTitle || u.roleTitle || u.sector}</div>
                     </div>
                     {currentUser?.id === u.id && (
                       <span className="h-2 w-2 rounded-full bg-blue-600" />
