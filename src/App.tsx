@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import {
   Student,
   SchoolClass,
@@ -118,9 +118,29 @@ import { setDocumentBranding } from './services/documentBranding';
 import { runCloudSyncNow } from './services/offline/cloudAutoSync';
 import { normalizeSchoolLinks } from './utils/schoolDataNormalizer';
 import { isProvisionalRa, resolveProvisionalRas } from './services/raService';
+import { can as canAccess, canOpenTab, deniedTabMessage, describeDenials, enforceDataPermissions } from './services/rbac/accessControl';
 
 export default function App() {
-  const [data, setData] = useState(() => getStoredData());
+  // setDataRaw: gravação sem checagem (dados vindos da nuvem, restauração, rotinas do sistema).
+  // setData: gravação feita pelo operador — passa pelos privilégios do usuário (accessControl).
+  const [data, setDataRaw] = useState(() => getStoredData());
+  const accessActorRef = useRef<any>(null);
+  const lastDeniedNoticeRef = useRef<{ text: string; at: number }>({ text: '', at: 0 });
+  const setData = useCallback((action: React.SetStateAction<ReturnType<typeof getStoredData>>) => {
+    setDataRaw((prev) => {
+      const next = typeof action === 'function' ? (action as any)(prev) : action;
+      const { next: allowed, denied } = enforceDataPermissions(prev as any, next as any, accessActorRef.current);
+      if (denied.length) {
+        const text = describeDenials(denied);
+        const last = lastDeniedNoticeRef.current;
+        if (last.text !== text || Date.now() - last.at > 1500) {
+          lastDeniedNoticeRef.current = { text, at: Date.now() };
+          setTimeout(() => notify(text, 'Permissão negada'), 0);
+        }
+      }
+      return allowed as any;
+    });
+  }, []);
   // Estado que acabou de chegar do Supabase: é gravado apenas localmente, sem ser
   // reenviado à nuvem (evita o ciclo upsert → evento realtime → recarga → upsert).
   const remoteOriginDataRef = useRef<unknown>(null);
@@ -268,6 +288,11 @@ export default function App() {
     : 'STUDENT';
 
   const authenticatedAccount = (data.userAccounts || []).find((u) => u.id === authenticatedUserId);
+  // Operador em uso, com as permissões mais recentes do cadastro (vale para toda gravação).
+  const accessActor = isAuthenticated
+    ? (data.userAccounts || []).find((u) => u.id === currentUser?.id) || currentUser
+    : null;
+  accessActorRef.current = accessActor;
   // Somente o Administrador Master autenticado pode operar como outro usuário.
   const canSwitchOperator = Boolean(authenticatedAccount?.isMaster);
 
@@ -286,7 +311,8 @@ export default function App() {
   // Grava o hash da senha (primeiro acesso, conversão de senha legada ou cópia local
   // da senha após login no Supabase) e atualiza o papel vindo da nuvem.
   const handlePasswordUpdate = (user: UserAccount, passwordHash: string) => {
-    setData((prev) => {
+    // Senha do próprio acesso (login / primeiro acesso): rotina do sistema, fora da checagem.
+    setDataRaw((prev) => {
       const accounts = prev.userAccounts || [];
       const exists = accounts.some((u) => u.id === user.id);
       return {
@@ -379,7 +405,7 @@ export default function App() {
         // Mescla por id no estado mais recente (a lista pode ter mudado durante o pedido).
         if (fresh.resolved && !cancelled) {
           console.info(`[SucessoEdu] RA definitivo recebido da nuvem para ${fresh.resolved} aluno(s).`);
-          setData((prev) => {
+          setDataRaw((prev) => {
             const map = new Map(fresh.students.map((s: any) => [s.id, s.enrollmentNumber]));
             let changed = false;
             const students = (prev.students || []).map((s) => {
@@ -440,13 +466,13 @@ export default function App() {
             : DEFAULT_ROLE_PREFERENCES,
         };
         remoteOriginDataRef.current = nextData;
-        setData(nextData);
+        setDataRaw(nextData);
       } else {
-        setData(getStoredData());
+        setDataRaw(getStoredData());
       }
     };
     const handleDbMigrated = () => {
-      setData(getStoredData());
+      setDataRaw(getStoredData());
     };
     window.addEventListener('sucessoedu_db_changed', handleDbChange);
     window.addEventListener('sucessoedu_database_migrated', handleDbMigrated);
@@ -463,7 +489,7 @@ export default function App() {
       const check = DatabaseAutomatorService.checkIfMigrationNeeded();
       if (config.autoMigrateOnStartup && check.needed) {
         DatabaseAutomatorService.executeAutomatedUpdate().then(() => {
-          setData(getStoredData());
+          setDataRaw(getStoredData());
         }).catch(() => {});
       }
     } catch {}
@@ -474,7 +500,7 @@ export default function App() {
   useEffect(() => {
     const pull = () => {
       const items = drainMessageQueue();
-      setData((prev) => {
+      setDataRaw((prev) => {
         if (!prev) return prev;
         const cfg: any = prev.whatsappConfig || {};
         const current = prev.whatsappLogs || [];
@@ -1608,6 +1634,11 @@ export default function App() {
       setActiveExamIdForTaking(payload.examId);
     }
 
+    if (isAuthenticated && !canOpenTab(accessActor, target)) {
+      notify(deniedTabMessage(target), 'Acesso restrito');
+      return;
+    }
+
     if (!isTabAvailable(target)) {
       triggerPushNotification(
         '🧪 Módulo experimental',
@@ -1674,6 +1705,18 @@ export default function App() {
       !n?.targetRoles
     )
   ).length;
+
+  // Troca de operador ou mudança de permissões: fecha as telas que o operador não pode abrir.
+  const accessKey = accessActor ? `${accessActor.id}|${JSON.stringify((accessActor as any).permissions || {})}|${accessActor.sector}` : '';
+  useEffect(() => {
+    if (!isAuthenticated || !accessActor) return;
+    setOpenTabs((prev) => {
+      const kept = prev.filter((t) => canOpenTab(accessActor, t));
+      return kept.length === prev.length ? prev : kept.length ? kept : ['MAIN_DASHBOARD'];
+    });
+    if (!canOpenTab(accessActor, activeTab)) setActiveTab('MAIN_DASHBOARD');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessKey, isAuthenticated]);
 
   if (!isAuthenticated) {
     return (
@@ -1792,6 +1835,7 @@ export default function App() {
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
           showDevBacklog={isDevBacklogOwner(currentUser?.email)}
+          canOpenTab={(tab) => canOpenTab(accessActor, tab)}
           counts={{
             students: data?.students?.length || 0,
             exams: data?.exams?.length || 0,
@@ -1888,7 +1932,7 @@ export default function App() {
                 onBatchSaveNotifications={handleBatchSaveNotifications}
                 onSaveSchoolUnit={handleSaveSchoolUnit}
                 onSaveStudent={handleSaveStudent}
-                onDeleteStudent={handleDeleteStudent}
+                onDeleteStudent={canAccess(accessActor, 'secretaria', 'canDelete') ? handleDeleteStudent : undefined}
                 onBatchImportStudents={handleBatchImportStudents}
                 onIssueDocument={handleIssueDocument}
                 onBack={handleGoBack}
@@ -1943,7 +1987,7 @@ export default function App() {
                 students={data.students}
                 schoolUnits={data.schoolUnits || []}
                 onSaveClass={handleSaveClass}
-                onDeleteClass={handleDeleteClass}
+                onDeleteClass={canAccess(accessActor, 'turmas', 'canDelete') ? handleDeleteClass : undefined}
                 onSaveSubject={handleSaveSubject}
                 onDeleteSubject={handleDeleteSubject}
                 onBack={() => handleNavigate('MAIN_DASHBOARD')}
@@ -2030,7 +2074,7 @@ export default function App() {
                 questions={data.questions}
                 subjects={data.subjects}
                 onSaveQuestion={handleSaveQuestion}
-                onDeleteQuestion={handleDeleteQuestion}
+                onDeleteQuestion={canAccess(accessActor, 'questoes', 'canDelete') ? handleDeleteQuestion : undefined}
                 onBatchImport={handleBatchImportQuestions}
                 onCreateExamWithQuestions={handleCreateExamFromQuestions}
                 onBack={() => handleNavigate('MAIN_DASHBOARD')}
@@ -2048,7 +2092,7 @@ export default function App() {
                 submissions={data.submissions}
                 settings={data.settings}
                 onSaveExam={handleSaveExam}
-                onDeleteExam={handleDeleteExam}
+                onDeleteExam={canAccess(accessActor, 'provas', 'canDelete') ? handleDeleteExam : undefined}
                 onTakeExamAsStudent={handleTakeExam}
                 onViewReport={handleViewReport}
                 initialSelectedQuestionIds={preselectedQuestionIdsForExam}
@@ -2129,7 +2173,7 @@ export default function App() {
                     },
                   }))
                 }
-                onRefreshData={() => setData(getStoredData())}
+                onRefreshData={() => setDataRaw(getStoredData())}
                 onBack={() => handleNavigate('MAIN_DASHBOARD')}
                 onNavigate={handleNavigate}
               />

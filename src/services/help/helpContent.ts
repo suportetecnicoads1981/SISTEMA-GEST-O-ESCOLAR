@@ -723,6 +723,25 @@ export const HELP_MODULES: HelpModule[] = [
       { q: 'Como crio o acesso de um professor ou funcionário?', steps: ['Clique em "Novo Usuário".', 'Informe nome, login, e-mail e perfil.', 'Escolha a escola.', 'Defina uma senha (ou gere uma) e salve.', 'Entregue o login e a senha à pessoa.'] },
       { q: 'Como tiro o acesso de alguém?', a: 'Edite o usuário e desative, ou exclua. Prefira desativar: o histórico continua ligado ao nome.' },
       { q: 'Como mudo o que cada perfil pode ver?', a: 'Use "Gestão de Permissões (RBAC)" / "Matriz de Níveis de Acesso" e marque os módulos permitidos para cada perfil.' },
+      {
+        q: 'O que cada permissão libera?',
+        a: 'Ler: o módulo aparece no menu e pode ser aberto. Criar: incluir cadastros. Editar: alterar cadastros. Excluir: apagar cadastros. As permissões valem em todas as telas: sem "Excluir" em Secretaria & Alunos, por exemplo, o botão de lixeira some e qualquer tentativa de apagar aluno é recusada com o aviso "Permissão negada". O módulo sem "Ler" não aparece no menu, na busca, nos atalhos nem no menu Iniciar.',
+        tip: 'Padrão da Secretaria: lê, inclui e altera em Secretaria & Alunos, Turmas, Documentos e Comunicados, e não exclui nada. Para liberar exclusão, o Master marca "Excluir" no módulo desejado.',
+      },
+      {
+        q: 'Quem pode criar, alterar ou excluir usuários?',
+        a: 'Somente o Administrador Master. Para os demais perfis, a tela de usuários fica só para consulta: não aparecem os botões de novo usuário, editar, excluir, simular, nem a troca de setor ou de situação. Senhas, setores, permissões e os dados do desenvolvedor só mudam pela conta Master, e qualquer tentativa por outro perfil é recusada.',
+        tip: 'Entrar no sistema e trocar a própria senha no primeiro acesso continuam liberados para cada usuário.',
+      },
+      {
+        q: 'Como testo as permissões de um usuário?',
+        steps: [
+          'Entre com a conta Master.',
+          'Em Usuários & Permissões, clique em "Simular" no usuário.',
+          'O sistema passa a funcionar com as permissões dele: menu, botões e gravações.',
+          'Para voltar, clique no nome do operador, no alto da tela, e escolha a conta Master.',
+        ],
+      },
       { q: 'Cuidado com "Excluir Todos os Usuários"', a: 'Esse botão apaga todas as contas. Use só com orientação do suporte.' },
     ],
   },

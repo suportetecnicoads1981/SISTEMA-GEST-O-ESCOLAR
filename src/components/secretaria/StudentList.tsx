@@ -86,7 +86,7 @@ interface StudentListProps {
   onBatchSaveNotifications?: (notifications: NotificationItem[]) => void;
   onSaveSchoolUnit?: (unit: SchoolUnit) => void;
   onSaveStudent: (student: Student) => void;
-  onDeleteStudent: (id: string) => void;
+  onDeleteStudent?: (id: string) => void;
   onIssueDocument?: (studentId: string, docType?: string) => void;
   onGenerateDocument?: (studentId: string, docType: string) => void;
   onBatchImportStudents?: (
@@ -2251,6 +2251,7 @@ export const StudentList: React.FC<StudentListProps> = ({
                             <Edit2 className="h-4 w-4" />
                           </button>
 
+                          {onDeleteStudent && (
                           <button
                             onClick={async () => {
                               if (
@@ -2266,6 +2267,7 @@ export const StudentList: React.FC<StudentListProps> = ({
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
+                          )}
                         </div>
                       </td>
                     </tr>

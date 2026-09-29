@@ -45,7 +45,7 @@ interface ClassManagementProps {
   students: Student[];
   schoolUnits?: SchoolUnit[];
   onSaveClass: (cls: SchoolClass) => void;
-  onDeleteClass: (id: string) => void;
+  onDeleteClass?: (id: string) => void;
   onSaveSubject?: (subject: Subject) => void;
   onDeleteSubject?: (id: string) => void;
   onBatchImportClasses?: (classes: SchoolClass[]) => void;
@@ -623,6 +623,7 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
                     >
                       <Edit2 className="h-4 w-4" />
                     </button>
+                    {onDeleteClass && (
                     <button
                       title="Excluir turma"
                       aria-label={`Excluir turma ${cls.name}`}
@@ -635,6 +636,7 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
+                    )}
                   </div>
                 </div>
 

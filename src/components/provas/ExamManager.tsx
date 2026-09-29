@@ -52,7 +52,7 @@ interface ExamManagerProps {
   submissions: ExamSubmission[];
   settings: SchoolSettings;
   onSaveExam: (exam: Exam) => void;
-  onDeleteExam: (id: string) => void;
+  onDeleteExam?: (id: string) => void;
   onTakeExamAsStudent: (examId: string) => void;
   onViewReport: (examId: string) => void;
   initialSelectedQuestionIds?: string[];
@@ -493,6 +493,7 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
                       >
                         <Edit2 className="h-4 w-4" />
                       </button>
+                      {onDeleteExam && (
                       <button
                         onClick={async () => {
                           if (await confirmDialog(`Deseja excluir a prova "${exam.title}"?`)) {
@@ -504,6 +505,7 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
+                      )}
                     </div>
                   </div>
 

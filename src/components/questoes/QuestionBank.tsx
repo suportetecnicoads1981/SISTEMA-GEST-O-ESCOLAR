@@ -41,7 +41,7 @@ interface QuestionBankProps {
   questions: Question[];
   subjects: Subject[];
   onSaveQuestion: (question: Question) => void;
-  onDeleteQuestion: (id: string) => void;
+  onDeleteQuestion?: (id: string) => void;
   onBatchImport: (questions: Question[]) => void;
   onCreateExamWithQuestions?: (questionIds: string[]) => void;
   onBack?: () => void;
@@ -180,6 +180,7 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
         `Deseja realmente excluir as ${selectedQuestionIds.length} questões selecionadas do banco?`
       )
     ) {
+      if (!onDeleteQuestion) return;
       selectedQuestionIds.forEach((id) => onDeleteQuestion(id));
       setSelectedQuestionIds([]);
     }
@@ -558,6 +559,7 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
                     >
                       <Edit2 className="h-3.5 w-3.5" />
                     </button>
+                    {onDeleteQuestion && (
                     <button
                       onClick={async () => {
                         if (await confirmDialog(`Excluir questão ${q.code}?`)) {
@@ -569,6 +571,7 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
+                    )}
                   </div>
                 </div>
 

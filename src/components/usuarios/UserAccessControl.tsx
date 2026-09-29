@@ -55,6 +55,7 @@ import { confirmDialog, notify } from '../../utils/dialogs';
 import { ModuleReportButton, reportDate } from '../common/ModuleReportButton';
 
 import { moduleName } from '../../config/moduleNames';
+import { isMasterAccount } from '../../services/rbac/accessControl';
 interface UserAccessControlProps {
   users: UserAccount[];
   currentUser: UserAccount;
@@ -265,6 +266,17 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
 
   const photoInputRef = useRef<HTMLInputElement>(null);
 
+  // Cadastro de usuários, senhas, setores e permissões: somente o Administrador Master altera.
+  const canManageUsers = isMasterAccount(currentUser);
+  const requireMaster = (): boolean => {
+    if (canManageUsers) return true;
+    notify(
+      'Somente o Administrador Master pode incluir, alterar, desativar ou excluir usuários e mudar setores, senhas e permissões.',
+      'Acesso restrito'
+    );
+    return false;
+  };
+
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -290,6 +302,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
   };
 
   const handleOpenCreateModal = () => {
+    if (!requireMaster()) return;
     setEditingUser(null);
     setShowPassword(false);
     setFormData({
@@ -311,6 +324,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
   };
 
   const handleOpenEditModal = (user: UserAccount) => {
+    if (!requireMaster()) return;
     setEditingUser(user);
     setShowPassword(false);
     setFormData({
@@ -346,6 +360,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
   };
 
   const handleQuickChangeUserSector = async (user: UserAccount, newSector: UserSector) => {
+    if (!requireMaster()) return;
     if (user.isMaster && newSector !== 'MASTER') {
       if (!await confirmDialog('Deseja realmente remover o privilégio de Cadastro Mestre deste usuário?')) {
         return;
@@ -375,6 +390,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
 
   const handleSaveUser = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!requireMaster()) return;
     if (!formData.name.trim() || !formData.login.trim()) {
       notify('Preencha o Nome e o Login do usuário.');
       return;
@@ -453,7 +469,8 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
   };
 
   const handleToggleUserActive = (user: UserAccount) => {
-    if (user.isMaster) {
+    if (!requireMaster()) return;
+    if (isMasterAccount(user)) {
       notify('O Cadastro Mestre não pode ser desativado por motivos de segurança.');
       return;
     }
@@ -464,8 +481,9 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
   };
 
   const handleConfirmDeleteUser = () => {
+    if (!requireMaster()) return;
     if (!deleteCandidateUser) return;
-    if (deleteCandidateUser.isMaster) {
+    if (isMasterAccount(deleteCandidateUser)) {
       notify('O Cadastro Mestre não pode ser excluído.');
       setDeleteCandidateUser(null);
       return;
@@ -484,8 +502,9 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
   };
 
   const handleConfirmDeleteAllUsers = () => {
+    if (!requireMaster()) return;
     // Mantém a conta do Administrador Mestre ou a conta atualmente autenticada para garantir o acesso do operador
-    const masterAccount = users.find((u) => u.isMaster || u.id === currentUser.id) || currentUser;
+    const masterAccount = users.find((u) => isMasterAccount(u) || u.id === currentUser.id) || currentUser;
     const updated = [masterAccount];
     onUpdateUsers(updated);
     setShowDeleteAllModal(false);
@@ -498,6 +517,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
     action: keyof ModulePermission,
     value: boolean
   ) => {
+    if (!canManageUsers) return;
     setFormData((prev) => ({
       ...prev,
       permissions: {
@@ -579,6 +599,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
             <span>Gestão de Permissões (RBAC)</span>
           </button>
 
+          {canManageUsers && (<>
           <button
             onClick={handleOpenCreateModal}
             className="px-3 py-1.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
@@ -596,6 +617,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
             <Trash2 className="h-3.5 w-3.5" />
             <span>Excluir Todos os Usuários</span>
           </button>
+          </>)}
 
           <button
             onClick={() => setActiveMainTab('MATRIX')}
@@ -795,6 +817,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                 ]}
                 className="px-4 py-2 rounded-xl bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-xs sm:text-sm flex items-center gap-2 cursor-pointer"
               />
+              {canManageUsers ? (
               <button
                 onClick={handleOpenCreateModal}
                 className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
@@ -802,6 +825,11 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                 <Plus className="h-4 w-4" />
                 <span>Adicionar Novo Usuário</span>
               </button>
+              ) : (
+                <span className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-500 inline-flex items-center gap-1.5">
+                  <Lock className="h-3.5 w-3.5" /> Somente consulta • alterações só pelo Administrador Master
+                </span>
+              )}
             </div>
           </div>
 
@@ -896,10 +924,11 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                             <div className="space-y-1.5">
                               <select
                                 value={user.sector}
+                                disabled={!canManageUsers}
                                 onChange={(e) =>
                                   handleQuickChangeUserSector(user, e.target.value as UserSector)
                                 }
-                                className={`text-xs font-bold px-2.5 py-1.5 rounded-xl border cursor-pointer transition-all shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:outline-none ${sectorInfo.color}`}
+                                className={`text-xs font-bold px-2.5 py-1.5 rounded-xl border cursor-pointer disabled:cursor-not-allowed disabled:opacity-80 transition-all shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:outline-none ${sectorInfo.color}`}
                                 title="Selecione para alterar o nível de acesso deste usuário"
                               >
                                 {(Object.keys(SECTOR_LABELS) as UserSector[]).map((sec) => (
@@ -952,6 +981,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                           <td className="py-3.5 px-4">
                             <button
                               onClick={() => handleToggleUserActive(user)}
+                              disabled={!canManageUsers}
                               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold cursor-pointer transition-colors ${
                                 user.active
                                   ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
@@ -971,6 +1001,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                           {/* Actions: Editar, Excluir, Simular */}
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
+                              {canManageUsers && (<>
                               <button
                                 onClick={() => onSwitchCurrentUser(user)}
                                 title="Alternar sessão para este usuário"
@@ -989,7 +1020,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                                 <span>Editar</span>
                               </button>
 
-                              {!user.isMaster && (
+                              {!isMasterAccount(user) && (
                                 <button
                                   onClick={() => setDeleteCandidateUser(user)}
                                   title="Excluir usuário permanentemente"
@@ -999,6 +1030,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                                   <span>Excluir</span>
                                 </button>
                               )}
+                              </>)}
                             </div>
                           </td>
                         </tr>
@@ -1036,13 +1068,13 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                 Consulte o escopo institucional de cada perfil na plataforma educacional.
               </p>
             </div>
-            <button
+            {canManageUsers && <button
               onClick={handleOpenCreateModal}
               className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-2 shadow-xs cursor-pointer"
             >
               <Plus className="h-4 w-4" />
               <span>Adicionar Usuário com Perfil</span>
-            </button>
+            </button>}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

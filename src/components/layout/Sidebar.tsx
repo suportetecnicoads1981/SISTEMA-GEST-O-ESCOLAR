@@ -77,6 +77,8 @@ interface SidebarProps {
   onToggleCollapse?: () => void;
   /** Mostra o Plano de Desenvolvimento (somente para o desenvolvedor). */
   showDevBacklog?: boolean;
+  /** Privilégios do operador: módulos sem permissão de leitura não aparecem no menu. */
+  canOpenTab?: (tabId: string) => boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -91,6 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed = false,
   onToggleCollapse,
   showDevBacklog = false,
+  canOpenTab,
 }) => {
   const current = activeTab || currentTab || 'MAIN_DASHBOARD';
   const [isAdminTIExpanded, setIsAdminTIExpanded] = useState(true);
@@ -418,7 +421,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const filteredSections = menuSections
     .map((rawSection) => {
       // Módulos experimentais ficam fora do menu por padrão (ver src/config/features.ts).
-      const section = { ...rawSection, items: rawSection.items.filter((item) => isTabAvailable(item.id)) };
+      const section = { ...rawSection, items: rawSection.items.filter((item) => isTabAvailable(item.id) && (!canOpenTab || canOpenTab(item.id === 'QUESTIONS' ? 'QUESTION_BANK' : item.id))) };
       if (section.items.length === 0) return null;
       if (!searchFilter.trim()) return section;
       const q = searchFilter.toLowerCase().trim();
