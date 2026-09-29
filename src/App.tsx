@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';
 import {
   Student,
   SchoolClass,
@@ -119,6 +119,8 @@ import { runCloudSyncNow } from './services/offline/cloudAutoSync';
 import { normalizeSchoolLinks } from './utils/schoolDataNormalizer';
 import { isProvisionalRa, resolveProvisionalRas } from './services/raService';
 import { clearLocalServerSession } from './services/offline/localServerSync';
+import { computeDropoutRisk, describeDropoutCriterion } from './utils/dropoutRiskEngine';
+import { DropoutRiskAlertModal } from './components/common/DropoutRiskAlertModal';
 import { can as canAccess, canOpenTab, deniedTabMessage, describeDenials, enforceDataPermissions } from './services/rbac/accessControl';
 
 export default function App() {
@@ -294,6 +296,82 @@ export default function App() {
     ? (data.userAccounts || []).find((u) => u.id === currentUser?.id) || currentUser
     : null;
   accessActorRef.current = accessActor;
+
+  // ---- Risco de evasão por faltas sem justificativa (gatilho configurável no Censo) ----
+  // Usuário lotado numa escola vê só os alunos dela; o Master e a rede veem todos.
+  const riskScopeUnit =
+    accessActor && !(accessActor as any).isMaster && (accessActor as any).sector !== 'MASTER'
+      ? (accessActor as any).schoolUnitId || undefined
+      : undefined;
+  const dropoutRisk = useMemo(
+    () =>
+      computeDropoutRisk(data.students || [], data.attendanceSheets || [], (data as any).dropoutAlertConfig, {
+        classes: data.classes || [],
+        schoolUnitId: riskScopeUnit,
+      }),
+    [data.students, data.attendanceSheets, (data as any).dropoutAlertConfig, data.classes, riskScopeUnit]
+  );
+  const canSeeDropoutRisk = isAuthenticated && canOpenTab(accessActor, 'DROPOUT_CENSUS');
+  const riskAckKey = `sucessoedu_risco_evasao_ciente_${accessActor?.id || 'anon'}`;
+  const [riskAck, setRiskAck] = useState<Record<string, number>>({});
+  const [riskPopupDismissed, setRiskPopupDismissed] = useState(false);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(riskAckKey);
+      setRiskAck(raw ? JSON.parse(raw) || {} : {});
+    } catch {
+      setRiskAck({});
+    }
+    setRiskPopupDismissed(false);
+  }, [riskAckKey]);
+  // Alunos no limite que este usuário ainda não viu (ou que somaram faltas depois do "Ciente").
+  const pendingRiskStudents = dropoutRisk.atLimit.filter((r) => (riskAck[r.studentId] ?? -1) < r.absences);
+  // Um aluno novo no limite reabre a janela, mesmo que ela tenha sido fechada nesta sessão.
+  const pendingRiskKey = pendingRiskStudents.map((r) => `${r.studentId}:${r.absences}`).join('|');
+  useEffect(() => {
+    if (pendingRiskKey) setRiskPopupDismissed(false);
+  }, [pendingRiskKey]);
+  const acknowledgeRisk = () => {
+    const next = { ...riskAck };
+    dropoutRisk.atLimit.forEach((r) => {
+      next[r.studentId] = r.absences;
+    });
+    setRiskAck(next);
+    setRiskPopupDismissed(true);
+    try {
+      localStorage.setItem(riskAckKey, JSON.stringify(next));
+    } catch {
+      /* sem armazenamento: a janela volta na próxima abertura */
+    }
+  };
+  // Central de Notificações: um aviso por aluno que atinge o limite (mesmo código em todas as estações).
+  const riskNotifKey = dropoutRisk.atLimit.map((r) => r.studentId).join('|');
+  useEffect(() => {
+    if (!isAuthenticated || !riskNotifKey) return;
+    setDataRaw((prev: any) => {
+      const list: any[] = Array.isArray(prev?.notifications) ? prev.notifications : [];
+      const have = new Set(list.filter((n) => n?.metadata?.kind === 'DROPOUT_RISK').map((n) => n.id));
+      const fresh = dropoutRisk.atLimit
+        .filter((r) => !have.has(`notif-risco-evasao-${r.studentId}`))
+        .map((r) => ({
+          id: `notif-risco-evasao-${r.studentId}`,
+          title: `Risco de evasão: ${r.studentName}`,
+          message: `${r.studentName}${r.className ? ` (${r.className})` : ''} atingiu ${r.absences} ${
+            dropoutRisk.config.countMode === 'AULAS' ? 'faltas' : 'dias com falta'
+          } sem justificativa. Critério: ${describeDropoutCriterion(dropoutRisk.config)}. Procure a família e abra a busca ativa.`,
+          type: 'DROPOUT_RISK',
+          priority: 'URGENT',
+          targetRoles: ['ADMIN', 'TEACHER'],
+          actionTab: 'DROPOUT_CENSUS',
+          actionLabel: 'Abrir Censo & Busca Ativa',
+          createdAt: new Date().toISOString(),
+          read: false,
+          metadata: { kind: 'DROPOUT_RISK', studentId: r.studentId, studentName: r.studentName, absences: r.absences, schoolUnitId: r.schoolUnitId },
+        }));
+      return fresh.length ? { ...prev, notifications: [...fresh, ...list] } : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [riskNotifKey, isAuthenticated]);
   // Somente o Administrador Master autenticado pode operar como outro usuário.
   const canSwitchOperator = Boolean(authenticatedAccount?.isMaster);
 
@@ -1892,6 +1970,7 @@ export default function App() {
                 userAccounts={data.userAccounts || []}
                 currentUser={currentUser}
                 notifications={data.notifications || []}
+                dropoutRisk={canSeeDropoutRisk ? dropoutRisk : undefined}
                 onNavigate={handleNavigate}
                 onLogout={handleLogout}
                 onOpenImportModal={() => setIsUniversalImportModalOpen(true)}
@@ -1966,6 +2045,14 @@ export default function App() {
                 onUpdateStudent={handleSaveStudent}
                 onBack={handleGoBack}
                 onNavigate={handleNavigate}
+                dropoutRisk={dropoutRisk}
+                canConfigureDropoutRisk={canAccess(accessActor, 'secretaria', 'canEdit')}
+                onSaveDropoutAlertConfig={(cfg) =>
+                  setData((prev: any) => ({
+                    ...prev,
+                    dropoutAlertConfig: { ...cfg, updatedAt: new Date().toISOString(), updatedBy: currentUser?.name || '' },
+                  }))
+                }
               />
             )}
 
@@ -2466,6 +2553,20 @@ export default function App() {
           }}
         />
       )}
+
+      {/* AVISO NA TELA: ALUNOS QUE ATINGIRAM O LIMITE DE FALTAS SEM JUSTIFICATIVA */}
+      <DropoutRiskAlertModal
+        isOpen={canSeeDropoutRisk && dropoutRisk.config.showPopup && !riskPopupDismissed && pendingRiskStudents.length > 0}
+        students={pendingRiskStudents}
+        criterion={describeDropoutCriterion(dropoutRisk.config)}
+        unitLabel={dropoutRisk.config.countMode === 'AULAS' ? 'faltas' : 'dias'}
+        onAcknowledge={acknowledgeRisk}
+        onOpenCensus={() => {
+          acknowledgeRisk();
+          handleNavigate('DROPOUT_CENSUS');
+          setTimeout(() => document.getElementById('painel-risco-evasao')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400);
+        }}
+      />
 
       {/* CANAL DIRETO COM O DESENVOLVEDOR (FEEDBACK & SUGESTÕES WHATSAPP) */}
       <FeedbackSuggestionsModal

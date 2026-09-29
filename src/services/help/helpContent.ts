@@ -248,6 +248,7 @@ export const HELP_MODULES: HelpModule[] = [
     summary: 'Tela inicial com os números principais da escola e os atalhos para cada módulo.',
     faq: [
       { q: 'Para que serve esta tela?', a: 'Mostra um resumo (alunos, turmas, avaliações, avisos) e botões de acesso rápido aos módulos. Clique em um cartão para abrir o módulo correspondente.' },
+      { q: 'O que é o cartão "Risco de evasão por faltas"?', a: 'Mostra quantos alunos atingiram o limite de faltas sem justificativa (vermelho) e quantos estão perto dele (amarelo), com o critério em uso. Clique no cartão para abrir o painel de risco no Censo de Evasão & Busca Ativa.' },
       { q: 'Os números estão desatualizados.', steps: ['Clique em "Sincronizar agora" no selo do rodapé.', 'Aperte F5 para recarregar a tela.'] },
     ],
   },
@@ -400,6 +401,31 @@ export const HELP_MODULES: HelpModule[] = [
     where: `Menu > ${moduleGroup('DROPOUT_CENSUS')} > ${moduleName('DROPOUT_CENSUS')} (Alt+C)`,
     summary: 'Acompanhamento de alunos evadidos ou em risco, visitas, resgate e exportação para o Educacenso.',
     faq: [
+      {
+        q: 'Como funciona o alerta de risco de evasão por faltas?',
+        a: 'O sistema conta as faltas SEM justificativa de cada aluno lançadas no Diário & Frequência (falta justificada não conta). Quando o aluno atinge o limite definido, ele entra no painel "Risco de evasão por faltas sem justificativa" deste módulo, aparece no cartão de risco do Início, gera um aviso na Central de Notificações e abre uma janela de atenção na tela de quem acompanha o Censo. Alunos transferidos, concluintes ou já evadidos não entram na conta.',
+        tip: 'Quem está lotado numa escola vê só os alunos dela; a Secretaria e o Master veem a rede toda.',
+      },
+      {
+        q: 'Como defino o limite de faltas do alerta?',
+        steps: [
+          'Abra este módulo e clique em "Critério do alerta", no painel de risco.',
+          'Informe o limite de faltas sem justificativa (ex.: 10).',
+          'Escolha como contar: dias com falta (várias aulas no mesmo dia contam 1) ou cada aula.',
+          'Escolha o período: ano letivo inteiro ou só os últimos dias (ex.: 30).',
+          'Ajuste a partir de qual percentual do limite o aluno aparece "em atenção" (padrão: 80%).',
+          'Clique em "Salvar critério". Vale para toda a rede.',
+        ],
+        tip: 'Só quem pode alterar em Secretaria & Alunos muda o critério. O padrão é 10 dias com falta sem justificativa no ano letivo.',
+      },
+      {
+        q: 'O que faço quando aparece a janela "Atenção: risco de evasão"?',
+        a: 'Clique em "Ver alunos e abrir busca ativa": o sistema abre este módulo no painel de risco. Em cada aluno, "Abrir busca ativa" abre a ficha para registrar o contato com a família. "Ciente" fecha a janela; ela volta a aparecer se outro aluno atingir o limite ou se um aluno já avisado somar novas faltas.',
+      },
+      {
+        q: 'Um aluno está no alerta, mas as faltas dele foram justificadas.',
+        a: 'Corrija a frequência no Diário & Frequência, marcando "Falta justificada" com o motivo. O alerta recalcula na hora e o aluno sai da lista se ficar abaixo do limite.',
+      },
       {
         q: 'Como vejo os gráficos de evasão de uma escola só?',
         a: 'Acima dos gráficos há a barra "Filtrar": escolha a escola, a etapa/série e o turno. Os gráficos e indicadores passam a mostrar só aquele recorte, e ao lado aparece quantos registros entraram. "Limpar" volta para a rede toda. O gráfico "por turma" mostra só as turmas que têm evadidos, da maior para a menor (até 25), com o nome da escola quando há mais de uma.',

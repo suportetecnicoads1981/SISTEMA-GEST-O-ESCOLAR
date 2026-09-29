@@ -50,6 +50,7 @@ import { CadastralPendingCensusDashbox } from './CadastralPendingCensusDashbox';
 import { SystemUpdateStatusDashbox } from './SystemUpdateStatusDashbox';
 
 import { moduleName } from '../../config/moduleNames';
+import { DropoutRiskResult, describeDropoutCriterion } from '../../utils/dropoutRiskEngine';
 interface MainOverviewDashboardProps {
   students: Student[];
   classes: SchoolClass[];
@@ -67,6 +68,8 @@ interface MainOverviewDashboardProps {
   onOpenNewExamModal?: () => void;
   onOpenImportModal?: () => void;
   onEditStudent?: (student: Student) => void;
+  /** Alunos que atingiram (ou estão perto) do limite de faltas sem justificativa. */
+  dropoutRisk?: DropoutRiskResult;
 }
 
 export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
@@ -80,6 +83,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
   userAccounts = [],
   currentUser,
   notifications = [],
+  dropoutRisk,
   onNavigate,
   onLogout,
   onOpenNewStudentModal,
@@ -287,6 +291,59 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* RISCO DE EVASÃO: alunos no limite de faltas sem justificativa */}
+      {dropoutRisk?.config.enabled && (
+        <button
+          type="button"
+          id="dashbox-risco-evasao"
+          onClick={() => {
+            onNavigate('DROPOUT_CENSUS');
+            setTimeout(() => document.getElementById('painel-risco-evasao')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400);
+          }}
+          className={`w-full text-left rounded-2xl border-2 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-shadow hover:shadow-md ${
+            dropoutRisk.atLimit.length
+              ? 'border-rose-400 bg-rose-50'
+              : dropoutRisk.nearLimit.length
+              ? 'border-amber-300 bg-amber-50'
+              : 'border-emerald-200 bg-emerald-50'
+          }`}
+        >
+          <div className="flex items-start gap-3 min-w-0">
+            <div
+              className={`h-11 w-11 rounded-xl flex items-center justify-center shrink-0 text-white ${
+                dropoutRisk.atLimit.length ? 'bg-rose-600 animate-pulse' : dropoutRisk.nearLimit.length ? 'bg-amber-500' : 'bg-emerald-600'
+              }`}
+            >
+              <UserX className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-black uppercase tracking-wide text-slate-900">Risco de evasão por faltas</div>
+              <div className="text-xs text-slate-700 mt-0.5">
+                {dropoutRisk.atLimit.length
+                  ? `${dropoutRisk.atLimit.length} aluno(s) atingiram o limite: ${dropoutRisk.atLimit
+                      .slice(0, 3)
+                      .map((r) => r.studentName)
+                      .join(', ')}${dropoutRisk.atLimit.length > 3 ? '…' : ''}`
+                  : dropoutRisk.nearLimit.length
+                  ? `Nenhum aluno no limite; ${dropoutRisk.nearLimit.length} em atenção.`
+                  : 'Nenhum aluno perto do limite de faltas sem justificativa.'}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Critério: {describeDropoutCriterion(dropoutRisk.config)}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="text-center px-3 py-1 rounded-xl bg-rose-600 text-white">
+              <div className="text-lg font-black leading-none">{dropoutRisk.atLimit.length}</div>
+              <div className="text-[9px] font-bold uppercase">no limite</div>
+            </div>
+            <div className="text-center px-3 py-1 rounded-xl bg-amber-100 text-amber-900">
+              <div className="text-lg font-black leading-none">{dropoutRisk.nearLimit.length}</div>
+              <div className="text-[9px] font-bold uppercase">em atenção</div>
+            </div>
+          </div>
+        </button>
+      )}
 
       {/* ========================================================= */}
       {/* SEÇÃO 1: METRIC CARDS - UNIDADES ESCOLARES & SITUAÇÃO DOS ALUNOS */}

@@ -359,7 +359,7 @@ export const SYNC_TABLES: SyncTable[] = [
   ...(['teacherLessonPlans', 'teacherStudentNotes', 'stateRegulations', 'whatsappTemplates'] as const).map(
     (key): SyncTable => ({ stream: `${APP_TABLE}:${key}`, table: APP_TABLE, key, kind: 'appList' })
   ),
-  ...(['municipalSecretary', 'whatsappConfig', 'rolePreferences', 'activeStateRegulationCode', 'developerContact'] as const).map(
+  ...(['municipalSecretary', 'whatsappConfig', 'rolePreferences', 'activeStateRegulationCode', 'developerContact', 'dropoutAlertConfig'] as const).map(
     (key): SyncTable => ({ stream: `${APP_TABLE}:${SINGLETON_COLLECTION}:${key}`, table: APP_TABLE, key, kind: 'appSingle' })
   ),
 ];

@@ -39,7 +39,9 @@ import {
   WhatsAppTemplate,
   SystemUpdatePackage,
   SecurityAuditLog,
+  DropoutAlertConfig,
 } from '../types';
+import { DEFAULT_DROPOUT_ALERT_CONFIG } from '../utils/dropoutRiskEngine';
 import { PENDING_DELETES_KEY } from '../services/datasync/deletionTracker';
 import { enqueueLocalChanges, enqueueFullReplace, getLocalServerInfo } from '../services/offline/localServerSync';
 import { loteDeletionsBetween } from '../services/offline/batchPacket';
@@ -323,6 +325,8 @@ export interface AppStateData {
   systemUpdates: SystemUpdatePackage[];
   systemUpdatePackages?: SystemUpdatePackage[];
   auditLogs: SecurityAuditLog[];
+  /** Critério do alerta de risco de evasão (limite de faltas sem justificativa). */
+  dropoutAlertConfig?: DropoutAlertConfig;
 }
 
 export interface CleanInstallationOptions {
@@ -615,6 +619,7 @@ export function getStoredData(): AppStateData {
       whatsappLogs: hasArr(parsed.whatsappLogs) ? parsed.whatsappLogs : [],
       systemUpdates: parsed.systemUpdates || DEFAULT_SYSTEM_UPDATES,
       auditLogs: hasArr(parsed.auditLogs) ? parsed.auditLogs : [],
+      dropoutAlertConfig: { ...DEFAULT_DROPOUT_ALERT_CONFIG, ...(parsed.dropoutAlertConfig || {}) },
     };
     return loadedState;
   } catch {

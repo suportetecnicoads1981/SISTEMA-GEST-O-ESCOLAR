@@ -147,6 +147,7 @@ export const ACCESS_RULES: Record<string, Rule> = {
   },
   whatsappTemplates: { keys: ['comunicacao'], label: 'modelos de WhatsApp' },
   whatsappConfig: { keys: ['comunicacao'], label: 'configuração do WhatsApp' },
+  dropoutAlertConfig: { keys: ['secretaria'], label: 'critério do alerta de evasão' },
   settings: {
     keys: ['configuracoes'],
     label: 'configurações do sistema',

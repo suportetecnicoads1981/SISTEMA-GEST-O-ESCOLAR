@@ -75,6 +75,8 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({
         return <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />;
       case 'DIRECT_MESSAGE':
         return <MessageSquare className="h-3.5 w-3.5 text-blue-600" />;
+      case 'DROPOUT_RISK':
+        return <AlertTriangle className="h-3.5 w-3.5 text-rose-600" />;
       default:
         return <Bell className="h-3.5 w-3.5 text-slate-600" />;
     }

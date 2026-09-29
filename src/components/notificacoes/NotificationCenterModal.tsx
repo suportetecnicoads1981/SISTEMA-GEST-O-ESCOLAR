@@ -233,6 +233,12 @@ const NotificationCenterModalContent: React.FC<NotificationCenterModalProps> = (
           bg: 'bg-amber-50 text-amber-700 border-amber-200',
           icon: AlertTriangle,
         };
+      case 'DROPOUT_RISK':
+        return {
+          label: 'Risco de Evasão',
+          bg: 'bg-rose-100 text-rose-800 border-rose-300',
+          icon: AlertTriangle,
+        };
       case 'DIRECT_MESSAGE':
         return {
           label: 'Mensagem Direta',

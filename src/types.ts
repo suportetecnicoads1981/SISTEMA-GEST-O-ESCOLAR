@@ -92,6 +92,28 @@ export interface ActiveSearchContactAttempt {
   successful: boolean;
 }
 
+/**
+ * Gatilho de alerta de risco de evasão (Censo de Evasão & Busca Ativa).
+ * Quando o aluno atinge o limite de faltas SEM justificativa, o sistema avisa no painel de
+ * risco, no Início, na Central de Notificações e numa janela na tela do usuário.
+ */
+export interface DropoutAlertConfig {
+  enabled: boolean;
+  /** Limite de faltas sem justificativa que dispara o alerta. */
+  maxUnjustifiedAbsences: number;
+  /** DIAS: conta dias com falta (várias aulas no mesmo dia = 1). AULAS: conta cada aula. */
+  countMode: 'DIAS' | 'AULAS';
+  /** ANO_LETIVO: todas as faltas do ano. ULTIMOS_DIAS: só as dos últimos `windowDays` dias. */
+  period: 'ANO_LETIVO' | 'ULTIMOS_DIAS';
+  windowDays: number;
+  /** Percentual do limite a partir do qual o aluno aparece como "em atenção" (antes do limite). */
+  warnAtPercent: number;
+  /** Mostra a janela de aviso ao abrir o sistema. */
+  showPopup: boolean;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
 export interface DropoutIntervention {
   searchStatus: ActiveSearchStatus;
   responsibleAgent: string;
@@ -705,7 +727,8 @@ export type NotificationType =
   | 'DEADLINE_ALERT'        // Prazos de entrega de provas e documentos
   | 'EXAM_RESULT'           // Resultados e notas de provas corrigidas
   | 'IMPORTANT_ANNOUNCEMENT' // Comunicados importantes da diretoria/coordenação
-  | 'DIRECT_MESSAGE';       // Mensagem direta de professores ou secretaria
+  | 'DIRECT_MESSAGE'        // Mensagem direta de professores ou secretaria
+  | 'DROPOUT_RISK';         // Aluno atingiu o limite de faltas sem justificativa (risco de evasão)
 
 export type NotificationPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
 

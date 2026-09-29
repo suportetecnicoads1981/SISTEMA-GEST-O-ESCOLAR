@@ -52,6 +52,9 @@ import { ModuleReportButton } from '../common/ModuleReportButton';
 import { ChartScopeBar, useChartScope } from '../common/ChartScopeBar';
 
 import { moduleName } from '../../config/moduleNames';
+import { DropoutRiskPanel } from './DropoutRiskPanel';
+import type { DropoutRiskResult } from '../../utils/dropoutRiskEngine';
+import type { DropoutAlertConfig } from '../../types';
 interface DropoutCensusReportProps {
   students: Student[];
   classes: SchoolClass[];
@@ -59,6 +62,10 @@ interface DropoutCensusReportProps {
   onUpdateStudent: (student: Student) => void;
   onBack?: () => void;
   onNavigate?: (tab: string) => void;
+  /** Alunos em risco de evasão por faltas sem justificativa (gatilho configurável). */
+  dropoutRisk?: DropoutRiskResult;
+  canConfigureDropoutRisk?: boolean;
+  onSaveDropoutAlertConfig?: (config: DropoutAlertConfig) => void;
 }
 
 export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
@@ -68,6 +75,9 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
   onUpdateStudent,
   onBack,
   onNavigate,
+  dropoutRisk,
+  canConfigureDropoutRisk = false,
+  onSaveDropoutAlertConfig,
 }) => {
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -800,6 +810,19 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
           </div>
         </div>
       </div>
+
+      {/* RISCO DE EVASÃO POR FALTAS SEM JUSTIFICATIVA (gatilho configurável) */}
+      {dropoutRisk && (
+        <DropoutRiskPanel
+          result={dropoutRisk}
+          canConfigure={canConfigureDropoutRisk}
+          onSaveConfig={onSaveDropoutAlertConfig}
+          onOpenStudent={(id) => {
+            const st = students.find((x) => x.id === id);
+            if (st) setSelectedStudentForIntervention(st);
+          }}
+        />
+      )}
 
       {/* ========================================================================= */}
       {/* GRÁFICOS VISUAIS E ANALÍTICOS CUSTOMIZÁVEIS DO CENSO COM ENQUADRAMENTO */}
