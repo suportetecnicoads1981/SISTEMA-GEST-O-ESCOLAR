@@ -57,10 +57,10 @@ export function downloadLote(packet: LotePacket): string {
 }
 
 /** Importa o lote na Sede (mescla) e grava. Com Servidor da Sede, vai para o banco dele. */
-export function importLote(packet: LotePacket, operatorName: string): LoteMergeReport {
+export function importLote(packet: LotePacket, operatorName: string, options?: { viaCloud?: boolean }): LoteMergeReport {
   const current = getStoredData() as any;
   const { next, report } = mergeLotePacket(current, packet, operatorName);
-  saveStoredData(next as any);
+  saveStoredData(next as any, options?.viaCloud ? { opsOrigin: 'cloud' } : undefined);
   window.dispatchEvent(new CustomEvent('sucessoedu_db_changed', { detail: next }));
   return report;
 }

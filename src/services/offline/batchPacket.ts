@@ -474,7 +474,13 @@ export function mergeLotePacket(state: AnyState, packet: LotePacket, operatorNam
       submissions: (report.added.submissions || 0) + (report.updated.submissions || 0),
     },
     status: report.conflicts.length ? 'AVISO' : 'SUCESSO',
-    notes: `Lote ${packet.packetId} (${packet.createdAt}): ${sum(report.added)} novos, ${sum(report.updated)} atualizados, ${report.deleted} exclusões, ${report.conflicts.length} conflitos.`,
+    // Procedência do lote: quem gerou, em qual servidor e quando; quem importou.
+    generatedBy: packet.origin?.operatorName || 'Não informado',
+    originServer: packet.origin?.serverName || packet.origin?.role || 'Não informado',
+    notes:
+      `Lote ${packet.packetId} gerado por ${packet.origin?.operatorName || 'Não informado'}` +
+      ` no ${packet.origin?.serverName || packet.origin?.role || 'servidor não informado'} em ${packet.createdAt};` +
+      ` importado por ${operatorName || 'Não informado'}: ${sum(report.added)} novos, ${sum(report.updated)} atualizados, ${report.deleted} exclusões, ${report.conflicts.length} conflitos.`,
   };
   next.syncLogs = [log, ...list(next, 'syncLogs')].slice(0, 500);
   return { next, report };

@@ -7,6 +7,7 @@
 #    apagam o trabalho uma da outra (o sistema reaplica as mudancas e grava de novo).
 #  - Copias de seguranca automaticas em data\historico (ultimas 60).
 #  - So atende computadores da rede local (IPs privados).
+#  - Confere o usuario e as permissoes de cada gravacao (sessao aberta no login).
 #
 #  Funciona no Windows PowerShell 5.1 (ja vem no Windows 10/11). Nao precisa de internet.
 # =============================================================================
@@ -85,7 +86,7 @@ if ($script:DataText) {
     [System.IO.File]::WriteAllText($MetaFile, ([string]$script:Version) + '|' + $script:UpdatedAt, $Utf8)
 }
 
-function Save-Database([string]$text) {
+function Save-Database([string]$text, [bool]$keepObject = $false) {
     # Copia de seguranca da versao anterior (no maximo uma a cada 30 minutos).
     if (Test-Path $DbFile) {
         $last = Get-ChildItem -Path $HistDir -Filter 'banco_*.json' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
@@ -102,6 +103,8 @@ function Save-Database([string]$text) {
     $script:UpdatedAt = (Get-Date).ToUniversalTime().ToString('o')
     [System.IO.File]::WriteAllText($MetaFile, ([string]$script:Version) + '|' + $script:UpdatedAt, $Utf8)
     $script:DataText = $text
+    # Gravacao do banco inteiro: a copia em memoria e relida na proxima conferencia.
+    if (-not $keepObject) { $script:DbObj = $null }
 }
 
 # ---------------------------------------------------------------- http
@@ -207,6 +210,486 @@ function Get-StoreJson {
     $data = 'null'
     if ($script:DataText) { $data = $script:DataText }
     return '{"version":' + $script:Version + ',"updatedAt":' + (ConvertTo-JsonString $script:UpdatedAt) + ',"data":' + $data + '}'
+}
+
+# ---------------------------------------------------------------- privilegios dos usuarios
+# O servidor confere QUEM esta gravando e O QUE essa pessoa pode fazer, antes de gravar.
+#  - Cada usuario abre uma sessao no login (/api/local/login): o servidor confere a senha
+#    no banco dele e devolve um codigo de sessao assinado (vale 12 horas).
+#  - Cada gravacao (/api/local/ops) chega como lista de operacoes (incluir, alterar, excluir).
+#    O servidor compara com o banco e recusa o que o usuario nao tem permissao de fazer,
+#    mesmo que o pedido venha de fora do sistema.
+#  - Usuarios, senhas, setores, permissoes e dados do desenvolvedor: so o Master altera.
+#  - Tudo fica registrado no servidor.log (quem gravou, de qual estacao, o que foi recusado).
+#  As regras abaixo sao as mesmas do sistema (src/services/rbac/accessControl.ts).
+$SessionSecretFile = Join-Path $DataDir 'sessoes.chave'
+$SessionHours = 12
+$script:JsonSer = $null
+try {
+    Add-Type -AssemblyName System.Web.Extensions -ErrorAction Stop
+    $script:JsonSer = New-Object System.Web.Script.Serialization.JavaScriptSerializer
+    $script:JsonSer.MaxJsonLength = [int]::MaxValue
+    $script:JsonSer.RecursionLimit = 1000
+} catch { $script:JsonSer = $null }
+
+# Mesmo formato do JavaScriptSerializer (Dictionary[string,object] e object[]); usado nos testes
+# automaticos, que rodam fora do Windows.
+function ConvertTo-GenericShape($v) {
+    if ($v -is [System.Collections.IDictionary]) {
+        $d = New-Object 'System.Collections.Generic.Dictionary[string,object]'
+        foreach ($k in @($v.Keys)) { $d[[string]$k] = ConvertTo-GenericShape $v[$k] }
+        return ,$d
+    }
+    if ($null -ne $v -and -not ($v -is [string]) -and ($v -is [System.Collections.IEnumerable])) {
+        $out = New-Object 'object[]' (@($v).Count)
+        $i = 0
+        foreach ($item in $v) { $out[$i] = ConvertTo-GenericShape $item; $i++ }
+        return ,$out
+    }
+    return $v
+}
+function ConvertFrom-JsonText([string]$text) {
+    if ($script:JsonSer) { return ,($script:JsonSer.DeserializeObject($text)) }
+    $parsed = ConvertFrom-Json -InputObject $text -AsHashtable -Depth 200
+    if ($env:SUCESSOEDU_TEST_GENERIC -eq '1') { return ,(ConvertTo-GenericShape $parsed) }
+    return ,$parsed
+}
+function ConvertTo-JsonText($value) {
+    if ($script:JsonSer) { return $script:JsonSer.Serialize($value) }
+    return (ConvertTo-Json -InputObject $value -Depth 100 -Compress)
+}
+
+$AccessRulesJson = @'
+{"students":{"keys":["secretaria"],"label":"alunos"},"academicHistories":{"keys":["secretaria","documentos"],"label":"hist\u00f3ricos escolares"},"classes":{"keys":["turmas"],"label":"turmas"},"subjects":{"keys":["turmas"],"label":"disciplinas"},"courses":{"keys":["turmas"],"label":"cursos"},"schoolUnits":{"keys":["gestaoMunicipal"],"label":"escolas","ignore":["totalStudents","totalClasses","totalTeachers","syncStatus","lastSync"]},"municipalSecretary":{"keys":["gestaoMunicipal"],"label":"cadastro da SEMED"},"questions":{"keys":["questoes"],"label":"quest\u00f5es"},"bnccSkills":{"keys":["questoes"],"label":"habilidades BNCC"},"exams":{"keys":["provas"],"label":"provas"},"submissions":{"keys":["provas"],"label":"respostas de provas","createNeedsRead":true},"bnccAssessments":{"keys":["relatorios","portalProfessor","diarioClasse"],"label":"lan\u00e7amentos de habilidades BNCC"},"attendanceSheets":{"keys":["diarioClasse","portalProfessor"],"label":"frequ\u00eancia"},"lessonRegistries":{"keys":["diarioClasse","portalProfessor"],"label":"registros de aula"},"classGradeSheets":{"keys":["diarioClasse","portalProfessor"],"label":"notas"},"teacherLessonPlans":{"keys":["portalProfessor","diarioClasse"],"label":"planos de aula"},"teacherStudentNotes":{"keys":["portalProfessor","diarioClasse"],"label":"anota\u00e7\u00f5es do professor"},"communications":{"keys":["comunicacao"],"label":"comunicados","ignore":["readBy","reads","readCount","readReceipts","confirmedBy","views","viewCount","acknowledgedBy"]},"whatsappTemplates":{"keys":["comunicacao"],"label":"modelos de WhatsApp"},"whatsappConfig":{"keys":["comunicacao"],"label":"configura\u00e7\u00e3o do WhatsApp"},"settings":{"keys":["configuracoes"],"label":"configura\u00e7\u00f5es do sistema","ignore":["systemVersion","logoUrl","managementLogoUrl","lastBackupAt","lastBackupDate","lastSync","lastSyncAt","lastUpdateCheck"]},"userAccounts":{"keys":"MASTER","label":"usu\u00e1rios e permiss\u00f5es","ignore":["password","lastLogin","lastLoginAt","lastAccess","lastActivity","lastSeen","loginAttempts","mustChangePassword"]},"developerContact":{"keys":"MASTER","label":"dados do desenvolvedor"}}
+'@
+$SectorDefaultsJson = @'
+{"MASTER":{"dashboard":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"portalProfessor":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"diarioClasse":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"secretaria":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"turmas":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"documentos":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"comunicacao":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"questoes":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"provas":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"relatorios":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"gestaoMunicipal":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"usuarios":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"configuracoes":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true}},"DIRETORIA":{"dashboard":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"portalProfessor":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"diarioClasse":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"secretaria":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"turmas":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"documentos":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"comunicacao":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"questoes":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"provas":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"relatorios":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"gestaoMunicipal":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"usuarios":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"configuracoes":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true}},"COORDENACAO":{"dashboard":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"portalProfessor":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"diarioClasse":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"secretaria":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"turmas":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"documentos":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"comunicacao":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"questoes":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"provas":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"relatorios":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"gestaoMunicipal":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"usuarios":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"configuracoes":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false}},"SECRETARIA":{"dashboard":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"portalProfessor":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"diarioClasse":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"secretaria":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"turmas":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"documentos":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"comunicacao":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"questoes":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"provas":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"relatorios":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"gestaoMunicipal":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"usuarios":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"configuracoes":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false}},"PROFESSOR":{"dashboard":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"portalProfessor":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":false},"diarioClasse":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":false},"secretaria":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"turmas":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"documentos":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"comunicacao":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"questoes":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":false},"provas":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":false},"relatorios":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"gestaoMunicipal":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"usuarios":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"configuracoes":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false}},"GESTOR_MUNICIPAL":{"dashboard":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"portalProfessor":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"diarioClasse":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"secretaria":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"turmas":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"documentos":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"comunicacao":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"questoes":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"provas":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"relatorios":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"gestaoMunicipal":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"usuarios":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"configuracoes":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false}},"ALUNO":{"dashboard":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"portalProfessor":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"diarioClasse":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"secretaria":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"turmas":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"documentos":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"comunicacao":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"questoes":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"provas":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"relatorios":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"gestaoMunicipal":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"usuarios":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"configuracoes":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false}},"RESPONSAVEL":{"dashboard":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"portalProfessor":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"diarioClasse":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"secretaria":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"turmas":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"documentos":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"comunicacao":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"questoes":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"provas":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"relatorios":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"gestaoMunicipal":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"usuarios":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"configuracoes":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false}}}
+'@
+$script:AccessRules = ConvertFrom-JsonText $AccessRulesJson
+$script:SectorDefaults = ConvertFrom-JsonText $SectorDefaultsJson
+$SyncFields = @('updatedAt', 'rowVersion', 'serverUpdatedAt', 'baseVersion', 'syncedAt', 'lastSyncAt')
+
+function Test-IsMap($v) { return ($v -is [System.Collections.IDictionary]) }
+function Test-IsList($v) { return ($null -ne $v -and -not ($v -is [string]) -and -not (Test-IsMap $v) -and ($v -is [System.Collections.IEnumerable])) }
+function Get-Val($map, [string]$name) {
+    # A virgula preserva listas de um item so (o PowerShell desmontaria a lista no retorno).
+    if ((Test-IsMap $map) -and ([System.Collections.IDictionary]$map).Contains($name)) { return ,$map[$name] }
+    return $null
+}
+
+# Forma canonica (chaves em ordem, sem campos ignorados) para comparar dois registros.
+function Get-Sorted($value, $ignore) {
+    if (Test-IsMap $value) {
+        $out = New-Object 'System.Collections.Generic.SortedDictionary[string,object]' ([System.StringComparer]::Ordinal)
+        foreach ($k in @($value.Keys)) {
+            $key = [string]$k
+            if ($ignore -and ($ignore -contains $key)) { continue }
+            if ($key.StartsWith('_')) { continue }
+            $out[$key] = Get-Sorted $value[$k] $null
+        }
+        return ,$out
+    }
+    if (Test-IsList $value) {
+        $arr = New-Object System.Collections.ArrayList
+        foreach ($item in $value) { [void]$arr.Add((Get-Sorted $item $null)) }
+        return ,$arr
+    }
+    return $value
+}
+function Get-Canon($value, $ignore) { return (ConvertTo-JsonText (Get-Sorted $value $ignore)) }
+function Test-SameRecord($a, $b, $ignore) { return ((Get-Canon $a $ignore) -ceq (Get-Canon $b $ignore)) }
+
+function Get-RecordId($item, [int]$index) {
+    $id = Get-Val $item 'id'
+    if ($null -ne $id) { return [string]$id }
+    return ('#' + $index)
+}
+function Find-Record($list, [string]$id) {
+    if (-not (Test-IsList $list)) { return $null }
+    $i = 0
+    foreach ($item in $list) {
+        if ((Get-RecordId $item $i) -eq $id) { return ,$item }
+        $i++
+    }
+    return $null
+}
+
+# Quantas inclusoes, alteracoes e exclusoes existem entre dois valores de uma chave.
+function Get-Diff($before, $after, $ignore) {
+    $d = @{ created = 0; edited = 0; deleted = 0 }
+    if (((Test-IsList $before) -or (Test-IsList $after)) -and -not (Test-IsMap $before) -and -not (Test-IsMap $after)) {
+        $old = @{}
+        $i = 0
+        if ($before) { foreach ($r in $before) { $old[(Get-RecordId $r $i)] = $r; $i++ } }
+        $seen = @{}
+        $i = 0
+        if ($after) {
+            foreach ($r in $after) {
+                $id = Get-RecordId $r $i
+                $seen[$id] = $true
+                if (-not $old.ContainsKey($id)) { $d.created++ }
+                elseif (-not (Test-SameRecord $old[$id] $r $ignore)) { $d.edited++ }
+                $i++
+            }
+        }
+        foreach ($id in @($old.Keys)) { if (-not $seen.ContainsKey($id)) { $d.deleted++ } }
+        return $d
+    }
+    if ($null -eq $before -and $null -ne $after) { $d.created = 1 }
+    elseif ($null -ne $before -and $null -eq $after) { $d.deleted = 1 }
+    elseif (-not (Test-SameRecord $before $after $ignore)) { $d.edited = 1 }
+    return $d
+}
+
+function Test-IsMasterUser($user) {
+    if (-not $user) { return $false }
+    if ((Get-Val $user 'isMaster') -eq $true) { return $true }
+    return ([string](Get-Val $user 'sector') -eq 'MASTER')
+}
+
+function Test-UserCan($user, [string]$moduleKey, [string]$action) {
+    if (-not $user) { return $false }
+    if (Test-IsMasterUser $user) { return $true }
+    if ((Get-Val $user 'active') -eq $false) { return $false }
+    $matrix = Get-Val $user 'permissions'
+    if (-not (Test-IsMap $matrix) -or $matrix.Count -eq 0) { $matrix = Get-Val $script:SectorDefaults ([string](Get-Val $user 'sector')) }
+    $perm = Get-Val $matrix $moduleKey
+    return ((Get-Val $perm $action) -eq $true)
+}
+
+$ActionLabel = @{ canCreate = 'incluir'; canEdit = 'alterar'; canDelete = 'excluir'; canRead = 'abrir' }
+
+# Confere uma operacao. Devolve '' se pode gravar, ou o motivo da recusa.
+function Test-OpAllowed($user, $op, $db, [bool]$fromServerPc, $work) {
+    $k = [string](Get-Val $op 'k')
+    $rule = Get-Val $script:AccessRules $k
+    if (-not $rule) { return '' }
+    $keys = Get-Val $rule 'keys'
+    $masterOnly = ($keys -is [string] -and $keys -eq 'MASTER')
+    $label = [string](Get-Val $rule 'label')
+    $ignore = @($SyncFields)
+    $ign = Get-Val $rule 'ignore'
+    if ($ign) { foreach ($x in $ign) { $ignore += [string]$x } }
+
+    # Dados recebidos da nuvem pelo motor de sincronizacao (ja conferidos la).
+    if ((Get-Val $op 'o') -eq 'n') {
+        if (-not $masterOnly) { return '' }
+        if ($fromServerPc -or (Test-IsMasterUser $user)) { return '' }
+        return ('Cadastro de ' + $label + ' vindo da nuvem: aceito so no computador do servidor ou com a conta Master.')
+    }
+    if (Test-IsMasterUser $user) { return '' }
+    if ((Get-Val $user 'active') -eq $false) { return 'Usuario inativo.' }
+
+    $t = [string](Get-Val $op 't')
+    # Senha e dados de login: cada um so mexe nos proprios (nunca na conta de outra pessoa).
+    if ($k -eq 'userAccounts' -and [string](Get-Val $op 'id') -ne [string](Get-Val $user 'id')) { $ignore = @($SyncFields) }
+    $current = Get-Val $db $k
+    $d = @{ created = 0; edited = 0; deleted = 0 }
+    if ($t -eq 'u') {
+        $old = Find-WorkRecord $work $db $k ([string](Get-Val $op 'id'))
+        if ($null -eq $old) { $d.created = 1 }
+        elseif (-not (Test-SameRecord $old (Get-Val $op 'v') $ignore)) { $d.edited = 1 }
+    } elseif ($t -eq 'd') {
+        if ($null -ne (Find-WorkRecord $work $db $k ([string](Get-Val $op 'id')))) { $d.deleted = 1 }
+    } elseif ($t -eq 's') {
+        $d = Get-Diff (Get-WorkValue $work $db $k) (Get-Val $op 'v') $ignore
+    } else {
+        return 'Operacao desconhecida.'
+    }
+
+    foreach ($action in @('canCreate', 'canEdit', 'canDelete')) {
+        $count = 0
+        if ($action -eq 'canCreate') { $count = $d.created }
+        if ($action -eq 'canEdit') { $count = $d.edited }
+        if ($action -eq 'canDelete') { $count = $d.deleted }
+        if ($count -le 0) { continue }
+        if ($masterOnly) { return ('Somente o Administrador Master pode ' + $ActionLabel[$action] + ' ' + $label + '.') }
+        $ok = $false
+        foreach ($mk in $keys) {
+            $need = $action
+            if ($action -eq 'canCreate' -and (Get-Val $rule 'createNeedsRead') -eq $true) { $need = 'canRead' }
+            if (Test-UserCan $user ([string]$mk) $need) { $ok = $true; break }
+        }
+        if (-not $ok) { return ('Sem permissao para ' + $ActionLabel[$action] + ' ' + $label + '.') }
+    }
+    return ''
+}
+
+# Listas em trabalho durante uma gravacao: indice por id (rapido mesmo com milhares de alunos).
+$script:Removed = New-Object object
+function Get-Work($work, $db, [string]$k) {
+    if ($work.ContainsKey($k)) { return $work[$k] }
+    $list = New-Object System.Collections.ArrayList
+    $idx = New-Object 'System.Collections.Generic.Dictionary[string,int]'
+    $current = Get-Val $db $k
+    if (Test-IsList $current) {
+        $i = 0
+        foreach ($item in $current) { [void]$list.Add($item); $idx[(Get-RecordId $item $i)] = $i; $i++ }
+    }
+    $w = @{ list = $list; idx = $idx; replaced = $false; value = $null; touched = $false }
+    $work[$k] = $w
+    return $w
+}
+function Find-WorkRecord($work, $db, [string]$k, [string]$id) {
+    $w = Get-Work $work $db $k
+    if ($w.replaced -and -not (Test-IsList $w.value)) { return $null }
+    $pos = 0
+    if ($w.idx.TryGetValue($id, [ref]$pos)) { return ,$w.list[$pos] }
+    return $null
+}
+function Get-WorkValue($work, $db, [string]$k) {
+    if ($work.ContainsKey($k)) {
+        $w = $work[$k]
+        if ($w.replaced) { return ,$w.value }
+        if ($w.touched) { return ,(@($w.list | Where-Object { -not [object]::ReferenceEquals($_, $script:Removed) })) }
+    }
+    return ,(Get-Val $db $k)
+}
+# Aplica uma operacao ja conferida (mesma regra do sistema: storeOps.applyOps).
+function Invoke-ApplyOp($work, $db, $op) {
+    $k = [string](Get-Val $op 'k')
+    $t = [string](Get-Val $op 't')
+    if ($t -eq 's') {
+        $v = Get-Val $op 'v'
+        $db[$k] = $v
+        $work.Remove($k)
+        return
+    }
+    $w = Get-Work $work $db $k
+    $w.touched = $true
+    $id = [string](Get-Val $op 'id')
+    $pos = 0
+    $has = $w.idx.TryGetValue($id, [ref]$pos)
+    if ($t -eq 'u') {
+        if ($has) { $w.list[$pos] = Get-Val $op 'v' }
+        else { $w.idx[$id] = $w.list.Add((Get-Val $op 'v')) }
+    } elseif ($t -eq 'd' -and $has) {
+        $w.list[$pos] = $script:Removed
+        [void]$w.idx.Remove($id)
+    }
+}
+# Devolve as listas alteradas ao banco (sem os registros excluidos).
+function Complete-Work($work, $db) {
+    foreach ($k in @($work.Keys)) {
+        $w = $work[$k]
+        if (-not $w.touched) { continue }
+        $out = New-Object System.Collections.ArrayList
+        foreach ($item in $w.list) { if (-not [object]::ReferenceEquals($item, $script:Removed)) { [void]$out.Add($item) } }
+        $db[$k] = $out
+    }
+}
+
+# Banco em memoria (lido do arquivo uma vez; descartado a cada gravacao inteira).
+$script:DbObj = $null
+function Get-DbObject {
+    if ($null -eq $script:DbObj) {
+        if ($script:DataText) { $script:DbObj = ConvertFrom-JsonText $script:DataText }
+        if (-not (Test-IsMap $script:DbObj)) {
+            if ($script:JsonSer) { $script:DbObj = New-Object 'System.Collections.Generic.Dictionary[string,object]' }
+            else { $script:DbObj = @{} }
+        }
+    }
+    return ,$script:DbObj
+}
+
+function Find-User($db, [string]$userId, [string]$login) {
+    $users = Get-Val $db 'userAccounts'
+    if (-not (Test-IsList $users)) { return $null }
+    if ($userId) { foreach ($u in $users) { if ([string](Get-Val $u 'id') -eq $userId) { return ,$u } } }
+    $l = ([string]$login).Trim().ToLower()
+    if ($l) {
+        foreach ($u in $users) {
+            if (([string](Get-Val $u 'login')).Trim().ToLower() -eq $l -or ([string](Get-Val $u 'email')).Trim().ToLower() -eq $l) { return ,$u }
+        }
+    }
+    return $null
+}
+
+# ---- senhas (mesmo formato do sistema: sha256$iteracoes$sal$hash)
+function Get-PasswordDigest([string]$password, [string]$salt, [int]$iterations) {
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $digest = $sha.ComputeHash($Utf8.GetBytes($salt + ':' + $password))
+        $saltBytes = $Utf8.GetBytes($salt)
+        $buf = New-Object byte[] ($digest.Length + $saltBytes.Length)
+        [Array]::Copy($saltBytes, 0, $buf, $digest.Length, $saltBytes.Length)
+        for ($i = 1; $i -lt $iterations; $i++) {
+            [Array]::Copy($digest, 0, $buf, 0, $digest.Length)
+            $digest = $sha.ComputeHash($buf)
+        }
+        return ([BitConverter]::ToString($digest)).Replace('-', '').ToLower()
+    } finally { $sha.Dispose() }
+}
+function Test-SameText([string]$a, [string]$b) {
+    if ($a.Length -ne $b.Length) { return $false }
+    $diff = 0
+    for ($i = 0; $i -lt $a.Length; $i++) { $diff = $diff -bor ([int][char]$a[$i] -bxor [int][char]$b[$i]) }
+    return ($diff -eq 0)
+}
+function Test-Password([string]$stored, [string]$typed) {
+    if ([string]::IsNullOrEmpty($stored) -or $stored -eq ([string][char]0x2022 * 8)) { return $false }
+    if ($stored.StartsWith('sha256$')) {
+        $p = $stored.Split('$')
+        if ($p.Length -ne 4) { return $false }
+        $iter = 0
+        if (-not [int]::TryParse($p[1], [ref]$iter) -or $iter -lt 1) { return $false }
+        return (Test-SameText (Get-PasswordDigest $typed $p[2] $iter) $p[3])
+    }
+    return (Test-SameText $stored $typed)
+}
+function New-PasswordHash([string]$password) {
+    $bytes = New-Object byte[] 16
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
+    $salt = ([BitConverter]::ToString($bytes)).Replace('-', '').ToLower()
+    return ('sha256$5000$' + $salt + '$' + (Get-PasswordDigest $password $salt 5000))
+}
+
+# ---- sessoes assinadas (sobrevivem ao reinicio do servidor)
+function Get-SessionSecret {
+    if ($script:SessionSecret) { return ,$script:SessionSecret }
+    $bytes = $null
+    if (Test-Path $SessionSecretFile) { try { $bytes = [System.IO.File]::ReadAllBytes($SessionSecretFile) } catch { $bytes = $null } }
+    if (-not $bytes -or $bytes.Length -lt 32) {
+        $bytes = New-Object byte[] 32
+        $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+        try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
+        [System.IO.File]::WriteAllBytes($SessionSecretFile, $bytes)
+    }
+    $script:SessionSecret = $bytes
+    return ,$bytes
+}
+function Get-Signature([string]$payload) {
+    $h = New-Object System.Security.Cryptography.HMACSHA256 (,(Get-SessionSecret))
+    try { return ([BitConverter]::ToString($h.ComputeHash($Utf8.GetBytes($payload)))).Replace('-', '').ToLower() } finally { $h.Dispose() }
+}
+function New-SessionToken([string]$userId) {
+    $exp = [DateTimeOffset]::UtcNow.AddHours($SessionHours).ToUnixTimeMilliseconds()
+    $payload = $userId + '|' + $exp
+    $b64 = [Convert]::ToBase64String($Utf8.GetBytes($payload)).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+    return @{ token = ($b64 + '.' + (Get-Signature $payload)); expiresAt = $exp }
+}
+function Get-SessionUserId([string]$token) {
+    if ([string]::IsNullOrWhiteSpace($token)) { return '' }
+    $parts = $token.Trim().Split('.')
+    if ($parts.Length -ne 2) { return '' }
+    try {
+        $b64 = $parts[0].Replace('-', '+').Replace('_', '/')
+        while ($b64.Length % 4 -ne 0) { $b64 += '=' }
+        $payload = $Utf8.GetString([Convert]::FromBase64String($b64))
+    } catch { return '' }
+    if (-not (Test-SameText (Get-Signature $payload) $parts[1])) { return '' }
+    $idx = $payload.LastIndexOf('|')
+    if ($idx -lt 1) { return '' }
+    $exp = 0L
+    if (-not [int64]::TryParse($payload.Substring($idx + 1), [ref]$exp)) { return '' }
+    if ($exp -lt [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) { return '' }
+    return $payload.Substring(0, $idx)
+}
+function Get-SessionUser($ctx, $db) {
+    $uid = Get-SessionUserId ([string]$ctx.Request.Headers['X-Sessao'])
+    if (-not $uid) { return $null }
+    $user = Find-User $db $uid ''
+    if (-not $user -or (Get-Val $user 'active') -eq $false) { return $null }
+    return ,$user
+}
+
+# ---- tentativas de senha (5 erros seguidos por estacao: espera 1 minuto)
+$script:LoginFails = @{}
+function Test-LoginBlocked([string]$ip) {
+    $f = $script:LoginFails[$ip]
+    return ($f -and $f.count -ge 5 -and ((Get-Date) - $f.at).TotalSeconds -lt 60)
+}
+function Register-LoginFail([string]$ip) {
+    $f = $script:LoginFails[$ip]
+    if (-not $f -or ((Get-Date) - $f.at).TotalSeconds -ge 60) { $f = @{ count = 0; at = (Get-Date) } }
+    $f.count++
+    $f.at = Get-Date
+    $script:LoginFails[$ip] = $f
+}
+
+# Abre a sessao do usuario. Primeiro acesso (usuario sem senha no servidor): a senha digitada vira a senha dele.
+function Invoke-Login($ctx) {
+    $ip = [string]$ctx.Request.RemoteEndPoint.Address
+    if (Test-LoginBlocked $ip) { return @{ status = 429; body = '{"error":"muitas-tentativas","message":"Muitas tentativas de senha. Aguarde 1 minuto e tente de novo."}' } }
+    $in = $null
+    try { $in = ConvertFrom-JsonText (Read-Body $ctx) } catch { $in = $null }
+    $password = [string](Get-Val $in 'password')
+    $db = Get-DbObject
+    $user = Find-User $db ([string](Get-Val $in 'userId')) ([string](Get-Val $in 'login'))
+    if (-not $user -or (Get-Val $user 'active') -eq $false -or [string]::IsNullOrEmpty($password)) {
+        Register-LoginFail $ip
+        return @{ status = 401; body = '{"error":"credenciais-invalidas","message":"O servidor da escola nao reconheceu este usuario (ou ele esta inativo)."}' }
+    }
+    $stored = [string](Get-Val $user 'password')
+    if ([string]::IsNullOrEmpty($stored) -or $stored -eq ([string][char]0x2022 * 8)) {
+        # Conta criada na nuvem: a senha e a do cadastro na nuvem. Pela rede, ninguem define a
+        # senha dela; so no computador do servidor (depois do login conferido na nuvem).
+        if ((Get-Val $user 'cloudSynced') -eq $true -and -not [System.Net.IPAddress]::IsLoopback($ctx.Request.RemoteEndPoint.Address)) {
+            return @{ status = 401; body = '{"error":"conta-da-nuvem","message":"Esta conta ainda nao tem senha no servidor da escola. Entre uma vez no computador do servidor; depois ela funciona em todas as estacoes."}' }
+        }
+        if ($password.Length -lt 6) { return @{ status = 400; body = '{"error":"senha-curta","message":"A senha deve ter pelo menos 6 caracteres."}' } }
+        $user['password'] = New-PasswordHash $password
+        Save-Database (ConvertTo-JsonText $db) $true
+        Write-Log ('Primeiro acesso: senha definida no servidor para ' + [string](Get-Val $user 'name'))
+    } elseif (-not (Test-Password $stored $password)) {
+        Register-LoginFail $ip
+        Write-Log ('Senha incorreta para ' + [string](Get-Val $user 'name') + ' (' + $ip + ')')
+        return @{ status = 401; body = '{"error":"senha-incorreta","message":"A senha nao confere com a cadastrada no servidor da escola. Suas alteracoes ficam guardadas nesta estacao ate voce entrar com a senha correta."}' }
+    }
+    $script:LoginFails.Remove($ip)
+    $s = New-SessionToken ([string](Get-Val $user 'id'))
+    Write-Log ('Sessao aberta: ' + [string](Get-Val $user 'name') + ' (' + $ip + ')')
+    $body = '{"token":' + (ConvertTo-JsonString $s.token) + ',"expiresAt":' + $s.expiresAt + ',"userId":' + (ConvertTo-JsonString ([string](Get-Val $user 'id'))) + ',"name":' + (ConvertTo-JsonString ([string](Get-Val $user 'name'))) + ',"master":' + $(if (Test-IsMasterUser $user) { 'true' } else { 'false' }) + '}'
+    return @{ status = 200; body = $body }
+}
+
+# Recebe as alteracoes de uma estacao, confere as permissoes e grava o que for permitido.
+function Invoke-Ops($ctx) {
+    $db = Get-DbObject
+    $user = Get-SessionUser $ctx $db
+    if (-not $user) { return @{ status = 401; body = '{"error":"sessao-necessaria","message":"Entre no sistema com o seu usuario para gravar."}' } }
+    $in = $null
+    try { $in = ConvertFrom-JsonText (Read-Body $ctx) } catch { $in = $null }
+    $ops = Get-Val $in 'ops'
+    if (-not (Test-IsList $ops)) { return @{ status = 400; body = '{"error":"conteudo-invalido"}' } }
+    $remote = $ctx.Request.RemoteEndPoint.Address
+    $fromServerPc = [System.Net.IPAddress]::IsLoopback($remote)
+    $applied = 0
+    $denied = New-Object System.Collections.ArrayList
+    $byKey = @{}
+    $work = @{}
+    try {
+        foreach ($op in $ops) {
+            if (-not (Test-IsMap $op)) { continue }
+            $reason = Test-OpAllowed $user $op $db $fromServerPc $work
+            if ($reason) {
+                [void]$denied.Add(@{ k = [string](Get-Val $op 'k'); t = [string](Get-Val $op 't'); id = [string](Get-Val $op 'id'); reason = $reason })
+                continue
+            }
+            Invoke-ApplyOp $work $db $op
+            $applied++
+            $k = [string](Get-Val $op 'k')
+            if ($byKey.ContainsKey($k)) { $byKey[$k]++ } else { $byKey[$k] = 1 }
+        }
+        if ($applied -gt 0) {
+            Complete-Work $work $db
+            Save-Database (ConvertTo-JsonText $db) $true
+        }
+    } catch {
+        $script:DbObj = $null
+        throw
+    }
+    $station = [string]$ctx.Request.Headers['X-Station']
+    $detail = (@($byKey.Keys | Sort-Object | ForEach-Object { $_ + ':' + $byKey[$_] }) -join ', ')
+    $msg = 'Gravacao de ' + [string](Get-Val $user 'name') + ' (estacao ' + $station + ', ' + $remote + '): ' + $applied + ' alteracao(oes)'
+    if ($detail) { $msg += ' [' + $detail + ']' }
+    if ($denied.Count -gt 0) {
+        $msg += ', ' + $denied.Count + ' RECUSADA(S): ' + ((@($denied | Select-Object -First 5 | ForEach-Object { $_.k + '/' + $_.t + ' ' + $_.reason })) -join ' | ')
+    }
+    if ($applied -gt 0 -or $denied.Count -gt 0) { Write-Log $msg }
+    $body = '{"version":' + $script:Version + ',"updatedAt":' + (ConvertTo-JsonString $script:UpdatedAt) + ',"applied":' + $applied + ',"denied":' + (ConvertTo-JsonText $denied) + '}'
+    return @{ status = 200; body = $body }
 }
 
 # ---------------------------------------------------------------- atualizacao segura
@@ -343,7 +826,19 @@ function Handle-Api($ctx, [string]$path, [string]$method) {
     }
     switch ($path) {
         '/api/local/health' {
-            Send-Json $ctx 200 ('{"app":"sucessoedu-local","role":"' + $Role + '","serverName":' + (ConvertTo-JsonString $ServerName) + ',"version":' + $script:Version + ',"port":' + $Port + ',"needsKey":' + ($(if ($AccessKey -ne '') { 'true' } else { 'false' })) + ',"appBuiltAt":' + (ConvertTo-JsonString $script:AppBuiltAt) + ',"schoolUnitId":' + (ConvertTo-JsonString $SchoolUnitId) + ',"schoolInep":' + (ConvertTo-JsonString $SchoolInep) + ',"schoolName":' + (ConvertTo-JsonString $SchoolName) + '}')
+            Send-Json $ctx 200 ('{"app":"sucessoedu-local","role":"' + $Role + '","serverName":' + (ConvertTo-JsonString $ServerName) + ',"version":' + $script:Version + ',"port":' + $Port + ',"needsKey":' + ($(if ($AccessKey -ne '') { 'true' } else { 'false' })) + ',"appBuiltAt":' + (ConvertTo-JsonString $script:AppBuiltAt) + ',"schoolUnitId":' + (ConvertTo-JsonString $SchoolUnitId) + ',"schoolInep":' + (ConvertTo-JsonString $SchoolInep) + ',"schoolName":' + (ConvertTo-JsonString $SchoolName) + ',"permissoes":true}')
+            return
+        }
+        '/api/local/login' {
+            if ($method -ne 'POST') { Send-Json $ctx 405 '{"error":"metodo-nao-permitido"}'; return }
+            $r = Invoke-Login $ctx
+            Send-Json $ctx $r.status $r.body
+            return
+        }
+        '/api/local/ops' {
+            if ($method -ne 'POST') { Send-Json $ctx 405 '{"error":"metodo-nao-permitido"}'; return }
+            $r = Invoke-Ops $ctx
+            Send-Json $ctx $r.status $r.body
             return
         }
         '/api/local/version' {
@@ -391,6 +886,16 @@ function Handle-Api($ctx, [string]$path, [string]$method) {
         '/api/local/store' {
             if ($method -eq 'GET') { Send-Json $ctx 200 (Get-StoreJson); return }
             if ($method -eq 'PUT' -or $method -eq 'POST') {
+                # Gravacao do banco inteiro: so no primeiro acesso (banco vazio) ou pela conta Master.
+                # As gravacoes do dia a dia vao por /api/local/ops, com as permissoes conferidas.
+                if ($script:DataText) {
+                    $master = Get-SessionUser $ctx (Get-DbObject)
+                    if (-not (Test-IsMasterUser $master)) {
+                        Write-Log ('Gravacao do banco inteiro recusada (sem conta Master) - estacao ' + [string]$ctx.Request.Headers['X-Station'] + ' (' + $ctx.Request.RemoteEndPoint.Address + ')')
+                        Send-Json $ctx 403 '{"error":"somente-master","message":"Esta estacao usa uma versao antiga do sistema. Recarregue a pagina (F5) para atualizar."}'
+                        return
+                    }
+                }
                 $base = $ctx.Request.Headers['X-Base-Version']
                 $station = $ctx.Request.Headers['X-Station']
                 if ($null -eq $base -or [int64]$base -ne $script:Version) {

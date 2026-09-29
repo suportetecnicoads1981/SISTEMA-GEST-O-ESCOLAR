@@ -122,7 +122,7 @@ type Rule = {
 
 const SYNC_FIELDS = ['updatedAt', 'rowVersion', 'serverUpdatedAt', 'baseVersion', 'syncedAt', 'lastSyncAt'];
 
-const RULES: Record<string, Rule> = {
+export const ACCESS_RULES: Record<string, Rule> = {
   students: { keys: ['secretaria'], label: 'alunos' },
   academicHistories: { keys: ['secretaria', 'documentos'], label: 'históricos escolares' },
   classes: { keys: ['turmas'], label: 'turmas' },
@@ -177,8 +177,9 @@ const same = (a: any, b: any, ignore: string[]) =>
   a === b || JSON.stringify(strip(a, ignore)) === JSON.stringify(strip(b, ignore));
 
 /** Inclusões, alterações e exclusões entre duas versões de um cadastro (lista ou registro único). */
-export function diffCollection(prev: any, next: any, ignore: string[] = []) {
+export function diffCollection(prev: any, next: any, ignore: string[] = [], strictIds?: (id: string) => boolean) {
   const ign = [...SYNC_FIELDS, ...ignore];
+  const strict = [...SYNC_FIELDS];
   const out = { created: 0, edited: 0, deleted: 0 };
   if (prev === next) return out;
   if (!Array.isArray(prev) && !Array.isArray(next)) {
@@ -199,7 +200,7 @@ export function diffCollection(prev: any, next: any, ignore: string[] = []) {
     if (!before.has(id)) out.created += 1;
     else {
       const old = before.get(id);
-      if (old !== r && !same(old, r, ign)) out.edited += 1;
+      if (old !== r && !same(old, r, strictIds?.(id) ? strict : ign)) out.edited += 1;
     }
   });
   before.forEach((_r, id) => {
@@ -229,11 +230,12 @@ export function enforceDataPermissions<T extends Record<string, any>>(
   let result: T | null = null;
   const denied: PermissionDenial[] = [];
 
-  for (const [collection, rule] of Object.entries(RULES)) {
+  for (const [collection, rule] of Object.entries(ACCESS_RULES)) {
     const before = (prev as any)[collection];
     const after = (next as any)[collection];
     if (before === after) continue;
-    const d = diffCollection(before, after, rule.ignore);
+    // Senha e dados de login: cada um só mexe nos próprios, nunca na conta de outra pessoa.
+    const d = diffCollection(before, after, rule.ignore, collection === 'userAccounts' ? (id) => id !== String(actor.id) : undefined);
     if (!d.created && !d.edited && !d.deleted) continue;
 
     const checks: Array<[AccessAction, number]> = [

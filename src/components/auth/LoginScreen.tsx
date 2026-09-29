@@ -46,6 +46,7 @@ import {
   MIN_PASSWORD_LENGTH,
 } from '../../utils/passwordHasher';
 
+import { openLocalServerSession } from '../../services/offline/localServerSync';
 interface LoginScreenProps {
   userAccounts: UserAccount[];
   schoolUnits: SchoolUnit[];
@@ -344,6 +345,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         // Guarda a senha (em hash) para permitir o login também sem internet neste computador.
         const passwordHash = hashPassword(password);
         onPasswordUpdate?.({ ...account, password: passwordHash }, passwordHash);
+        // Servidor da escola/Sede: abre a sessão do usuário (o servidor confere as permissões).
+        void openLocalServerSession({ userId: account.id, login: account.login || email, password });
         setIsLoading(false);
         setPassword('');
         onLoginSuccess({ ...account, password: passwordHash });
@@ -386,6 +389,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         onPasswordUpdate(match, hashPassword(password));
       }
 
+      void openLocalServerSession({ userId: match.id, login: match.login || match.email, password });
       setIsLoading(false);
       setPassword('');
       onLoginSuccess(match);
@@ -454,6 +458,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     if (onPasswordUpdate) {
       onPasswordUpdate(userWithPassword, passwordHash);
     }
+    void openLocalServerSession({ userId: firstAccessUser.id, login: firstAccessUser.login || firstAccessUser.email, password: newPassword });
     setFirstAccessUser(null);
     setNewPassword('');
     setConfirmNewPassword('');

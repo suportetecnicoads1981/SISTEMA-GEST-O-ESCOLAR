@@ -118,6 +118,7 @@ import { setDocumentBranding } from './services/documentBranding';
 import { runCloudSyncNow } from './services/offline/cloudAutoSync';
 import { normalizeSchoolLinks } from './utils/schoolDataNormalizer';
 import { isProvisionalRa, resolveProvisionalRas } from './services/raService';
+import { clearLocalServerSession } from './services/offline/localServerSync';
 import { can as canAccess, canOpenTab, deniedTabMessage, describeDenials, enforceDataPermissions } from './services/rbac/accessControl';
 
 export default function App() {
@@ -455,6 +456,21 @@ export default function App() {
     return () => authListener.subscription.unsubscribe();
   }, []);
 
+  // O servidor da escola/Sede recusou alterações por falta de permissão do usuário.
+  useEffect(() => {
+    const onDenied = (e: any) => {
+      const list: any[] = Array.isArray(e?.detail) ? e.detail : [];
+      if (!list.length) return;
+      const reasons = Array.from(new Set(list.map((d) => String(d.reason || '')).filter(Boolean))).slice(0, 4);
+      notify(
+        `O servidor recusou ${list.length} alteração(ões) por falta de permissão do seu usuário. ${reasons.join(' ')} Nada foi gravado nesses cadastros; a tela voltou ao que está no servidor.`,
+        'Permissão negada pelo servidor'
+      );
+    };
+    window.addEventListener('sucessoedu_server_denied', onDenied);
+    return () => window.removeEventListener('sucessoedu_server_denied', onDenied);
+  }, []);
+
   // Sincronizar estado global instantaneamente quando ocorrer limpeza de base ou restauração demo
   useEffect(() => {
     const handleDbChange = (e: any) => {
@@ -676,6 +692,7 @@ export default function App() {
 
   // Logout Handler with Automatic Safety Backup
   const handleLogout = () => {
+    clearLocalServerSession();
     // Executa cópia de segurança automática com todas as informações do sistema
     const autoBackup = performAutoBackup(
       'Encerramento de Sessão (Logout)',

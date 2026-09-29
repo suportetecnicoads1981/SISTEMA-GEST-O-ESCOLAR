@@ -680,7 +680,7 @@ export function setAfterLocalSave(fn: (() => void) | null): void {
  */
 export function saveStoredData(
   data: AppStateData,
-  options?: { skipCloudSync?: boolean; bulkReplace?: boolean; authoritative?: boolean; origin?: 'cloud' }
+  options?: { skipCloudSync?: boolean; bulkReplace?: boolean; authoritative?: boolean; origin?: 'cloud'; replaceOrigin?: 'cloud'; opsOrigin?: 'cloud' }
 ): void {
   // Exclusões e alterações vão à nuvem pelo motor de sincronização, que compara cada registro
   // com a última versão enviada/recebida. Substituições completas (limpar base, restaurar
@@ -695,7 +695,9 @@ export function saveStoredData(
     }
     // Servidor da rede local: envia só o que mudou nesta gravação.
     try {
-      enqueueLocalChanges(previous, data as any);
+      // Dados que chegaram pela nuvem (sincronização ou lote enviado pela internet) contam, no
+      // servidor da rede local, como operação da nuvem e não como ação do operador desta estação.
+      enqueueLocalChanges(previous, data as any, options?.origin || options?.opsOrigin);
     } catch (err) {
       console.warn('[SucessoEdu] Falha ao preparar envio ao servidor local:', err);
     }
@@ -710,7 +712,7 @@ export function saveStoredData(
   } else if (options?.authoritative) {
     // Ação explícita do usuário (restaurar backup, limpar base): vale para toda a rede local.
     try {
-      enqueueFullReplace(data as any);
+      enqueueFullReplace(data as any, options?.replaceOrigin);
     } catch (err) {
       console.warn('[SucessoEdu] Falha ao preparar substituição no servidor local:', err);
     }

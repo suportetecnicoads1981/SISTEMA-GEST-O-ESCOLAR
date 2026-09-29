@@ -123,7 +123,8 @@ async function receiveFromSede(force: boolean): Promise<string> {
     writeJson(LAST_PULL_KEY, { at: new Date().toISOString() });
     if (next) {
       // Grava no servidor da escola (todas as estações recebem) e atualiza a tela.
-      saveStoredData(next as any);
+      // Vem da Sede pela nuvem: o servidor da escola trata como operação da nuvem.
+      saveStoredData(next as any, { opsOrigin: 'cloud' });
       window.dispatchEvent(new CustomEvent('sucessoedu_db_changed', { detail: next }));
     }
     return note;
@@ -150,7 +151,7 @@ async function importPendingLotes(userId: string): Promise<string[]> {
         await client.from(LOTES_TABLE).update({ imported_at: new Date().toISOString(), imported_by: userId }).eq('id', row.id);
         continue;
       }
-      const report = importLote(parsed.packet, 'Envio automático pela internet');
+      const report = importLote(parsed.packet, 'Envio automático pela internet', { viaCloud: true });
       notes.push(`${report.unitName}: ${Object.values(report.added).reduce((a, b) => a + b, 0)} novo(s)` + (report.conflicts.length ? `, ${report.conflicts.length} conflito(s)` : ''));
       await client.from(LOTES_TABLE).update({ imported_at: new Date().toISOString(), imported_by: userId }).eq('id', row.id);
     } catch (err: any) {

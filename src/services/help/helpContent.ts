@@ -752,6 +752,19 @@ export const HELP_MODULES: HelpModule[] = [
     summary: 'Pacotes do Servidor da Sede, do Servidor Remoto (escola) e das estações, atualização do servidor e cópias de segurança.',
     faq: [
       {
+        q: 'Como o servidor protege os dados contra quem não tem permissão?',
+        a: 'O Servidor da Sede e o Servidor Remoto conferem cada gravação. No login, o servidor confere a senha no banco dele e abre uma sessão do usuário (vale 12 horas). Cada alteração enviada pelas estações é comparada com o banco: inclusão, alteração ou exclusão sem permissão é recusada pelo próprio servidor, mesmo que o pedido venha de fora do sistema. Usuários, senhas, setores e permissões só mudam com a conta Master. Tudo fica registrado no arquivo C:\\SucessoEdu\\data\\servidor.log (quem gravou, de qual estação e o que foi recusado).',
+        tip: 'Esta proteção vem no programa do servidor: depois de atualizar o sistema, gere de novo o pacote do servidor e reinstale (o banco de dados é mantido). Em seguida, cada pessoa sai e entra de novo no sistema para abrir a sessão.',
+      },
+      {
+        q: 'Apareceu "Para enviar as alterações ao servidor da escola é preciso entrar no sistema".',
+        a: 'A sessão do usuário no servidor não está aberta (primeiro uso depois da atualização) ou venceu (12 horas). As alterações ficam guardadas na estação. Clique em "Sair do Sistema", entre de novo com o seu usuário e senha, e elas são enviadas.',
+      },
+      {
+        q: 'O lote de uma escola pode alterar usuários ou dados de outra escola na Sede?',
+        a: 'Não. O lote leva só dados escolares da própria escola (alunos, turmas, provas, frequência, notas e o banco de questões); nunca usuários, senhas, permissões ou configurações. Registros de outra escola viram "conflito" e não são aplicados. O histórico de sincronização da Sede registra quem gerou o lote, em qual servidor, quando, e quem importou.',
+      },
+      {
         q: 'Como crio a conta da nuvem do Servidor Remoto de uma escola?',
         steps: ['Em Instaladores & Backup, no quadro "Servidor Remoto (escola)", escolha a escola.', 'Em "Conta do servidor na nuvem", clique em "Criar / renovar conta" (é preciso estar na nuvem como administrador).', 'Anote o e-mail e a senha que aparecem (a senha não aparece de novo).', 'No servidor da escola, clique no selo do servidor e em "Entrar na nuvem" com esse e-mail e senha.'],
         a: 'A conta é da escola, não de uma pessoa: envia só o lote daquela escola e recebe só os dados dela. "Desligar" corta o acesso daquele servidor sem afetar as outras escolas; "Criar / renovar" gera uma nova senha.',

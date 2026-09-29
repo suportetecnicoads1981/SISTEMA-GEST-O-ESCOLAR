@@ -31,6 +31,8 @@ export interface LocalServerInfo {
   schoolUnitId?: string;
   schoolInep?: string;
   schoolName?: string;
+  /** O servidor confere as permissões de cada usuário antes de gravar (versão com sessões). */
+  permissions?: boolean;
 }
 
 export interface LocalServerStatus {
@@ -52,6 +54,8 @@ interface QueuedOp {
 export const LOCAL_OPS_KEY = 'sucessoedu_local_ops_v1';
 export const LOCAL_VERSION_KEY = 'sucessoedu_local_version_v1';
 export const LOCAL_KEY_STORAGE = 'sucessoedu_local_key';
+/** Sessão do usuário no servidor da rede local (aberta no login, vale 12 horas). */
+export const LOCAL_SESSION_KEY = 'sucessoedu_local_session_v1';
 const API = '/api/local';
 const POLL_MS = 4000;
 
@@ -372,6 +376,7 @@ function parseHealth(code: number, body: any): LocalServerInfo | null {
       schoolUnitId: typeof body.schoolUnitId === 'string' && body.schoolUnitId ? body.schoolUnitId : undefined,
       schoolInep: typeof body.schoolInep === 'string' && body.schoolInep ? body.schoolInep : undefined,
       schoolName: typeof body.schoolName === 'string' && body.schoolName ? body.schoolName : undefined,
+      permissions: body.permissoes === true,
     };
   } catch {
     return null;
@@ -487,13 +492,106 @@ function stationName(): string {
 }
 
 // ---------------------------------------------------------------------------
+// Sessão do usuário no servidor (privilégios conferidos pelo próprio servidor)
+// ---------------------------------------------------------------------------
+
+interface LocalSession {
+  token: string;
+  userId: string;
+  name?: string;
+  exp: number;
+}
+
+function readSession(): LocalSession | null {
+  try {
+    const raw = localStorage.getItem(LOCAL_SESSION_KEY);
+    const s = raw ? JSON.parse(raw) : null;
+    if (!s || typeof s.token !== 'string' || !s.token || !(Number(s.exp) > Date.now())) return null;
+    return s;
+  } catch {
+    return null;
+  }
+}
+
+function writeSession(s: LocalSession | null) {
+  try {
+    if (s) localStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify(s));
+    else localStorage.removeItem(LOCAL_SESSION_KEY);
+  } catch {
+    /* sem armazenamento */
+  }
+}
+
+const SESSION_NEEDED_MSG =
+  'Para enviar as alterações ao servidor da escola é preciso entrar no sistema com o seu usuário. Saia e entre novamente.';
+
+/**
+ * Abre a sessão do usuário no servidor da rede local. Chamado no login, com a senha digitada:
+ * o servidor confere a senha no banco dele e, a partir daí, aceita só o que o usuário pode fazer.
+ */
+export async function openLocalServerSession(credentials: { userId?: string; login?: string; password: string }): Promise<{ ok: boolean; message?: string }> {
+  if (!info?.permissions) return { ok: true };
+  try {
+    const res = await call<any>('/login', { method: 'POST', body: JSON.stringify(credentials) }, 20000);
+    if (res.status === 200 && res.body?.token) {
+      writeSession({
+        token: String(res.body.token),
+        userId: String(res.body.userId || ''),
+        name: res.body.name ? String(res.body.name) : undefined,
+        exp: Number(res.body.expiresAt) || Date.now() + 12 * 3600 * 1000,
+      });
+      setStatus({ message: undefined });
+      scheduleFlush(50);
+      return { ok: true };
+    }
+    writeSession(null);
+    const message =
+      res.body?.message ||
+      'O servidor da escola não confirmou o seu usuário e senha. As alterações ficam guardadas nesta estação até você entrar de novo.';
+    setStatus({ message });
+    return { ok: false, message };
+  } catch {
+    return { ok: false, message: 'O servidor da escola não respondeu ao abrir a sessão. Tente entrar de novo em instantes.' };
+  }
+}
+
+/** Encerra a sessão desta estação no servidor (saída do sistema). */
+export function clearLocalServerSession(): void {
+  writeSession(null);
+}
+
+/** Operações recusadas pelo servidor por falta de permissão: a tela avisa o operador. */
+function announceDenied(denied: Array<{ k: string; t: string; id?: string; reason?: string }>) {
+  if (!denied.length) return;
+  try {
+    window.dispatchEvent(new CustomEvent('sucessoedu_server_denied', { detail: denied }));
+  } catch {
+    /* sem janela (testes) */
+  }
+}
+
+/** Envia as operações para o servidor conferir e gravar (servidor com privilégios). */
+function postOps(ops: StoreOp[], session: LocalSession) {
+  return call<any>(
+    '/ops',
+    {
+      method: 'POST',
+      body: JSON.stringify({ ops }),
+      headers: { 'X-Sessao': session.token, 'X-Station': stationName() },
+    },
+    60000
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Gravação
 // ---------------------------------------------------------------------------
 
 /** Chamado por saveStoredData a cada gravação feita nas telas. */
-export function enqueueLocalChanges(prev: Record<string, any> | null, next: Record<string, any>): void {
+export function enqueueLocalChanges(prev: Record<string, any> | null, next: Record<string, any>, origin?: 'cloud'): void {
   if (!info) return;
-  const { ops, skippedMass } = diffStates(prev, next);
+  const { ops: raw, skippedMass } = diffStates(prev, next);
+  const ops = origin === 'cloud' ? raw.map((op) => ({ ...op, o: 'n' as const })) : raw;
   if (skippedMass.length) {
     console.warn('[SucessoEdu] Remoção em massa não enviada ao servidor da rede local:', skippedMass.join(', '));
     setStatus({
@@ -529,9 +627,9 @@ export async function fetchServerStore(): Promise<{ version: number; data: Recor
 }
 
 /** Substitui o banco do servidor pelo estado informado (restaurar backup, limpar base). */
-export function enqueueFullReplace(next: Record<string, any>): void {
+export function enqueueFullReplace(next: Record<string, any>, origin?: 'cloud'): void {
   if (!info) return;
-  const ops: StoreOp[] = Object.keys(next).map((k) => ({ k, t: 's', v: next[k] }));
+  const ops: StoreOp[] = Object.keys(next).map((k) => (origin === 'cloud' ? { k, t: 's', v: next[k], o: 'n' } : { k, t: 's', v: next[k] }));
   appendOps(ops);
   setStatus({});
   scheduleFlush(50);
@@ -557,6 +655,35 @@ export function flushLocalChanges(): Promise<void> {
         if (!queue.length) return;
         setStatus({ mode: 'sincronizando' });
         debug('flush tentativa', attempt);
+
+        // Servidor com privilégios: envia só as operações; o servidor confere quem é o
+        // usuário e o que ele pode fazer, grava o permitido e devolve o que recusou.
+        if (info?.permissions) {
+          const session = readSession();
+          if (!session) {
+            setStatus({ mode: 'conectado', message: SESSION_NEEDED_MSG });
+            return;
+          }
+          const res = await postOps(queue.map((q) => q.op), session);
+          debug('flush OPS', res.status);
+          if (res.status === 401) {
+            writeSession(null);
+            setStatus({ mode: 'conectado', message: SESSION_NEEDED_MSG });
+            return;
+          }
+          if (res.status !== 200 || !res.body) throw new Error(`HTTP ${res.status}`);
+          const sent = new Set(queue.map((q) => q.seq));
+          writeQueue(readQueue().filter((q) => !sent.has(q.seq)));
+          announceDenied(Array.isArray(res.body.denied) ? res.body.denied : []);
+          // Relê o banco do servidor: o que foi recusado volta ao valor gravado lá.
+          const fresh = await call('/store', {}, 30000);
+          if (fresh.status === 200 && fresh.body?.data) adoptServerData(fresh.body.data, Number(fresh.body.version) || 0);
+          resetFailures();
+          setStatus({ mode: 'conectado', lastSyncAt: new Date().toISOString(), message: undefined });
+          if (!readQueue().length) return;
+          continue;
+        }
+
         const current = await call('/store', {}, 30000);
         debug('flush GET', current.status);
         if (current.status !== 200 || !current.body) throw new Error(`HTTP ${current.status}`);

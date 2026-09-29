@@ -55,6 +55,12 @@ describe('privilégios de usuário', () => {
     };
     expect(enforceDataPermissions(prev, login, sec).denied).toEqual([]);
 
+    const otherPwd = {
+      ...prev,
+      userAccounts: prev.userAccounts.map((u) => (u.id === 'm' ? { ...u, password: 'trocada' } : u)),
+    };
+    expect(enforceDataPermissions(prev, otherPwd, sec).denied[0]?.collection).toBe('userAccounts');
+
     const promote = { ...prev, userAccounts: prev.userAccounts.map((u) => (u.id === sec.id ? { ...u, sector: 'MASTER' } : u)) };
     const r = enforceDataPermissions(prev, promote, sec);
     expect(r.denied[0].collection).toBe('userAccounts');

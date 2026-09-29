@@ -244,7 +244,8 @@ async function checkEpoch(client: ReturnType<typeof getSupabaseClient>, meta: Sy
   }
   const { next, removed } = applyEpochToState(getStoredData() as any, doc.at, doc.clearKeys?.length ? doc.clearKeys : DEFAULT_EPOCH_CLEAR_KEYS);
   // Substituição completa: vale também para o servidor da rede local (todas as estações).
-  saveStoredData(next as any, { bulkReplace: true, authoritative: true });
+  // Reinício vindo da nuvem: no servidor da rede local conta como operação da nuvem, não do operador.
+  saveStoredData(next as any, { bulkReplace: true, authoritative: true, replaceOrigin: 'cloud' });
   try {
     window.dispatchEvent(new CustomEvent('sucessoedu_db_changed', { detail: next }));
   } catch {

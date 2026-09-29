@@ -9,10 +9,13 @@
  * registro, e nesse caso vale a última gravação.
  */
 
+/** Origem da operação: 'n' = recebida da nuvem pelo motor de sincronização (não é ação do operador). */
+type OpOrigin = { o?: 'n' };
+
 export type StoreOp =
-  | { k: string; t: 'u'; id: string; v: any } // inclui ou altera o registro `id` da lista `k`
-  | { k: string; t: 'd'; id: string } // exclui o registro `id` da lista `k`
-  | { k: string; t: 's'; v: any }; // substitui o valor inteiro da chave `k`
+  | ({ k: string; t: 'u'; id: string; v: any } & OpOrigin) // inclui ou altera o registro `id` da lista `k`
+  | ({ k: string; t: 'd'; id: string } & OpOrigin) // exclui o registro `id` da lista `k`
+  | ({ k: string; t: 's'; v: any } & OpOrigin); // substitui o valor inteiro da chave `k`
 
 type AnyState = Record<string, any>;
 
