@@ -616,6 +616,20 @@ export const HELP_MODULES: HelpModule[] = [
       },
       { q: 'Como sei se o computador é Sede ou Servidor Remoto?', a: 'Pelo selo no rodapé: "Servidor da Sede" ou "Servidor Remoto". Só a Sede importa lotes e envia os alunos para a nuvem.' },
       { q: 'O cartão da escola mostra 0 alunos.', a: 'Confira se os alunos estão vinculados à escola (Secretaria & Alunos > filtro Unidade Escolar) e sincronize.' },
+      {
+        q: 'Como excluo uma escola da rede?',
+        steps: [
+          'Transfira antes os alunos da escola para a escola correta (a exclusão é bloqueada enquanto houver aluno vinculado).',
+          'Na lista de escolas, clique no ícone da lixeira da escola.',
+          'Confirme. As turmas vazias da escola saem junto.',
+        ],
+        tip: 'A exclusão vale para todos os computadores: a escola some das listas de Alunos, Censo, BNCC e documentos depois da próxima sincronização. Uma escola excluída não volta, mesmo que outro computador tenha uma cópia antiga.',
+      },
+      {
+        q: 'A Certidão de Vínculo saiu cortada na margem direita.',
+        a: 'Foi corrigido. A tabela da certidão agora tem largura fixa por coluna e o texto quebra dentro da célula, no tamanho da folha A4 (padrão ABNT). Em listas longas o cabeçalho da tabela se repete na página seguinte e nenhuma escola fica partida entre duas folhas.',
+        tip: 'Use "Imprimir / Salvar PDF" dentro da certidão. No diálogo de impressão, deixe "Tamanho do papel: A4" e "Escala: Padrão".',
+      },
     ],
   },
   {
@@ -764,8 +778,24 @@ export const HELP_MODULES: HelpModule[] = [
     id: 'ABOUT',
     title: 'Sobre o Sistema & Dev',
     where: 'Menu > Administração & TI',
-    summary: 'Versão do sistema e contato do suporte.',
-    faq: [{ q: 'Como falo com o suporte?', a: 'Os contatos do desenvolvedor estão nesta tela. Ao pedir ajuda, diga o módulo, o que tentou fazer e mande um print da tela.' }],
+    summary: 'Versão do sistema, dados e logo do desenvolvedor e contato do suporte.',
+    faq: [
+      { q: 'Como falo com o suporte?', a: 'Os contatos do desenvolvedor estão nesta tela. Ao pedir ajuda, diga o módulo, o que tentou fazer e mande um print da tela.' },
+      {
+        q: 'Como coloco a logo do desenvolvedor?',
+        steps: [
+          'Entre com a conta do Administrador Master.',
+          'Clique em "Editar Meus Dados (Desenvolvedor)".',
+          'Em "Logo do Desenvolvedor / Empresa", clique em "Enviar logo" e escolha a imagem.',
+          'Clique em "Salvar Meus Dados".',
+        ],
+        tip: 'Use PNG com fundo transparente. A imagem é reduzida automaticamente e vai para a nuvem, aparecendo em todos os computadores.',
+      },
+      {
+        q: 'Os dados do desenvolvedor podem ser alterados por outros usuários?',
+        a: 'Não. Só a conta do Administrador Master vê o botão de edição; os demais usuários só consultam. Os dados ficam gravados na nuvem e só mudam quando o Master salva: a instalação de novas versões e a sincronização não alteram esse cadastro, e um campo obrigatório deixado em branco mantém o valor anterior.',
+      },
+    ],
   },
   ...[
     ['ARCHITECTURE_DIAGRAM', 'Diagrama & Solicitações IA'],

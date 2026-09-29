@@ -13,6 +13,46 @@ import {
 import { MunicipalSecretaryInfo, SchoolUnit } from '../../types';
 import { printElementIsolated, printFileName, setPrintTitle } from '../../utils/printIsolated';
 
+/**
+ * Ajustes da certidão na folha A4 (ABNT: 16 cm de largura útil).
+ * A tabela tem largura fixa por coluna e quebra o texto dentro da célula: nada passa da margem
+ * direita (antes a coluna "Situação" saía cortada no PDF). O cabeçalho da tabela se repete
+ * em cada página e nenhuma linha é partida entre duas folhas.
+ */
+const CERTIFICATE_PRINT_CSS = `
+.print-isolated-root .cert-doc{max-height:none!important;overflow:visible!important}
+.print-isolated-root .cert-header{display:grid!important;grid-template-columns:24mm 1fr 24mm;align-items:center;gap:3mm}
+.print-isolated-root .cert-header img{max-width:24mm!important;max-height:22mm!important}
+.print-isolated-root .cert-header .cert-header-text h1{font-size:12pt!important;margin:0}
+.print-isolated-root .cert-header .cert-header-text h2{font-size:11pt!important;margin:0}
+.print-isolated-root .cert-header .cert-header-text h3{font-size:9.5pt!important;margin:0}
+.print-isolated-root .cert-header .cert-header-text p{font-size:8.5pt!important;line-height:1.3!important;text-align:center!important}
+.print-isolated-root .cert-title h2{font-size:12pt!important}
+.print-isolated-root .cert-table-wrap{overflow:visible!important;border:0!important;border-radius:0!important}
+.print-isolated-root .cert-table{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;font-size:8.5pt!important}
+.print-isolated-root .cert-table th,.print-isolated-root .cert-table td{border:0.5pt solid #94a3b8!important;padding:1.4mm 1.2mm!important;vertical-align:middle;word-wrap:break-word;overflow-wrap:anywhere;hyphens:auto;line-height:1.2!important}
+.print-isolated-root .cert-table thead{display:table-header-group}
+.print-isolated-root .cert-table tr{break-inside:avoid;page-break-inside:avoid}
+.print-isolated-root .cert-table .cert-sub{font-size:7pt!important}
+.print-isolated-root .cert-summary{break-inside:avoid;page-break-inside:avoid}
+.print-isolated-root .cert-summary span{font-size:8pt!important}
+.print-isolated-root .cert-summary span.cert-num{font-size:11pt!important}
+.print-isolated-root .cert-signatures{break-inside:avoid;page-break-inside:avoid}
+.print-isolated-root .cert-signatures p{text-align:center!important;font-size:9pt!important;line-height:1.3!important}
+.print-isolated-root .cert-footer{font-size:7.5pt!important;text-align:center!important}
+.print-isolated-root .cert-signatures p.text-right{text-align:right!important;font-size:11pt!important}
+`;
+
+const UNIT_TYPE_LABEL: Record<string, string> = {
+  SEDE_CENTRAL: 'Sede Central',
+  ESCOLA_POLO: 'Escola Polo',
+  ESCOLA_SATELITE: 'Escola Satélite',
+  ESCOLA_RURAL: 'Escola do Campo',
+  CRECHE_INFANTIL: 'Educação Infantil',
+};
+
+const isRural = (zone?: string) => zone === 'ZONA_RURAL' || zone === 'RURAL';
+
 interface MunicipalLinkageCertificateModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -29,7 +69,7 @@ export const MunicipalLinkageCertificateModal: React.FC<
 
   const handlePrint = () => {
     const fileName = printFileName('Certidao de Vinculo Municipal', secretary?.name);
-    if (!printElementIsolated(printRef.current, { fileName, abnt: true })) {
+    if (!printElementIsolated(printRef.current, { fileName, abnt: true, extraCss: CERTIFICATE_PRINT_CSS })) {
       setPrintTitle(fileName);
       window.print();
     }
@@ -83,11 +123,11 @@ export const MunicipalLinkageCertificateModal: React.FC<
         {/* Printable Document Body */}
         <div
           ref={printRef}
-          className="p-8 sm:p-12 space-y-6 text-slate-900 font-sans max-h-[80vh] overflow-y-auto print:max-h-none print:overflow-visible print:p-6"
+          className="cert-doc p-8 sm:p-12 space-y-6 text-slate-900 font-sans max-h-[80vh] overflow-y-auto print:max-h-none print:overflow-visible print:p-6"
         >
           {/* Cabeçalho Timbrado Oficial */}
           <div className="border-b-2 border-slate-900 pb-6">
-            <div className="flex items-center justify-between gap-4">
+            <div className="cert-header flex items-center justify-between gap-4">
               {/* Logo Esquerdo: Gestão Municipal / Brasão Oficial */}
               <div className="w-24 sm:w-28 h-24 flex items-center justify-center shrink-0">
                 {secretary.managementLogoUrl ? (
@@ -105,7 +145,7 @@ export const MunicipalLinkageCertificateModal: React.FC<
               </div>
 
               {/* Texto Central Oficial */}
-              <div className="flex-1 text-center space-y-1.5 px-2">
+              <div className="cert-header-text flex-1 text-center space-y-1.5 px-2">
                 <h1 className="text-base sm:text-lg font-black uppercase tracking-wide text-slate-950">
                   ESTADO DO PARÁ
                 </h1>
@@ -147,7 +187,7 @@ export const MunicipalLinkageCertificateModal: React.FC<
           </div>
 
           {/* Título do Documento */}
-          <div className="text-center py-2">
+          <div className="cert-title text-center py-2">
             <span className="inline-block px-3 py-1 bg-slate-100 text-slate-800 font-mono text-xs font-bold rounded-md uppercase border border-slate-300">
               Ofício Circular nº 01/2026 – Gabinete SEMED / PMCN
             </span>
@@ -174,9 +214,17 @@ export const MunicipalLinkageCertificateModal: React.FC<
             </p>
           </div>
 
-          {/* Tabela de Unidades Vinculadas */}
-          <div className="overflow-x-auto border border-slate-300 rounded-lg">
-            <table className="w-full text-[11px] text-left">
+          {/* Tabela de Unidades Vinculadas (largura fixa: cabe na folha A4) */}
+          <div className="cert-table-wrap overflow-x-auto border border-slate-300 rounded-lg">
+            <table className="cert-table w-full table-fixed text-[11px] text-left">
+              <colgroup>
+                <col style={{ width: '30%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '15%' }} />
+                <col style={{ width: '17%' }} />
+                <col style={{ width: '11%' }} />
+                <col style={{ width: '13%' }} />
+              </colgroup>
               <thead className="bg-slate-100 text-slate-900 border-b border-slate-300 font-bold">
                 <tr>
                   <th className="p-2.5">Unidade Escolar</th>
@@ -189,35 +237,32 @@ export const MunicipalLinkageCertificateModal: React.FC<
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {schoolUnits.map((unit) => (
-                  <tr key={unit.id} className="hover:bg-slate-50">
-                    <td className="p-2.5 font-bold text-slate-950">
+                  <tr key={unit.id} className="hover:bg-slate-50 break-inside-avoid">
+                    <td className="p-2.5 font-bold text-slate-950 break-words">
                       {unit.name}
-                      <span className="block text-[10px] font-normal text-slate-500">
-                        {unit.address} – {unit.district}
-                      </span>
+                      {(unit.address || unit.district) && (
+                        <span className="cert-sub block text-[10px] font-normal text-slate-500">
+                          {[unit.address, unit.district].filter(Boolean).join(' – ')}
+                        </span>
+                      )}
                     </td>
-                    <td className="p-2.5 font-mono font-bold text-slate-800">{unit.inepCode}</td>
-                    <td className="p-2.5">
+                    <td className="p-2.5 font-mono font-bold text-slate-800 break-words">
+                      {unit.inepCode || 'Não informado'}
+                    </td>
+                    <td className="p-2.5 break-words">
                       <span className="block font-semibold">
-                        {unit.type === 'SEDE_CENTRAL' && 'Sede Central'}
-                        {unit.type === 'ESCOLA_POLO' && 'Escola Polo'}
-                        {unit.type === 'ESCOLA_SATELITE' && 'Escola Satélite'}
-                        {unit.type === 'ESCOLA_RURAL' && 'Escola Campo / Rural'}
-                        {unit.type === 'CRECHE_INFANTIL' && 'Educação Infantil'}
+                        {UNIT_TYPE_LABEL[unit.type as string] || 'Unidade Escolar'}
                       </span>
-                      <span className="text-[10px] text-slate-500">
-                        {unit.locationZone === 'ZONA_RURAL' ? '🌾 Zona Rural' : '🏙️ Zona Urbana'}
+                      <span className="cert-sub text-[10px] text-slate-500">
+                        {isRural(unit.locationZone as string) ? 'Zona Rural' : 'Zona Urbana'}
                       </span>
                     </td>
-                    <td className="p-2.5 text-slate-800">{unit.directorName}</td>
+                    <td className="p-2.5 text-slate-800 break-words">{unit.directorName || 'Não informado'}</td>
                     <td className="p-2.5 text-center font-bold text-emerald-800">
-                      {unit.totalStudents}
+                      {Number(unit.totalStudents || 0).toLocaleString('pt-BR')}
                     </td>
-                    <td className="p-2.5 text-center">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">
-                        <CheckCircle2 className="h-3 w-3" />
-                        Vinculada à SEMED
-                      </span>
+                    <td className="p-2.5 text-center font-bold text-emerald-800 break-words">
+                      Vinculada à SEMED
                     </td>
                   </tr>
                 ))}
@@ -226,12 +271,12 @@ export const MunicipalLinkageCertificateModal: React.FC<
           </div>
 
           {/* Quadro Resumo Consolidado */}
-          <div className="grid grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200 text-center">
+          <div className="cert-summary grid grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200 text-center">
             <div>
               <span className="block text-[10px] font-bold text-slate-500 uppercase">
                 Escolas Vinculadas
               </span>
-              <span className="text-base font-black text-slate-900">
+              <span className="cert-num text-base font-black text-slate-900">
                 {schoolUnits.length} Unidades
               </span>
             </div>
@@ -239,7 +284,7 @@ export const MunicipalLinkageCertificateModal: React.FC<
               <span className="block text-[10px] font-bold text-slate-500 uppercase">
                 Alunos Matriculados
               </span>
-              <span className="text-base font-black text-emerald-800">
+              <span className="cert-num text-base font-black text-emerald-800">
                 {totalStudents.toLocaleString('pt-BR')}
               </span>
             </div>
@@ -247,18 +292,18 @@ export const MunicipalLinkageCertificateModal: React.FC<
               <span className="block text-[10px] font-bold text-slate-500 uppercase">
                 Corpo Docente Ativo
               </span>
-              <span className="text-base font-black text-slate-900">{totalTeachers}</span>
+              <span className="cert-num text-base font-black text-slate-900">{totalTeachers}</span>
             </div>
             <div>
               <span className="block text-[10px] font-bold text-slate-500 uppercase">
                 Turmas Registradas
               </span>
-              <span className="text-base font-black text-slate-900">{totalClasses}</span>
+              <span className="cert-num text-base font-black text-slate-900">{totalClasses}</span>
             </div>
           </div>
 
           {/* Encerramento e Assinaturas */}
-          <div className="pt-6 space-y-8">
+          <div className="cert-signatures pt-6 space-y-8">
             <p className="text-xs text-slate-700 text-right">
               Cumaru do Norte – PA, {formattedDate}.
             </p>
@@ -285,7 +330,7 @@ export const MunicipalLinkageCertificateModal: React.FC<
           </div>
 
           {/* Rodapé institucional */}
-          <div className="border-t border-slate-200 pt-4 text-center text-[10px] text-slate-400">
+          <div className="cert-footer border-t border-slate-200 pt-4 text-center text-[10px] text-slate-400">
             Documento emitido eletronicamente via SucessoEdu Gestão Educacional • CNPJ SEMED:{' '}
             {secretary.cnpj} • Sistema Municipal de Ensino de Cumaru do Norte/PA
           </div>

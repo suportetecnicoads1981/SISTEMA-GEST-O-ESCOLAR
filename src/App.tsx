@@ -608,9 +608,10 @@ export default function App() {
 
   // Developer Contact & Settings Handlers
   const handleUpdateDeveloperContact = (updatedContact: DeveloperContact) => {
+    // Mescla com o cadastro atual: nenhum dado do desenvolvedor se perde numa gravação parcial.
     setData((prev) => ({
       ...prev,
-      developerContact: updatedContact,
+      developerContact: { ...(prev.developerContact || ({} as any)), ...updatedContact },
     }));
     triggerPushNotification(
       '🛠️ Dados do Desenvolvedor Salvos',
@@ -1515,10 +1516,7 @@ export default function App() {
           ...prev.settings,
           systemVersion: pkg.version,
         },
-        developerContact: {
-          ...(prev.developerContact || {} as any),
-          systemVersion: pkg.version,
-        },
+        // Os dados do desenvolvedor (Sobre o Sistema) não são alterados pela instalação de pacotes.
         systemUpdatePackages: updated,
       };
     });
@@ -2108,6 +2106,14 @@ export default function App() {
                 onUpdateSchoolUnits={(units) =>
                   setData((prev) => ({ ...prev, schoolUnits: units }))
                 }
+                onRemoveSchoolUnit={(unitId, classIds) => {
+                  const drop = new Set(classIds);
+                  setData((prev) => ({
+                    ...prev,
+                    schoolUnits: (prev.schoolUnits || []).filter((u) => u.id !== unitId),
+                    classes: (prev.classes || []).filter((c) => !drop.has(c.id)),
+                  }));
+                }}
                 onUpdateSyncLogs={(logs) =>
                   setData((prev) => ({ ...prev, syncLogs: logs }))
                 }
@@ -2321,6 +2327,7 @@ export default function App() {
                 onBack={handleGoBack}
                 onNavigate={handleNavigate}
                 onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
+                canEditDeveloper={[authenticatedAccount, currentUser].some((u: any) => u?.isMaster || u?.sector === 'MASTER')}
               />
             )}
           </div>

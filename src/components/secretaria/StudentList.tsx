@@ -196,8 +196,11 @@ export const StudentList: React.FC<StudentListProps> = ({
       });
     }
 
-    // 2. Extrai unidades originárias mencionadas diretamente nos alunos
+    // 2. Extrai unidades originárias mencionadas diretamente nos alunos.
+    // Só para alunos SEM escola cadastrada: o nome de origem da importação não pode
+    // "ressuscitar" na lista uma escola que foi excluída ou unificada.
     students.forEach((s) => {
+      if (s.schoolUnitId && unitMap.has(s.schoolUnitId)) return;
       if (s.schoolOriginName) {
         const originNormalized = s.schoolOriginName.trim();
         const existingByOrigin = Array.from(unitMap.values()).find(

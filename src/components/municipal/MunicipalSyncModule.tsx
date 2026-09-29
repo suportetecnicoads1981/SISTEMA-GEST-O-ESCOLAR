@@ -82,6 +82,8 @@ interface MunicipalSyncModuleProps {
   settings?: SchoolSettings;
   municipalSecretary?: MunicipalSecretaryInfo;
   onUpdateSchoolUnits?: (units: SchoolUnit[]) => void;
+  /** Remove a escola e as turmas (vazias) dela numa gravação só. */
+  onRemoveSchoolUnit?: (unitId: string, classIds: string[]) => void;
   onUpdateSyncLogs?: (logs: SyncAuditLog[]) => void;
   onUpdateMunicipalSecretary?: (secretary: MunicipalSecretaryInfo) => void;
   onRefreshData?: () => void;
@@ -221,6 +223,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
   const settings = props?.settings;
   const municipalSecretary = props?.municipalSecretary;
   const onUpdateSchoolUnits = props?.onUpdateSchoolUnits;
+  const onRemoveSchoolUnit = props?.onRemoveSchoolUnit;
   const onUpdateSyncLogs = props?.onUpdateSyncLogs;
   const onUpdateMunicipalSecretary = props?.onUpdateMunicipalSecretary;
   const onRefreshData = props?.onRefreshData;
@@ -315,22 +318,36 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
     if (!onUpdateSchoolUnits) return;
     const unit = schoolUnits.find((u) => u.id === id);
     // Integridade: não deixar alunos ou turmas apontando para uma escola que não existe mais.
-    const linkedStudents = (students || []).filter((st: any) => st?.schoolUnitId === id).length;
-    const linkedClasses = (classes || []).filter((c: any) => c?.schoolUnitId === id).length;
-    if (linkedStudents || linkedClasses) {
+    const unitClasses = (classes || []).filter((c: any) => c?.schoolUnitId === id);
+    const unitClassIds = new Set(unitClasses.map((c: any) => c.id));
+    const linkedStudents = (students || []).filter(
+      (st: any) => st?.schoolUnitId === id || (st?.classId && unitClassIds.has(st.classId))
+    ).length;
+    if (linkedStudents) {
       notify(
-        `Não é possível remover "${unit?.name || 'esta unidade'}": ela tem ${linkedStudents} aluno(s) e ${linkedClasses} turma(s) vinculados. ` +
-          'Transfira-os para outra unidade antes de remover.'
+        `Não é possível remover "${unit?.name || 'esta unidade'}": ela tem ${linkedStudents} aluno(s) vinculado(s). ` +
+          'Transfira os alunos para outra unidade antes de remover.'
       );
       return;
     }
-    const message =
+    // Turmas vazias saem junto com a escola. Antes elas travavam a exclusão e,
+    // quando a escola sumia de uma tela, voltava a aparecer nas telas que listam pelas turmas.
+    if (unitClasses.length && !onRemoveSchoolUnit) {
+      notify(
+        `Não é possível remover "${unit?.name || 'esta unidade'}": ela tem ${unitClasses.length} turma(s). Remova as turmas antes.`
+      );
+      return;
+    }
+    const base =
       unit?.type === 'SEDE_CENTRAL'
         ? `"${unit.name}" é a SEDE CENTRAL da rede. Tem certeza que deseja removê-la?`
-        : 'Tem certeza que deseja remover esta unidade escolar da rede municipal?';
+        : `Tem certeza que deseja remover "${unit?.name || 'esta unidade escolar'}" da rede municipal?`;
+    const message = unitClasses.length
+      ? `${base} As ${unitClasses.length} turma(s) vazia(s) dela também serão removidas. A exclusão vale para todos os computadores.`
+      : `${base} A exclusão vale para todos os computadores.`;
     if (await confirmDialog(message)) {
-      const updated = schoolUnits.filter((u) => u.id !== id);
-      onUpdateSchoolUnits(updated);
+      if (onRemoveSchoolUnit) onRemoveSchoolUnit(id, Array.from(unitClassIds));
+      else onUpdateSchoolUnits(schoolUnits.filter((u) => u.id !== id));
     }
   };
 

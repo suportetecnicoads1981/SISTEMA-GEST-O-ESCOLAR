@@ -50,8 +50,40 @@ const DEFAULT_DEVELOPER_CONTACT: DeveloperContact = {
   systemVersion: 'v5.4.2-ENTERPRISE',
 };
 
+/**
+ * Reduz a logo enviada (máx. 480 px no maior lado, PNG com transparência) antes de gravar.
+ * A logo vai para a nuvem junto com os dados do desenvolvedor: imagem pesada deixaria
+ * a sincronização lenta em todos os computadores.
+ */
+function resizeLogo(file: File, maxSide = 480): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Não foi possível ler a imagem.'));
+    reader.onload = () => {
+      const src = String(reader.result || '');
+      if (file.type === 'image/svg+xml') return resolve(src);
+      const img = new Image();
+      img.onerror = () => reject(new Error('Arquivo de imagem inválido.'));
+      img.onload = () => {
+        const scale = Math.min(1, maxSide / Math.max(img.width || 1, img.height || 1));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(src);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.src = src;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 interface AboutSystemProps {
   settings?: SchoolSettings;
+  /** Só o Administrador Master altera os dados do desenvolvedor. */
+  canEditDeveloper?: boolean;
   developerContact?: DeveloperContact;
   onUpdateDeveloperContact: (contact: DeveloperContact) => void;
   onUpdateSettings?: (settings: SchoolSettings) => void;
@@ -68,6 +100,7 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
   onBack,
   onNavigate,
   onOpenVersionControl,
+  canEditDeveloper = false,
 }) => {
   const safeContact: DeveloperContact = useMemo(() => {
     return {
@@ -145,9 +178,39 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
     }
   };
 
+  const devLogoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDevLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      notify('Selecione um arquivo de imagem (PNG, JPG, SVG ou WEBP).');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      notify('A imagem é maior que 5 MB. Use um arquivo mais leve.');
+      return;
+    }
+    try {
+      const dataUrl = await resizeLogo(file);
+      setFormData((prev) => ({ ...prev, companyLogoUrl: dataUrl }));
+    } catch (err: any) {
+      notify(err?.message || 'Não foi possível carregar a logo.');
+    }
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    onUpdateDeveloperContact(formData);
+    // Grava por cima do cadastro atual: campo que não está no formulário (changelog,
+    // GitHub, LinkedIn...) continua como estava. Campo obrigatório vazio mantém o valor anterior.
+    const trimmed: DeveloperContact = { ...safeContact, ...formData };
+    (['name', 'company', 'email', 'phone'] as const).forEach((k) => {
+      const v = String(formData[k] ?? '').trim();
+      trimmed[k] = (v || safeContact[k] || '') as any;
+    });
+    trimmed.developerName = trimmed.name;
+    onUpdateDeveloperContact(trimmed);
     setIsEditing(false);
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 4000);
@@ -376,6 +439,7 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
             </div>
           </div>
 
+          {canEditDeveloper ? (
           <button
             onClick={() => {
               setFormData({ ...safeContact });
@@ -393,11 +457,50 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
               </>
             )}
           </button>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-semibold text-slate-500 shrink-0">
+              <Lock className="h-3.5 w-3.5" /> Dados protegidos • alteração só pelo Administrador Master
+            </span>
+          )}
         </div>
 
-        {isEditing ? (
+        {isEditing && canEditDeveloper ? (
           /* FORMULÁRIO DE EDIÇÃO DO DESENVOLVEDOR */
           <form onSubmit={handleSave} className="space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-200">
+            {/* Logo do desenvolvedor / empresa */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 pb-4 border-b border-slate-200">
+              <div className="h-24 w-24 rounded-2xl bg-white border border-slate-300 flex items-center justify-center overflow-hidden shrink-0">
+                {formData.companyLogoUrl ? (
+                  <img src={formData.companyLogoUrl} alt="Logo do desenvolvedor" className="max-h-full max-w-full object-contain p-1" />
+                ) : (
+                  <span className="text-[10px] font-bold text-slate-400 uppercase text-center px-2">Sem logo</span>
+                )}
+              </div>
+              <div className="space-y-2 text-xs">
+                <p className="font-bold text-slate-700 uppercase">Logo do Desenvolvedor / Empresa</p>
+                <p className="text-slate-500">PNG com fundo transparente fica melhor. A imagem é reduzida automaticamente e vale em todos os computadores.</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => devLogoInputRef.current?.click()}
+                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    {formData.companyLogoUrl ? 'Trocar logo' : 'Enviar logo'}
+                  </button>
+                  {formData.companyLogoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, companyLogoUrl: '' }))}
+                      className="px-3 py-1.5 rounded-lg bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 font-bold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Remover
+                    </button>
+                  )}
+                  <input ref={devLogoInputRef} type="file" accept="image/*" className="hidden" onChange={handleDevLogoUpload} />
+                </div>
+              </div>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
               <div>
                 <label className="block font-bold text-slate-700 uppercase mb-1">
@@ -429,6 +532,19 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
                     })
                   }
                   placeholder="Ex: Engenheiro de Software ADS"
+                  className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1">
+                  Cargo / Função
+                </label>
+                <input
+                  type="text"
+                  value={formData.role || formData.roleTitle || ''}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value, roleTitle: e.target.value })}
+                  placeholder="Ex: Analista de Sistemas"
                   className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                 />
               </div>
@@ -479,7 +595,7 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={formData.website}
+                  value={formData.website || ''}
                   onChange={(e) => setFormData({ ...formData, website: e.target.value })}
                   placeholder="Ex: https://sucessoedu.com.br"
                   className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
@@ -492,7 +608,7 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={formData.location}
+                  value={formData.location || ''}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                   placeholder="Ex: São Paulo, SP - Atendimento Nacional"
                   className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
@@ -505,7 +621,7 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={formData.systemVersion}
+                  value={formData.systemVersion || ''}
                   onChange={(e) => setFormData({ ...formData, systemVersion: e.target.value })}
                   placeholder="Ex: v5.0.0-Enterprise"
                   className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
@@ -518,7 +634,7 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={formData.license}
+                  value={formData.license || ''}
                   onChange={(e) => setFormData({ ...formData, license: e.target.value })}
                   placeholder="Ex: Licença Definitiva Governamental / Enterprise"
                   className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
@@ -532,7 +648,7 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
               </label>
               <textarea
                 rows={2}
-                value={formData.supportAvailability}
+                value={formData.supportAvailability || ''}
                 onChange={(e) => setFormData({ ...formData, supportAvailability: e.target.value })}
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               />
@@ -562,7 +678,24 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
                 <Building className="h-4 w-4 text-indigo-600" />
                 <span>Empresa Desenvolvedora</span>
               </div>
-              <div className="text-slate-800 font-bold text-base">{safeContact.company || 'SucessoEdu Gestão Educacional'}</div>
+              <div className="flex items-center gap-3">
+                {safeContact.companyLogoUrl && (
+                  <img
+                    src={safeContact.companyLogoUrl}
+                    alt="Logo do desenvolvedor"
+                    className="h-14 w-14 rounded-xl object-contain bg-white border border-slate-200 p-1 shrink-0"
+                  />
+                )}
+                <div className="text-slate-800 font-bold text-base">{safeContact.company || 'SucessoEdu Gestão Educacional'}</div>
+              </div>
+              {(safeContact.developerName || safeContact.name) && (
+                <div className="text-slate-700">
+                  <span className="font-semibold">Desenvolvedor:</span> {safeContact.developerName || safeContact.name}
+                  {(safeContact.role || safeContact.roleTitle) && (
+                    <span className="block text-[11px] text-slate-500">{safeContact.role || safeContact.roleTitle}</span>
+                  )}
+                </div>
+              )}
               {safeContact.cnpj && (
                 <div className="text-slate-500">
                   <span className="font-semibold">CNPJ:</span> {safeContact.cnpj}
