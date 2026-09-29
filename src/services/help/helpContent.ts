@@ -1,3 +1,4 @@
+import { moduleName, moduleGroup } from '../../config/moduleNames';
 /**
  * Tira-dúvidas: perguntas e respostas de cada módulo (aba do menu).
  * Para acrescentar uma dúvida, inclua um item em "faq" do módulo. Cada resposta pode ter
@@ -37,6 +38,11 @@ export const HELP_GENERAL: HelpModule = {
   summary: 'Entrar, sair, sincronizar com a nuvem, atalhos e o que fazer quando algo parece errado.',
   faq: [
       {
+        q: 'O nome de um módulo aparece diferente em algum lugar?',
+        a: 'Não deveria. Cada módulo tem um nome só, o mesmo do menu lateral, e ele aparece igual nas abas abertas, na barra de tarefas, no título da janela, no selo "Módulo:" do cabeçalho, na trilha de navegação, na busca rápida (Ctrl+K), nos atalhos de teclado, nos cartões do Início, no título da própria tela e aqui no Tira-dúvidas.',
+        tip: 'Se encontrar um nome diferente, mande um print para o suporte informando a tela.',
+      },
+      {
         q: 'Como funciona a sincronização com a nuvem agora?',
         a: 'Cada computador envia só os registros que mudaram nele e recebe só o que mudou na nuvem, em até 1 minuto (ou na hora, com "Sincronizar agora"). Cada registro tem um número de versão controlado pela nuvem: se um computador tentar gravar a partir de uma cópia desatualizada, a nuvem recusa e ele recebe a versão atual. Por isso o sistema pode ficar aberto pelo link e pela Sede ao mesmo tempo, e uma cópia antiga não apaga mais o trabalho de ninguém. A nuvem passou a guardar o cadastro completo (série, turno, raça/cor, PCD, filiação etc.) e também o cadastro da SEMED, planos de aula e anotações do professor.',
         tip: 'A regra antiga "não abrir pelo link enquanto a Sede estiver em uso" não é mais necessária.',
@@ -74,7 +80,7 @@ export const HELP_GENERAL: HelpModule = {
       {
         q: 'Onde encontro o botão de relatório nos módulos?',
         steps: ['Aplique os filtros da tela (busca, escola, turma, situação etc.).', 'Clique no botão verde "Relatório".', 'Marque as colunas que quer no relatório (as mais usadas já vêm marcadas).', 'Confira a pré-visualização.', 'Escolha: "Imprimir / Salvar em PDF", "Excel", "Word" ou "CSV".'],
-        a: 'Os módulos de dados têm o botão verde "Relatório" (ou "Relatório / Exportar"): Alunos, Turmas, Evasão & Busca Ativa, Diário de Classe (frequência), Avaliações, Banco de Questões, Resultados das Avaliações, Comunicados, Histórico do WhatsApp, Rede Municipal (escolas) e Usuários. Todos abrem o mesmo painel, com escolha de colunas, pré-visualização, impressão com timbre, Excel formatado, Word e CSV.',
+        a: 'Os módulos de dados têm o botão verde "Relatório" (ou "Relatório / Exportar"): Alunos, Turmas, Evasão & Busca Ativa, Diário & Frequência, Avaliações, Banco de Questões, Resultados das Avaliações, Comunicados, Histórico do WhatsApp, Rede Municipal (escolas) e Usuários. Todos abrem o mesmo painel, com escolha de colunas, pré-visualização, impressão com timbre, Excel formatado, Word e CSV.',
         tip: 'O relatório sai com o timbre da Prefeitura, SEMED e escola, e o arquivo recebe nome com a data e a hora.',
       },
     {
@@ -237,8 +243,8 @@ export const HELP_GENERAL: HelpModule = {
 export const HELP_MODULES: HelpModule[] = [
   {
     id: 'MAIN_DASHBOARD',
-    title: 'Visão Geral / Dashbox',
-    where: 'Menu > Visão Geral & Notificações',
+    title: moduleName('MAIN_DASHBOARD'),
+    where: `Menu > ${moduleGroup('MAIN_DASHBOARD')} > ${moduleName('MAIN_DASHBOARD')}`,
     summary: 'Tela inicial com os números principais da escola e os atalhos para cada módulo.',
     faq: [
       { q: 'Para que serve esta tela?', a: 'Mostra um resumo (alunos, turmas, avaliações, avisos) e botões de acesso rápido aos módulos. Clique em um cartão para abrir o módulo correspondente.' },
@@ -247,8 +253,8 @@ export const HELP_MODULES: HelpModule[] = [
   },
   {
     id: 'NOTIFICATIONS',
-    title: 'Central de Notificações',
-    where: 'Menu > Comunicação & Avisos > Central de Notificações (Alt+N)',
+    title: moduleName('NOTIFICATIONS'),
+    where: `Menu > ${moduleGroup('NOTIFICATIONS')} > ${moduleName('NOTIFICATIONS')} (Alt+N)`,
     summary: 'Avisos do sistema: resultados de provas, atualizações e comunicados.',
     faq: [
       { q: 'Como marco os avisos como lidos?', a: 'Clique no aviso para marcá-lo, ou use "Marcar todas como lidas" no sino do alto da tela.' },
@@ -256,8 +262,8 @@ export const HELP_MODULES: HelpModule[] = [
   },
   {
     id: 'TEACHER_PORTAL',
-    title: 'Portal do Professor',
-    where: 'Menu > Espaço do Docente & Gestão de Turmas',
+    title: moduleName('TEACHER_PORTAL'),
+    where: `Menu > ${moduleGroup('TEACHER_PORTAL')} > ${moduleName('TEACHER_PORTAL')}`,
     summary: 'Área do professor: turmas, diário, chamada, notas, provas e prontuário dos alunos.',
     faq: [
       {
@@ -274,8 +280,8 @@ export const HELP_MODULES: HelpModule[] = [
   },
   {
     id: 'CLASS_DIARY',
-    title: 'Diário & Frequência',
-    where: 'Menu > Espaço do Docente & Gestão de Turmas (Alt+E)',
+    title: moduleName('CLASS_DIARY'),
+    where: `Menu > ${moduleGroup('CLASS_DIARY')} > ${moduleName('CLASS_DIARY')} (Alt+E)`,
     summary: 'Chamada diária, registro das aulas com habilidades BNCC e impressão do diário oficial.',
     faq: [
       {
@@ -299,8 +305,8 @@ export const HELP_MODULES: HelpModule[] = [
   },
   {
     id: 'STUDENTS',
-    title: 'Secretaria & Alunos',
-    where: 'Menu > Secretaria & Ensino (Alt+S)',
+    title: moduleName('STUDENTS'),
+    where: `Menu > ${moduleGroup('STUDENTS')} > ${moduleName('STUDENTS')} (Alt+S)`,
     summary: 'Matrículas, cadastro dos alunos, importação de listas, filtros, impressão e pendências do Censo.',
     faq: [
       {
@@ -372,8 +378,8 @@ export const HELP_MODULES: HelpModule[] = [
   },
   {
     id: 'CLASSES',
-    title: 'Turmas & Matrizes',
-    where: 'Menu > Secretaria & Ensino (Alt+T)',
+    title: moduleName('CLASSES'),
+    where: `Menu > ${moduleGroup('CLASSES')} > ${moduleName('CLASSES')} (Alt+T)`,
     summary: 'Cadastro das turmas, vagas, professor regente e matriz curricular (disciplinas).',
     faq: [
       {
@@ -390,8 +396,8 @@ export const HELP_MODULES: HelpModule[] = [
   },
   {
     id: 'DROPOUT_CENSUS',
-    title: 'Censo de Evasão & Busca Ativa',
-    where: 'Menu > Secretaria & Ensino (Alt+C)',
+    title: moduleName('DROPOUT_CENSUS'),
+    where: `Menu > ${moduleGroup('DROPOUT_CENSUS')} > ${moduleName('DROPOUT_CENSUS')} (Alt+C)`,
     summary: 'Acompanhamento de alunos evadidos ou em risco, visitas, resgate e exportação para o Educacenso.',
     faq: [
       {
@@ -411,8 +417,8 @@ export const HELP_MODULES: HelpModule[] = [
   },
   {
     id: 'DOCUMENTS',
-    title: 'Documentos & Certificados',
-    where: 'Menu > Secretaria & Ensino (Alt+O)',
+    title: moduleName('DOCUMENTS'),
+    where: `Menu > ${moduleGroup('DOCUMENTS')} > ${moduleName('DOCUMENTS')} (Alt+O)`,
     summary: 'Emissão de declaração de matrícula, declaração de transferência, histórico escolar, boletim e certificado de conclusão.',
     faq: [
       {
@@ -439,8 +445,8 @@ export const HELP_MODULES: HelpModule[] = [
   },
   {
     id: 'PEDAGOGICAL_DASHBOARD',
-    title: 'Evolução Pedagógica',
-    where: 'Menu > Pedagógico & Avaliações (Alt+R)',
+    title: moduleName('PEDAGOGICAL_DASHBOARD'),
+    where: `Menu > ${moduleGroup('PEDAGOGICAL_DASHBOARD')} > ${moduleName('PEDAGOGICAL_DASHBOARD')} (Alt+R)`,
     summary: 'Painel com médias, aprovação, acertos por questão e evolução dos alunos e turmas.',
     faq: [
       {
@@ -463,8 +469,8 @@ export const HELP_MODULES: HelpModule[] = [
   },
   {
     id: 'BNCC_SKILLS',
-    title: 'Habilidades BNCC',
-    where: 'Menu > Pedagógico & Avaliações',
+    title: moduleName('BNCC_SKILLS'),
+    where: `Menu > ${moduleGroup('BNCC_SKILLS')} > ${moduleName('BNCC_SKILLS')}`,
     summary: 'Lançamento do nível de cada habilidade por aluno e bimestre, desempenho nas provas, relatórios, gráficos e catálogo.',
     faq: [
       {
@@ -498,8 +504,8 @@ export const HELP_MODULES: HelpModule[] = [
   },
   {
     id: 'ASSESSMENT_REPORT',
-    title: 'Resultados Nível & Escola',
-    where: 'Menu > Pedagógico & Avaliações',
+    title: moduleName('ASSESSMENT_REPORT'),
+    where: `Menu > ${moduleGroup('ASSESSMENT_REPORT')} > ${moduleName('ASSESSMENT_REPORT')}`,
     summary: 'Resultados das avaliações por escola, série e nível de proficiência, com relatório oficial para impressão.',
     faq: [
       {
@@ -514,8 +520,8 @@ export const HELP_MODULES: HelpModule[] = [
   },
   {
     id: 'EXAMS',
-    title: 'Elaboração de Provas',
-    where: 'Menu > Pedagógico & Avaliações (Alt+P)',
+    title: moduleName('EXAMS'),
+    where: `Menu > ${moduleGroup('EXAMS')} > ${moduleName('EXAMS')} (Alt+P)`,
     summary: 'Montar provas a partir do banco de questões, imprimir caderno e gabarito, lançar as respostas da prova de papel e ver resultados.',
     faq: [
       {
@@ -555,8 +561,8 @@ export const HELP_MODULES: HelpModule[] = [
   },
   {
     id: 'QUESTION_BANK',
-    title: 'Banco de Questões BNCC',
-    where: 'Menu > Pedagógico & Avaliações',
+    title: moduleName('QUESTION_BANK'),
+    where: `Menu > ${moduleGroup('QUESTION_BANK')} > ${moduleName('QUESTION_BANK')}`,
     summary: 'Cadastro de questões com gabarito e habilidades BNCC, impressão e importação.',
     faq: [
       {
@@ -582,8 +588,8 @@ export const HELP_MODULES: HelpModule[] = [
   },
   {
     id: 'MUNICIPAL_SYNC',
-    title: 'Rede Municipal & Polos',
-    where: 'Menu > Gestão Municipal & Polos',
+    title: moduleName('MUNICIPAL_SYNC'),
+    where: `Menu > ${moduleGroup('MUNICIPAL_SYNC')} > ${moduleName('MUNICIPAL_SYNC')}`,
     summary: 'Escolas da rede, envio de lotes das escolas para a Sede e consolidação na Secretaria.',
     faq: [
       {
@@ -634,8 +640,8 @@ export const HELP_MODULES: HelpModule[] = [
   },
   {
     id: 'COMMUNICATION',
-    title: 'Comunicados & Avisos',
-    where: 'Menu > Comunicação & Avisos > Mural de Comunicados & Mensagens (ou botão Início > Mural & Mensagens)',
+    title: moduleName('COMMUNICATION'),
+    where: `Menu > ${moduleGroup('COMMUNICATION')} > ${moduleName('COMMUNICATION')} (ou pelo botão de mesmo nome no Início)`,
     summary: 'Mural de comunicados para professores, alunos e famílias, com anexos e confirmação de leitura.',
     faq: [
       {
@@ -659,8 +665,8 @@ export const HELP_MODULES: HelpModule[] = [
   },
   {
     id: 'WHATSAPP',
-    title: 'WhatsApp para Pais & Equipe',
-    where: 'Menu > Comunicação & Avisos > WhatsApp para Pais & Equipe (ou pelo Mural, no botão "Enviar por WhatsApp")',
+    title: moduleName('WHATSAPP'),
+    where: `Menu > ${moduleGroup('WHATSAPP')} > ${moduleName('WHATSAPP')} (ou pelo Mural, no botão "Enviar por WhatsApp")`,
     summary:
       'Envio assistido: o sistema monta a lista e abre cada conversa com a mensagem pronta; você aperta Enviar no WhatsApp da escola.',
     faq: [
@@ -701,8 +707,8 @@ export const HELP_MODULES: HelpModule[] = [
   },
   {
     id: 'USER_CONTROL',
-    title: 'Usuários & Permissões',
-    where: 'Menu > Administração & TI',
+    title: moduleName('USER_CONTROL'),
+    where: `Menu > ${moduleGroup('USER_CONTROL')} > ${moduleName('USER_CONTROL')}`,
     summary: 'Contas de acesso, perfis (Secretaria, Professor, Coordenação, Direção, SME) e permissões por módulo.',
     faq: [
       {
@@ -722,8 +728,8 @@ export const HELP_MODULES: HelpModule[] = [
   },
   {
     id: 'NETWORK_INSTALLER',
-    title: 'Instaladores & Backup',
-    where: 'Menu > Administração & TI (Alt+I)',
+    title: moduleName('NETWORK_INSTALLER'),
+    where: `Menu > ${moduleGroup('NETWORK_INSTALLER')} > ${moduleName('NETWORK_INSTALLER')} (Alt+I)`,
     summary: 'Pacotes do Servidor da Sede, do Servidor Remoto (escola) e das estações, atualização do servidor e cópias de segurança.',
     faq: [
       {
@@ -769,15 +775,15 @@ export const HELP_MODULES: HelpModule[] = [
   },
   {
     id: 'SYSTEM_UPDATES',
-    title: 'Atualizações na Nuvem',
-    where: 'Menu > Administração & TI',
+    title: moduleName('SYSTEM_UPDATES'),
+    where: `Menu > ${moduleGroup('SYSTEM_UPDATES')} > ${moduleName('SYSTEM_UPDATES')}`,
     summary: 'Catálogo de versões publicadas do sistema.',
     faq: [{ q: 'Preciso fazer algo aqui?', a: 'Normalmente não. Para atualizar um servidor instalado, use Instaladores & Backup (Alt+I) > "Verificar atualização agora".' }],
   },
   {
     id: 'ABOUT',
-    title: 'Sobre o Sistema & Dev',
-    where: 'Menu > Administração & TI',
+    title: moduleName('ABOUT'),
+    where: `Menu > ${moduleGroup('ABOUT')} > ${moduleName('ABOUT')}`,
     summary: 'Versão do sistema, dados e logo do desenvolvedor e contato do suporte.',
     faq: [
       { q: 'Como falo com o suporte?', a: 'Os contatos do desenvolvedor estão nesta tela. Ao pedir ajuda, diga o módulo, o que tentou fazer e mande um print da tela.' },
@@ -809,15 +815,15 @@ export const HELP_MODULES: HelpModule[] = [
     ['DATASYNC_PRO', 'Sincronização Remota (.edusync)'],
     ['DEBUG_FLOW', 'DebugFlow & Auditoria Full-Stack'],
   ].map(
-    ([id, title]): HelpModule => ({
+    ([id]): HelpModule => ({
       id,
-      title,
-      where: 'Menu > Administração & TI',
+      title: moduleName(id),
+      where: `Menu > ${moduleGroup(id)} > ${moduleName(id)}`,
       summary: TECNICO,
       faq: [
         { q: 'Preciso usar este módulo?', a: TECNICO },
         ...(id === 'DATASYNC_PRO' || id === 'NEXUS_INSTALL' || id === 'NEXUS_DEPLOYER'
-          ? [{ q: 'Onde faço isso no dia a dia?', a: 'Envio de lotes: Rede Municipal & Polos. Instalação de servidor e estações: Instaladores & Backup (Alt+I).' }]
+          ? [{ q: 'Onde faço isso no dia a dia?', a: `Envio de lotes: ${moduleName('MUNICIPAL_SYNC')}. Instalação de servidor e estações: ${moduleName('NETWORK_INSTALLER')} (Alt+I).` }]
           : []),
       ],
     })

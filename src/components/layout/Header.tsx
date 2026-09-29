@@ -34,6 +34,7 @@ import { NotificationItem, UserRole, UserAccount } from '../../types';
 import { NotificationPopover } from '../notificacoes/NotificationPopover';
 import { formatPersonName } from '../../services/documentBranding';
 
+import { moduleName } from '../../config/moduleNames';
 interface HeaderProps {
   schoolName: string;
   activeTab: string;
@@ -149,143 +150,8 @@ export const Header: React.FC<HeaderProps> = ({
     )
   );
 
-  const getTabTitle = (tab: string) => {
-    switch (tab) {
-      case 'MAIN_DASHBOARD':
-        return 'Dashbox Principal • Visão Executiva & Notificações';
-      case 'TEACHER_PORTAL':
-      case 'PROFESSOR_DASHBOARD':
-      case 'PROFESSOR':
-        return 'Portal do Professor • Diário, Frequência & Lançamento de Notas';
-      case 'STUDENTS':
-        return 'Secretaria Acadêmica & Gestão de Matrículas';
-      case 'CLASS_DIARY':
-        return 'Diário de Classe, Chamadas & Normativas Estaduais';
-      case 'DROPOUT_CENSUS':
-        return 'Censo de Evasão Escolar & Busca Ativa Municipal';
-      case 'CLASSES':
-        return 'Turmas, Matrizes Curriculares & Disciplinas';
-      case 'DOCUMENTS':
-        return 'Emissão Oficial de Certificados & Documentos';
-      case 'COMMUNICATION':
-        return 'Mural de Comunicados & Avisos SME';
-      case 'WHATSAPP':
-        return 'WhatsApp Notificações & Comunicados Automáticos';
-      case 'NOTIFICATIONS':
-        return 'Central de Notificações & Auditoria Preventiva';
-      case 'BNCC_SKILLS':
-        return 'Habilidades BNCC - Lançamento, Relatórios e Gráficos';
-      case 'QUESTION_BANK':
-        return 'Banco de Questões & Habilidades BNCC';
-      case 'EXAMS':
-        return 'Gerador de Provas & Avaliações Diagnósticas';
-      case 'STUDENT_ROOM':
-        return 'Sala do Estudante (Ambiente de Provas)';
-      case 'PEDAGOGICAL_DASHBOARD':
-        return 'Evolução Pedagógica Discente & Turmas';
-      case 'ASSESSMENT_REPORT':
-        return 'Resultados Oficiais de Avaliações por Nível e Escola';
-      case 'MUNICIPAL_SYNC':
-        return 'Gestão Municipal & Unificação de Polos Remotos';
-      case 'ADMIN_TI':
-        return 'Central de Administração & TI • Painel Geral';
-      case 'CLEANSLATE_HUB':
-        return 'CleanSlate Enterprise • Reset e Higienização de Banco';
-      case 'INSTALAFLOW':
-        return 'InstalaFlow Híbrido • Gestão de Deploy e Instalação Supabase';
-      case 'DATASYNC_PRO':
-        return 'DataSync Pro • Sincronização & Migração Supabase';
-      case 'DEBUG_FLOW':
-        return 'DebugFlow • Auditoria Full-Stack & Sincronização Supabase';
-      case 'USER_CONTROL':
-        return 'Controle de Usuários, Setores & Permissões';
-      case 'SYSTEM_UPDATES':
-        return 'Central de Atualizações & Histórico de Versões';
-      case 'OMNI_DEPLOY':
-        return 'OmniDeploy • Sistema de Gestão e Instalação Híbrida';
-      case 'NEXUS_DEPLOYER':
-        return 'NexusDeployer • Provisionamento & Updates na Nuvem';
-      case 'NEXUS_INSTALL':
-        return 'NexusInstall • Gerenciador de Módulos & Instaladores';
-      case 'NEXUS_BUILD':
-        return 'NexusBuild • Diagnóstico, Instalação & Empacotamento Total';
-      case 'NETWORK_INSTALLER':
-        return 'Instalador de Rede Local, Nuvem & Backup';
-      case 'ABOUT':
-        return 'Sobre o SucessoEdu & Dados do Desenvolvedor';
-      default:
-        return 'SucessoEdu Gestão Educacional';
-    }
-  };
-
-  const getShortTabLabel = (tab: string) => {
-    switch (tab) {
-      case 'MAIN_DASHBOARD':
-        return 'Visão Geral';
-      case 'TEACHER_PORTAL':
-      case 'PROFESSOR_DASHBOARD':
-      case 'PROFESSOR':
-        return 'Portal do Professor';
-      case 'STUDENTS':
-        return 'Alunos & Matrículas';
-      case 'CLASS_DIARY':
-        return 'Diário de Classe';
-      case 'DROPOUT_CENSUS':
-        return 'Censo de Evasão';
-      case 'CLASSES':
-        return 'Turmas & Horários';
-      case 'DOCUMENTS':
-        return 'Documentos Oficiais';
-      case 'COMMUNICATION':
-        return 'Mural de Avisos';
-      case 'WHATSAPP':
-        return 'WhatsApp Notificações';
-      case 'NOTIFICATIONS':
-        return 'Notificações';
-      case 'BNCC_SKILLS':
-        return 'Habilidades BNCC';
-      case 'QUESTION_BANK':
-        return 'Banco de Questões';
-      case 'EXAMS':
-        return 'Avaliações & Provas';
-      case 'STUDENT_ROOM':
-        return 'Sala do Estudante';
-      case 'PEDAGOGICAL_DASHBOARD':
-        return 'Evolução Pedagógica';
-      case 'ASSESSMENT_REPORT':
-        return 'Relatórios de Avaliação';
-      case 'MUNICIPAL_SYNC':
-        return 'Sincronização Municipal';
-      case 'ADMIN_TI':
-        return 'Administração & TI';
-      case 'CLEANSLATE_HUB':
-        return 'CleanSlate';
-      case 'INSTALAFLOW':
-        return 'InstalaFlow';
-      case 'DATASYNC_PRO':
-        return 'DataSync Pro';
-      case 'DEBUG_FLOW':
-        return 'DebugFlow';
-      case 'USER_CONTROL':
-        return 'Controle de Usuários';
-      case 'SYSTEM_UPDATES':
-        return 'Atualizações';
-      case 'OMNI_DEPLOY':
-        return 'OmniDeploy';
-      case 'NEXUS_DEPLOYER':
-        return 'NexusDeployer';
-      case 'NEXUS_INSTALL':
-        return 'NexusInstall';
-      case 'NEXUS_BUILD':
-        return 'NexusBuild';
-      case 'NETWORK_INSTALLER':
-        return 'Central de Instalação';
-      case 'ABOUT':
-        return 'Sobre o Sistema';
-      default:
-        return 'Módulo';
-    }
-  };
+  // Nome igual ao do menu lateral (fonte única em config/moduleNames).
+  const getShortTabLabel = (tab: string) => moduleName(tab, 'Módulo');
 
   const isNotDashboard = activeTab !== 'MAIN_DASHBOARD';
 
@@ -323,7 +189,7 @@ export const Header: React.FC<HeaderProps> = ({
         {isNotDashboard && (
           <div
             id="header-active-module-badge"
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 max-w-[240px] truncate"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 max-w-[320px] truncate"
           >
             {onGoBack && (
               <button
@@ -335,7 +201,7 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
             <span className="text-slate-500 font-medium">Módulo:</span>
-            <span className="text-slate-900 font-bold truncate">
+            <span className="text-slate-900 font-bold truncate" title={getShortTabLabel(activeTab)}>
               {getShortTabLabel(activeTab)}
             </span>
           </div>

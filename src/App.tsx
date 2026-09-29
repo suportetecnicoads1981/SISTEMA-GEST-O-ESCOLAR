@@ -1006,7 +1006,7 @@ export default function App() {
 
         triggerPushNotification(
           `📝 Nova Prova: ${exam.title}`,
-          `Disponível para realização na Sala do Estudante.`
+          `Disponível para realização na Sala do Aluno.`
         );
       }
 

@@ -416,7 +416,7 @@ export const BnccExamPerformanceSection: React.FC<Props> = ({
         <div className="font-semibold text-slate-700">Provas incluídas {pickedExams.size ? `(${pickedExams.size} escolhida(s))` : '(todas as corrigidas do filtro)'}</div>
         {candidateExams.length === 0 ? (
           <p className="text-slate-500">
-            Nenhuma prova corrigida para este filtro. Em <strong>Provas & Avaliações</strong>, use <strong>Lançar respostas</strong> para corrigir as provas aplicadas no papel.
+            Nenhuma prova corrigida para este filtro. Em <strong>Elaboração de Provas</strong>, use <strong>Lançar respostas</strong> para corrigir as provas aplicadas no papel.
           </p>
         ) : (
           <div className="flex flex-wrap gap-1.5">

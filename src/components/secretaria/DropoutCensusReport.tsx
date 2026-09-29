@@ -51,6 +51,7 @@ import { CustomizableChartCard } from '../common/CustomizableChartCard';
 import { ModuleReportButton } from '../common/ModuleReportButton';
 import { ChartScopeBar, useChartScope } from '../common/ChartScopeBar';
 
+import { moduleName } from '../../config/moduleNames';
 interface DropoutCensusReportProps {
   students: Student[];
   classes: SchoolClass[];
@@ -760,7 +761,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
               <span>Painel Oficial do Censo da Educação Municipal & Busca Ativa</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-              Diagnóstico de Evasão Escolar & Controle do Censo Municipal
+              {moduleName('DROPOUT_CENSUS')}
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
               Mapeamento nominal de estudantes evadidos, classificação multifatorial de motivos (Padrão MEC/Educacenso), protocolos da Busca Ativa e articulação intersetorial com o Conselho Tutelar e CRAS.

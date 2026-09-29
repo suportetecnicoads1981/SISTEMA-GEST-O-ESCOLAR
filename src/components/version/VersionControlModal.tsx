@@ -46,6 +46,7 @@ import {
   downloadReleaseNotesFile,
 } from '../../services/versionControlService';
 
+import { moduleName } from '../../config/moduleNames';
 interface VersionControlModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -184,7 +185,7 @@ export const VersionControlModal: React.FC<VersionControlModalProps> = ({
                 title="Abrir Central de Atualizações na Nuvem"
               >
                 <RefreshCw className="h-3.5 w-3.5 text-amber-300" />
-                <span>Central Nuvem (OTA)</span>
+                <span>{moduleName('SYSTEM_UPDATES')}</span>
               </button>
             </div>
           </div>

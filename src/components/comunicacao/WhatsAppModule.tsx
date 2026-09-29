@@ -60,6 +60,7 @@ import {
 } from '../../services/whatsapp/whatsappAssist';
 import { ModuleReportButton } from '../common/ModuleReportButton';
 
+import { moduleName } from '../../config/moduleNames';
 /** Pedido de envio vindo de outro módulo (ex.: Mural de Comunicados). */
 export interface WhatsAppPrefill {
   title?: string;
@@ -417,7 +418,7 @@ export const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({
             <MessageSquare className="h-7 w-7" />
           </div>
           <div>
-            <h2 className="text-xl font-bold">Central de WhatsApp</h2>
+            <h2 className="text-xl font-bold">{moduleName('WHATSAPP')}</h2>
             <p className="text-xs text-emerald-100/80 max-w-2xl leading-relaxed mt-1">
               Envio assistido: o sistema monta a lista e abre cada conversa com a mensagem pronta. Você confere e aperta
               <strong> Enviar</strong> no WhatsApp. Use o WhatsApp da escola, conectado neste computador.

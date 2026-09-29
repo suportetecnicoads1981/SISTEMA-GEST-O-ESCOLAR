@@ -28,6 +28,7 @@ import {
   CornerDownLeft,
 } from 'lucide-react';
 
+import { moduleName } from '../../config/moduleNames';
 interface QuickJumpSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -50,7 +51,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   // Visão Geral
   {
     id: 'MAIN_DASHBOARD',
-    title: 'Visão Geral & Dashbox Executivo',
+    title: moduleName('MAIN_DASHBOARD'),
     category: 'Início',
     categoryColor: 'bg-indigo-50 text-indigo-700',
     keywords: ['dashboard', 'resumo', 'painel', 'métricas', 'inicio', 'home', 'graficos'],
@@ -60,7 +61,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   },
   {
     id: 'NOTIFICATIONS',
-    title: 'Central de Notificações & Auditoria',
+    title: moduleName('NOTIFICATIONS'),
     category: 'Início',
     categoryColor: 'bg-indigo-50 text-indigo-700',
     keywords: ['avisos', 'notificacoes', 'alertas', 'mensagens', 'sino'],
@@ -72,7 +73,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   // Espaço Docente
   {
     id: 'TEACHER_PORTAL',
-    title: 'Portal do Professor',
+    title: moduleName('TEACHER_PORTAL'),
     category: 'Docente',
     categoryColor: 'bg-emerald-50 text-emerald-700',
     keywords: ['professor', 'turmas', 'aulas', 'docente', 'notas', 'frequencia'],
@@ -81,7 +82,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   },
   {
     id: 'CLASS_DIARY',
-    title: 'Diário de Classe, Chamada & BNCC',
+    title: moduleName('CLASS_DIARY'),
     category: 'Docente',
     categoryColor: 'bg-emerald-50 text-emerald-700',
     keywords: ['diario', 'chamada', 'presenca', 'frequencia', 'normativas', 'seduc'],
@@ -93,7 +94,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   // Secretaria
   {
     id: 'STUDENTS',
-    title: 'Secretaria & Cadastro de Alunos',
+    title: moduleName('STUDENTS'),
     category: 'Secretaria',
     categoryColor: 'bg-blue-50 text-blue-700',
     keywords: ['alunos', 'matriculas', 'secretaria', 'cadastro', 'ra', 'estudantes', 'ficha'],
@@ -103,7 +104,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   },
   {
     id: 'CLASSES',
-    title: 'Turmas, Turnos & Matrizes Curriculares',
+    title: moduleName('CLASSES'),
     category: 'Secretaria',
     categoryColor: 'bg-blue-50 text-blue-700',
     keywords: ['turmas', 'series', 'grades', 'turnos', 'disciplinas', 'matriz'],
@@ -113,7 +114,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   },
   {
     id: 'DROPOUT_CENSUS',
-    title: 'Censo de Evasão & Busca Ativa',
+    title: moduleName('DROPOUT_CENSUS'),
     category: 'Secretaria',
     categoryColor: 'bg-blue-50 text-blue-700',
     keywords: ['evasao', 'censo', 'busca ativa', 'desistencias', 'inep', 'abandono'],
@@ -123,7 +124,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   },
   {
     id: 'DOCUMENTS',
-    title: 'Certificados & Documentos Oficiais',
+    title: moduleName('DOCUMENTS'),
     category: 'Secretaria',
     categoryColor: 'bg-blue-50 text-blue-700',
     keywords: ['documentos', 'historico', 'declaracao', 'certificado', 'boletim', 'autenticacao'],
@@ -135,7 +136,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   // Pedagógico
   {
     id: 'PEDAGOGICAL_DASHBOARD',
-    title: 'Evolução Pedagógica & Desempenho',
+    title: moduleName('PEDAGOGICAL_DASHBOARD'),
     category: 'Pedagógico',
     categoryColor: 'bg-purple-50 text-purple-700',
     keywords: ['evolucao', 'graficos', 'desempenho', 'pedagogico', 'bncc', 'habilidades'],
@@ -145,7 +146,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   },
   {
     id: 'BNCC_SKILLS',
-    title: 'Habilidades BNCC (lançamento e relatórios)',
+    title: moduleName('BNCC_SKILLS'),
     category: 'Pedagógico',
     categoryColor: 'bg-purple-50 text-purple-700',
     keywords: ['bncc', 'habilidades', 'competencias', 'parecer', 'relatorio', 'descritivo', 'lancamento'],
@@ -154,7 +155,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   },
   {
     id: 'QUESTION_BANK',
-    title: 'Banco de Questões & Habilidades BNCC',
+    title: moduleName('QUESTION_BANK'),
     category: 'Pedagógico',
     categoryColor: 'bg-purple-50 text-purple-700',
     keywords: ['questoes', 'bncc', 'itens', 'gabarito', 'provas', 'avaliacoes'],
@@ -164,7 +165,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   },
   {
     id: 'EXAMS',
-    title: 'Gerador de Provas & Avaliações',
+    title: moduleName('EXAMS'),
     category: 'Pedagógico',
     categoryColor: 'bg-purple-50 text-purple-700',
     keywords: ['provas', 'exames', 'testes', 'caderno', 'gabarito', 'correcao'],
@@ -176,7 +177,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   // Comunicação & Municipal
   {
     id: 'MUNICIPAL_SYNC',
-    title: 'Polos Remotos & Gestão Municipal (.edusync)',
+    title: moduleName('MUNICIPAL_SYNC'),
     category: 'Municipal',
     categoryColor: 'bg-cyan-50 text-cyan-700',
     keywords: ['polos', 'remotos', 'rural', 'sincronizacao', 'edusync', 'secretaria municipal', 'pendrive'],
@@ -186,7 +187,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   },
   {
     id: 'WHATSAPP',
-    title: 'WhatsApp Notificações & Avisos aos Pais',
+    title: moduleName('WHATSAPP'),
     category: 'Comunicação',
     categoryColor: 'bg-emerald-50 text-emerald-700',
     keywords: ['whatsapp', 'mensagens', 'pais', 'comunicados', 'disparo', 'faltas'],
@@ -198,7 +199,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   // ADMINISTRAÇÃO & TI (Central unificada e sub-módulos)
   {
     id: 'ADMIN_TI',
-    title: 'Hub de Administração & TI (Painel Central)',
+    title: moduleName('ADMIN_TI'),
     category: 'Administração & TI',
     categoryColor: 'bg-rose-50 text-rose-700',
     keywords: ['ti', 'administracao', 'painel ti', 'hub', 'infraestrutura', 'servidores', 'engenharia'],
@@ -208,7 +209,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   },
   {
     id: 'USER_CONTROL',
-    title: 'Controle de Usuários & Níveis de Acesso',
+    title: moduleName('USER_CONTROL'),
     category: 'Administração & TI',
     categoryColor: 'bg-rose-50 text-rose-700',
     keywords: ['usuarios', 'senhas', 'permissoes', 'perfis', 'acessos', 'setores', 'master', 'admin'],
@@ -218,7 +219,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   },
   {
     id: 'NEXUS_BUILD',
-    title: 'NexusBuild Total .EXE Suite',
+    title: moduleName('NEXUS_BUILD'),
     category: 'Administração & TI',
     categoryColor: 'bg-amber-50 text-amber-700',
     keywords: ['nexusbuild', 'exe', 'instalador', 'inno setup', 'postgresql', '800mb', 'netstat', 'windows'],
@@ -228,7 +229,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   },
   {
     id: 'DATASYNC_PRO',
-    title: 'DataSync Pro (Supabase / PostgreSQL)',
+    title: moduleName('DATASYNC_PRO'),
     category: 'Administração & TI',
     categoryColor: 'bg-emerald-50 text-emerald-700',
     keywords: ['datasync', 'supabase', 'ddl', 'schema', 'backup', 'recuperacao', 'banco de dados'],
@@ -238,7 +239,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   },
   {
     id: 'CLEANSLATE_HUB',
-    title: 'CleanSlate Enterprise Hub (Zero-Data)',
+    title: moduleName('CLEANSLATE_HUB'),
     category: 'Administração & TI',
     categoryColor: 'bg-rose-50 text-rose-700',
     keywords: ['cleanslate', 'zero-data', 'seguranca', 'chunks 64mb', 'cli', 'sha256'],
@@ -248,7 +249,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   },
   {
     id: 'NETWORK_INSTALLER',
-    title: 'Instaladores de Rede Local & Backup ZIP',
+    title: moduleName('NETWORK_INSTALLER'),
     category: 'Administração & TI',
     categoryColor: 'bg-indigo-50 text-indigo-700',
     keywords: ['instalador', 'rede', 'backup', 'zip', 'powershell', 'servidor local', 'atalho'],
@@ -258,7 +259,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   },
   {
     id: 'ABOUT',
-    title: 'Sobre o Sistema & Contato do Desenvolvedor',
+    title: moduleName('ABOUT'),
     category: 'Administração & TI',
     categoryColor: 'bg-slate-100 text-slate-700',
     keywords: ['sobre', 'versao', 'desenvolvedor', 'suporte', 'licenca', 'engenharia'],

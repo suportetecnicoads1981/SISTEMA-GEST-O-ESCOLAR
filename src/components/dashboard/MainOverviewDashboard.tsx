@@ -49,6 +49,7 @@ import {
 import { CadastralPendingCensusDashbox } from './CadastralPendingCensusDashbox';
 import { SystemUpdateStatusDashbox } from './SystemUpdateStatusDashbox';
 
+import { moduleName } from '../../config/moduleNames';
 interface MainOverviewDashboardProps {
   students: Student[];
   classes: SchoolClass[];
@@ -603,7 +604,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors">
-                Secretaria & Matrículas
+                {moduleName('STUDENTS')}
               </h3>
               <p className="text-xs text-slate-500 mt-1">
                 Fichas cadastrais, emissão de RA, transferências e enturmação de alunos.
@@ -629,7 +630,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-sm group-hover:text-purple-600 transition-colors">
-                Turmas & Matrizes Curriculares
+                {moduleName('CLASSES')}
               </h3>
               <p className="text-xs text-slate-500 mt-1">
                 Controle de capacidades, turnos, enturmação e alocação do corpo docente.
@@ -655,7 +656,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-sm group-hover:text-blue-600 transition-colors">
-                Documentos & Histórico Escolar
+                {moduleName('DOCUMENTS')}
               </h3>
               <p className="text-xs text-slate-500 mt-1">
                 Boletins bimestrais, históricos com autenticação e declarações de matrícula.
@@ -681,7 +682,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-sm group-hover:text-emerald-600 transition-colors">
-                Evolução Pedagógica & BNCC
+                {moduleName('PEDAGOGICAL_DASHBOARD')}
               </h3>
               <p className="text-xs text-slate-500 mt-1">
                 Gráficos de evolução do aluno e turma, taxas de aprovação e diagnóstico.
@@ -707,7 +708,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-sm group-hover:text-amber-600 transition-colors">
-                Banco de Questões BNCC
+                {moduleName('QUESTION_BANK')}
               </h3>
               <p className="text-xs text-slate-500 mt-1">
                 Itens de múltipla escolha e discursivos com habilidades, gabarito e distratores.
@@ -733,7 +734,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-sm group-hover:text-rose-600 transition-colors">
-                Gerador de Provas & Avaliações
+                {moduleName('EXAMS')}
               </h3>
               <p className="text-xs text-slate-500 mt-1">
                 Elaboração de cadernos de prova, gabaritos e correção automática.
@@ -759,7 +760,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-sm group-hover:text-cyan-600 transition-colors">
-                Gestão Municipal & Polos Remotos
+                {moduleName('MUNICIPAL_SYNC')}
               </h3>
               <p className="text-xs text-slate-500 mt-1">
                 Sincronização de escolas sem internet por pendrive e censo unificado.
@@ -786,7 +787,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-sm group-hover:text-emerald-600 transition-colors">
-                WhatsApp & Avisos aos Pais
+                {moduleName('WHATSAPP')}
               </h3>
               <p className="text-xs text-slate-500 mt-1">
                 Disparo de alertas de faltas, boletins, busca ativa e comunicados via WhatsApp.
@@ -812,7 +813,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-sm group-hover:text-rose-600 transition-colors">
-                Controle de Usuários & Setores
+                {moduleName('USER_CONTROL')}
               </h3>
               <p className="text-xs text-slate-500 mt-1">
                 Permissões para Diretoria, Coordenação, Secretaria, Professores e Master.
@@ -838,7 +839,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
             </div>
             <div>
               <h3 className="font-black text-slate-900 text-sm group-hover:text-indigo-600 transition-colors flex items-center gap-1.5">
-                Central de Administração & TI
+                {moduleName('ADMIN_TI')}
               </h3>
               <p className="text-xs text-slate-600 mt-1">
                 Painel unificado com todos os 11 módulos de Deploy, Cloud, Builds .EXE e Segurança.

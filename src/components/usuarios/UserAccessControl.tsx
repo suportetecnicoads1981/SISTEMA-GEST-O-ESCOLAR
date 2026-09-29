@@ -54,6 +54,7 @@ import { getSupabaseClient } from '../../services/datasync/supabaseClient';
 import { confirmDialog, notify } from '../../utils/dialogs';
 import { ModuleReportButton, reportDate } from '../common/ModuleReportButton';
 
+import { moduleName } from '../../config/moduleNames';
 interface UserAccessControlProps {
   users: UserAccount[];
   currentUser: UserAccount;
@@ -547,7 +548,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
             <ChevronRight className="h-3 w-3 text-slate-300" />
             <span>Administração</span>
             <ChevronRight className="h-3 w-3 text-slate-300" />
-            <span className="font-bold text-slate-800">Controle de Usuários & Níveis de Acesso</span>
+            <span className="font-bold text-slate-800">{moduleName('USER_CONTROL')}</span>
           </div>
         </div>
 
@@ -633,7 +634,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
               Gestão de Contas, Níveis de Acesso & Matriz de Permissões
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-              Controle de Usuários & Níveis de Acesso
+              {moduleName('USER_CONTROL')}
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
               Adicione novos operadores, edite credenciais, selecione o nível de acesso em tempo real

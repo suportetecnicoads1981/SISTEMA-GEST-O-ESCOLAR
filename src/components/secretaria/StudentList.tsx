@@ -72,6 +72,7 @@ import { computePredictiveAlerts } from '../../utils/predictiveAlertsEngine';
 import { AttendanceSheet, ClassGradeSheet, NotificationItem } from '../../types';
 import { confirmDialog } from '../../utils/dialogs';
 
+import { moduleName } from '../../config/moduleNames';
 interface StudentListProps {
   students: Student[];
   classes: SchoolClass[];
@@ -1069,7 +1070,7 @@ export const StudentList: React.FC<StudentListProps> = ({
           <div className="hidden sm:flex items-center gap-1 text-xs text-slate-400">
             <span>Início</span>
             <ChevronRight className="h-3 w-3 text-slate-300" />
-            <span className="font-bold text-slate-800">Secretaria & Alunos</span>
+            <span className="font-bold text-slate-800">{moduleName('STUDENTS')}</span>
           </div>
         </div>
 
@@ -1103,14 +1104,14 @@ export const StudentList: React.FC<StudentListProps> = ({
               className="px-3 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <Award className="h-3.5 w-3.5 text-slate-500" />
-              <span>Documentos</span>
+              <span>{moduleName('DOCUMENTS')}</span>
             </button>
             <button
               onClick={() => onNavigate('PEDAGOGICAL_DASHBOARD')}
               className="px-3 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <BarChart3 className="h-3.5 w-3.5 text-slate-500" />
-              <span>Pedagógico</span>
+              <span>{moduleName('PEDAGOGICAL_DASHBOARD')}</span>
             </button>
           </div>
         )}
@@ -1121,7 +1122,7 @@ export const StudentList: React.FC<StudentListProps> = ({
         <div>
           <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
             <GraduationCap className="h-4 w-4 text-indigo-600" />
-            Secretaria Acadêmica & Gestão de Matrículas
+            {moduleName('STUDENTS')}
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
             Cadastro de estudantes, enturmação, documentação oficial, censo escolar e acompanhamento da evasão
@@ -1135,7 +1136,7 @@ export const StudentList: React.FC<StudentListProps> = ({
               title="Abrir Censo Municipal de Evasão Escolar & Busca Ativa"
             >
               <UserX className="h-3.5 w-3.5 text-rose-600" />
-              <span>Painel do Censo / Evasão</span>
+              <span>{moduleName('DROPOUT_CENSUS')}</span>
             </button>
           )}
           <button

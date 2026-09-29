@@ -36,6 +36,7 @@ import { ModuleReportButton } from '../common/ModuleReportButton';
 import { triggerPrint } from '../../utils/printHelper';
 import { confirmDialog } from '../../utils/dialogs';
 
+import { moduleName } from '../../config/moduleNames';
 interface QuestionBankProps {
   questions: Question[];
   subjects: Subject[];
@@ -243,7 +244,7 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
           <div className="hidden sm:flex items-center gap-1 text-xs text-slate-400">
             <span>Início</span>
             <ChevronRight className="h-3 w-3 text-slate-300" />
-            <span className="font-bold text-slate-800">Banco de Questões</span>
+            <span className="font-bold text-slate-800">{moduleName('QUESTION_BANK')}</span>
           </div>
         </div>
 
@@ -262,21 +263,21 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
               className="px-3 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <FileCheck className="h-3.5 w-3.5 text-slate-500" />
-              <span>Gerador de Provas</span>
+              <span>{moduleName('EXAMS')}</span>
             </button>
             <button
               onClick={() => onNavigate('STUDENT_ROOM')}
               className="px-3 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <GraduationCap className="h-3.5 w-3.5 text-slate-500" />
-              <span>Sala do Estudante</span>
+              <span>{moduleName('STUDENT_ROOM')}</span>
             </button>
             <button
               onClick={() => onNavigate('PEDAGOGICAL_DASHBOARD')}
               className="px-3 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <BarChart3 className="h-3.5 w-3.5 text-slate-500" />
-              <span>Pedagógico</span>
+              <span>{moduleName('PEDAGOGICAL_DASHBOARD')}</span>
             </button>
           </div>
         )}
@@ -287,7 +288,7 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
         <div>
           <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
             <HelpCircle className="h-5 w-5 text-indigo-600" />
-            Banco Central de Questões & Itens BNCC
+            {moduleName('QUESTION_BANK')}
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
             Acervo categorizado de questões com distratores mapeados, habilidades da BNCC e relatórios psicométricos

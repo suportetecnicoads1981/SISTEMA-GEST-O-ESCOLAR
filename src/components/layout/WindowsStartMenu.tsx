@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { UserAccount } from '../../types';
 
+import { moduleName } from '../../config/moduleNames';
 interface WindowsStartMenuProps {
   isOpen: boolean;
   onClose: () => void;
@@ -115,26 +116,26 @@ export const WindowsStartMenu: React.FC<WindowsStartMenuProps> = ({
 
   // Aplicativos / Módulos Fixados no Menu Iniciar Vertical Direito
   const pinnedApps = [
-    { id: 'MAIN_DASHBOARD', name: 'Visão Geral & Métricas', desc: 'Dashbox, Anomalias & Gráficos', icon: LayoutDashboard, color: 'bg-blue-600', group: 'Geral' },
-    { id: 'STUDENTS', name: 'Alunos & Matrículas', desc: 'Secretaria Acadêmica & Censo', icon: Users, color: 'bg-indigo-600', group: 'Acadêmico' },
-    { id: 'CLASSES', name: 'Turmas & Horários', desc: 'Enturmação, Salas e Matrizes', icon: Layers, color: 'bg-purple-600', group: 'Acadêmico' },
-    { id: 'CLASS_DIARY', name: 'Diário de Classe & Frequência', desc: 'Chamadas e Aulas Ministradas', icon: BookOpen, color: 'bg-emerald-600', group: 'Pedagógico' },
-    { id: 'TEACHER_PORTAL', name: 'Portal Docente', desc: 'Lançamento de Notas e Avaliações', icon: GraduationCap, color: 'bg-sky-600', group: 'Pedagógico' },
-    { id: 'EXAMS', name: 'Provas & Avaliações', desc: 'Gerador de Provas e Gabaritos', icon: ClipboardList, color: 'bg-amber-600', group: 'Pedagógico' },
-    { id: 'BNCC_SKILLS', name: 'Habilidades BNCC', desc: 'Lançamento, Relatórios e Gráficos', icon: HelpCircle, color: 'bg-indigo-600', group: 'Pedagógico' },
-    { id: 'QUESTION_BANK', name: 'Banco de Questões BNCC', desc: 'Habilidades e Itens Avaliativos', icon: HelpCircle, color: 'bg-teal-600', group: 'Pedagógico' },
-    { id: 'DOCUMENTS', name: 'Emissão de Documentos', desc: 'Históricos, Declarações e Diplomas', icon: Award, color: 'bg-rose-600', group: 'Secretaria' },
-    { id: 'DROPOUT_CENSUS', name: 'Censo & Evasão Escolar', desc: 'Busca Ativa e Infrequência', icon: UserX, color: 'bg-orange-600', group: 'Gestão' },
-    { id: 'PEDAGOGICAL_DASHBOARD', name: 'Evolução Pedagógica', desc: 'Diagnósticos e Rendimento', icon: TrendingUp, color: 'bg-cyan-600', group: 'Gestão' },
-    { id: 'MUNICIPAL_SYNC', name: 'Polos & Unidades da Rede', desc: 'Sincronização e Censo Municipal', icon: Building2, color: 'bg-violet-600', group: 'Rede' },
-    { id: 'NOTIFICATIONS', name: 'Central de Notificações', desc: 'Alertas, Prazos e Avisos do Sistema', icon: Bell, color: 'bg-amber-500', group: 'Comunicação' },
-    { id: 'COMMUNICATION', name: 'Mural & Mensagens', desc: 'Comunicados e Avisos Oficiais', icon: MessageSquare, color: 'bg-pink-600', group: 'Comunicação' },
-    { id: 'WHATSAPP', name: 'WhatsApp Notificações', desc: 'Avisos e Cobranças Automáticas', icon: MessageSquare, color: 'bg-emerald-500', group: 'Comunicação' },
-    { id: 'ADMIN_TI', name: 'Administração & TI', desc: 'Segurança, Servidor e Logs', icon: Sliders, color: 'bg-slate-700', group: 'Sistema' },
-    { id: 'INSTALAFLOW', name: 'InstalaFlow Híbrido', desc: 'Deploy, Offline e Nuvem', icon: Server, color: 'bg-indigo-500', group: 'Sistema' },
-    { id: 'DATASYNC_PRO', name: 'DataSync Pro & Banco', desc: 'Backups, Migração e Schemas', icon: Database, color: 'bg-blue-700', group: 'Sistema' },
-    { id: 'USER_CONTROL', name: 'Usuários & Permissões', desc: 'Contas, Perfis e Acessos', icon: Key, color: 'bg-zinc-700', group: 'Segurança' },
-    { id: 'NETWORK_INSTALLER', name: 'Instaladores Windows', desc: 'Pacotes Offline e Rede Local', icon: Network, color: 'bg-cyan-700', group: 'Deploy' },
+    { id: 'MAIN_DASHBOARD', name: moduleName('MAIN_DASHBOARD'), desc: 'Dashbox, Anomalias & Gráficos', icon: LayoutDashboard, color: 'bg-blue-600', group: 'Geral' },
+    { id: 'STUDENTS', name: moduleName('STUDENTS'), desc: 'Secretaria Acadêmica & Censo', icon: Users, color: 'bg-indigo-600', group: 'Acadêmico' },
+    { id: 'CLASSES', name: moduleName('CLASSES'), desc: 'Enturmação, Salas e Matrizes', icon: Layers, color: 'bg-purple-600', group: 'Acadêmico' },
+    { id: 'CLASS_DIARY', name: moduleName('CLASS_DIARY'), desc: 'Chamadas e Aulas Ministradas', icon: BookOpen, color: 'bg-emerald-600', group: 'Pedagógico' },
+    { id: 'TEACHER_PORTAL', name: moduleName('TEACHER_PORTAL'), desc: 'Lançamento de Notas e Avaliações', icon: GraduationCap, color: 'bg-sky-600', group: 'Pedagógico' },
+    { id: 'EXAMS', name: moduleName('EXAMS'), desc: 'Gerador de Provas e Gabaritos', icon: ClipboardList, color: 'bg-amber-600', group: 'Pedagógico' },
+    { id: 'BNCC_SKILLS', name: moduleName('BNCC_SKILLS'), desc: 'Lançamento, Relatórios e Gráficos', icon: HelpCircle, color: 'bg-indigo-600', group: 'Pedagógico' },
+    { id: 'QUESTION_BANK', name: moduleName('QUESTION_BANK'), desc: 'Habilidades e Itens Avaliativos', icon: HelpCircle, color: 'bg-teal-600', group: 'Pedagógico' },
+    { id: 'DOCUMENTS', name: moduleName('DOCUMENTS'), desc: 'Históricos, Declarações e Diplomas', icon: Award, color: 'bg-rose-600', group: 'Secretaria' },
+    { id: 'DROPOUT_CENSUS', name: moduleName('DROPOUT_CENSUS'), desc: 'Busca Ativa e Infrequência', icon: UserX, color: 'bg-orange-600', group: 'Gestão' },
+    { id: 'PEDAGOGICAL_DASHBOARD', name: moduleName('PEDAGOGICAL_DASHBOARD'), desc: 'Diagnósticos e Rendimento', icon: TrendingUp, color: 'bg-cyan-600', group: 'Gestão' },
+    { id: 'MUNICIPAL_SYNC', name: moduleName('MUNICIPAL_SYNC'), desc: 'Sincronização e Censo Municipal', icon: Building2, color: 'bg-violet-600', group: 'Rede' },
+    { id: 'NOTIFICATIONS', name: moduleName('NOTIFICATIONS'), desc: 'Alertas, Prazos e Avisos do Sistema', icon: Bell, color: 'bg-amber-500', group: 'Comunicação' },
+    { id: 'COMMUNICATION', name: moduleName('COMMUNICATION'), desc: 'Comunicados e Avisos Oficiais', icon: MessageSquare, color: 'bg-pink-600', group: 'Comunicação' },
+    { id: 'WHATSAPP', name: moduleName('WHATSAPP'), desc: 'Avisos e Cobranças Automáticas', icon: MessageSquare, color: 'bg-emerald-500', group: 'Comunicação' },
+    { id: 'ADMIN_TI', name: moduleName('ADMIN_TI'), desc: 'Segurança, Servidor e Logs', icon: Sliders, color: 'bg-slate-700', group: 'Sistema' },
+    { id: 'INSTALAFLOW', name: moduleName('INSTALAFLOW'), desc: 'Deploy, Offline e Nuvem', icon: Server, color: 'bg-indigo-500', group: 'Sistema' },
+    { id: 'DATASYNC_PRO', name: moduleName('DATASYNC_PRO'), desc: 'Backups, Migração e Schemas', icon: Database, color: 'bg-blue-700', group: 'Sistema' },
+    { id: 'USER_CONTROL', name: moduleName('USER_CONTROL'), desc: 'Contas, Perfis e Acessos', icon: Key, color: 'bg-zinc-700', group: 'Segurança' },
+    { id: 'NETWORK_INSTALLER', name: moduleName('NETWORK_INSTALLER'), desc: 'Pacotes Offline e Rede Local', icon: Network, color: 'bg-cyan-700', group: 'Deploy' },
   ];
 
   // Filtro de busca estilo Windows Search

@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { TAB_METADATA } from './WorkspaceTabsBar';
 
+import { moduleName } from '../../config/moduleNames';
 interface WindowsTitleBarProps {
   activeTab: string;
   schoolName?: string;
@@ -183,7 +184,7 @@ export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
                     }}
                     className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 flex items-center justify-between cursor-pointer"
                   >
-                    <span>Secretaria &amp; Alunos</span>
+                    <span>{moduleName('STUDENTS')}</span>
                     <kbd className="text-[9px] text-slate-500 font-mono">Alt+S</kbd>
                   </button>
                   <button
@@ -193,7 +194,7 @@ export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
                     }}
                     className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 flex items-center justify-between cursor-pointer"
                   >
-                    <span>Turmas &amp; Horários</span>
+                    <span>{moduleName('CLASSES')}</span>
                     <kbd className="text-[9px] text-slate-500 font-mono">Alt+T</kbd>
                   </button>
                   <div className="h-px bg-slate-800 my-1" />
@@ -241,7 +242,7 @@ export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
                     }}
                     className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 flex items-center justify-between cursor-pointer"
                   >
-                    <span>Visão Geral</span>
+                    <span>{moduleName('MAIN_DASHBOARD')}</span>
                     <kbd className="text-[9px] text-slate-500 font-mono">Alt+D</kbd>
                   </button>
                   <button
@@ -288,7 +289,7 @@ export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
                     className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 flex items-center gap-2 cursor-pointer"
                   >
                     <Sliders className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Central de TI &amp; Servidor</span>
+                    <span>{moduleName('ADMIN_TI')}</span>
                   </button>
                   {isTabAvailable('INSTALAFLOW') && (
                   <button
@@ -299,7 +300,7 @@ export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
                     className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 flex items-center gap-2 cursor-pointer"
                   >
                     <Server className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>InstalaFlow Híbrido</span>
+                    <span>{moduleName('INSTALAFLOW')}</span>
                   </button>
                   )}
                   <button
@@ -310,7 +311,7 @@ export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
                     className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 flex items-center gap-2 cursor-pointer"
                   >
                     <Database className="w-3.5 h-3.5 text-blue-400" />
-                    <span>DataSync Pro &amp; Backup</span>
+                    <span>{moduleName('DATASYNC_PRO')}</span>
                   </button>
                   <button
                     onClick={() => {
@@ -320,7 +321,7 @@ export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
                     className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 flex items-center gap-2 cursor-pointer"
                   >
                     <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Gerador de Pacotes e Atalhos</span>
+                    <span>{moduleName('NETWORK_INSTALLER')}</span>
                   </button>
                 </div>
               )}
@@ -376,7 +377,7 @@ export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
                     className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 flex items-center gap-2 cursor-pointer"
                   >
                     <HelpCircle className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Sobre o SucessoEdu</span>
+                    <span>{moduleName('ABOUT')}</span>
                   </button>
                 </div>
               )}

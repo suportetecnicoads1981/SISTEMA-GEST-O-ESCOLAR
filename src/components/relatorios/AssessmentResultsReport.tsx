@@ -60,6 +60,7 @@ import {
 import { CustomizableChartCard } from '../common/CustomizableChartCard';
 import { ModuleReportButton } from '../common/ModuleReportButton';
 
+import { moduleName } from '../../config/moduleNames';
 interface AssessmentResultsReportProps {
   exams: Exam[];
   questions: Question[];
@@ -612,14 +613,14 @@ export const AssessmentResultsReport: React.FC<AssessmentResultsReportProps> = (
               className="px-3 py-1 text-xs font-bold rounded-lg bg-indigo-600 text-white shadow-xs cursor-pointer flex items-center gap-1.5"
             >
               <BarChart3 className="h-3.5 w-3.5" />
-              <span>Painel Pedagógico</span>
+              <span>{moduleName('PEDAGOGICAL_DASHBOARD')}</span>
             </button>
             <button
               onClick={() => onNavigate('EXAMS')}
               className="px-3 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <Award className="h-3.5 w-3.5 text-slate-500" />
-              <span>Provas</span>
+              <span>{moduleName('EXAMS')}</span>
             </button>
           </div>
         )}
@@ -638,7 +639,7 @@ export const AssessmentResultsReport: React.FC<AssessmentResultsReportProps> = (
               <span className="text-indigo-600 font-bold">Relatório Oficial de Avaliações</span>
             </div>
             <h1 className="text-xl font-black text-slate-900 tracking-tight">
-              Resultados de Avaliações por Nível Escolar & Unidade Escolar
+              {moduleName('ASSESSMENT_REPORT')}
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
               Análise comparativa de proficiência, rendimento acadêmico e desempenho entre escolas e etapas de ensino

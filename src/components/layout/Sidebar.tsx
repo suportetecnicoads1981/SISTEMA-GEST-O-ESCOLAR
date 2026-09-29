@@ -54,6 +54,7 @@ import {
   BookOpenCheck,
 } from 'lucide-react';
 
+import { moduleName } from '../../config/moduleNames';
 interface SidebarProps {
   activeTab?: string;
   currentTab?: string;
@@ -225,14 +226,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         {
           id: 'MAIN_DASHBOARD',
-          label: 'Visão Geral / Dashbox',
+          label: moduleName('MAIN_DASHBOARD'),
           icon: LayoutDashboard,
           badge: 'Principal',
           shortcut: 'Alt+D',
         },
         {
           id: 'ARCHITECTURE_DIAGRAM',
-          label: 'Diagrama & Solicitações IA',
+          label: moduleName('ARCHITECTURE_DIAGRAM'),
           icon: GitBranch,
           badge: '18 Módulos',
           shortcut: 'Alt+A',
@@ -244,20 +245,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         {
           id: 'NOTIFICATIONS',
-          label: 'Central de Notificações',
+          label: moduleName('NOTIFICATIONS'),
           icon: Bell,
           count: counts?.unreadNotifications,
           shortcut: 'Alt+N',
         },
         {
           id: 'COMMUNICATION',
-          label: 'Mural de Comunicados & Mensagens',
+          label: moduleName('COMMUNICATION'),
           icon: Megaphone,
           badge: 'Avisos',
         },
         {
           id: 'WHATSAPP',
-          label: 'WhatsApp para Pais & Equipe',
+          label: moduleName('WHATSAPP'),
           icon: MessageCircle,
           badge: 'Envio',
         },
@@ -268,13 +269,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         {
           id: 'TEACHER_PORTAL',
-          label: 'Portal do Professor',
+          label: moduleName('TEACHER_PORTAL'),
           icon: GraduationCap,
           badge: 'Minhas Turmas',
         },
         {
           id: 'CLASS_DIARY',
-          label: 'Diário & Frequência',
+          label: moduleName('CLASS_DIARY'),
           icon: BookOpen,
           badge: 'Normativas',
           shortcut: 'Alt+E',
@@ -284,10 +285,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'Secretaria & Ensino',
       items: [
-        { id: 'STUDENTS', label: 'Secretaria & Alunos', icon: Users, count: counts?.students, shortcut: 'Alt+S' },
-        { id: 'CLASSES', label: 'Turmas & Matrizes', icon: Layers, shortcut: 'Alt+T' },
-        { id: 'DROPOUT_CENSUS', label: 'Censo de Evasão & Busca Ativa', icon: UserX, badge: 'Censo', shortcut: 'Alt+C' },
-        { id: 'DOCUMENTS', label: 'Documentos & Certificados', icon: Award, badge: 'Oficial', shortcut: 'Alt+O' },
+        { id: 'STUDENTS', label: moduleName('STUDENTS'), icon: Users, count: counts?.students, shortcut: 'Alt+S' },
+        { id: 'CLASSES', label: moduleName('CLASSES'), icon: Layers, shortcut: 'Alt+T' },
+        { id: 'DROPOUT_CENSUS', label: moduleName('DROPOUT_CENSUS'), icon: UserX, badge: 'Censo', shortcut: 'Alt+C' },
+        { id: 'DOCUMENTS', label: moduleName('DOCUMENTS'), icon: Award, badge: 'Oficial', shortcut: 'Alt+O' },
       ],
     },
     {
@@ -295,27 +296,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         {
           id: 'PEDAGOGICAL_DASHBOARD',
-          label: 'Evolução Pedagógica',
+          label: moduleName('PEDAGOGICAL_DASHBOARD'),
           icon: TrendingUp,
           badge: 'Gráficos',
           shortcut: 'Alt+R',
         },
         {
           id: 'BNCC_SKILLS',
-          label: 'Habilidades BNCC',
+          label: moduleName('BNCC_SKILLS'),
           icon: BookOpenCheck,
           badge: 'Novo',
         },
         {
           id: 'ASSESSMENT_REPORT',
-          label: 'Resultados Nível & Escola',
+          label: moduleName('ASSESSMENT_REPORT'),
           icon: BarChart3,
           badge: 'INEP/SAEB',
         },
-        { id: 'EXAMS', label: 'Elaboração de Provas', icon: ClipboardList, count: counts?.exams, shortcut: 'Alt+P' },
+        { id: 'EXAMS', label: moduleName('EXAMS'), icon: ClipboardList, count: counts?.exams, shortcut: 'Alt+P' },
         {
           id: 'QUESTIONS',
-          label: 'Banco de Questões BNCC',
+          label: moduleName('QUESTIONS'),
           icon: HelpCircle,
           count: counts?.questions,
           shortcut: 'Alt+Q',
@@ -327,7 +328,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         {
           id: 'MUNICIPAL_SYNC',
-          label: 'Rede Municipal & Polos',
+          label: moduleName('MUNICIPAL_SYNC'),
           icon: Building2,
           count: counts?.schoolUnits,
           badge: 'SEMED',
@@ -341,61 +342,61 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         {
           id: 'ADMIN_TI',
-          label: 'Hub de Engenharia & TI',
+          label: moduleName('ADMIN_TI'),
           icon: Server,
           badge: '12 Painéis',
         },
         {
           id: 'OMNI_DEPLOY',
-          label: 'Deploy em Nuvem & Docker',
+          label: moduleName('OMNI_DEPLOY'),
           icon: Box,
           badge: 'Nuvem',
         },
         {
           id: 'NEXUS_DEPLOYER',
-          label: 'Gerador de Pacotes Windows',
+          label: moduleName('NEXUS_DEPLOYER'),
           icon: HardDrive,
           badge: 'Instalador',
         },
         {
           id: 'NEXUS_INSTALL',
-          label: 'Instalador Rápido de Estação',
+          label: moduleName('NEXUS_INSTALL'),
           icon: Wrench,
           badge: 'Setup',
         },
         {
           id: 'NEXUS_BUILD',
-          label: 'Compilador & Empacotador',
+          label: moduleName('NEXUS_BUILD'),
           icon: Cpu,
           badge: 'Build',
         },
         {
           id: 'CLEANSLATE_HUB',
-          label: 'Manutenção de Banco & Cache',
+          label: moduleName('CLEANSLATE_HUB'),
           icon: Database,
           badge: 'Limpeza',
         },
         {
           id: 'INSTALAFLOW',
-          label: 'Assistente Passo a Passo',
+          label: moduleName('INSTALAFLOW'),
           icon: Sliders,
           badge: 'Guiado',
         },
         {
           id: 'DATASYNC_PRO',
-          label: 'Sincronização Remota (.edusync)',
+          label: moduleName('DATASYNC_PRO'),
           icon: Folder,
           badge: 'Offline',
         },
         {
           id: 'DEBUG_FLOW',
-          label: 'DebugFlow & Auditoria Full-Stack',
+          label: moduleName('DEBUG_FLOW'),
           icon: ShieldAlert,
           badge: 'Supabase',
         },
         {
           id: 'USER_CONTROL',
-          label: 'Usuários & Permissões',
+          label: moduleName('USER_CONTROL'),
           icon: Key,
           count: counts?.userAccounts,
           badge: 'Setores',
@@ -403,13 +404,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         },
         {
           id: 'SYSTEM_UPDATES',
-          label: 'Atualizações na Nuvem',
+          label: moduleName('SYSTEM_UPDATES'),
           icon: RefreshCw,
           badge: 'OTA Web',
         },
-        { id: 'NETWORK_INSTALLER', label: 'Instaladores & Backup', icon: Network, shortcut: 'Alt+I' },
-        ...(showDevBacklog ? [{ id: 'DEV_BACKLOG', label: 'Plano de Desenvolvimento', icon: NotebookPen, badge: 'Privado' }] : []),
-        { id: 'ABOUT', label: 'Sobre o Sistema & Dev', icon: Info, shortcut: 'Alt+A' },
+        { id: 'NETWORK_INSTALLER', label: moduleName('NETWORK_INSTALLER'), icon: Network, shortcut: 'Alt+I' },
+        ...(showDevBacklog ? [{ id: 'DEV_BACKLOG', label: moduleName('DEV_BACKLOG'), icon: NotebookPen, badge: 'Privado' }] : []),
+        { id: 'ABOUT', label: moduleName('ABOUT'), icon: Info, shortcut: 'Alt+A' },
       ],
     },
   ];

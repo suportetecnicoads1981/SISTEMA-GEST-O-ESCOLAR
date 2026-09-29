@@ -28,6 +28,7 @@ import {
   SchoolSettings,
 } from '../../types';
 
+import { moduleName } from '../../config/moduleNames';
 interface QuickActionButtonsDashboardProps {
   students: Student[];
   classes: SchoolClass[];
@@ -270,7 +271,7 @@ export const QuickActionButtonsDashboard: React.FC<QuickActionButtonsDashboardPr
               <Users className="h-5 w-5" />
             </div>
             <div>
-              <h4 className="font-bold text-slate-900 text-xs">Gestão de Alunos</h4>
+              <h4 className="font-bold text-slate-900 text-xs">{moduleName('STUDENTS')}</h4>
               <p className="text-[11px] text-slate-500">{students.length} cadastrados</p>
             </div>
           </button>
@@ -284,7 +285,7 @@ export const QuickActionButtonsDashboard: React.FC<QuickActionButtonsDashboardPr
               <HelpCircle className="h-5 w-5" />
             </div>
             <div>
-              <h4 className="font-bold text-slate-900 text-xs">Banco de Questões</h4>
+              <h4 className="font-bold text-slate-900 text-xs">{moduleName('QUESTION_BANK')}</h4>
               <p className="text-[11px] text-slate-500">Alinhado à BNCC</p>
             </div>
           </button>
@@ -298,7 +299,7 @@ export const QuickActionButtonsDashboard: React.FC<QuickActionButtonsDashboardPr
               <BookOpen className="h-5 w-5" />
             </div>
             <div>
-              <h4 className="font-bold text-slate-900 text-xs">Gerador de Provas</h4>
+              <h4 className="font-bold text-slate-900 text-xs">{moduleName('EXAMS')}</h4>
               <p className="text-[11px] text-slate-500">{exams.length} avaliações</p>
             </div>
           </button>
@@ -312,7 +313,7 @@ export const QuickActionButtonsDashboard: React.FC<QuickActionButtonsDashboardPr
               <Bell className="h-5 w-5" />
             </div>
             <div>
-              <h4 className="font-bold text-slate-900 text-xs">Mural de Avisos</h4>
+              <h4 className="font-bold text-slate-900 text-xs">{moduleName('COMMUNICATION')}</h4>
               <p className="text-[11px] text-slate-500">Recados e comunicados</p>
             </div>
           </button>

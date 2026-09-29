@@ -14,6 +14,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 
+import { moduleName } from '../../config/moduleNames';
 interface GuidedTourModalProps {
   isOpen: boolean;
   /** neverShowAgain = true quando o usuário marcou "Não mostrar mais ao entrar". */
@@ -114,7 +115,7 @@ const TOUR_STEPS: TourStep[] = [
     badge: 'Início',
   },
   {
-    title: 'Visão Geral / Dashbox',
+    title: moduleName('MAIN_DASHBOARD'),
     subtitle: 'Indicadores e Métricas em Tempo Real',
     description:
       'O painel principal consolida o total de matrículas, frequência média, fluxo de caixa e alertas gerenciais para tomada rápida de decisões.',
@@ -124,7 +125,7 @@ const TOUR_STEPS: TourStep[] = [
     badge: 'Dashboard',
   },
   {
-    title: 'Secretaria & Alunos',
+    title: moduleName('STUDENTS'),
     subtitle: 'Gestão Completa de Matrizes e Estudantes',
     description:
       'Cadastre alunos, gerencie histórico escolar, transferências, status cadastral e emita certificados e históricos oficiais com validação.',
@@ -134,7 +135,7 @@ const TOUR_STEPS: TourStep[] = [
     badge: 'Secretaria',
   },
   {
-    title: 'Turmas & Enturmação',
+    title: moduleName('CLASSES'),
     subtitle: 'Organização da Grade Curricular e Vagas',
     description:
       'Configure turmas por modalidade (Infantil, Fundamental, Médio), turnos, atribuição de professores e lotação de salas de aula.',
@@ -144,7 +145,7 @@ const TOUR_STEPS: TourStep[] = [
     badge: 'Turmas',
   },
   {
-    title: 'Portal do Docente & Diário',
+    title: `${moduleName('TEACHER_PORTAL')} e ${moduleName('CLASS_DIARY')}`,
     subtitle: 'Registro de Aulas e Chamada Digital',
     description:
       'Espaço dedicado aos professores registrarem frequências diárias, conteúdos ministrados, notas e planos de aula pedagógicos.',
@@ -154,7 +155,7 @@ const TOUR_STEPS: TourStep[] = [
     badge: 'Docentes',
   },
   {
-    title: 'Hub de Engenharia & TI',
+    title: moduleName('ADMIN_TI'),
     subtitle: 'Instalação, Backup e Sincronização',
     description:
       'Painéis avançados para gerenciamento de banco de dados local/nuvem, exportação de instaladores offline e atualizações OTA.',

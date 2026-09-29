@@ -83,6 +83,7 @@ import {
 } from '../common/ConfigurablePrintModal';
 import { confirmDialog } from '../../utils/dialogs';
 
+import { moduleName } from '../../config/moduleNames';
 interface PedagogicalDashboardProps {
   exams: Exam[];
   questions: Question[];
@@ -569,28 +570,28 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
               className="px-3 py-1 text-xs font-bold rounded-lg bg-indigo-600 text-white shadow-xs cursor-pointer flex items-center gap-1.5"
             >
               <BarChart3 className="h-3.5 w-3.5" />
-              <span>Painel Pedagógico</span>
+              <span>{moduleName('PEDAGOGICAL_DASHBOARD')}</span>
             </button>
             <button
               onClick={() => onNavigate('EXAMS')}
               className="px-3 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <FileCheck className="h-3.5 w-3.5 text-slate-500" />
-              <span>Gerador de Provas</span>
+              <span>{moduleName('EXAMS')}</span>
             </button>
             <button
               onClick={() => onNavigate('QUESTION_BANK')}
               className="px-3 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <HelpCircle className="h-3.5 w-3.5 text-slate-500" />
-              <span>Banco de Questões</span>
+              <span>{moduleName('QUESTION_BANK')}</span>
             </button>
             <button
               onClick={() => onNavigate('STUDENTS')}
               className="px-3 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <Users className="h-3.5 w-3.5 text-slate-500" />
-              <span>Alunos</span>
+              <span>{moduleName('STUDENTS')}</span>
             </button>
           </div>
         )}

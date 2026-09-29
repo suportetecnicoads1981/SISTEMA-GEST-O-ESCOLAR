@@ -71,6 +71,7 @@ import { generateLote, downloadLote, importLote } from '../../services/offline/l
 import { getLocalServerInfo } from '../../services/offline/localServerSync';
 import { ModuleReportButton } from '../common/ModuleReportButton';
 
+import { moduleName } from '../../config/moduleNames';
 interface MunicipalSyncModuleProps {
   schoolUnits?: SchoolUnit[];
   syncLogs?: SyncAuditLog[];
@@ -576,7 +577,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
           <div className="hidden sm:flex items-center gap-1 text-xs text-slate-400 ml-1">
             <span>Início</span>
             <ChevronRight className="h-3 w-3 text-slate-300" />
-            <span className="font-bold text-slate-800">Gestão Municipal & Polos</span>
+            <span className="font-bold text-slate-800">{moduleName('MUNICIPAL_SYNC')}</span>
           </div>
         </div>
 
@@ -666,7 +667,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                 Gestão Escolar Pública Municipal & Sincronização Descentralizada
               </div>
               <h2 className="text-xl font-black">
-                Central de Unificação Municipal, Polos Satélites & Censo Escolar
+                {moduleName('MUNICIPAL_SYNC')}
               </h2>
               <p className="text-xs text-emerald-100 max-w-2xl">
                 Órgão Gestor Central: <strong>{activeSecretary.name}</strong> • CNPJ: <strong>{activeSecretary.cnpj}</strong> • {activeSecretary.city}/{activeSecretary.state}. Todas as unidades escolares e polos remotos operam integradas a este registro central.

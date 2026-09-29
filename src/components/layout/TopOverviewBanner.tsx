@@ -12,6 +12,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 
+import { moduleName } from '../../config/moduleNames';
 interface TopOverviewBannerProps {
   activeTab: string;
   onNavigate: (tab: string) => void;
@@ -81,7 +82,7 @@ export const TopOverviewBanner: React.FC<TopOverviewBannerProps> = ({
           title="Ver Central de Notificações"
         >
           <Bell className="h-3.5 w-3.5 text-amber-500" />
-          <span>Notificações</span>
+          <span>{moduleName('NOTIFICATIONS')}</span>
           {unreadNotificationsCount > 0 && (
             <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse">
               {unreadNotificationsCount}

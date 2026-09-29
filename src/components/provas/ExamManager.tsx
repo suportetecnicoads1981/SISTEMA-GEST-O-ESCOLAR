@@ -43,6 +43,7 @@ import { classLabelWithSchool } from '../../utils/schoolDataNormalizer';
 import { confirmDialog } from '../../utils/dialogs';
 import { ModuleReportButton, reportDate } from '../common/ModuleReportButton';
 
+import { moduleName } from '../../config/moduleNames';
 interface ExamManagerProps {
   exams: Exam[];
   questions: Question[];
@@ -257,7 +258,7 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
           <div className="hidden sm:flex items-center gap-1 text-xs text-slate-400">
             <span>Início</span>
             <ChevronRight className="h-3 w-3 text-slate-300" />
-            <span className="font-bold text-slate-800">Gerador & Gestão de Provas</span>
+            <span className="font-bold text-slate-800">{moduleName('EXAMS')}</span>
           </div>
         </div>
 
@@ -276,21 +277,21 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
               className="px-3 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <HelpCircle className="h-3.5 w-3.5 text-slate-500" />
-              <span>Banco de Questões</span>
+              <span>{moduleName('QUESTION_BANK')}</span>
             </button>
             <button
               onClick={() => onNavigate('STUDENT_ROOM')}
               className="px-3 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <GraduationCap className="h-3.5 w-3.5 text-slate-500" />
-              <span>Sala de Provas</span>
+              <span>{moduleName('STUDENT_ROOM')}</span>
             </button>
             <button
               onClick={() => onNavigate('PEDAGOGICAL_DASHBOARD')}
               className="px-3 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <BarChart3 className="h-3.5 w-3.5 text-slate-500" />
-              <span>Pedagógico</span>
+              <span>{moduleName('PEDAGOGICAL_DASHBOARD')}</span>
             </button>
           </div>
         )}
@@ -301,7 +302,7 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
         <div>
           <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
             <ClipboardList className="h-5 w-5 text-indigo-600" />
-            Controle de Avaliações, Cadernos & Gabaritos Oficiais
+            {moduleName('EXAMS')}
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
             Crie provas personalizadas com cronômetro, pesos por questão, impressão de cartões resposta e espelho de correção do professor

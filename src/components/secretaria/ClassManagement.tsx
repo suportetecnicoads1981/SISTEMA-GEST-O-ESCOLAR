@@ -37,6 +37,7 @@ import {
 import { triggerPrint, downloadPrintableHtml } from '../../utils/printHelper';
 import { confirmDialog } from '../../utils/dialogs';
 
+import { moduleName } from '../../config/moduleNames';
 interface ClassManagementProps {
   classes: SchoolClass[];
   courses: Course[];
@@ -389,7 +390,7 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
           <div className="hidden sm:flex items-center gap-1 text-xs text-slate-400">
             <span>Início</span>
             <ChevronRight className="h-3 w-3 text-slate-300" />
-            <span className="font-bold text-slate-800">Turmas & Matrizes</span>
+            <span className="font-bold text-slate-800">{moduleName('CLASSES')}</span>
           </div>
         </div>
 
@@ -415,7 +416,7 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
               className="px-3 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <Award className="h-3.5 w-3.5 text-slate-500" />
-              <span>Documentos</span>
+              <span>{moduleName('DOCUMENTS')}</span>
             </button>
           </div>
         )}
@@ -426,7 +427,7 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
         <div>
           <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
             <Layers className="h-5 w-5 text-indigo-600" />
-            Gestão de Turmas, Cursos e Matrizes Curriculares
+            {moduleName('CLASSES')}
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
             Organização dos ciclos letivos, ordenação alfabética, turnos (Matutino/Vespertino) e capacidade de salas

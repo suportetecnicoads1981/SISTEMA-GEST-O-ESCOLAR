@@ -1,6 +1,7 @@
 import { SystemUpdatePackage, SystemUpdateImprovement } from '../types';
 import { OFFICIAL_CLOUD_UPDATE_PACKAGES } from '../utils/updatePackageHelper';
 
+import { moduleName } from '../config/moduleNames';
 export interface VersionComparisonResult {
   fromVersion: string;
   toVersion: string;
@@ -198,48 +199,48 @@ export function getTargetTabForImprovement(improvement: SystemUpdateImprovement)
   const cat = improvement.category;
 
   if (title.includes('login') || title.includes('acesso') || title.includes('usuário')) {
-    return { tabId: 'USER_CONTROL', label: 'Controle de Usuários' };
+    return { tabId: 'USER_CONTROL', label: moduleName('USER_CONTROL') };
   }
   if (title.includes('whatsapp') || title.includes('comunicado')) {
-    return { tabId: 'WHATSAPP', label: 'WhatsApp Notificações' };
+    return { tabId: 'WHATSAPP', label: moduleName('WHATSAPP') };
   }
   if (title.includes('c:\\sucessoedu') || title.includes('instalador') || title.includes('servidor')) {
-    return { tabId: 'NETWORK_INSTALLER', label: 'Central de Instalação' };
+    return { tabId: 'NETWORK_INSTALLER', label: moduleName('NETWORK_INSTALLER') };
   }
   if (title.includes('integridade') || title.includes('chave estrangeira') || title.includes('fk')) {
-    return { tabId: 'ADMIN_TI', label: 'Integridade & TI' };
+    return { tabId: 'ADMIN_TI', label: moduleName('ADMIN_TI') };
   }
   if (title.includes('datasync') || title.includes('supabase') || title.includes('ddl')) {
-    return { tabId: 'DATASYNC_PRO', label: 'DataSync Pro' };
+    return { tabId: 'DATASYNC_PRO', label: moduleName('DATASYNC_PRO') };
   }
   if (title.includes('diagrama') || title.includes('arquitetura')) {
-    return { tabId: 'ARCHITECTURE_DIAGRAM', label: 'Diagrama de Arquitetura' };
+    return { tabId: 'ARCHITECTURE_DIAGRAM', label: moduleName('ARCHITECTURE_DIAGRAM') };
   }
   if (title.includes('diário') || title.includes('frequência') || title.includes('chamada')) {
-    return { tabId: 'CLASS_DIARY', label: 'Diário de Classe' };
+    return { tabId: 'CLASS_DIARY', label: moduleName('CLASS_DIARY') };
   }
   if (title.includes('prova') || title.includes('avaliação') || title.includes('distrator')) {
-    return { tabId: 'EXAMS', label: 'Gerador de Provas' };
+    return { tabId: 'EXAMS', label: moduleName('EXAMS') };
   }
   if (title.includes('bncc') || title.includes('pedagógico') || title.includes('aprendizagem')) {
-    return { tabId: 'PEDAGOGICAL_DASHBOARD', label: 'Evolução Pedagógica' };
+    return { tabId: 'PEDAGOGICAL_DASHBOARD', label: moduleName('PEDAGOGICAL_DASHBOARD') };
   }
   if (title.includes('evasão') || title.includes('busca ativa')) {
-    return { tabId: 'DROPOUT_CENSUS', label: 'Censo de Evasão' };
+    return { tabId: 'DROPOUT_CENSUS', label: moduleName('DROPOUT_CENSUS') };
   }
   if (title.includes('histórico') || title.includes('matrícula') || title.includes('aluno')) {
-    return { tabId: 'STUDENTS', label: 'Secretaria & Alunos' };
+    return { tabId: 'STUDENTS', label: moduleName('STUDENTS') };
   }
   if (title.includes('polo') || title.includes('edusync') || title.includes('municipal')) {
-    return { tabId: 'MUNICIPAL_SYNC', label: 'Polos Remotos & Censo' };
+    return { tabId: 'MUNICIPAL_SYNC', label: moduleName('MUNICIPAL_SYNC') };
   }
   if (cat === 'SEGURANCA') {
-    return { tabId: 'NOTIFICATIONS', label: 'Central de Segurança' };
+    return { tabId: 'NOTIFICATIONS', label: moduleName('NOTIFICATIONS') };
   }
   if (cat === 'PERFORMANCE' || cat === 'SISTEMA') {
-    return { tabId: 'SYSTEM_UPDATES', label: 'Atualizações na Nuvem' };
+    return { tabId: 'SYSTEM_UPDATES', label: moduleName('SYSTEM_UPDATES') };
   }
-  return { tabId: 'MAIN_DASHBOARD', label: 'Visão Geral' };
+  return { tabId: 'MAIN_DASHBOARD', label: moduleName('MAIN_DASHBOARD') };
 }
 
 /**

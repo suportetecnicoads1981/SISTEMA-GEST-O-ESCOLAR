@@ -103,6 +103,7 @@ import { UninstallationModule } from './UninstallationModule';
 import { generateUpdateManualHtml } from '../../utils/updatePackageHelper';
 import { confirmDialog, notify } from '../../utils/dialogs';
 
+import { moduleName } from '../../config/moduleNames';
 interface NetworkInstallerProps {
   onBack?: () => void;
   onNavigate?: (tab: string, payload?: any) => void;
@@ -443,7 +444,7 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
           <div className="hidden sm:flex items-center gap-1 text-xs text-slate-400 ml-1">
             <span>Início</span>
             <ChevronRight className="h-3 w-3 text-slate-300" />
-            <span className="font-bold text-slate-800">Instaladores & Arquitetura Local</span>
+            <span className="font-bold text-slate-800">{moduleName('NETWORK_INSTALLER')}</span>
           </div>
         </div>
 
@@ -462,7 +463,7 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
               className="px-3 py-1 text-xs font-bold rounded-lg bg-indigo-600 text-white shadow-xs cursor-pointer flex items-center gap-1.5"
             >
               <HardDrive className="h-3.5 w-3.5" />
-              <span>Instaladores</span>
+              <span>{moduleName('NETWORK_INSTALLER')}</span>
             </button>
             <button
               onClick={() => onNavigate('USER_ACCESS')}
@@ -476,7 +477,7 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
               className="px-3 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <Info className="h-3.5 w-3.5 text-slate-500" />
-              <span>Sobre o Sistema</span>
+              <span>{moduleName('ABOUT')}</span>
             </button>
           </div>
         )}

@@ -31,6 +31,7 @@ import { isProvisionalRa } from '../../services/raService';
 import { mergeGradeHistories, isNum } from '../../services/gradeAnalytics';
 import type { AttendanceSheet, ClassGradeSheet } from '../../types';
 
+import { moduleName } from '../../config/moduleNames';
 export type DocumentType =
   | 'CERTIFICADO_CONCLUSAO'
   | 'DECLARACAO_MATRICULA'
@@ -209,7 +210,7 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
           <div className="hidden md:flex items-center gap-1 text-xs text-slate-400 ml-2">
             <span>Início</span>
             <ChevronRight className="h-3 w-3 text-slate-300" />
-            <span className="font-bold text-slate-800">Documentos & Certificados</span>
+            <span className="font-bold text-slate-800">{moduleName('DOCUMENTS')}</span>
           </div>
         </div>
 
@@ -264,7 +265,7 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
           <div>
             <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               <Award className="h-5 w-5 text-indigo-600" />
-              Emissão Automatizada de Certificados e Documentos Oficiais
+              {moduleName('DOCUMENTS')}
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               Gere certificados autenticados, históricos escolares e declarações com layout oficial pronto para impressão

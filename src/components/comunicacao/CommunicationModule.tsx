@@ -45,6 +45,7 @@ import {
 
 import { ModuleReportButton, reportDate } from '../common/ModuleReportButton';
 
+import { moduleName } from '../../config/moduleNames';
 interface CommunicationModuleProps {
   messages: CommunicationMessage[];
   classes: SchoolClass[];
@@ -393,7 +394,7 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
           <div className="hidden sm:flex items-center gap-1 text-xs text-slate-400 ml-1">
             <span>Início</span>
             <ChevronRight className="h-3 w-3 text-slate-300" />
-            <span className="font-bold text-slate-800">Comunicação Escolar</span>
+            <span className="font-bold text-slate-800">{moduleName('COMMUNICATION')}</span>
           </div>
         </div>
 
@@ -428,7 +429,7 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
               title="Abrir Central de Disparos WhatsApp"
             >
               <Smartphone className="h-3.5 w-3.5 text-emerald-600" />
-              <span>Central de WhatsApp</span>
+              <span>{moduleName('WHATSAPP')}</span>
             </button>
           )}
         </div>
