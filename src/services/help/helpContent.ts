@@ -48,7 +48,12 @@ export const HELP_GENERAL: HelpModule = {
         tip: 'A regra antiga "não abrir pelo link enquanto a Sede estiver em uso" não é mais necessária.',
       },
       {
-        q: 'O que é o botão "Nuvem" no alto da tela?',
+        q: 'O selo mostra "1 registro(s) foram recusados pela nuvem", mas já excluí o registro com problema. E agora?',
+        a: 'Na versão atual o aviso some sozinho na próxima sincronização (em até 1 minuto, ou com "Enviar à nuvem agora"): o recusado que não existe mais neste computador sai da conta. Se o registro ainda existir, abra-o e complete o que falta (por exemplo, o nome ou o e-mail do usuário) e salve de novo.',
+        tip: 'Um registro recusado nunca chega à nuvem nem apaga nada lá: fica só neste computador até ser corrigido ou excluído.',
+      },
+      {
+      q: 'O que é o botão "Nuvem" no alto da tela?',
         a: 'Mostra a situação da sincronização: verde = em dia; azul girando = sincronizando; âmbar = há alterações aguardando envio ou avisos; vermelho = erro (tenta de novo sozinho). Clique para ver a hora da última sincronização, quantos registros aguardam envio, os recusados e os avisos recentes, e para "Sincronizar agora".',
         tip: 'O administrador também vê "Conferência completa": compara todos os registros deste computador com a nuvem. Onde houver diferença, fica a da nuvem; o que só existe aqui é enviado. Use só se o suporte pedir.',
       },

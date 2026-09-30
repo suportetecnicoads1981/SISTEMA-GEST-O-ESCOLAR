@@ -597,9 +597,12 @@ function countPending(meta: SyncMeta, state: Record<string, any>, isAdmin: boole
   for (const t of SYNC_TABLES) {
     const sm = meta.streams[t.stream];
     if (!sm) continue;
+    const records = recordsOf(state, t);
+    // Recusado que não existe mais aqui (ex.: excluído depois da recusa) sai da conta e do controle.
+    if (sm.rejected) for (const id of Object.keys(sm.rejected)) if (!records.has(id)) delete sm.rejected[id];
     rejected += Object.keys(sm.rejected || {}).length;
     if (t.adminOnly && !isAdmin) continue;
-    for (const [id, rec] of recordsOf(state, t)) if (sm.rows[id]?.h !== hashOf(t, rec) && sm.rejected?.[id]?.h !== hashOf(t, rec)) pending++;
+    for (const [id, rec] of records) if (sm.rows[id]?.h !== hashOf(t, rec) && sm.rejected?.[id]?.h !== hashOf(t, rec)) pending++;
   }
   return { pending, rejected };
 }
@@ -664,6 +667,7 @@ async function runOnce(): Promise<CloudSyncStatus> {
     commit(ctx);
     const after = getStoredData() as any;
     const { pending, rejected } = countPending(ctx.meta, after, ctx.isAdmin);
+    writeMeta(ctx.meta); // guarda a limpeza de recusados que não existem mais
     const noticeList = [...ctx.notices, ...status.notices].slice(0, 30);
     setStatus({
       state: 'ok',
