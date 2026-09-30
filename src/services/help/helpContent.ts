@@ -176,6 +176,16 @@ export const HELP_GENERAL: HelpModule = {
       tip: 'Acentos, letras maiúsculas e espaços não contam na comparação: "Bep Rôrôti" e "BEP ROROTI" são o mesmo nome.',
     },
     {
+      q: 'Ao salvar um usuário apareceu "Acesso na nuvem ... não foi criado". O que faço?',
+      a: 'O usuário foi salvo neste computador; só o acesso dele na nuvem (para entrar em qualquer computador) não foi criado. Isso agora funciona igual na Sede, nas escolas e pelo link. As causas mais comuns são: você não está conectado à nuvem como administrador (clique no selo do rodapé e em "Entrar na nuvem"), o usuário está sem e-mail, ou a senha tem menos de 6 caracteres.',
+      steps: [
+        'Confira se o selo do rodapé mostra a nuvem conectada com uma conta de administrador.',
+        'Em Usuários & Permissões, clique em "Editar" no usuário, confira o e-mail e digite a senha de novo.',
+        'Clique em Salvar. A mensagem verde "Acesso na nuvem criado" confirma.',
+      ],
+      tip: 'Cada usuário precisa de um e-mail próprio. Se dois usuários usarem o mesmo e-mail, a senha salva por último vale para os dois na nuvem.',
+    },
+    {
       q: 'Como faço para não precisar digitar a senha da nuvem toda vez?',
       steps: [
         'Na tela de login (ou no selo do rodapé, em "Entrar na nuvem"), deixe marcada a opção "Manter este computador conectado à nuvem".',

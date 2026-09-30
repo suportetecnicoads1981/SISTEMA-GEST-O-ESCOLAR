@@ -454,14 +454,23 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
         });
         return;
       }
-      const response = await fetch('/api/admin/cloud-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ email: user.email, password: plainPassword, role: user.role, name: user.name }),
+      // Função da nuvem (gerenciar-conta-nuvem): responde igual no link publicado, na Sede e
+      // nas estações. A antiga rota /api/admin/cloud-user só existia no site publicado; na Sede
+      // a chamada caía no servidor local e voltava "chave-de-acesso-invalida".
+      const { data, error: fnError } = await getSupabaseClient().functions.invoke('gerenciar-conta-nuvem', {
+        body: { email: user.email, password: plainPassword, role: user.role, name: user.name },
       });
-      const result = await response.json().catch(() => ({}));
+      let result: any = data || {};
+      if (fnError) {
+        try {
+          const body = await (fnError as any).context?.json?.();
+          result = body && typeof body === 'object' ? body : { error: fnError.message };
+        } catch {
+          result = { error: fnError.message };
+        }
+      }
       setCloudMessage(
-        response.ok && result.success
+        !fnError && result.success
           ? { ok: true, text: `Acesso na nuvem de "${user.name}" (${user.email}): ${result.message}` }
           : { ok: false, text: `Acesso na nuvem de "${user.name}" não foi criado: ${result.error || 'erro desconhecido.'}` }
       );
