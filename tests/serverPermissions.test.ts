@@ -29,6 +29,16 @@ describe('servidor da rede local: mesmas regras de permissão do sistema', () =>
     expect([...ps].every((c) => c.charCodeAt(0) < 128)).toBe(true);
   });
 
+  it('gravação não falha com valores embrulhados do PowerShell (referência circular)', () => {
+    expect(ps).toContain('function ConvertTo-PlainValue');
+    const fn = ps.slice(ps.indexOf('function ConvertTo-JsonText'), ps.indexOf("$AccessRulesJson = @'"));
+    expect(fn).toContain('catch');
+    expect(fn).toContain('ConvertTo-PlainValue $value');
+    // Sem pipeline (Where-Object) montando listas que voltam ao banco ou à comparação.
+    expect(ps).not.toMatch(/\$w\.list \| Where-Object/);
+    expect(ps).toContain('reason = [string]$reason');
+  });
+
   it('servidor anuncia as permissões e exige sessão para gravar', () => {
     expect(ps).toContain('"permissoes":true');
     expect(ps).toContain("'/api/local/ops'");

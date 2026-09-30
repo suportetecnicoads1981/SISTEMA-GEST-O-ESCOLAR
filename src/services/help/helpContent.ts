@@ -844,6 +844,16 @@ export const HELP_MODULES: HelpModule[] = [
         a: 'A sessão do usuário no servidor não está aberta (primeiro uso depois da atualização) ou venceu (12 horas). As alterações ficam guardadas na estação. Clique em "Sair do Sistema", entre de novo com o seu usuário e senha, e elas são enviadas.',
       },
       {
+        q: 'O selo fica em "Servidor da Sede: enviando N alteração(ões)" e o número não zera. O que faço?',
+        steps: [
+          'Saia do sistema e entre de novo com o seu usuário, para abrir a sessão no servidor.',
+          'Se o número continuar sem zerar, abra C:\\SucessoEdu\\data\\servidor.log no Bloco de Notas e aperte Ctrl+End para ver as últimas linhas.',
+          'Se aparecer "Erro ao atender requisicao ... referência circular ... PSParameterizedProperty", o servidor está numa versão com uma falha de gravação já corrigida. Gere de novo o pacote do servidor (pelo sistema aberto no link publicado, depois de atualizado) e reinstale. O banco de dados é mantido.',
+          'Depois de reinstalar, recarregue a estação (F5): as alterações guardadas nela são enviadas sozinhas.',
+        ],
+        tip: 'Enquanto o número não zera, as alterações ficam guardadas na estação e não se perdem. Não limpe os dados do navegador nem reinstale a estação antes de elas serem enviadas.',
+      },
+      {
         q: 'O lote de uma escola pode alterar usuários ou dados de outra escola na Sede?',
         a: 'Não. O lote leva só dados escolares da própria escola (alunos, turmas, provas, frequência, notas e o banco de questões); nunca usuários, senhas, permissões ou configurações. Registros de outra escola viram "conflito" e não são aplicados. O histórico de sincronização da Sede registra quem gerou o lote, em qual servidor, quando, e quem importou.',
       },

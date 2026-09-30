@@ -254,8 +254,42 @@ function ConvertFrom-JsonText([string]$text) {
     if ($env:SUCESSOEDU_TEST_GENERIC -eq '1') { return ,(ConvertTo-GenericShape $parsed) }
     return ,$parsed
 }
+# Copia sem os "embrulhos" do PowerShell (PSObject). Valores que passam pelo retorno de uma
+# funcao podem ficar embrulhados; o JavaScriptSerializer nao sabe gravar esse embrulho e falha
+# com "referencia circular ... PSParameterizedProperty". Aqui cada valor volta ao objeto original.
+function ConvertTo-PlainValue($v) {
+    if ($null -eq $v) { return $null }
+    $b = $v.psobject.BaseObject
+    if ($b -is [System.Collections.IDictionary]) {
+        $d = New-Object 'System.Collections.Generic.Dictionary[string,object]'
+        foreach ($k in @($b.Keys)) {
+            $c = ConvertTo-PlainValue $b[$k]
+            if ($null -ne $c) { $c = $c.psobject.BaseObject }
+            $d[[string]$k] = $c
+        }
+        return ,$d
+    }
+    if (-not ($b -is [string]) -and ($b -is [System.Collections.IEnumerable])) {
+        $l = New-Object System.Collections.ArrayList
+        foreach ($item in $b) {
+            $c = ConvertTo-PlainValue $item
+            if ($null -ne $c) { $c = $c.psobject.BaseObject }
+            [void]$l.Add($c)
+        }
+        return ,$l
+    }
+    return $b
+}
 function ConvertTo-JsonText($value) {
-    if ($script:JsonSer) { return $script:JsonSer.Serialize($value) }
+    if ($script:JsonSer) {
+        try { return $script:JsonSer.Serialize($value) }
+        catch {
+            # Algum valor ficou embrulhado: grava a copia limpa (nada se perde).
+            $plain = ConvertTo-PlainValue $value
+            if ($null -ne $plain) { $plain = $plain.psobject.BaseObject }
+            return $script:JsonSer.Serialize($plain)
+        }
+    }
     return (ConvertTo-Json -InputObject $value -Depth 100 -Compress)
 }
 
@@ -285,13 +319,19 @@ function Get-Sorted($value, $ignore) {
             $key = [string]$k
             if ($ignore -and ($ignore -contains $key)) { continue }
             if ($key.StartsWith('_')) { continue }
-            $out[$key] = Get-Sorted $value[$k] $null
+            $c = Get-Sorted $value[$k] $null
+            if ($null -ne $c) { $c = $c.psobject.BaseObject }
+            $out[$key] = $c
         }
         return ,$out
     }
     if (Test-IsList $value) {
         $arr = New-Object System.Collections.ArrayList
-        foreach ($item in $value) { [void]$arr.Add((Get-Sorted $item $null)) }
+        foreach ($item in $value) {
+            $c = Get-Sorted $item $null
+            if ($null -ne $c) { $c = $c.psobject.BaseObject }
+            [void]$arr.Add($c)
+        }
         return ,$arr
     }
     return $value
@@ -501,7 +541,11 @@ function Get-WorkValue($work, $db, [string]$k) {
     if ($work.ContainsKey($k)) {
         $w = $work[$k]
         if ($w.replaced) { return ,$w.value }
-        if ($w.touched) { return ,(@($w.list | Where-Object { -not [object]::ReferenceEquals($_, $script:Removed) })) }
+        if ($w.touched) {
+            $alive = New-Object System.Collections.ArrayList
+            foreach ($item in $w.list) { if (-not [object]::ReferenceEquals($item, $script:Removed)) { [void]$alive.Add($item) } }
+            return ,$alive
+        }
     }
     return ,(Get-Val $db $k)
 }
@@ -511,6 +555,7 @@ function Invoke-ApplyOp($work, $db, $op) {
     $t = [string](Get-Val $op 't')
     if ($t -eq 's') {
         $v = Get-Val $op 'v'
+        if ($null -ne $v) { $v = $v.psobject.BaseObject }
         $db[$k] = $v
         $work.Remove($k)
         return
@@ -521,8 +566,10 @@ function Invoke-ApplyOp($work, $db, $op) {
     $pos = 0
     $has = $w.idx.TryGetValue($id, [ref]$pos)
     if ($t -eq 'u') {
-        if ($has) { $w.list[$pos] = Get-Val $op 'v' }
-        else { $w.idx[$id] = $w.list.Add((Get-Val $op 'v')) }
+        $val = Get-Val $op 'v'
+        if ($null -ne $val) { $val = $val.psobject.BaseObject }
+        if ($has) { $w.list[$pos] = $val }
+        else { $w.idx[$id] = $w.list.Add($val) }
     } elseif ($t -eq 'd' -and $has) {
         $w.list[$pos] = $script:Removed
         [void]$w.idx.Remove($id)
@@ -689,7 +736,7 @@ function Invoke-Login($ctx) {
             return @{ status = 401; body = '{"error":"conta-da-nuvem","message":"Esta conta ainda nao tem senha no servidor da escola. Entre uma vez no computador do servidor; depois ela funciona em todas as estacoes."}' }
         }
         if ($password.Length -lt 6) { return @{ status = 400; body = '{"error":"senha-curta","message":"A senha deve ter pelo menos 6 caracteres."}' } }
-        $user['password'] = New-PasswordHash $password
+        $user['password'] = [string](New-PasswordHash $password)
         Save-Database (ConvertTo-JsonText $db) $true
         Write-Log ('Primeiro acesso: senha definida no servidor para ' + [string](Get-Val $user 'name'))
     } elseif (-not (Test-Password $stored $password)) {
@@ -724,7 +771,7 @@ function Invoke-Ops($ctx) {
             if (-not (Test-IsMap $op)) { continue }
             $reason = Test-OpAllowed $user $op $db $fromServerPc $work
             if ($reason) {
-                [void]$denied.Add(@{ k = [string](Get-Val $op 'k'); t = [string](Get-Val $op 't'); id = [string](Get-Val $op 'id'); reason = $reason })
+                [void]$denied.Add(@{ k = [string](Get-Val $op 'k'); t = [string](Get-Val $op 't'); id = [string](Get-Val $op 'id'); reason = [string]$reason })
                 continue
             }
             Invoke-ApplyOp $work $db $op
