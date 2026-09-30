@@ -112,6 +112,8 @@ export interface FileImportResult {
   sourceContext?: ImportBlockContext; // Contexto do bloco (escola anexa)
   sourceFileName?: string; // Nome do arquivo original (quando o arquivo tem várias escolas)
   sections?: Array<{ series: string; count: number; header: string }>; // Tabelas (séries) encontradas
+  schoolFicha?: SchoolFicha; // Ficha da escola lida da aba "DADOS DA ESCOLA"
+  fichaUpdatesRegisteredUnit?: boolean; // A ficha completa o cadastro de uma escola que já existe
 }
 
 // Colunas esperadas no levantamento municipal, da ESQUERDA para a DIREITA
@@ -144,6 +146,7 @@ export interface ImportBlockContext {
   isAnnex?: boolean;
   parentUnit?: SchoolUnit; // Escola principal (bloco anterior do mesmo documento)
   schoolName?: string; // Nome do bloco quando a linha não tem "ESCOLA:" (ex: linha "ANEXO NGÔNH-RE")
+  ficha?: SchoolFicha; // Ficha da escola (aba "DADOS DA ESCOLA" da planilha padrão)
 }
 
 export interface SchoolCheckResult {
@@ -743,6 +746,279 @@ function parseMedicalReport(val: any): { hasReport: boolean; text: string } {
   return { hasReport: false, text: str };
 }
 
+// ===================== Conferências da data de nascimento =====================
+
+/** Ano mínimo aceito como data de nascimento (antes disso é erro de digitação, ex.: 1018). */
+export const MIN_BIRTH_YEAR = 1920;
+
+/** Data de nascimento impossível: fora do calendário, antes de 1920 ou no futuro. */
+export function isImpossibleBirthDate(isoDate: string, today = new Date()): boolean {
+  const m = String(isoDate || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return true;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return true; // ex.: 31/02
+  if (y < MIN_BIRTH_YEAR) return true;
+  return dt.getTime() > today.getTime();
+}
+
+/** Idade esperada na série (em 31/03 do ano letivo). null = série sem idade de referência (creche, EJA...). */
+export function expectedAgeForGrade(serie: string): number | null {
+  const g = canonicalGrade(serie);
+  if (g === 'PRÉ I') return 4;
+  if (g === 'PRÉ II') return 5;
+  const m = g.match(/^(\d{1,2})º ANO$/);
+  if (m) {
+    const n = Number(m[1]);
+    if (n >= 1 && n <= 9) return n + 5;
+  }
+  return null;
+}
+
+/** Idade na data de corte do Censo (31/03 do ano letivo). */
+export function ageAtSchoolCutoff(isoDate: string, schoolYear = new Date().getFullYear()): number | null {
+  const m = String(isoDate || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  let age = schoolYear - y;
+  if (mo > 3 || (mo === 3 && d > 31)) age -= 1;
+  return age;
+}
+
+/** Pendência de conferência quando a idade não combina com a série. */
+export const AGE_GRADE_PENDING = 'Conferir data de nascimento / série';
+/** Prefixo da pendência de aluno que aparece mais de uma vez no mesmo arquivo. */
+export const DUPLICATE_PENDING_PREFIX = 'Possível cadastro duplicado';
+
+/**
+ * Idade muito fora da série: 2 ou mais anos MAIS NOVO que o esperado (quase sempre erro de
+ * digitação na data ou na série) ou 6 ou mais anos mais velho (ex.: adulto no 9º ano, EJA).
+ * Atraso escolar comum (1 a 5 anos) não vira pendência.
+ */
+export function isAgeFarFromGrade(isoDate: string, serie: string, schoolYear = new Date().getFullYear()): boolean {
+  const expected = expectedAgeForGrade(serie);
+  const age = ageAtSchoolCutoff(isoDate, schoolYear);
+  if (expected === null || age === null) return false;
+  return age <= expected - 2 || age >= expected + 6;
+}
+
+// ===================== Ficha da escola (aba "DADOS DA ESCOLA") =====================
+
+/** Dados lidos da aba "DADOS DA ESCOLA" da planilha padrão. */
+export interface SchoolFicha {
+  name: string;
+  tradeName?: string;
+  inepCode?: string;
+  cnpjOrDecree?: string;
+  typeLabel?: string; // como escrito na ficha (ESCOLA POLO, ESCOLA ANEXA, ESCOLA RURAL, CRECHE...)
+  parentName?: string; // escola sede (só para anexa)
+  locationLabel?: string; // URBANA / RURAL
+  address?: string;
+  district?: string;
+  zipCode?: string;
+  city?: string;
+  state?: string;
+  phone?: string;
+  email?: string;
+  directorName?: string;
+  coordinatorName?: string;
+  secretaryName?: string;
+  totalClassrooms?: number;
+  operatingHours?: string;
+  hasInternet?: boolean;
+  shifts: string[]; // MANHÃ, TARDE, NOITE, INTEGRAL marcados com SIM
+  grades: string[]; // séries marcadas com SIM (forma canônica)
+}
+
+const FICHA_LABELS: Array<{ key: keyof SchoolFicha; test: RegExp }> = [
+  { key: 'name', test: /^NOME OFICIAL DA ESCOLA/ },
+  { key: 'tradeName', test: /^NOME COMO A ESCOLA/ },
+  { key: 'inepCode', test: /^CODIGO INEP/ },
+  { key: 'cnpjOrDecree', test: /^CNPJ OU DECRETO/ },
+  { key: 'typeLabel', test: /^TIPO DA UNIDADE/ },
+  { key: 'parentName', test: /^ESCOLA SEDE/ },
+  { key: 'locationLabel', test: /^LOCALIZACAO\b/ },
+  { key: 'address', test: /^ENDERECO\b/ },
+  { key: 'district', test: /^BAIRRO/ },
+  { key: 'zipCode', test: /^CEP\b/ },
+  { key: 'city', test: /^MUNICIPIO\b/ },
+  { key: 'state', test: /^UF\b/ },
+  { key: 'phone', test: /^TELEFONE\b/ },
+  { key: 'email', test: /^E-?MAIL\b/ },
+  { key: 'directorName', test: /^DIRETOR/ },
+  { key: 'coordinatorName', test: /^COORDENADOR/ },
+  { key: 'secretaryName', test: /^SECRETARIO/ },
+  { key: 'operatingHours', test: /^HORARIO DE FUNCIONAMENTO/ },
+];
+
+const FICHA_SHIFTS = ['MANHÃ', 'TARDE', 'NOITE', 'INTEGRAL'];
+
+/** A aba é a ficha da escola da planilha padrão? */
+export function isSchoolFichaSheet(sheetName: string, rows: any[][]): boolean {
+  if (/DADOS DA ESCOLA/.test(stripAccentsUpper(sheetName))) return true;
+  return rows.slice(0, 12).some((r) => /^NOME OFICIAL DA ESCOLA/.test(stripAccentsUpper((r || [])[0]).trim()));
+}
+
+/**
+ * Lê a ficha: rótulo na coluna A e valor na coluna C (modelo padrão SEMED).
+ * Devolve null quando não há nome oficial da escola.
+ */
+export function parseSchoolFichaSheet(rows: any[][]): SchoolFicha | null {
+  const ficha: SchoolFicha = { name: '', shifts: [], grades: [] };
+  const valueOf = (row: any[]) => {
+    const v = row[2];
+    if (v === null || v === undefined) return '';
+    return String(v).replace(/\s+/g, ' ').trim();
+  };
+  (rows || []).forEach((row) => {
+    const r = row || [];
+    const label = stripAccentsUpper(r[0]).replace(/\s+/g, ' ').replace(/\s*\*\s*$/, '').trim();
+    if (!label) return;
+    const value = valueOf(r);
+    const yes = /^S(IM)?$/.test(stripAccentsUpper(value));
+
+    // Turnos e séries: linha com o nome do turno/série e SIM ao lado
+    const shift = FICHA_SHIFTS.find((s) => stripAccentsUpper(s) === label);
+    if (shift) {
+      if (yes) ficha.shifts.push(shift);
+      return;
+    }
+    const grade = extractSeriesFromFirstColumnHeader(label);
+    if (grade.known && grade.series && grade.series === canonicalGrade(label) && label.length <= 12) {
+      if (yes && !ficha.grades.includes(grade.series)) ficha.grades.push(grade.series);
+      return;
+    }
+
+    if (/^SALAS DE AULA/.test(label)) {
+      const n = Number(String(r[2] ?? '').replace(/\D/g, ''));
+      if (n > 0) ficha.totalClassrooms = n;
+      return;
+    }
+    if (/^INTERNET/.test(label)) {
+      if (value) ficha.hasInternet = yes;
+      return;
+    }
+    const field = FICHA_LABELS.find((f) => f.test.test(label));
+    if (field && value && !(ficha as any)[field.key]) (ficha as any)[field.key] = value;
+  });
+  if (!ficha.name) return null;
+  ficha.name = ficha.name.toUpperCase();
+  if (ficha.inepCode) ficha.inepCode = ficha.inepCode.replace(/\D/g, '');
+  if (ficha.zipCode) {
+    const cep = ficha.zipCode.replace(/\D/g, '');
+    ficha.zipCode = cep.length === 8 ? `${cep.slice(0, 5)}-${cep.slice(5)}` : ficha.zipCode;
+  }
+  return ficha;
+}
+
+/** Id estável de uma escola pelo nome (o mesmo usado ao cadastrar pela importação). */
+export function importedUnitIdForName(name: string): string {
+  return `unit-imp-${normalizeSchoolName(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+}
+
+function fichaUnitType(label: string | undefined): { type?: SchoolUnit['type']; isAnnex: boolean } {
+  const t = stripAccentsUpper(label || '');
+  if (!t) return { isAnnex: false };
+  if (/ANEX|SATELIT/.test(t)) return { type: 'ESCOLA_SATELITE', isAnnex: true };
+  if (/CRECHE|INFANTIL/.test(t)) return { type: 'CRECHE_INFANTIL', isAnnex: false };
+  if (/RURAL/.test(t)) return { type: 'ESCOLA_RURAL', isAnnex: false };
+  if (/POLO/.test(t)) return { type: 'ESCOLA_POLO', isAnnex: false };
+  return { isAnnex: false };
+}
+
+/** Valor ainda provisório no cadastro (preenchido pela importação antiga ou vazio). */
+function isPlaceholderValue(v: any): boolean {
+  const s = stripAccentsUpper(v).trim();
+  return !s || /PENDENTE|AGUARDANDO|POLO REMOTO|COORDENACAO POLO/.test(s) || /@EDUCACAO\.GOV\.BR$/.test(s);
+}
+
+/**
+ * Aplica a ficha da escola ao cadastro.
+ * - Escola nova: a ficha preenche tudo.
+ * - Escola já cadastrada (onlyFillMissing): só completa os campos ainda vazios ou provisórios,
+ *   sem apagar o que a secretaria já corrigiu à mão.
+ * As pendências da escola passam a ser só o que continua faltando.
+ */
+export function applySchoolFicha(
+  unit: SchoolUnit,
+  ficha: SchoolFicha,
+  schoolUnits: SchoolUnit[] = [],
+  onlyFillMissing = false
+): { unit: SchoolUnit; notes: string[] } {
+  const notes: string[] = [];
+  const next: any = { ...unit };
+  const set = (key: keyof SchoolUnit, value: any) => {
+    if (value === undefined || value === null || value === '') return;
+    if (onlyFillMissing && !isPlaceholderValue(next[key])) return;
+    next[key] = value;
+  };
+
+  const inepOk = /^\d{8}$/.test(ficha.inepCode || '');
+  if (ficha.inepCode && !inepOk) notes.push(`Código INEP "${ficha.inepCode}" inválido na ficha (precisa ter 8 números).`);
+  set('tradeName', ficha.tradeName);
+  if (inepOk) set('inepCode', ficha.inepCode);
+  set('cnpjOrDecree', ficha.cnpjOrDecree);
+  set('address', ficha.address);
+  set('district', ficha.district);
+  set('zipCode', ficha.zipCode);
+  set('city', ficha.city);
+  set('state', ficha.state);
+  set('phone', ficha.phone);
+  set('email', ficha.email);
+  set('directorName', ficha.directorName);
+  set('coordinatorName', ficha.coordinatorName);
+  set('secretaryName', ficha.secretaryName);
+  set('operatingHours', ficha.operatingHours);
+  if (ficha.totalClassrooms && (!onlyFillMissing || !next.totalClassrooms)) next.totalClassrooms = ficha.totalClassrooms;
+  if (ficha.hasInternet !== undefined && !onlyFillMissing) next.hasInternet = ficha.hasInternet;
+  const loc = stripAccentsUpper(ficha.locationLabel || '');
+  if (loc && !onlyFillMissing) next.locationZone = /URBAN/.test(loc) ? 'ZONA_URBANA' : 'ZONA_RURAL';
+  if (ficha.shifts.length > 0 && (!onlyFillMissing || !(next.offeredShifts || []).length)) next.offeredShifts = ficha.shifts;
+  if (ficha.grades.length > 0 && (!onlyFillMissing || !(next.gradesServed || []).length)) {
+    next.gradesServed = ficha.grades;
+    next.gradesServedText = ficha.grades.join(', ');
+  }
+
+  // Tipo e vínculo de escola anexa
+  const { type, isAnnex } = fichaUnitType(ficha.typeLabel);
+  if (type && (!onlyFillMissing || next.createdViaImport)) next.type = type;
+  if (isAnnex) {
+    next.isAnnex = true;
+    if (ficha.parentName) {
+      const parent = findRegisteredSchoolUnit(ficha.parentName, schoolUnits);
+      const parentId = parent?.id || importedUnitIdForName(ficha.parentName);
+      if (parentId === next.id) {
+        notes.push('A ficha indica a própria escola como escola sede; o vínculo de anexa não foi feito.');
+      } else {
+        next.parentUnitId = parentId;
+        const parentName = parent?.name || ficha.parentName.toUpperCase();
+        if (!next.tradeName || /\(ANEXO DE|\(ESCOLA ANEXA\)/i.test(next.tradeName)) next.tradeName = `${next.name} (Anexo de ${parentName})`;
+        if (!parent) notes.push(`Escola sede "${parentName}" ainda não está cadastrada: importe também a planilha dela para completar o vínculo.`);
+      }
+    } else {
+      notes.push('Escola anexa sem a escola sede informada na ficha.');
+    }
+  } else if (type && ficha.parentName) {
+    notes.push(`A ficha informa escola sede (${ficha.parentName}), mas o tipo é "${ficha.typeLabel}". Para ser anexa, o tipo deve ser ESCOLA ANEXA.`);
+  }
+
+  // Pendências da escola: o que continua faltando depois da ficha
+  const pending: string[] = [];
+  if (!/^\d{8}$/.test(String(next.inepCode || ''))) pending.push('Código INEP Escolar');
+  if (isPlaceholderValue(next.cnpjOrDecree)) pending.push('Ato de Autorização / Decreto');
+  if (isPlaceholderValue(next.directorName)) pending.push('Nome do(a) Diretor(a)');
+  if (isPlaceholderValue(next.phone)) pending.push('Telefone e Contato Oficial');
+  if (isPlaceholderValue(next.address)) pending.push('Endereço Completo e CEP');
+  if (isAnnex && !next.parentUnitId) pending.push('Escola sede (escola anexa)');
+  next.pendingFields = pending;
+  next.cadastralStatus = pending.length > 0 ? 'INCOMPLETE' : 'OK';
+  return { unit: next as SchoolUnit, notes };
+}
+
 const SCHOOL_LINE_RE = /\bESCOLA(\s+ANEXO)?\s*:\s*(.+?)(?=\s*\|?\s*(?:TURMAS?|S[EÉ]RIES?|DATA)\s*:|\s*\||$)/i;
 
 /**
@@ -800,16 +1076,25 @@ function processMatrixBlocks(
   filters: ImportFilterOptions,
   classes: SchoolClass[],
   schoolUnits: SchoolUnit[],
-  documentType: FileImportResult['documentType']
+  documentType: FileImportResult['documentType'],
+  ficha: SchoolFicha | null = null
 ): FileImportResult[] {
   const blocks = splitMatrixBySchool(matrix);
   const results: FileImportResult[] = [];
   let parentUnit: SchoolUnit | undefined;
-  blocks.forEach((block) => {
+  // A ficha vale para o bloco da mesma escola; com um bloco só, vale para ele
+  const fichaKey = ficha ? normalizeSchoolName(ficha.name) : '';
+  const fichaBlock = ficha
+    ? blocks.length === 1
+      ? 0
+      : Math.max(0, blocks.findIndex((b) => !!b.schoolName && b.schoolName === fichaKey))
+    : -1;
+  blocks.forEach((block, idx) => {
     const res = processSheetWithHeaders(block.matrix, fileName, fileSize, filters, classes, schoolUnits, {
       isAnnex: block.isAnnex,
       parentUnit: block.isAnnex ? parentUnit : undefined,
       schoolName: block.isAnnex ? block.displayName : undefined,
+      ficha: idx === fichaBlock && ficha ? ficha : undefined,
     });
     res.documentType = documentType;
     res.sourceFileName = fileName;
@@ -874,14 +1159,19 @@ export async function parseFileResults(
     const buffer = await file.arrayBuffer();
     const wb = XLSX.read(buffer, { type: 'array' });
     const allRows: any[][] = [];
+    let ficha: SchoolFicha | null = null;
     wb.SheetNames.forEach((name) => {
       const rows = XLSX.utils.sheet_to_json<any>(wb.Sheets[name], { header: 1, defval: '' });
-      if (rows.length > 0) {
-        allRows.push(...rows, []);
+      if (rows.length === 0) return;
+      // Aba "DADOS DA ESCOLA" (planilha padrão): é a ficha da escola, não tem alunos
+      if (isSchoolFichaSheet(name, rows)) {
+        ficha = ficha || parseSchoolFichaSheet(rows);
+        return;
       }
+      allRows.push(...rows, []);
     });
     const docType = ext === 'ods' ? 'CALC' : ext === 'xls' || ext === 'xlsx' ? 'EXCEL' : 'GENERIC';
-    return processMatrixBlocks(allRows, fileName, fileSize, filters, classes, schoolUnits, docType);
+    return processMatrixBlocks(allRows, fileName, fileSize, filters, classes, schoolUnits, docType, ficha);
   } catch (error: any) {
     return [
       {
@@ -962,6 +1252,13 @@ function mapColumnsByHeader(headers: string[]): Record<string, number> {
       if (colMap.tea === undefined) colMap.tea = idx;
     }
 
+    // Deficiências adicionais (planilha padrão v2: "DEFICIÊNCIA ADICIONAL 1" e "2")
+    if (/DEFICIENCIA ADICIONAL|OUTRA DEFICIENCIA|DEFICIENCIA SECUNDARIA/.test(norm)) {
+      if (colMap.pcdExtra1 === undefined) colMap.pcdExtra1 = idx;
+      else if (colMap.pcdExtra2 === undefined) colMap.pcdExtra2 = idx;
+      return;
+    }
+
     if (/PCD|DEFICIENCIA|CONDICAO|CLASSIFICACAO MEDICA|NECESSIDADES/.test(norm)) {
       if (colMap.pcd === undefined) colMap.pcd = idx;
     }
@@ -1030,7 +1327,13 @@ function checkColumnsLeftToRight(
   });
 
   const expectedIdx = new Set(report.map((r) => r.columnIndex).filter((i) => i !== undefined));
-  const extraLabels: Record<string, string> = { tea: 'TEA', shift: 'Turno', series: 'Série do aluno' };
+  const extraLabels: Record<string, string> = {
+    tea: 'TEA',
+    shift: 'Turno',
+    series: 'Série do aluno',
+    pcdExtra1: 'Deficiência adicional 1',
+    pcdExtra2: 'Deficiência adicional 2',
+  };
   const extraColumns: string[] = [];
   Object.entries(extraLabels).forEach(([k, label]) => {
     const idx = colMap[k];
@@ -1100,6 +1403,9 @@ export function processSheetWithHeaders(
     schoolNameDetected = context.schoolName;
     if (context.isAnnex) isAnnex = true;
   }
+  // Planilha padrão: sem a linha "ESCOLA:" (ex.: fórmula sem valor salvo), o nome vem da ficha
+  const ficha = context.ficha;
+  if (!schoolNameDetected && ficha) schoolNameDetected = ficha.name;
 
   if (headerRowIndex === -1 && matrix.length > 0) {
     headerRowIndex = 0;
@@ -1188,6 +1494,39 @@ export function processSheetWithHeaders(
   } else if (!targetUnit) {
     schoolStatus = 'NAO_IDENTIFICADA';
     errors.push('Nome da escola não encontrado na planilha (linha "ESCOLA: ..."). Selecione a escola de destino antes de importar.');
+  }
+
+  // Ficha da escola (aba "DADOS DA ESCOLA"): INEP, decreto, equipe, endereço, turnos, séries e vínculo de anexa.
+  // Escola nova: a ficha preenche o cadastro. Escola já cadastrada: só completa o que estiver vazio ou provisório.
+  let fichaUpdatesRegisteredUnit = false;
+  const fichaMatchesUnit =
+    !!ficha && !!targetUnit && (!selectedUnit || findRegisteredSchoolUnit(ficha.name, [targetUnit])?.id === targetUnit.id);
+  if (ficha && targetUnit && fichaMatchesUnit) {
+    const registered = schoolStatus === 'CADASTRADA';
+    const { unit, notes } = applySchoolFicha(targetUnit, ficha, schoolUnits, registered);
+    targetUnit = unit;
+    if (unit.isAnnex) isAnnex = true;
+    fichaUpdatesRegisteredUnit = registered;
+    if (!registered) {
+      // Com a ficha, a escola nova não fica "pendente de complementação" (só o que faltar na ficha)
+      const at = schoolMessages.findIndex((m) => /não está cadastrada\. Ela será cadastrada/.test(m));
+      if (at >= 0) schoolMessages[at] = `A escola "${schoolNameDetected}" não está cadastrada e será cadastrada com os dados da ficha.`;
+    }
+    schoolMessages.push(
+      registered
+        ? 'Ficha da escola (aba "DADOS DA ESCOLA") lida: os campos ainda vazios ou provisórios do cadastro serão completados.'
+        : 'Ficha da escola (aba "DADOS DA ESCOLA") lida: INEP, decreto, equipe, endereço, turnos e séries entram no cadastro.'
+    );
+    if (unit.isAnnex && unit.parentUnitId) {
+      const parent = schoolUnits.find((u) => u.id === unit.parentUnitId);
+      schoolMessages.push(`Escola anexa de ${parent?.name || ficha.parentName?.toUpperCase() || 'escola sede'}.`);
+    }
+    if ((unit.pendingFields || []).length > 0) {
+      schoolMessages.push(`Pendências da escola que continuam: ${(unit.pendingFields || []).join(', ')}.`);
+    }
+    notes.forEach((n) => warnings.push(n));
+  } else if (ficha && targetUnit && !fichaMatchesUnit) {
+    warnings.push(`A ficha da escola é de "${ficha.name}", diferente do destino selecionado; a ficha não foi aplicada.`);
   }
 
   const gradesRegistered = schoolStatus === 'CADASTRADA' ? targetUnit?.gradesServed || [] : gradesInFile;
@@ -1314,7 +1653,14 @@ export function processSheetWithHeaders(
     const race = parseRaceColor(rawRace);
     const address = cleanPlaceholder(rawAddr);
 
-    let pcdDesc = cleanPlaceholder(rawPcd);
+    // Aluno com mais de uma deficiência: principal em PCD e as outras em DEFICIÊNCIA ADICIONAL 1 e 2
+    const extraPcd = [activeMap.pcdExtra1, activeMap.pcdExtra2]
+      .filter((i): i is number => i !== undefined)
+      .map((i) => cleanPlaceholder(row[i]))
+      .filter(Boolean);
+    let pcdDesc = [cleanPlaceholder(rawPcd), ...extraPcd]
+      .filter((v, i, arr) => v && arr.findIndex((x) => stripAccentsUpper(x) === stripAccentsUpper(v)) === i)
+      .join(' + ');
     if (!pcdDesc && hasPcdInName) pcdDesc = 'PCD Identificado no Levantamento';
 
     const teaStr = cleanPlaceholder(rawTea).toLowerCase();
@@ -1348,7 +1694,11 @@ export function processSheetWithHeaders(
     }
 
     const pendingFields: string[] = [];
-    if (!parsedDate.isValid || !parsedDate.isoDate) pendingFields.push('Data de Nascimento');
+    const birthOk = parsedDate.isValid && !!parsedDate.isoDate && !isImpossibleBirthDate(parsedDate.isoDate);
+    // Data vazia, fora do calendário, antes de 1920 (ex.: 1018) ou no futuro
+    if (!birthOk) pendingFields.push('Data de Nascimento');
+    // Idade muito fora da série (ex.: 4 anos no 3º ano; adulto no 9º ano)
+    else if (isAgeFarFromGrade(parsedDate.isoDate, finalSeries)) pendingFields.push(AGE_GRADE_PENDING);
     if (!address) pendingFields.push('Endereço / Localidade');
     if (race === 'NAO_DECLARADA') pendingFields.push('Raça/Cor (Censo Escolar)');
     if (gender === 'OTHER') pendingFields.push('Sexo');
@@ -1424,16 +1774,40 @@ export function processSheetWithHeaders(
       schoolMessages.push(`${renamed} turma(s) já existente(s) terão o nome ajustado para "SÉRIE - TURNO" (sem o nome da escola).`);
     }
     // Uma turma por série + letra (1º ANO A, 1º ANO B...). Sem letra, uma turma por série.
-    const combos = new Map<string, { serie: string; letter: string }>();
-    students.forEach((s) => combos.set(`${s.series}|${s.classLetter || ''}`, { serie: s.series, letter: s.classLetter || '' }));
-    combos.forEach(({ serie, letter }) => {
+    // O turno da turma nova é o dos alunos dela (antes ficava sempre o turno padrão, ex.: MANHÃ).
+    const combos = new Map<string, { serie: string; letter: string; shifts: Map<string, number> }>();
+    students.forEach((s) => {
+      const key = `${s.series}|${s.classLetter || ''}`;
+      const entry = combos.get(key) || { serie: s.series, letter: s.classLetter || '', shifts: new Map<string, number>() };
+      const sh = String(s.shift || '').toUpperCase();
+      if (sh) entry.shifts.set(sh, (entry.shifts.get(sh) || 0) + 1);
+      combos.set(key, entry);
+    });
+    const mixedShifts: string[] = [];
+    combos.forEach(({ serie, letter, shifts }) => {
+      const ranked = Array.from(shifts.entries()).sort((a, b) => b[1] - a[1]);
+      const shift = ranked[0]?.[0] || filters.defaultShift || 'MANHÃ';
+      if (ranked.length > 1) mixedShifts.push(`${serie}${letter ? ` ${letter}` : ''} (${ranked.map(([s, n]) => `${n} ${s}`).join(', ')})`);
       const found = findClassForSeries(targetUnit!.id, serie, allClasses, unlinkedAllowed, letter);
+      const isNew = found && !classes.some((ex) => ex.id === found.id);
       if (!found && filters.autoRegisterSchoolUnit) {
-        const cls = buildClassForSeries(targetUnit!, serie, filters.defaultShift || 'MANHÃ', suggestedClasses.length, letter);
+        const cls = buildClassForSeries(targetUnit!, serie, shift, suggestedClasses.length, letter);
         suggestedClasses.push(cls);
         allClasses.push(cls);
+      } else if (isNew && found.shift !== shift) {
+        // Turma nova criada antes com o turno padrão: acerta o turno pelo dos alunos
+        const fixed = { ...found, shift: shift as ClassShift, name: `${serie}${letter ? ` ${letter}` : ''} - ${shift}` } as SchoolClass;
+        const ai = allClasses.findIndex((c) => c.id === found.id);
+        if (ai >= 0) allClasses[ai] = fixed;
+        const si = suggestedClasses.findIndex((c) => c.id === found.id);
+        if (si >= 0) suggestedClasses[si] = fixed;
       }
     });
+    if (mixedShifts.length > 0) {
+      warnings.push(
+        `Série com alunos em mais de um turno e sem letra de turma: ${mixedShifts.join('; ')}. A turma ficou com o turno da maioria; se forem turmas diferentes, informe a letra (ex.: 1º ANO A e 1º ANO B).`
+      );
+    }
   }
 
   students.forEach((std) => {
@@ -1465,7 +1839,9 @@ export function processSheetWithHeaders(
     }
   }
 
-  // Aluno repetido no mesmo arquivo (mesmo nome e nascimento): entra uma vez só
+  // Aluno repetido no mesmo arquivo (mesmo nome e nascimento): entra uma vez só (a nuvem não aceita
+  // o mesmo aluno duas vezes na escola) e fica com a pendência "Possível cadastro duplicado",
+  // para a escola conferir a turma certa na lista de cadastros pendentes.
   const seen = new Map<string, ParsedImportStudent>();
   const repeated: string[] = [];
   students.forEach((st) => {
@@ -1475,14 +1851,25 @@ export function processSheetWithHeaders(
       const a = `${first.series}${first.classLetter ? ` ${first.classLetter}` : ''}`;
       const b = `${st.series}${st.classLetter ? ` ${st.classLetter}` : ''}`;
       repeated.push(`${st.cleanName || st.name} (${a === b ? `2 vezes no ${a}` : `${a} e ${b}`})`);
+      const label = `${DUPLICATE_PENDING_PREFIX}: aparece ${a === b ? `2 vezes no ${a}` : `também no ${b}`} (conferir a turma)`;
+      if (!first.pendingFields.some((f) => f.startsWith(DUPLICATE_PENDING_PREFIX))) first.pendingFields.push(label);
+      first.cadastralStatus = 'INCOMPLETE';
     } else {
       seen.set(key, st);
     }
   });
   if (repeated.length > 0) {
     warnings.push(
-      `${repeated.length} aluno(s) aparece(m) repetido(s) no arquivo e será(ão) cadastrado(s) uma vez só. Confira com a escola em qual turma ele(s) está(ão): ${repeated.join('; ')}.`
+      `${repeated.length} aluno(s) aparece(m) repetido(s) no arquivo e será(ão) cadastrado(s) uma vez só, com a pendência "${DUPLICATE_PENDING_PREFIX}" para a escola conferir a turma: ${repeated.join('; ')}.`
     );
+  }
+  const impossibleDates = students.filter((st) => st.pendingFields.includes('Data de Nascimento')).length;
+  if (impossibleDates > 0) {
+    warnings.push(`${impossibleDates} aluno(s) com data de nascimento vazia ou impossível (ex.: ano 1018 ou data no futuro): ficam com a pendência "Data de Nascimento".`);
+  }
+  const ageGrade = students.filter((st) => st.pendingFields.includes(AGE_GRADE_PENDING)).length;
+  if (ageGrade > 0) {
+    warnings.push(`${ageGrade} aluno(s) com idade muito fora da série: ficam com a pendência "${AGE_GRADE_PENDING}".`);
   }
 
   if (students.length === 0) {
@@ -1506,7 +1893,11 @@ export function processSheetWithHeaders(
 
   const schoolCheck: SchoolCheckResult = {
     isAnnex,
-    parentUnitName: isAnnex ? context.parentUnit?.name : undefined,
+    parentUnitName: isAnnex
+      ? context.parentUnit?.name ||
+        schoolUnits.find((u) => u.id === targetUnit?.parentUnitId)?.name ||
+        (fichaMatchesUnit ? ficha?.parentName?.toUpperCase() : undefined)
+      : undefined,
     status: schoolStatus,
     detectedName: schoolNameDetected,
     unitId: targetUnit?.id,
@@ -1546,6 +1937,8 @@ export function processSheetWithHeaders(
     sourceMatrix: matrix,
     sourceContext: context,
     sections: usedSections,
+    schoolFicha: fichaMatchesUnit ? ficha : undefined,
+    fichaUpdatesRegisteredUnit,
   };
 }
 
@@ -1672,7 +2065,12 @@ export function convertImportedStudentsToOfficial(
 
     const specialNeeds: string[] = [];
     if (filters.importPcd && item.medicalClassification && item.medicalClassification !== 'Não declarada') {
-      specialNeeds.push(item.medicalClassification);
+      // Várias deficiências (principal + adicionais) viram um item cada
+      item.medicalClassification
+        .split(' + ')
+        .map((d) => d.trim())
+        .filter(Boolean)
+        .forEach((d) => specialNeeds.push(d));
     }
 
     const officialStudent: Student = {

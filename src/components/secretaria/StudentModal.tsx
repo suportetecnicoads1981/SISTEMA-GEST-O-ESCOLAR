@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { cpfDigits, cpfState, formatAge, formatCpf, isCpfMissing, isFutureBirthDate, withCpfPending } from '../../utils/studentDocuments';
+import { cpfDigits, cpfState, formatAge, formatCpf, isCpfMissing, isFutureBirthDate, isTooOldBirthDate, withCpfPending, withoutReviewPendings } from '../../utils/studentDocuments';
 import {
   X,
   UserPlus,
@@ -263,7 +263,11 @@ export const StudentModal: React.FC<StudentModalProps> = ({
       setError('A data de nascimento está no futuro. Confira o dia, o mês e o ano.');
       return;
     }
-    const pendingFields = withCpfPending(formData.pendingFields, formData.cpf);
+    if (isTooOldBirthDate(formData.birthDate)) {
+      setError('O ano de nascimento está antes de 1920. Confira o ano (ex.: 2018, e não 1018).');
+      return;
+    }
+    const pendingFields = withCpfPending(withoutReviewPendings(formData.pendingFields, formData.birthDate), formData.cpf);
     let cadastralStatus = (formData.cadastralStatus as CadastralStatus) || 'OK';
     if (cpfNow !== 'OK' && cadastralStatus === 'OK') cadastralStatus = 'INCOMPLETE';
     if (cpfNow === 'OK' && pendingFields.length === 0 && cadastralStatus === 'INCOMPLETE') cadastralStatus = 'OK';

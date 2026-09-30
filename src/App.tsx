@@ -854,13 +854,21 @@ export default function App() {
     explicitClasses?: SchoolClass[]
   ) => {
     setData((prev) => {
-      const existingUnits = prev.schoolUnits || [];
+      // Escola que já existe (mesmo id) e veio na importação: a ficha "DADOS DA ESCOLA" completou o cadastro
+      // (só campos vazios/provisórios). updatedAt garante que a alteração vá para a nuvem.
+      const unitStamp = new Date().toISOString();
+      const unitUpdates = new Map(
+        (explicitUnits || [])
+          .filter((u) => u && (prev.schoolUnits || []).some((eu) => eu && eu.id === u.id))
+          .map((u) => [u.id, { ...u, updatedAt: unitStamp } as SchoolUnit])
+      );
+      const existingUnits = (prev.schoolUnits || []).map((eu) => (eu && unitUpdates.get(eu.id)) || eu);
       const newUnits: SchoolUnit[] = [];
 
       // Se explicitUnits foi passado (gerado pelo módulo de importação com detecção de séries atendidas)
       if (explicitUnits && explicitUnits.length > 0) {
         explicitUnits.forEach((u) => {
-          if (!u) return;
+          if (!u || unitUpdates.has(u.id)) return;
           const uName = (u.name || '').toLowerCase().trim();
           if (
             !existingUnits.some(

@@ -347,6 +347,10 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
 
     if (filters.autoRegisterSchoolUnit) {
       fileResults.forEach((fr) => {
+        // Escola já cadastrada cuja ficha ("DADOS DA ESCOLA") completou campos: vai como atualização
+        if (fr.suggestedSchoolUnit && fr.schoolCheck?.status === 'CADASTRADA' && fr.fichaUpdatesRegisteredUnit) {
+          if (!newSchoolUnits.some((u) => u.id === fr.suggestedSchoolUnit!.id)) newSchoolUnits.push(fr.suggestedSchoolUnit);
+        }
         if (fr.suggestedSchoolUnit && fr.schoolCheck?.status !== 'CADASTRADA') {
           const exists = schoolUnits.some(
             (u) =>

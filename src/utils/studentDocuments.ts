@@ -80,6 +80,28 @@ export function isFutureBirthDate(birthDate: string | undefined | null, today = 
   return new Date(s + 'T00:00:00').getTime() > today.getTime();
 }
 
+/** Ano de nascimento antes de 1920 (erro de digitação, ex.: 1018 em vez de 2018). */
+export function isTooOldBirthDate(birthDate: string | undefined | null): boolean {
+  const s = String(birthDate || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  return Number(s.slice(0, 4)) < 1920;
+}
+
+/**
+ * Pendências de conferência criadas pela importação (idade fora da série, aluno repetido no arquivo):
+ * saem quando a secretaria abre e salva o cadastro, porque conferir é justamente o que foi pedido.
+ * "Data de Nascimento" também sai quando a data salva é válida.
+ */
+export function withoutReviewPendings(pendingFields: string[] | undefined, birthDate: string | undefined | null): string[] {
+  const birthOk = /^\d{4}-\d{2}-\d{2}$/.test(String(birthDate || '').slice(0, 10)) && !isTooOldBirthDate(birthDate) && !isFutureBirthDate(birthDate);
+  return (pendingFields || []).filter((f) => {
+    const t = String(f || '').trim();
+    if (/^Conferir data de nascimento/i.test(t) || /^Possível cadastro duplicado/i.test(t)) return false;
+    if (birthOk && t === 'Data de Nascimento') return false;
+    return true;
+  });
+}
+
 /**
  * Atualiza a pendência de CPF na lista de pendências do aluno.
  * Remove quando o CPF está certo; acrescenta quando falta ou é inválido.

@@ -338,7 +338,36 @@ export const HELP_MODULES: HelpModule[] = [
       {
         q: 'Como a importação separa as turmas A, B, C de uma mesma série?',
         a: 'Pela letra escrita logo depois da série: no título da tabela ("1º ANO A Nº", "3 ANO B") ou na linha acima dela ("TURMA: PRÉ-ESCOLA I C"). Cada letra vira uma turma própria (ex.: "1º ANO A - MANHÃ", "1º ANO B - MANHÃ"). Sem letra, a série fica numa turma só.',
-        tip: 'O turno não vem nos levantamentos: as turmas entram como MANHÃ. Para as turmas da tarde, abra Turmas & Matrizes, clique em editar e troque o turno.',
+        tip: 'A turma nova recebe o turno dos alunos dela (coluna TURNO da planilha padrão). Se a mesma série tiver alunos em dois turnos e sem letra, a turma fica com o turno da maioria e a conferência avisa: nesse caso, informe a letra (ex.: 1º ANO A e 1º ANO B). Levantamentos sem coluna de turno entram como MANHÃ.',
+      },
+      {
+        q: 'A aba "DADOS DA ESCOLA" da planilha padrão é importada?',
+        a: 'Sim. A ficha da escola é lida junto com os alunos: nome, código INEP, CNPJ ou decreto, tipo da unidade, escola sede (se for anexa), endereço, CEP, telefone, e-mail, diretor(a), coordenador(a), secretário(a), salas, horário, internet, turnos e séries atendidas. Escola nova entra com esses dados; escola já cadastrada só tem completados os campos que ainda estavam vazios ou provisórios (o que a secretaria corrigiu à mão não é trocado).',
+        steps: [
+          'Peça à escola que preencha primeiro a aba DADOS DA ESCOLA e depois a aba ALUNOS.',
+          'Importe o arquivo normalmente. Na conferência aparece "Ficha da escola lida" e o que ainda falta na ficha.',
+          'O que faltar (ex.: decreto) fica como pendência da escola em Rede Municipal & Polos.',
+        ],
+        tip: 'Se a linha "ESCOLA:" da aba ALUNOS vier vazia (planilha salva por outro programa), o nome da escola é tirado da ficha.',
+      },
+      {
+        q: 'Como a escola anexa fica ligada à escola sede na importação?',
+        a: 'Pela ficha da anexa: tipo da unidade ESCOLA ANEXA e, em "Escola sede", o nome da escola principal. A escola sede não precisa informar suas anexas. Se a sede ainda não foi importada, o vínculo é feito pelo nome e a conferência avisa para importar a planilha dela também.',
+        tip: 'Se a ficha trouxer escola sede, mas o tipo não for ESCOLA ANEXA, a conferência avisa e o vínculo não é feito. Para as demais escolas, o campo "Escola sede" fica em branco.',
+      },
+      {
+        q: 'Como informo um aluno com mais de uma deficiência na planilha?',
+        a: 'A deficiência principal vai em PCD / DEFICIÊNCIA e as outras em DEFICIÊNCIA ADICIONAL 1 e 2. Na importação, as deficiências são juntas no cadastro do aluno (ex.: "DEFICIÊNCIA FÍSICA + BAIXA VISÃO") e cada uma entra na lista de necessidades especiais.',
+      },
+      {
+        q: 'Quais pendências a importação marca nos alunos?',
+        steps: [
+          'Data de Nascimento: data vazia, fora do calendário (ex.: 31/02), antes de 1920 (ex.: 14/11/1018) ou no futuro.',
+          'Conferir data de nascimento / série: idade muito fora da série, como 4 anos no 3º ano ou um adulto no 9º ano. Atraso escolar comum (1 a 5 anos) não entra.',
+          'Possível cadastro duplicado: o aluno aparece mais de uma vez no arquivo (mesmo nome e nascimento). Ele entra uma vez só e a pendência diz em qual outra turma apareceu.',
+          'Também: endereço, raça/cor, sexo, laudo de PCD e CPF / Certidão.',
+        ],
+        tip: 'Todas aparecem em "Pendências Censo". Ao abrir o aluno, corrigir e salvar, as pendências de conferência saem. O sistema não aceita salvar ano de nascimento antes de 1920.',
       },
       {
         q: 'Importei antes da correção e as turmas A, B, C ficaram juntas. Como arrumo?',
@@ -351,7 +380,7 @@ export const HELP_MODULES: HelpModule[] = [
       },
       {
         q: 'Um aluno aparece repetido no arquivo. O que acontece?',
-        a: 'Aluno com o mesmo nome e a mesma data de nascimento entra uma vez só. A conferência avisa quem está repetido e em quais turmas, para você confirmar com a escola em qual turma ele realmente estuda.',
+        a: 'Aluno com o mesmo nome e a mesma data de nascimento entra uma vez só (a nuvem não aceita o mesmo aluno duas vezes na escola). A conferência avisa quem está repetido e em quais turmas, e o aluno fica com a pendência "Possível cadastro duplicado", para a escola confirmar em qual turma ele realmente estuda.',
       },
       {
         q: 'A mesma escola apareceu duas vezes com nomes diferentes. Como junto?',
@@ -363,7 +392,7 @@ export const HELP_MODULES: HelpModule[] = [
       },
       {
         q: 'O arquivo tem uma escola anexa. Ela é importada separada?',
-        a: 'Sim. Uma linha "ESCOLA ANEXO: nome" ou só "ANEXO nome" antes das tabelas abre a escola anexa. Ela vira uma escola própria, ligada à escola principal, com as turmas e os alunos dela.',
+        a: 'Sim. Uma linha "ESCOLA ANEXO: nome" ou só "ANEXO nome" antes das tabelas abre a escola anexa. Ela vira uma escola própria, ligada à escola principal, com as turmas e os alunos dela. Na planilha padrão, cada anexa vem em arquivo próprio, com a escola sede informada na aba DADOS DA ESCOLA.',
       },
       { q: 'Como edito ou corrijo o cadastro de um aluno?', a: 'Na lista, clique no lápis (Editar) na linha do aluno, altere e salve.' },
       { q: 'Como encontro alunos com pendências no Censo?', a: 'Use o atalho "Pendências Censo" acima da lista, ou "Mais Filtros" > Situação Cadastral. Clique em "Completar" para corrigir o que falta.' },

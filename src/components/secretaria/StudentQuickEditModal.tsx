@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { cpfDigits, cpfState, formatAge, formatCpf, isFutureBirthDate, isValidCpf } from '../../utils/studentDocuments';
+import { cpfDigits, cpfState, formatAge, formatCpf, isFutureBirthDate, isTooOldBirthDate, isValidCpf } from '../../utils/studentDocuments';
 import {
   X,
   Save,
@@ -157,6 +157,10 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
     }
     if (isFutureBirthDate(formData.birthDate)) {
       setError('A data de nascimento está no futuro. Confira o dia, o mês e o ano.');
+      return;
+    }
+    if (isTooOldBirthDate(formData.birthDate)) {
+      setError('O ano de nascimento está antes de 1920. Confira o ano (ex.: 2018, e não 1018).');
       return;
     }
 
