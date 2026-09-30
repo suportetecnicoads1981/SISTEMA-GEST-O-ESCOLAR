@@ -768,6 +768,24 @@ export const HELP_MODULES: HelpModule[] = [
           'Para voltar, clique no nome do operador, no alto da tela, e escolha a conta Master.',
         ],
       },
+      {
+        q: 'O que muda quando escolho a "Unidade Escolar de Lotação" do usuário?',
+        a: 'Quem tem uma escola de lotação trabalha só com ela. Em todas as telas (Secretaria & Alunos, Turmas & Matrizes, frequência, notas, documentos, gráficos e os números da Visão Geral) aparecem apenas os alunos, turmas e registros dessa escola, e o filtro de escola mostra só ela. O usuário também não consegue incluir, alterar, mover ou excluir registro de outra escola: a tentativa é recusada com um aviso, na tela e no Servidor da Sede. Aluno ou turma cadastrado sem escola fica automaticamente na escola dele.',
+        tip: 'Deixe "Rede Municipal Global (Todas as Unidades)" só para quem trabalha com a rede inteira, como a Coordenação da SEMED. O Master sempre vê todas as escolas. Transferências de aluno entre escolas são feitas pela Sede.',
+      },
+      {
+        q: 'Apareceu o aviso "A escola em que este usuário estava lotado foi apagada".',
+        a: 'A escola que estava no cadastro do usuário não existe mais. Enquanto isso, ele não vê nenhuma escola (nunca a rede inteira). Ao editar, o campo mostra "Rede Municipal Global": escolha a escola correta antes de salvar. Se salvar em "Rede Municipal Global", ele passa a ver todas as escolas.',
+        tip: 'Antes, a escola apagada ficava escondida no formulário e a nuvem recusava a conta ("Recusados pela nuvem"). Agora a sincronização não trava mais por isso.',
+      },
+      {
+        q: 'Como confiro se um usuário vê só a escola dele?',
+        steps: [
+          'Entre com a conta do usuário (ou use "Simular" na conta Master).',
+          'Abra Secretaria & Alunos: o total de alunos e o filtro de escola devem mostrar só a escola de lotação.',
+          'Confira Turmas & Matrizes e a Visão Geral / Dashbox: turmas e números só dessa escola.',
+        ],
+      },
       { q: 'Cuidado com "Excluir Todos os Usuários"', a: 'Esse botão apaga todas as contas. Use só com orientação do suporte.' },
     ],
   },
@@ -779,7 +797,7 @@ export const HELP_MODULES: HelpModule[] = [
     faq: [
       {
         q: 'Como o servidor protege os dados contra quem não tem permissão?',
-        a: 'O Servidor da Sede e o Servidor Remoto conferem cada gravação. No login, o servidor confere a senha no banco dele e abre uma sessão do usuário (vale 12 horas). Cada alteração enviada pelas estações é comparada com o banco: inclusão, alteração ou exclusão sem permissão é recusada pelo próprio servidor, mesmo que o pedido venha de fora do sistema. Usuários, senhas, setores e permissões só mudam com a conta Master. Tudo fica registrado no arquivo C:\\SucessoEdu\\data\\servidor.log (quem gravou, de qual estação e o que foi recusado).',
+        a: 'O Servidor da Sede e o Servidor Remoto conferem cada gravação. No login, o servidor confere a senha no banco dele e abre uma sessão do usuário (vale 12 horas). Cada alteração enviada pelas estações é comparada com o banco: inclusão, alteração ou exclusão sem permissão é recusada pelo próprio servidor, mesmo que o pedido venha de fora do sistema. Usuários, senhas, setores e permissões só mudam com a conta Master. Quem tem escola de lotação só grava registros da própria escola: alteração em aluno, turma, frequência ou nota de outra escola também é recusada pelo servidor. Tudo fica registrado no arquivo C:\\SucessoEdu\\data\\servidor.log (quem gravou, de qual estação e o que foi recusado).',
         tip: 'Esta proteção vem no programa do servidor: depois de atualizar o sistema, gere de novo o pacote do servidor e reinstale (o banco de dados é mantido). Em seguida, cada pessoa sai e entra de novo no sistema para abrir a sessão.',
       },
       {

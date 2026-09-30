@@ -337,7 +337,9 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
       phone: user.phone || '',
       sector: user.sector,
       sectorTitle: user.sectorTitle,
-      schoolUnitId: user.schoolUnitId || '',
+      // Escola que não existe mais (apagada) volta para "Rede Municipal Global": antes o código
+      // antigo ficava escondido no formulário e a nuvem recusava a gravação da conta.
+      schoolUnitId: user.schoolUnitId && schoolUnits.some((u) => u.id === user.schoolUnitId) ? user.schoolUnitId : '',
       isMaster: user.isMaster,
       active: user.active,
       avatarUrl: user.avatarUrl || '',
@@ -1464,6 +1466,12 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                       </option>
                     ))}
                   </select>
+                  {editingUser?.schoolUnitId && !schoolUnits.some((u) => u.id === editingUser.schoolUnitId) && (
+                    <p className="mt-1 text-[11px] font-semibold text-amber-700">
+                      A escola em que este usuário estava lotado foi apagada. Escolha a escola correta antes de salvar;
+                      em "Rede Municipal Global" ele passa a ver todas as escolas.
+                    </p>
+                  )}
                 </div>
               </div>
 

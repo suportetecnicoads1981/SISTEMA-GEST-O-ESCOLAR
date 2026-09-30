@@ -122,6 +122,7 @@ import { clearLocalServerSession } from './services/offline/localServerSync';
 import { computeDropoutRisk, describeDropoutCriterion } from './utils/dropoutRiskEngine';
 import { DropoutRiskAlertModal } from './components/common/DropoutRiskAlertModal';
 import { can as canAccess, canOpenTab, deniedTabMessage, describeDenials, enforceDataPermissions } from './services/rbac/accessControl';
+import { scopeDataToSchool, userSchoolScope } from './services/rbac/schoolScope';
 
 export default function App() {
   // setDataRaw: gravação sem checagem (dados vindos da nuvem, restauração, rotinas do sistema).
@@ -297,12 +298,14 @@ export default function App() {
     : null;
   accessActorRef.current = accessActor;
 
+  // ---- Escola de lotação: quem está lotado numa escola vê só os dados dela ----
+  // O estado completo (data) continua inteiro para gravação e sincronização; as telas recebem viewData.
+  const schoolScope = userSchoolScope(accessActor as any);
+  const viewData = useMemo(() => scopeDataToSchool(data, schoolScope), [data, schoolScope]);
+
   // ---- Risco de evasão por faltas sem justificativa (gatilho configurável no Censo) ----
   // Usuário lotado numa escola vê só os alunos dela; o Master e a rede veem todos.
-  const riskScopeUnit =
-    accessActor && !(accessActor as any).isMaster && (accessActor as any).sector !== 'MASTER'
-      ? (accessActor as any).schoolUnitId || undefined
-      : undefined;
+  const riskScopeUnit = schoolScope || undefined;
   const dropoutRisk = useMemo(
     () =>
       computeDropoutRisk(data.students || [], data.attendanceSheets || [], (data as any).dropoutAlertConfig, {
@@ -1873,7 +1876,7 @@ export default function App() {
       {/* Barra de Título Superior Estilo Windows (Titlebar & Janela Desktop) */}
       <WindowsTitleBar
         activeTab={activeTab}
-        schoolName={data.settings?.name}
+        schoolName={viewData.settings?.name}
         onNavigate={handleNavigate}
         onOpenQuickSearch={() => setIsQuickSearchOpen(true)}
         onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
@@ -1886,20 +1889,20 @@ export default function App() {
 
       {/* Top Header */}
       <Header
-        schoolName={data.settings?.name}
+        schoolName={viewData.settings?.name}
         activeTab={activeTab}
         onSelectTab={(tab, payload) => handleNavigate(tab, payload)}
         onGoBack={handleGoBack}
         navigationHistory={navigationHistory}
-        notifications={data.notifications || []}
+        notifications={viewData.notifications || []}
         currentRole={currentRole}
         onChangeRole={(role) => {
-          const matchingAccount = data.userAccounts?.find((u) => u.role === role);
+          const matchingAccount = viewData.userAccounts?.find((u) => u.role === role);
           if (matchingAccount) {
             switchOperatorIfAllowed(matchingAccount);
           }
         }}
-        userAccounts={data.userAccounts || []}
+        userAccounts={viewData.userAccounts || []}
         currentUser={currentUser}
         onSelectUserAccount={handleSwitchCurrentUser}
         onMarkNotificationAsRead={handleMarkNotificationAsRead}
@@ -1909,7 +1912,7 @@ export default function App() {
         onOpenQuickSearch={() => setIsQuickSearchOpen(true)}
         onOpenArchitectureDiagram={() => setIsArchitectureDiagramModalOpen(true)}
         onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
-        currentVersion={data.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
+        currentVersion={viewData.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
         onLogout={handleLogout}
         onToggleStartMenu={() => setIsStartMenuOpen((prev) => !prev)}
         isStartMenuOpen={isStartMenuOpen}
@@ -1926,7 +1929,7 @@ export default function App() {
           onLogout={handleLogout}
           onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
           onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
-          currentVersion={data.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
+          currentVersion={viewData.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
           showDevBacklog={isDevBacklogOwner(currentUser?.email)}
@@ -1960,16 +1963,16 @@ export default function App() {
             {/* TAB: DASHBOX PRINCIPAL (VISÃO EXECUTIVA & NOTIFICAÇÕES) */}
             {activeTab === 'MAIN_DASHBOARD' && (
               <MainOverviewDashboard
-                students={data.students}
-                classes={data.classes}
-                exams={data.exams}
-                submissions={data.submissions}
-                settings={data.settings}
-                schoolUnits={data.schoolUnits || []}
-                syncLogs={data.syncLogs || []}
-                userAccounts={data.userAccounts || []}
+                students={viewData.students}
+                classes={viewData.classes}
+                exams={viewData.exams}
+                submissions={viewData.submissions}
+                settings={viewData.settings}
+                schoolUnits={viewData.schoolUnits || []}
+                syncLogs={viewData.syncLogs || []}
+                userAccounts={viewData.userAccounts || []}
                 currentUser={currentUser}
-                notifications={data.notifications || []}
+                notifications={viewData.notifications || []}
                 dropoutRisk={canSeeDropoutRisk ? dropoutRisk : undefined}
                 onNavigate={handleNavigate}
                 onLogout={handleLogout}
@@ -1981,22 +1984,22 @@ export default function App() {
             {/* TAB: PORTAL DO PROFESSOR (GESTÃO COMPLETA DE TURMAS, DIÁRIO, NOTAS, FREQUÊNCIA & PROVAS) */}
             {(activeTab === 'TEACHER_PORTAL' || activeTab === 'PROFESSOR_DASHBOARD' || activeTab === 'PROFESSOR') && (
               <TeacherPortalModule
-                students={data.students}
-                classes={data.classes}
-                subjects={data.subjects}
-                schoolUnits={data.schoolUnits || []}
-                settings={data.settings}
-                bnccSkills={data.bnccSkills || []}
-                stateRegulations={data.stateRegulations || []}
-                activeStateRegulationCode={data.activeStateRegulationCode || 'SP'}
-                attendanceSheets={data.attendanceSheets || []}
-                lessonRegistries={data.lessonRegistries || []}
-                classGradeSheets={data.classGradeSheets || []}
-                exams={data.exams}
-                questions={data.questions}
-                submissions={data.submissions}
-                teacherLessonPlans={data.teacherLessonPlans || []}
-                teacherStudentNotes={data.teacherStudentNotes || []}
+                students={viewData.students}
+                classes={viewData.classes}
+                subjects={viewData.subjects}
+                schoolUnits={viewData.schoolUnits || []}
+                settings={viewData.settings}
+                bnccSkills={viewData.bnccSkills || []}
+                stateRegulations={viewData.stateRegulations || []}
+                activeStateRegulationCode={viewData.activeStateRegulationCode || 'SP'}
+                attendanceSheets={viewData.attendanceSheets || []}
+                lessonRegistries={viewData.lessonRegistries || []}
+                classGradeSheets={viewData.classGradeSheets || []}
+                exams={viewData.exams}
+                questions={viewData.questions}
+                submissions={viewData.submissions}
+                teacherLessonPlans={viewData.teacherLessonPlans || []}
+                teacherStudentNotes={viewData.teacherStudentNotes || []}
                 currentUserTeacherName={currentUser?.role === 'TEACHER' ? currentUser?.name : undefined}
                 onSaveAttendanceSheet={handleSaveAttendanceSheet}
                 onSaveLessonRegistry={handleSaveLessonRegistry}
@@ -2016,14 +2019,14 @@ export default function App() {
             {/* TAB: SECRETARIA / ESTUDANTES */}
             {activeTab === 'STUDENTS' && (
               <StudentList
-                students={data.students}
-                classes={data.classes}
-                courses={data.courses || []}
-                schoolUnits={data.schoolUnits || []}
-                histories={data.academicHistories || []}
-                attendanceSheets={data.attendanceSheets || []}
-                classGradeSheets={data.classGradeSheets || []}
-                notifications={data.notifications || []}
+                students={viewData.students}
+                classes={viewData.classes}
+                courses={viewData.courses || []}
+                schoolUnits={viewData.schoolUnits || []}
+                histories={viewData.academicHistories || []}
+                attendanceSheets={viewData.attendanceSheets || []}
+                classGradeSheets={viewData.classGradeSheets || []}
+                notifications={viewData.notifications || []}
                 onSaveNotification={handleSaveNotification}
                 onBatchSaveNotifications={handleBatchSaveNotifications}
                 onSaveSchoolUnit={handleSaveSchoolUnit}
@@ -2039,9 +2042,9 @@ export default function App() {
             {/* TAB: CENSO DE EVASÃO ESCOLAR & BUSCA ATIVA MUNICIPAL */}
             {activeTab === 'DROPOUT_CENSUS' && (
               <DropoutCensusReport
-                students={data.students}
-                classes={data.classes}
-                schoolUnits={data.schoolUnits || []}
+                students={viewData.students}
+                classes={viewData.classes}
+                schoolUnits={viewData.schoolUnits || []}
                 onUpdateStudent={handleSaveStudent}
                 onBack={handleGoBack}
                 onNavigate={handleNavigate}
@@ -2060,16 +2063,16 @@ export default function App() {
             {activeTab === 'CLASS_DIARY' && (
               <ClassDiaryModule
                 currentUserName={currentUser?.role === 'TEACHER' ? currentUser?.name : undefined}
-                students={data.students}
-                classes={data.classes}
-                subjects={data.subjects}
-                schoolUnits={data.schoolUnits || []}
-                settings={data.settings}
-                bnccSkills={data.bnccSkills || []}
-                stateRegulations={data.stateRegulations || []}
-                activeStateRegulationCode={data.activeStateRegulationCode || 'SP'}
-                attendanceSheets={data.attendanceSheets || []}
-                lessonRegistries={data.lessonRegistries || []}
+                students={viewData.students}
+                classes={viewData.classes}
+                subjects={viewData.subjects}
+                schoolUnits={viewData.schoolUnits || []}
+                settings={viewData.settings}
+                bnccSkills={viewData.bnccSkills || []}
+                stateRegulations={viewData.stateRegulations || []}
+                activeStateRegulationCode={viewData.activeStateRegulationCode || 'SP'}
+                attendanceSheets={viewData.attendanceSheets || []}
+                lessonRegistries={viewData.lessonRegistries || []}
                 onSaveAttendanceSheet={handleSaveAttendanceSheet}
                 onSaveLessonRegistry={handleSaveLessonRegistry}
                 onDeleteLessonRegistry={handleDeleteLessonRegistry}
@@ -2085,11 +2088,11 @@ export default function App() {
             {/* TAB: TURMAS E MATRIZES */}
             {activeTab === 'CLASSES' && (
               <ClassManagement
-                classes={data.classes}
-                courses={data.courses}
-                subjects={data.subjects}
-                students={data.students}
-                schoolUnits={data.schoolUnits || []}
+                classes={viewData.classes}
+                courses={viewData.courses}
+                subjects={viewData.subjects}
+                students={viewData.students}
+                schoolUnits={viewData.schoolUnits || []}
                 onSaveClass={handleSaveClass}
                 onDeleteClass={canAccess(accessActor, 'turmas', 'canDelete') ? handleDeleteClass : undefined}
                 onSaveSubject={handleSaveSubject}
@@ -2120,16 +2123,16 @@ export default function App() {
               <Suspense fallback={<ModuleLoadingFallback moduleName="Evolução Pedagógica & Indicadores BNCC" />}>
                 <PedagogicalDashboard
                   initialSection={pedagogicalInitialSection}
-                  exams={data.exams}
-                  questions={data.questions}
-                  students={data.students}
-                  classes={data.classes}
-                  submissions={data.submissions}
-                  schoolUnits={data.schoolUnits || []}
-                  subjects={data.subjects || []}
-                  settings={data.settings}
-                  academicHistories={data.academicHistories || []}
-                  classGradeSheets={data.classGradeSheets || []}
+                  exams={viewData.exams}
+                  questions={viewData.questions}
+                  students={viewData.students}
+                  classes={viewData.classes}
+                  submissions={viewData.submissions}
+                  schoolUnits={viewData.schoolUnits || []}
+                  subjects={viewData.subjects || []}
+                  settings={viewData.settings}
+                  academicHistories={viewData.academicHistories || []}
+                  classGradeSheets={viewData.classGradeSheets || []}
                   onBack={() => handleNavigate('MAIN_DASHBOARD')}
                   onNavigate={handleNavigate}
                 />
@@ -2139,14 +2142,14 @@ export default function App() {
             {/* TAB: RELATÓRIO OFICIAL DE AVALIAÇÕES POR NÍVEL E POR ESCOLA */}
             {activeTab === 'ASSESSMENT_REPORT' && (
               <AssessmentResultsReport
-                exams={data.exams}
-                questions={data.questions}
-                students={data.students}
-                classes={data.classes}
-                submissions={data.submissions}
-                schoolUnits={data.schoolUnits || []}
-                subjects={data.subjects || []}
-                settings={data.settings}
+                exams={viewData.exams}
+                questions={viewData.questions}
+                students={viewData.students}
+                classes={viewData.classes}
+                submissions={viewData.submissions}
+                schoolUnits={viewData.schoolUnits || []}
+                subjects={viewData.subjects || []}
+                settings={viewData.settings}
                 onBack={() => handleNavigate('MAIN_DASHBOARD')}
                 onNavigate={handleNavigate}
               />
@@ -2155,19 +2158,19 @@ export default function App() {
             {/* TAB: HABILIDADES BNCC (lançamento, relatórios, gráficos, importação/exportação) */}
             {activeTab === 'BNCC_SKILLS' && (
               <BnccSkillsModule
-                students={data.students}
-                classes={data.classes}
-                subjects={data.subjects}
-                schoolUnits={data.schoolUnits || []}
-                settings={data.settings}
-                bnccSkills={data.bnccSkills || []}
-                assessments={data.bnccAssessments || []}
+                students={viewData.students}
+                classes={viewData.classes}
+                subjects={viewData.subjects}
+                schoolUnits={viewData.schoolUnits || []}
+                settings={viewData.settings}
+                bnccSkills={viewData.bnccSkills || []}
+                assessments={viewData.bnccAssessments || []}
                 currentUserName={currentUser?.name}
                 onSaveAssessments={handleSaveBnccAssessments}
                 onUpsertSkills={handleUpsertBnccSkills}
-                exams={data.exams}
-                questions={data.questions}
-                submissions={data.submissions}
+                exams={viewData.exams}
+                questions={viewData.questions}
+                submissions={viewData.submissions}
                 onBack={() => handleNavigate('MAIN_DASHBOARD')}
               />
             )}
@@ -2175,8 +2178,8 @@ export default function App() {
             {/* TAB: BANCO DE QUESTÕES BNCC */}
             {activeTab === 'QUESTION_BANK' && (
               <QuestionBank
-                questions={data.questions}
-                subjects={data.subjects}
+                questions={viewData.questions}
+                subjects={viewData.subjects}
                 onSaveQuestion={handleSaveQuestion}
                 onDeleteQuestion={canAccess(accessActor, 'questoes', 'canDelete') ? handleDeleteQuestion : undefined}
                 onBatchImport={handleBatchImportQuestions}
@@ -2189,12 +2192,12 @@ export default function App() {
             {/* TAB: GERENCIADOR DE PROVAS & EXAMES */}
             {activeTab === 'EXAMS' && (
               <ExamManager
-                exams={data.exams}
-                questions={data.questions}
-                classes={data.classes}
-                subjects={data.subjects}
-                submissions={data.submissions}
-                settings={data.settings}
+                exams={viewData.exams}
+                questions={viewData.questions}
+                classes={viewData.classes}
+                subjects={viewData.subjects}
+                submissions={viewData.submissions}
+                settings={viewData.settings}
                 onSaveExam={handleSaveExam}
                 onDeleteExam={canAccess(accessActor, 'provas', 'canDelete') ? handleDeleteExam : undefined}
                 onTakeExamAsStudent={handleTakeExam}
@@ -2202,9 +2205,9 @@ export default function App() {
                 initialSelectedQuestionIds={preselectedQuestionIdsForExam}
                 onBack={() => handleNavigate('MAIN_DASHBOARD')}
                 onNavigate={handleNavigate}
-                students={data.students}
+                students={viewData.students}
                 onSavePaperSubmissions={handleSavePaperSubmissions}
-                schoolUnits={data.schoolUnits || []}
+                schoolUnits={viewData.schoolUnits || []}
               />
             )}
 
@@ -2214,8 +2217,8 @@ export default function App() {
                 {examForStudentRoom ? (
                   <StudentExamRoom
                     exam={examForStudentRoom}
-                    questions={data.questions}
-                    students={studentsForExam(examForStudentRoom, data.students, data.classes)}
+                    questions={viewData.questions}
+                    students={studentsForExam(examForStudentRoom, viewData.students, viewData.classes)}
                     onFinishSubmission={handleFinishSubmission}
                     onExit={() => handleNavigate('EXAMS')}
                     onNavigate={handleNavigate}
@@ -2286,10 +2289,10 @@ export default function App() {
             {/* TAB: MURAL DE COMUNICADOS */}
             {activeTab === 'COMMUNICATION' && (
               <CommunicationModule
-                messages={data.communications || []}
-                classes={data.classes}
-                students={data.students}
-                settings={data.settings}
+                messages={viewData.communications || []}
+                classes={viewData.classes}
+                students={viewData.students}
+                settings={viewData.settings}
                 currentRole={currentRole}
                 currentUserName={currentUser?.name}
                 currentUserId={currentUser?.id}
@@ -2306,17 +2309,17 @@ export default function App() {
             {/* TAB: WHATSAPP NOTIFICAÇÕES & COMUNICADOS ADMINISTRATIVOS */}
             {activeTab === 'WHATSAPP' && (
               <WhatsAppModule
-                config={data.whatsappConfig}
-                logs={data.whatsappLogs || []}
-                messageLogs={data.whatsappLogs || []}
-                templates={data.whatsappTemplates || []}
-                students={data.students}
-                classes={data.classes}
-                userAccounts={data.userAccounts || []}
+                config={viewData.whatsappConfig}
+                logs={viewData.whatsappLogs || []}
+                messageLogs={viewData.whatsappLogs || []}
+                templates={viewData.whatsappTemplates || []}
+                students={viewData.students}
+                classes={viewData.classes}
+                userAccounts={viewData.userAccounts || []}
                 currentUser={currentUser}
-                schoolUnits={data.schoolUnits || []}
-                schoolName={(data.settings as any)?.name || (data.settings as any)?.schoolName || ''}
-                schoolPhone={(data.settings as any)?.phone || ''}
+                schoolUnits={viewData.schoolUnits || []}
+                schoolName={(viewData.settings as any)?.name || (viewData.settings as any)?.schoolName || ''}
+                schoolPhone={(viewData.settings as any)?.phone || ''}
                 prefill={whatsappPrefill}
                 onPrefillConsumed={() => setWhatsappPrefill(null)}
                 onUpdateLogs={handleUpdateWhatsAppLogs}
@@ -2332,8 +2335,8 @@ export default function App() {
             {/* TAB: ATUALIZAÇÕES WEB & HISTÓRICO DO SISTEMA */}
             {activeTab === 'SYSTEM_UPDATES' && (
               <SystemUpdateModule
-                currentVersion={data.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
-                updatePackages={data.systemUpdates || []}
+                currentVersion={viewData.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
+                updatePackages={viewData.systemUpdates || []}
                 onApplyUpdate={handleApplySystemUpdate}
                 onBack={handleGoBack}
                 onNavigate={handleNavigate}
@@ -2345,10 +2348,10 @@ export default function App() {
             {/* TAB: CONTROLE DE USUÁRIOS & NÍVEIS DE ACESSO POR SETOR */}
             {activeTab === 'USER_CONTROL' && (
               <UserAccessControl
-                users={data.userAccounts || []}
+                users={viewData.userAccounts || []}
                 currentUser={currentUser}
-                schoolUnits={data.schoolUnits || []}
-                auditLogs={data.auditLogs || []}
+                schoolUnits={viewData.schoolUnits || []}
+                auditLogs={viewData.auditLogs || []}
                 onUpdateUsers={handleUpdateUsers}
                 onSwitchCurrentUser={handleSwitchCurrentUser}
                 onBack={handleGoBack}
@@ -2360,10 +2363,10 @@ export default function App() {
             {activeTab === 'ADMIN_TI' && (
               <Suspense fallback={<ModuleLoadingFallback moduleName="Central de Administração & TI" />}>
                 <AdminTIHub
-                  schoolName={data.settings?.name || 'SucessoEdu Gestão Educacional'}
+                  schoolName={viewData.settings?.name || 'SucessoEdu Gestão Educacional'}
                   onNavigate={handleNavigate}
                   onBack={handleGoBack}
-                  userAccountsCount={data.userAccounts?.length || 0}
+                  userAccountsCount={viewData.userAccounts?.length || 0}
                 />
               </Suspense>
             )}
@@ -2372,7 +2375,7 @@ export default function App() {
             {activeTab === 'OMNI_DEPLOY' && (
               <Suspense fallback={<ModuleLoadingFallback moduleName="OmniDeploy Gestão Híbrida" />}>
                 <OmniDeployHub
-                  schoolName={data.settings?.name || 'SucessoEdu Gestão Educacional'}
+                  schoolName={viewData.settings?.name || 'SucessoEdu Gestão Educacional'}
                   onNavigate={handleNavigate}
                   onBack={handleGoBack}
                 />
@@ -2383,7 +2386,7 @@ export default function App() {
             {activeTab === 'NEXUS_DEPLOYER' && (
               <Suspense fallback={<ModuleLoadingFallback moduleName="Nexus Deployer & Nuvem" />}>
                 <NexusDeployerHub
-                  schoolName={data.settings?.name || 'SucessoEdu Gestão Educacional'}
+                  schoolName={viewData.settings?.name || 'SucessoEdu Gestão Educacional'}
                   onNavigate={handleNavigate}
                   onBack={handleGoBack}
                 />
@@ -2414,7 +2417,7 @@ export default function App() {
             {activeTab === 'CLEANSLATE_HUB' && (
               <Suspense fallback={<ModuleLoadingFallback moduleName="CleanSlate Enterprise Hub" />}>
                 <CleanSlateHub
-                  schoolName={data.settings?.name || 'SucessoEdu Gestão Educacional'}
+                  schoolName={viewData.settings?.name || 'SucessoEdu Gestão Educacional'}
                   onNavigate={handleNavigate}
                   onBack={handleGoBack}
                 />
@@ -2506,7 +2509,7 @@ export default function App() {
         onNavigate={handleNavigate}
         currentUser={currentUser}
         onLogout={handleLogout}
-        schoolName={data.settings?.name}
+        schoolName={viewData.settings?.name}
         onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
         onOpenArchitectureDiagram={() => setIsArchitectureDiagramModalOpen(true)}
         onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
@@ -2526,8 +2529,8 @@ export default function App() {
             }
           }}
           preferences={
-            data?.rolePreferences && typeof data.rolePreferences === 'object' && Object.keys(data.rolePreferences).length > 0
-              ? data.rolePreferences
+            data?.rolePreferences && typeof viewData.rolePreferences === 'object' && Object.keys(viewData.rolePreferences).length > 0
+              ? viewData.rolePreferences
               : (DEFAULT_ROLE_PREFERENCES && typeof DEFAULT_ROLE_PREFERENCES === 'object' && Object.keys(DEFAULT_ROLE_PREFERENCES).length > 0)
               ? DEFAULT_ROLE_PREFERENCES
               : INLINE_DEFAULT_ROLE_PREFERENCES
@@ -2572,7 +2575,7 @@ export default function App() {
       <FeedbackSuggestionsModal
         isOpen={isFeedbackModalOpen}
         onClose={() => setIsFeedbackModalOpen(false)}
-        developerContact={data.developerContact || {
+        developerContact={viewData.developerContact || {
           name: 'AD SUCESSO SISTEMA',
           phone: '(11) 98765-4321',
           whatsapp: '(11) 98765-4321',
@@ -2581,7 +2584,7 @@ export default function App() {
           website: 'https://sucessoedu.com.br',
           roleTitle: 'Engenheiro de Software & Arquiteto Líder',
         }}
-        settings={data.settings}
+        settings={viewData.settings}
         currentUser={currentUser}
       />
 
@@ -2590,7 +2593,7 @@ export default function App() {
         isOpen={isWelcomeModalOpen}
         onClose={handleCloseWelcomeModal}
         onNavigate={handleNavigate}
-        currentVersion={data.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
+        currentVersion={viewData.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
         updatePackage={lastUpdatePackage}
         onOpenManual={() => handleNavigate('SYSTEM_UPDATES')}
         onOpenDiagram={() => setIsArchitectureDiagramModalOpen(true)}
@@ -2601,8 +2604,8 @@ export default function App() {
       <VersionControlModal
         isOpen={isVersionControlModalOpen}
         onClose={() => setIsVersionControlModalOpen(false)}
-        currentVersion={data.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
-        packages={data.systemUpdates || []}
+        currentVersion={viewData.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
+        packages={viewData.systemUpdates || []}
         onNavigateToModule={handleNavigate}
       />
 
@@ -2610,7 +2613,7 @@ export default function App() {
       <ModulesArchitectureDiagramModal
         isOpen={isArchitectureDiagramModalOpen}
         onClose={() => setIsArchitectureDiagramModalOpen(false)}
-        version={data.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
+        version={viewData.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
         onNavigateToTab={handleNavigate}
       />
 

@@ -9,11 +9,13 @@
  *    depois de cada cadastro e recusa inclusão, alteração ou exclusão sem o privilégio.
  *    Vale para qualquer tela, porque a checagem é feita no ponto único de gravação.
  *  - Usuários, senhas, setores e permissões, e os dados do desenvolvedor: só o Master altera.
+ *  - Quem tem escola de lotação só grava registros da própria escola (schoolScope.ts).
  *  - O Master (setor MASTER ou marcado como Master) tem acesso total.
  */
 import type { ModulePermission, SystemModuleKey, UserAccount } from '../../types';
 import { moduleName } from '../../config/moduleNames';
 import { getDefaultSectorPermissions } from '../../components/usuarios/UserAccessControl';
+import { enforceSchoolScope, userSchoolScope } from './schoolScope';
 
 export type AccessAction = 'canRead' | 'canCreate' | 'canEdit' | 'canDelete';
 
@@ -40,7 +42,7 @@ const ACTION_LABEL: Record<AccessAction, string> = {
   canDelete: 'excluir',
 };
 
-type Actor = Pick<UserAccount, 'id' | 'isMaster' | 'sector' | 'permissions' | 'active'> | null | undefined;
+type Actor = (Pick<UserAccount, 'id' | 'isMaster' | 'sector' | 'permissions' | 'active'> & { schoolUnitId?: string | null }) | null | undefined;
 
 /** Master: setor MASTER ou conta marcada como Master. Acesso total. */
 export function isMasterAccount(user: Actor): boolean {
@@ -216,6 +218,8 @@ export interface PermissionDenial {
   action: AccessAction;
   count: number;
   modules: string[];
+  /** Recusa por ser registro de outra escola (e não por falta de privilégio no módulo). */
+  otherSchool?: boolean;
 }
 
 /**
@@ -265,15 +269,28 @@ export function enforceDataPermissions<T extends Record<string, any>>(
       (result as any)[collection] = before;
     }
   }
-  return { next: result || next, denied };
+  // Escola de lotação: nada de outra escola é incluído, alterado ou excluído.
+  const scoped = enforceSchoolScope(prev, result || next, userSchoolScope(actor));
+  for (const d of scoped.denied) {
+    const rule = ACCESS_RULES[d.collection];
+    denied.push({ collection: d.collection, label: rule?.label || d.collection, action: 'canEdit', count: d.count, modules: [], otherSchool: true });
+  }
+  return { next: scoped.next, denied };
 }
 
 /** Texto do aviso mostrado quando uma gravação é recusada. */
 export function describeDenials(denied: PermissionDenial[]): string {
-  const parts = denied.map((d) =>
+  const outside = denied.filter((d) => d.otherSchool);
+  const byModule = denied.filter((d) => !d.otherSchool);
+  const outsideText = outside.length
+    ? `Seu usuário está lotado em uma escola e só grava registros dela: ${outside.map((d) => d.label).join(', ')} de outra escola não foram alterados. Transferências entre escolas são feitas pela Sede.`
+    : '';
+  if (!byModule.length) return outsideText;
+  const parts = byModule.map((d) =>
     d.modules[0] === 'Administrador Master'
       ? `${ACTION_LABEL[d.action]} ${d.label} (somente o Administrador Master)`
       : `${ACTION_LABEL[d.action]} ${d.label} (${d.modules.join(' / ')})`
   );
-  return `Seu perfil não tem permissão para ${parts.join('; ')}. Nada foi alterado nesses cadastros. Se precisar, peça ao Administrador Master para ajustar suas permissões.`;
+  const moduleText = `Seu perfil não tem permissão para ${parts.join('; ')}. Nada foi alterado nesses cadastros. Se precisar, peça ao Administrador Master para ajustar suas permissões.`;
+  return outsideText ? `${moduleText} ${outsideText}` : moduleText;
 }

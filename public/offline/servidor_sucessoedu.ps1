@@ -359,6 +359,66 @@ function Test-UserCan($user, [string]$moduleKey, [string]$action) {
 
 $ActionLabel = @{ canCreate = 'incluir'; canEdit = 'alterar'; canDelete = 'excluir'; canRead = 'abrir' }
 
+# Escola de lotacao (mesmas regras de src/services/rbac/schoolScope.ts): quem tem escola no
+# cadastro de usuarios so grava registros da propria escola. Master e "Rede" gravam em todas.
+$SchoolScopedJson = @'
+["schoolUnits","students","classes","attendanceSheets","lessonRegistries","classGradeSheets","academicHistories","exams","submissions","bnccAssessments","teacherLessonPlans","teacherStudentNotes"]
+'@
+$script:SchoolScoped = ConvertFrom-JsonText $SchoolScopedJson
+$script:NetworkWideAllowed = @('exams')
+
+function Get-UserSchoolScope($user) {
+    if (-not $user) { return '' }
+    if (Test-IsMasterUser $user) { return '' }
+    $id = Get-Val $user 'schoolUnitId'
+    if ($null -eq $id) { return '' }
+    return ([string]$id).Trim()
+}
+function Get-TextVal($map, [string]$name) {
+    $v = Get-Val $map $name
+    if ($null -eq $v) { return '' }
+    return ([string]$v).Trim()
+}
+# Escola do registro ('' quando nao esta ligado a nenhuma escola).
+function Get-RecordSchool([string]$k, $rec, $work, $db) {
+    if (-not (Test-IsMap $rec)) { return '' }
+    if ($k -eq 'schoolUnits') { return (Get-TextVal $rec 'id') }
+    $own = Get-TextVal $rec 'schoolUnitId'
+    if ($own) { return $own }
+    if ($k -eq 'classes') { return '' }
+    $classId = Get-TextVal $rec 'classId'
+    if ($classId) {
+        $cls = Find-WorkRecord $work $db 'classes' $classId
+        $cs = Get-TextVal $cls 'schoolUnitId'
+        if ($cs) { return $cs }
+    }
+    if ($k -eq 'students') { return '' }
+    $studentId = Get-TextVal $rec 'studentId'
+    if ($studentId) {
+        $st = Find-WorkRecord $work $db 'students' $studentId
+        if ($st) { return (Get-RecordSchool 'students' $st $work $db) }
+    }
+    return ''
+}
+function Test-InSchool([string]$k, $rec, [string]$scope, $work, $db) {
+    $school = Get-RecordSchool $k $rec $work $db
+    if ($school) { return ($school -eq $scope) }
+    return ($script:NetworkWideAllowed -contains $k)
+}
+function Test-SchoolScopeOp($user, $op, $db, $work, [string]$label) {
+    $scope = Get-UserSchoolScope $user
+    if (-not $scope) { return '' }
+    $k = [string](Get-Val $op 'k')
+    if (-not ($script:SchoolScoped -contains $k)) { return '' }
+    $t = [string](Get-Val $op 't')
+    $msg = 'Usuario lotado em uma escola: ' + $label + ' de outra escola nao podem ser gravados (transferencias sao feitas pela Sede).'
+    if ($t -eq 's') { return $msg }
+    $old = Find-WorkRecord $work $db $k ([string](Get-Val $op 'id'))
+    if ($null -ne $old -and -not (Test-InSchool $k $old $scope $work $db)) { return $msg }
+    if ($t -eq 'u' -and -not (Test-InSchool $k (Get-Val $op 'v') $scope $work $db)) { return $msg }
+    return ''
+}
+
 # Confere uma operacao. Devolve '' se pode gravar, ou o motivo da recusa.
 function Test-OpAllowed($user, $op, $db, [bool]$fromServerPc, $work) {
     $k = [string](Get-Val $op 'k')
@@ -412,7 +472,7 @@ function Test-OpAllowed($user, $op, $db, [bool]$fromServerPc, $work) {
         }
         if (-not $ok) { return ('Sem permissao para ' + $ActionLabel[$action] + ' ' + $label + '.') }
     }
-    return ''
+    return (Test-SchoolScopeOp $user $op $db $work $label)
 }
 
 # Listas em trabalho durante uma gravacao: indice por id (rapido mesmo com milhares de alunos).

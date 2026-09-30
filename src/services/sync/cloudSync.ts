@@ -165,12 +165,24 @@ export function recordsOf(state: Record<string, any>, t: SyncTable): Map<string,
 
 const appCollection = (t: SyncTable) => (t.kind === 'appSingle' ? SINGLETON_COLLECTION : t.key);
 
-function buildRow(t: SyncTable, id: string, rec: any, base: number): Record<string, any> | null {
+export function buildRow(t: SyncTable, id: string, rec: any, base: number, schoolIds?: Set<string>): Record<string, any> | null {
   const doc = docOf(t, rec);
   if (t.table === APP_TABLE) return { collection: appCollection(t), id, doc, base_version: base };
   const cols = t.toColumns ? t.toColumns(rec) : {};
   if (!cols) return null;
+  // Escola que não existe mais (apagada): a coluna vai vazia para a nuvem não recusar o registro
+  // inteiro. O registro completo (doc) guarda a escola original, então um usuário lotado nela
+  // continua restrito (não passa a ver a rede toda) até o Master escolher a escola correta.
+  if (schoolIds && t.table !== 'school_units' && cols.school_unit_id && !schoolIds.has(String(cols.school_unit_id))) {
+    cols.school_unit_id = null;
+  }
   return { ...cols, id, doc, base_version: base };
+}
+
+/** Escolas que existem neste computador (para não enviar vínculo com escola apagada). */
+export function knownSchoolIds(state: Record<string, any>): Set<string> {
+  const list = Array.isArray(state?.schoolUnits) ? state.schoolUnits : [];
+  return new Set(list.filter((u: any) => u && u.id != null).map((u: any) => String(u.id)));
 }
 
 const INTERNAL = ['doc', 'rowVersion', 'baseVersion', 'serverUpdatedAt', 'row_version', 'base_version', 'server_updated_at'];
@@ -361,8 +373,9 @@ async function pushStream(ctx: RunContext, t: SyncTable) {
   if (!dirty.length) return;
 
   const rows: Array<{ id: string; rec: any; h: string; row: Record<string, any> }> = [];
+  const schoolIds = knownSchoolIds(ctx.snapshot);
   for (const d of dirty) {
-    const row = buildRow(t, d.id, d.rec, sm.rows[d.id]?.v ?? -1);
+    const row = buildRow(t, d.id, d.rec, sm.rows[d.id]?.v ?? -1, schoolIds);
     if (!row) {
       (sm.rejected ||= {})[d.id] = { h: d.h, msg: 'faltam dados obrigatórios (ex.: nome)' };
       continue;
