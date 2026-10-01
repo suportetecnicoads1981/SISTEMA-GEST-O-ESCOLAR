@@ -400,7 +400,8 @@ function Test-UserCan($user, [string]$moduleKey, [string]$action) {
 $ActionLabel = @{ canCreate = 'incluir'; canEdit = 'alterar'; canDelete = 'excluir'; canRead = 'abrir' }
 
 # Escola de lotacao (mesmas regras de src/services/rbac/schoolScope.ts): quem tem escola no
-# cadastro de usuarios so grava registros da propria escola. Master e "Rede" gravam em todas.
+# cadastro de usuarios so grava registros da propria escola (e das anexas, se ela for sede).
+# Master e "Rede" gravam em todas.
 $SchoolScopedJson = @'
 ["schoolUnits","students","classes","attendanceSheets","lessonRegistries","classGradeSheets","academicHistories","exams","submissions","bnccAssessments","teacherLessonPlans","teacherStudentNotes"]
 '@
@@ -442,7 +443,12 @@ function Get-RecordSchool([string]$k, $rec, $work, $db) {
 }
 function Test-InSchool([string]$k, $rec, [string]$scope, $work, $db) {
     $school = Get-RecordSchool $k $rec $work $db
-    if ($school) { return ($school -eq $scope) }
+    if ($school) {
+        if ($school -eq $scope) { return $true }
+        # Lotado na escola sede atende tambem as anexas dela
+        $unit = Find-WorkRecord $work $db 'schoolUnits' $school
+        return ((Get-TextVal $unit 'parentUnitId') -eq $scope)
+    }
     return ($script:NetworkWideAllowed -contains $k)
 }
 function Test-SchoolScopeOp($user, $op, $db, $work, [string]$label) {

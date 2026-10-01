@@ -53,6 +53,8 @@ export function userSchoolScope(actor: ScopeActor): string | null {
 export interface SchoolIndex {
   classSchool: Map<string, string>;
   studentSchool: Map<string, string>;
+  /** Escola anexa -> escola sede (quem é lotado na sede também atende as anexas dela). */
+  annexParent: Map<string, string>;
 }
 
 export function buildSchoolIndex(state: any): SchoolIndex {
@@ -64,7 +66,12 @@ export function buildSchoolIndex(state: any): SchoolIndex {
   for (const s of Array.isArray(state?.students) ? state.students : []) {
     if (s && s.id != null) studentSchool.set(String(s.id), text(s.schoolUnitId) || classSchool.get(text(s.classId)) || '');
   }
-  return { classSchool, studentSchool };
+  const annexParent = new Map<string, string>();
+  for (const u of Array.isArray(state?.schoolUnits) ? state.schoolUnits : []) {
+    const pid = text(u?.parentUnitId);
+    if (u && u.id != null && pid) annexParent.set(String(u.id), pid);
+  }
+  return { classSchool, studentSchool, annexParent };
 }
 
 /** Escola do registro ('' quando o registro não está ligado a nenhuma escola). */
@@ -83,7 +90,8 @@ export function recordSchool(collection: string, record: any, index: SchoolIndex
 /** O registro pode ser visto/gravado por quem está restrito à escola `scope`? */
 function inScope(collection: string, record: any, index: SchoolIndex, scope: string): boolean {
   const school = recordSchool(collection, record, index);
-  if (school) return school === scope;
+  // Escola da lotação ou uma anexa dela (lotado na sede atende também as anexas)
+  if (school) return school === scope || index.annexParent.get(school) === scope;
   return NETWORK_WIDE_ALLOWED.has(collection);
 }
 

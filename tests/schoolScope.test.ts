@@ -158,3 +158,48 @@ describe('servidor da rede local: mesma regra de escola', () => {
     expect(ps).toContain("$script:NetworkWideAllowed = @('exams')");
   });
 });
+
+describe('lotado na escola sede atende também as anexas', () => {
+  const rede3 = () => ({
+    schoolUnits: [
+      { id: 'SEDE', name: 'ERMINIO BRITO' },
+      { id: 'ANX', name: 'CASTRO ALVES', parentUnitId: 'SEDE' },
+      { id: 'OUT', name: 'OUTRA' },
+    ],
+    classes: [
+      { id: 'cs', name: '1º A', schoolUnitId: 'SEDE' },
+      { id: 'ca', name: 'MULTI', schoolUnitId: 'ANX' },
+      { id: 'co', name: '1º A', schoolUnitId: 'OUT' },
+    ],
+    students: [
+      { id: 's1', name: 'DA SEDE', schoolUnitId: 'SEDE', classId: 'cs' },
+      { id: 's2', name: 'DA ANEXA', schoolUnitId: 'ANX', classId: 'ca' },
+      { id: 's3', name: 'DE OUTRA', schoolUnitId: 'OUT', classId: 'co' },
+    ],
+  });
+
+  it('vê a sede e a anexa, e não vê outra escola', () => {
+    const v = scopeDataToSchool(rede3() as any, 'SEDE') as any;
+    expect(v.students.map((s: any) => s.id)).toEqual(['s1', 's2']);
+    expect(v.schoolUnits.map((u: any) => u.id)).toEqual(['SEDE', 'ANX']);
+  });
+
+  it('grava na anexa, mas não em outra escola', () => {
+    const prev = rede3();
+    const next = { ...prev, students: prev.students.map((s) => ({ ...s, name: s.name + ' *' })) };
+    const r = enforceSchoolScope(prev as any, next as any, 'SEDE');
+    const byId = new Map((r.next as any).students.map((s: any) => [s.id, s.name]));
+    expect(byId.get('s2')).toBe('DA ANEXA *');
+    expect(byId.get('s3')).toBe('DE OUTRA');
+  });
+
+  it('lotado na anexa não vê a sede', () => {
+    const v = scopeDataToSchool(rede3() as any, 'ANX') as any;
+    expect(v.students.map((s: any) => s.id)).toEqual(['s2']);
+  });
+
+  it('servidor da escola com a mesma regra', () => {
+    const ps = readFileSync(join(__dirname, '../public/offline/servidor_sucessoedu.ps1'), 'utf8');
+    expect(ps).toContain("return ((Get-TextVal $unit 'parentUnitId') -eq $scope)");
+  });
+});

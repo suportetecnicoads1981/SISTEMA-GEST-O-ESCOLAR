@@ -893,7 +893,7 @@ export const HELP_MODULES: HelpModule[] = [
       },
       {
         q: 'O que muda quando escolho a "Unidade Escolar de Lotação" do usuário?',
-        a: 'Quem tem uma escola de lotação trabalha só com ela. Em todas as telas (Secretaria & Alunos, Turmas & Matrizes, frequência, notas, documentos, gráficos e os números da Visão Geral) aparecem apenas os alunos, turmas e registros dessa escola, e o filtro de escola mostra só ela. O usuário também não consegue incluir, alterar, mover ou excluir registro de outra escola: a tentativa é recusada com um aviso, na tela e no Servidor da Sede. Aluno ou turma cadastrado sem escola fica automaticamente na escola dele.',
+        a: 'Quem tem uma escola de lotação trabalha só com ela. Em todas as telas (Secretaria & Alunos, Turmas & Matrizes, frequência, notas, documentos, gráficos e os números da Visão Geral) aparecem apenas os alunos, turmas e registros dessa escola, e o filtro de escola mostra só ela. O usuário também não consegue incluir, alterar, mover ou excluir registro de outra escola: a tentativa é recusada com um aviso, na tela e no Servidor da Sede. Aluno ou turma cadastrado sem escola fica automaticamente na escola dele. Quem é lotado numa escola sede trabalha também com as escolas anexas dela (ex.: lotado na Erminio Brito vê e grava também a Castro Alves e a Castro Alves Canaã); quem é lotado numa anexa vê só a anexa.',
         tip: 'Deixe "Rede Municipal Global (Todas as Unidades)" só para quem trabalha com a rede inteira, como a Coordenação da SEMED. O Master sempre vê todas as escolas. Transferências de aluno entre escolas são feitas pela Sede.',
       },
       {
