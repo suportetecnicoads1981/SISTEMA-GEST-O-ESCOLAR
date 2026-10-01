@@ -796,6 +796,15 @@ export function ageAtSchoolCutoff(isoDate: string, schoolYear = new Date().getFu
 export const AGE_GRADE_PENDING = 'Conferir data de nascimento / série';
 /** Prefixo da pendência de aluno que aparece mais de uma vez no mesmo arquivo. */
 export const DUPLICATE_PENDING_PREFIX = 'Possível cadastro duplicado';
+/** Aluno que a planilha traz, mas que já está matriculado em OUTRA escola (fica onde está, com esta pendência). */
+export const OTHER_SCHOOL_PENDING_PREFIX = 'Matrícula em duas escolas';
+
+/** Aluno já cadastrado que pertence a outra escola (a importação não o transfere sozinha). */
+export function isEnrolledInOtherSchool(existing: Pick<Student, 'schoolUnitId'> | undefined, targetUnitId: string | undefined): boolean {
+  const cur = String(existing?.schoolUnitId || '').trim();
+  const dest = String(targetUnitId || '').trim();
+  return !!cur && !!dest && cur !== dest;
+}
 
 /**
  * Idade muito fora da série: 2 ou mais anos MAIS NOVO que o esperado (quase sempre erro de
@@ -2168,6 +2177,18 @@ export function convertImportedStudentsToOfficial(
     // Aluno já cadastrado (mesmo nome e nascimento): ATUALIZA o cadastro em vez de duplicar.
     // Mantém id, matrícula, CPF, responsável e contatos; atualiza escola, turma, série e dados da planilha.
     const existing = findExistingStudent(item, existingStudents);
+    // Já matriculado em OUTRA escola: não transfere sozinho. Fica na escola atual com a pendência,
+    // para a Secretaria conferir com as duas escolas onde o aluno estuda de verdade.
+    if (existing && isEnrolledInOtherSchool(existing, officialStudent.schoolUnitId)) {
+      const otherName = finalSchoolName || item.schoolName || unit?.name || 'outra escola';
+      const label = `${OTHER_SCHOOL_PENDING_PREFIX}: também na planilha de ${otherName}${effectiveSeries ? ` (${effectiveSeries})` : ''}. Conferir onde estuda`;
+      const others = (existing.pendingFields || []).filter((f) => !String(f).startsWith(OTHER_SCHOOL_PENDING_PREFIX));
+      return {
+        ...existing,
+        pendingFields: [...others, label],
+        cadastralStatus: 'INCOMPLETE',
+      } as Student;
+    }
     if (existing) {
       const hasCpf = existing.cpf && existing.cpf !== '000.000.000-00';
       return {

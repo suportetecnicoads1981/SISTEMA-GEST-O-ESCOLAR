@@ -401,6 +401,15 @@ export const HELP_MODULES: HelpModule[] = [
         a: 'Aluno com o mesmo nome e a mesma data de nascimento entra uma vez só (a nuvem não aceita o mesmo aluno duas vezes na escola). A conferência avisa quem está repetido e em quais turmas, e o aluno fica com a pendência "Possível cadastro duplicado", para a escola confirmar em qual turma ele realmente estuda.',
       },
       {
+        q: 'A planilha de uma escola traz um aluno que já está matriculado em outra escola. Ele é transferido?',
+        a: 'Não. A importação nunca transfere sozinha um aluno de outra escola. Ele continua na escola onde já estava, com o mesmo RA, e ganha a pendência "Matrícula em duas escolas", dizendo em qual planilha também apareceu. Na conferência, o rodapé mostra quantos alunos estão nessa situação.',
+        steps: [
+          'Confira com as duas escolas onde o aluno estuda de verdade.',
+          'Se ele mudou de escola, abra o cadastro dele e troque a escola e a turma.',
+          'Ao salvar o cadastro conferido, a pendência sai.',
+        ],
+      },
+      {
         q: 'A mesma escola apareceu duas vezes com nomes diferentes. Como junto?',
         a: 'A importação entende que EMEIF, E.M.E.I.F e "Escola Municipal de Ensino Infantil e Fundamental" são a mesma coisa (o mesmo vale para EMEF e EMEI), então isso não se repete nas próximas importações.',
         steps: [

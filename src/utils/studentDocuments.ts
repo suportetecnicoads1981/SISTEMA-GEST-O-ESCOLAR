@@ -88,7 +88,8 @@ export function isTooOldBirthDate(birthDate: string | undefined | null): boolean
 }
 
 /**
- * Pendências de conferência criadas pela importação (idade fora da série, aluno repetido no arquivo):
+ * Pendências de conferência criadas pela importação (idade fora da série, aluno repetido no arquivo,
+ * aluno que também aparece na planilha de outra escola):
  * saem quando a secretaria abre e salva o cadastro, porque conferir é justamente o que foi pedido.
  * "Data de Nascimento" também sai quando a data salva é válida.
  */
@@ -96,7 +97,7 @@ export function withoutReviewPendings(pendingFields: string[] | undefined, birth
   const birthOk = /^\d{4}-\d{2}-\d{2}$/.test(String(birthDate || '').slice(0, 10)) && !isTooOldBirthDate(birthDate) && !isFutureBirthDate(birthDate);
   return (pendingFields || []).filter((f) => {
     const t = String(f || '').trim();
-    if (/^Conferir data de nascimento/i.test(t) || /^Possível cadastro duplicado/i.test(t)) return false;
+    if (/^Conferir data de nascimento/i.test(t) || /^Possível cadastro duplicado/i.test(t) || /^Matrícula em duas escolas/i.test(t)) return false;
     if (birthOk && t === 'Data de Nascimento') return false;
     return true;
   });

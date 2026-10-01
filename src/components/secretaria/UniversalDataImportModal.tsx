@@ -34,6 +34,7 @@ import { Student, SchoolClass, SchoolUnit, ClassShift } from '../../types';
 import {
   parseFileResults,
   findExistingStudent,
+  isEnrolledInOtherSchool,
   convertImportedStudentsToOfficial,
   processSheetWithHeaders,
   generateOfficialTemplateXlsx,
@@ -477,9 +478,13 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
   const totalSelectedAcrossFiles = allParsedStudents.filter((s) => s.selectedForImport !== false).length;
   // Arquivos com erro impeditivo (escola não identificada, coluna obrigatória ausente) e alunos selecionados
   // Alunos do arquivo que já estão cadastrados: serão atualizados, não duplicados
-  const alreadyRegisteredCount = allParsedStudents.filter(
-    (st) => st.selectedForImport !== false && !!findExistingStudent(st, existingStudents)
-  ).length;
+  const alreadyRegisteredMatches = allParsedStudents
+    .filter((st) => st.selectedForImport !== false)
+    .map((st) => ({ st, ex: findExistingStudent(st, existingStudents) }))
+    .filter((m) => !!m.ex);
+  // Já matriculados em OUTRA escola: não são transferidos, ficam onde estão com pendência
+  const otherSchoolMatches = alreadyRegisteredMatches.filter((m) => isEnrolledInOtherSchool(m.ex, m.st.schoolUnitId));
+  const alreadyRegisteredCount = alreadyRegisteredMatches.length - otherSchoolMatches.length;
   const blockingFiles = fileResults.filter(
     (fr) => fr.errors.length > 0 && fr.students.some((s) => s.selectedForImport !== false)
   );
@@ -2273,6 +2278,15 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
               {alreadyRegisteredCount > 0 && (
                 <span className="text-[11px] text-indigo-800 font-bold max-w-xs">
                   {alreadyRegisteredCount} já cadastrado(s): serão atualizados, sem duplicar
+                </span>
+              )}
+              {otherSchoolMatches.length > 0 && (
+                <span
+                  className="text-[11px] text-amber-800 font-bold flex items-center gap-1 max-w-xs"
+                  title={otherSchoolMatches.map((m) => m.st.cleanName || m.st.name).join(', ')}
+                >
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  {otherSchoolMatches.length} já matriculado(s) em outra escola: ficam onde estão, com pendência para conferir
                 </span>
               )}
               {blockingFiles.length > 0 && (
