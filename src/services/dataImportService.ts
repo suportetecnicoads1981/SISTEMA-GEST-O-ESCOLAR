@@ -1019,16 +1019,22 @@ export function applySchoolFicha(
   }
 
   // Pendências da escola: o que continua faltando depois da ficha
-  const pending: string[] = [];
-  if (!/^\d{8}$/.test(String(next.inepCode || ''))) pending.push('Código INEP Escolar');
-  if (isPlaceholderValue(next.cnpjOrDecree)) pending.push('Ato de Autorização / Decreto');
-  if (isPlaceholderValue(next.directorName)) pending.push('Nome do(a) Diretor(a)');
-  if (isPlaceholderValue(next.phone)) pending.push('Telefone e Contato Oficial');
-  if (isPlaceholderValue(next.address)) pending.push('Endereço Completo e CEP');
-  if (isAnnex && !next.parentUnitId) pending.push('Escola sede (escola anexa)');
+  const pending = schoolUnitPendings(next, isAnnex);
   next.pendingFields = pending;
   next.cadastralStatus = pending.length > 0 ? 'INCOMPLETE' : 'OK';
   return { unit: next as SchoolUnit, notes };
+}
+
+/** Pendências do cadastro da escola (o que ainda falta). Usado na importação e ao salvar o cadastro. */
+export function schoolUnitPendings(unit: Partial<SchoolUnit>, isAnnex = !!unit?.isAnnex): string[] {
+  const pending: string[] = [];
+  if (!/^\d{8}$/.test(String(unit?.inepCode || ''))) pending.push('Código INEP Escolar');
+  if (isPlaceholderValue(unit?.cnpjOrDecree)) pending.push('Ato de Autorização / Decreto');
+  if (isPlaceholderValue(unit?.directorName)) pending.push('Nome do(a) Diretor(a)');
+  if (isPlaceholderValue(unit?.phone)) pending.push('Telefone e Contato Oficial');
+  if (isPlaceholderValue(unit?.address)) pending.push('Endereço Completo e CEP');
+  if (isAnnex && !unit?.parentUnitId) pending.push('Escola sede (escola anexa)');
+  return pending;
 }
 
 const SCHOOL_LINE_RE = /\bESCOLA(\s+ANEXO)?\s*:\s*(.+?)(?=\s*\|?\s*(?:TURMAS?|S[EÉ]RIES?|DATA)\s*:|\s*\||$)/i;

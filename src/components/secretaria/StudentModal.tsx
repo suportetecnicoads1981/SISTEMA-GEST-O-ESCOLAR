@@ -1027,6 +1027,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
         isOpen={isSchoolUnitModalOpen}
         onClose={() => setIsSchoolUnitModalOpen(false)}
         onSave={handleSaveInlineSchoolUnit}
+        allUnits={schoolUnits}
       />
     )}
   </>

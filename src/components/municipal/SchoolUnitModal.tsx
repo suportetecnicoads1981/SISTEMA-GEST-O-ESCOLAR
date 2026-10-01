@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { SchoolUnit, LocationZone, SchoolUnitType } from '../../types';
 import { notify } from '../../utils/dialogs';
+import { annexesOf, annexLinkProblem } from '../../utils/schoolAnnexes';
+import { schoolUnitPendings } from '../../services/dataImportService';
 
 interface SchoolUnitModalProps {
   isOpen: boolean;
@@ -29,6 +31,8 @@ interface SchoolUnitModalProps {
   onSave: (unit: SchoolUnit) => void;
   unitToEdit?: SchoolUnit | null;
   defaultManagementLogo?: string;
+  /** Escolas cadastradas: para escolher a escola sede de uma anexa e mostrar as anexas da sede. */
+  allUnits?: SchoolUnit[];
 }
 
 export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
@@ -37,6 +41,7 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
   onSave,
   unitToEdit,
   defaultManagementLogo,
+  allUnits = [],
 }) => {
   const schoolLogoInputRef = useRef<HTMLInputElement>(null);
   const managementLogoInputRef = useRef<HTMLInputElement>(null);
@@ -168,8 +173,25 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
       return;
     }
 
+    // Escola anexa: precisa de uma escola sede válida (nunca ela mesma nem outra anexa)
+    const unitId = unitToEdit?.id || `unit-${Date.now()}`;
+    const isAnnex = formData.type === 'ESCOLA_SATELITE';
+    const parentUnitId = isAnnex ? String(formData.parentUnitId || '').trim() : '';
+    if (isAnnex) {
+      const problem = annexLinkProblem(unitToEdit?.id, parentUnitId, allUnits);
+      if (problem) {
+        setError(problem);
+        return;
+      }
+    } else if (unitToEdit && annexesOf(unitToEdit.id, allUnits).length > 0 && formData.type === 'SEDE_CENTRAL') {
+      setError('Esta escola é sede de escolas anexas. Desvincule as anexas antes de mudar o tipo para Sede Central da SME.');
+      return;
+    }
+
     const schoolUnit: SchoolUnit = {
-      id: unitToEdit?.id || `unit-${Date.now()}`,
+      // Mantém os campos que o formulário não mostra (pendências, origem da importação etc.)
+      ...(unitToEdit || {}),
+      id: unitId,
       name: formData.name.trim(),
       tradeName: formData.tradeName?.trim() || undefined,
       inepCode: formData.inepCode.trim(),
@@ -208,7 +230,13 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
       linkageCode: formData.linkageCode || 'VINC-SEMED-PA-001',
       linkageDate: formData.linkageDate || new Date().toISOString(),
       linkageDecree: formData.linkageDecree || 'Portaria SEMED/PMCN de Homologação da Unidade',
-    };
+      isAnnex: isAnnex || undefined,
+      parentUnitId: parentUnitId || undefined,
+    } as SchoolUnit;
+    // Pendências recalculadas com os dados salvos (o que foi corrigido sai da lista)
+    const pending = schoolUnitPendings(schoolUnit, isAnnex);
+    schoolUnit.pendingFields = pending;
+    schoolUnit.cadastralStatus = pending.length > 0 ? 'INCOMPLETE' : 'OK';
 
     onSave(schoolUnit);
   };
@@ -469,6 +497,7 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
               </select>
             </div>
 
+
             {/* SELEÇÃO CRÍTICA DE LOCALIDADE: ZONA URBANA OU RURAL */}
             <div>
               <label className="block font-semibold text-slate-700 mb-1">
@@ -488,6 +517,37 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
               </select>
             </div>
           </div>
+
+          {formData.type === 'ESCOLA_SATELITE' && (
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Escola sede (polo) desta anexa *</label>
+              <select
+                value={formData.parentUnitId || ''}
+                onChange={(e) => setFormData({ ...formData, parentUnitId: e.target.value || undefined })}
+                className="w-full px-3 py-2 rounded-xl border border-violet-300 bg-violet-50/60 font-semibold text-slate-800"
+              >
+                <option value="">Escolha a escola sede...</option>
+                {allUnits
+                  .filter((u) => u.id !== unitToEdit?.id && !u.parentUnitId && u.type !== 'SEDE_CENTRAL')
+                  .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+                  .map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+              </select>
+              <p className="text-[11px] text-slate-500 mt-1">
+                A anexa continua com as próprias turmas e alunos. Nos relatórios, marque "Incluir escolas anexas" para sair junto com a sede.
+              </p>
+            </div>
+          )}
+
+          {unitToEdit && annexesOf(unitToEdit.id, allUnits).length > 0 && (
+            <div className="px-3 py-2 rounded-xl bg-violet-50 border border-violet-200 text-xs text-violet-900">
+              <strong>Escolas anexas desta sede:</strong> {annexesOf(unitToEdit.id, allUnits).map((a) => a.name).join(', ')}
+            </div>
+          )}
+
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>

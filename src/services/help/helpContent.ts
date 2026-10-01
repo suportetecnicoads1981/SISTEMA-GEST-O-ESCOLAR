@@ -157,6 +157,16 @@ export const HELP_GENERAL: HelpModule = {
       tip: 'Os mesmos botões de Excel, Word e CSV também estão no Painel de Impressão das Turmas e do Pedagógico.',
     },
     {
+      q: 'Como gerar um relatório conjunto da escola sede (polo) com as escolas anexas dela?',
+      steps: [
+        'Em Secretaria > Alunos, escolha a escola sede no filtro de escola.',
+        'Marque "+ Anexas" ao lado do filtro (ou, no Painel de Impressão, em "Escolas anexas", escolha "Incluir anexas").',
+        'A lista e o relatório passam a trazer os alunos da sede e das anexas. Cada escola sai em bloco próprio, e a anexa aparece como "ESCOLA X (anexa de ESCOLA Y)".',
+        'No Relatório Oficial de Matrículas e Enturmação, o filtro "Escolas anexas" aparece logo abaixo da escola quando ela tem anexas.',
+      ],
+      tip: 'A opção só aparece quando a escola escolhida é sede de alguma anexa. Para ligar uma escola como anexa, veja a pergunta sobre juntar escolas em Rede Municipal & Polos.',
+    },
+    {
       q: 'Como sai o cabeçalho (escola, Gestão e SEMED) no Word e no Excel?',
       a: 'Igual ao da impressão, já alinhado: logo da Gestão Municipal à esquerda; no centro, Prefeitura, Secretaria de Educação e a escola (com INEP); à direita, as logos da SEMED e da escola, todas em tamanho padronizado. No Word, cada escola/turma começa em página nova com o timbre. No Excel, o timbre fica no topo da planilha, seguido do título, filtros e de quem emitiu; cada escola/turma vem num bloco com a identificação em destaque, o cabeçalho das colunas em fundo escuro, bordas, totais e o campo de conferência. A planilha já sai pronta para imprimir em A4, ajustada à largura, uma escola/turma por página e com rodapé "Emitido por... / Página X de Y".',
       tip: 'As logos vêm de Rede Municipal & Polos (Secretaria e Escolas). Se uma logo não aparecer, confira se ela está cadastrada ali. O arquivo CSV continua só com os dados, sem cabeçalho, para importar em outros sistemas.',
@@ -367,6 +377,16 @@ export const HELP_MODULES: HelpModule[] = [
         q: 'Qual cidade, CEP e curso o aluno importado recebe?',
         a: 'A planilha padrão não traz cidade nem CEP de cada aluno. Por isso o aluno recebe a cidade, a UF e o CEP da escola dele (aba DADOS DA ESCOLA). O curso vem pela série: Pré-escola e creche ficam em Educação Infantil, 1º ao 5º ano em Ensino Fundamental I, 6º ao 9º ano em Ensino Fundamental II e séries do médio em Ensino Médio.',
         tip: 'Alunos importados por versões antigas com "Belém – PA, CEP 66000-000" são corrigidos para os dados da escola quando a planilha é importada de novo. O endereço exato do aluno continua sendo atualizado no cadastro dele.',
+      },
+      {
+        q: 'Como juntar escolas: ligar uma escola como anexa de outra (escola sede / polo)?',
+        a: 'Em Rede Municipal & Polos, edite a escola que vai virar anexa, escolha o tipo "Escola Satélite / Anexa" e, no campo "Escola sede (polo) desta anexa", escolha a escola sede. A anexa continua com as próprias turmas, alunos e INEP; o que muda é o vínculo, que aparece no cartão das duas escolas ("Anexa de..." e "Sede de N anexas") e permite o relatório conjunto.',
+        steps: [
+          'Para desfazer o vínculo, edite a anexa e mude o tipo dela (ex.: Escola Campo / Rural).',
+          'Uma anexa não pode ser sede de outra, e uma escola que já tem anexas não pode virar anexa. Mude primeiro as anexas dela.',
+          'A escola sede com anexas não pode ser removida enquanto as anexas estiverem ligadas a ela.',
+        ],
+        tip: 'Juntar não mistura os cadastros: os alunos continuam matriculados na escola deles. Para mudar um aluno de escola, edite o cadastro dele.',
       },
       {
         q: 'Como a escola anexa fica ligada à escola sede na importação?',

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { z } from 'zod';
+import { annexesOf, parentOf } from '../../utils/schoolAnnexes';
 import {
   Building2,
   Upload,
@@ -324,6 +325,15 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
     const linkedStudents = (students || []).filter(
       (st: any) => st?.schoolUnitId === id || (st?.classId && unitClassIds.has(st.classId))
     ).length;
+    // Escola sede com anexas: as anexas ficariam ligadas a uma escola que não existe mais.
+    const ownAnnexes = annexesOf(id, schoolUnits);
+    if (ownAnnexes.length) {
+      notify(
+        `Não é possível remover "${unit?.name || 'esta unidade'}": ela é escola sede de ${ownAnnexes.map((a) => a.name).join(', ')}. ` +
+          'Edite as anexas e escolha outra escola sede (ou mude o tipo delas) antes de remover.'
+      );
+      return;
+    }
     if (linkedStudents) {
       notify(
         `Não é possível remover "${unit?.name || 'esta unidade'}": ela tem ${linkedStudents} aluno(s) vinculado(s). ` +
@@ -1034,7 +1044,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                     email: u.email || '',
                     classes: clCount.get(u.id) || 0,
                     students: stCount.get(u.id) || 0,
-                    annex: u.isAnnex ? 'Anexo' : 'Sede',
+                    annex: u.parentUnitId ? `Anexa de ${parentOf(u, schoolUnits)?.name || 'escola sede'}` : annexesOf(u.id, schoolUnits).length ? `Sede (${annexesOf(u.id, schoolUnits).length} anexa${annexesOf(u.id, schoolUnits).length === 1 ? '' : 's'})` : 'Sede',
                   }));
                 })()}
                 columns={[
@@ -1092,8 +1102,25 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                           ? 'Escola Rural'
                           : unit.type === 'CRECHE_INFANTIL'
                           ? 'Creche / Infantil'
+                          : unit.parentUnitId
+                          ? 'Escola Anexa'
                           : 'Unidade Satélite'}
                       </span>
+
+                      {/* VÍNCULO SEDE / ANEXA */}
+                      {parentOf(unit, schoolUnits) && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-100 text-violet-800 border border-violet-200">
+                          Anexa de {parentOf(unit, schoolUnits)!.name}
+                        </span>
+                      )}
+                      {annexesOf(unit.id, schoolUnits).length > 0 && (
+                        <span
+                          className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-100 text-violet-800 border border-violet-200"
+                          title={annexesOf(unit.id, schoolUnits).map((a) => a.name).join(', ')}
+                        >
+                          Sede de {annexesOf(unit.id, schoolUnits).length} anexa{annexesOf(unit.id, schoolUnits).length === 1 ? '' : 's'}
+                        </span>
+                      )}
 
                       {/* BADGE DE LOCALIDADE ZONA URBANA OU RURAL */}
                       <span
@@ -2032,6 +2059,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
         onSave={handleSaveSchoolUnit}
         unitToEdit={schoolUnitToEdit}
         defaultManagementLogo={activeSecretary.managementLogoUrl || activeSecretary.logoUrl}
+        allUnits={schoolUnits}
       />
 
       {/* MODAL DE CADASTRO CENTRAL DA SECRETARIA MUNICIPAL (SEMED) */}

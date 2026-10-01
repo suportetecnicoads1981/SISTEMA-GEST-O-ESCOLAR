@@ -73,6 +73,7 @@ import { AttendanceSheet, ClassGradeSheet, NotificationItem } from '../../types'
 import { confirmDialog } from '../../utils/dialogs';
 
 import { moduleName } from '../../config/moduleNames';
+import { annexesOf, unitDisplayName } from '../../utils/schoolAnnexes';
 interface StudentListProps {
   students: Student[];
   classes: SchoolClass[];
@@ -120,6 +121,8 @@ export const StudentList: React.FC<StudentListProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUnitFilter, setSelectedUnitFilter] = useState('ALL');
+  // Relatório conjunto: a escola sede escolhida + as escolas anexas dela
+  const [includeAnnexes, setIncludeAnnexes] = useState(false);
   const [selectedSeriesFilter, setSelectedSeriesFilter] = useState('ALL');
   const [selectedClassFilter, setSelectedClassFilter] = useState('ALL');
   const [selectedShiftFilter, setSelectedShiftFilter] = useState('ALL');
@@ -396,6 +399,7 @@ export const StudentList: React.FC<StudentListProps> = ({
 
   // ===== Relatório Oficial de Matrículas e Enturmação (filtros próprios) =====
   const [repUnitFilter, setRepUnitFilter] = useState('ALL');
+  const [repIncludeAnnexes, setRepIncludeAnnexes] = useState('NO');
   const [repSeriesFilter, setRepSeriesFilter] = useState('ALL');
   const [repShiftFilter, setRepShiftFilter] = useState('ALL');
   const [repClassFilter, setRepClassFilter] = useState('ALL');
@@ -424,6 +428,14 @@ export const StudentList: React.FC<StudentListProps> = ({
     ],
     []
   );
+
+  // Escolas do relatório: a escolhida e, se pedido, as anexas dela (relatório conjunto)
+  const repUnitIds = useMemo(() => {
+    if (repUnitFilter === 'ALL') return null;
+    const ids = new Set([repUnitFilter]);
+    if (repIncludeAnnexes === 'YES') annexesOf(repUnitFilter, schoolUnits).forEach((a) => ids.add(a.id));
+    return ids;
+  }, [repUnitFilter, repIncludeAnnexes, schoolUnits]);
 
   const enrollmentReportRows = useMemo(() => {
     const unitById = new Map((schoolUnits || []).map((u) => [u.id, u]));
@@ -457,7 +469,7 @@ export const StudentList: React.FC<StudentListProps> = ({
       return {
         unitId,
         unitKey: unitId || 'sem-escola',
-        school: u?.name || 'Escola não informada',
+        school: (u && unitDisplayName(u, schoolUnits)) || 'Escola não informada',
         inep: u?.inepCode && /\d/.test(u.inepCode) ? u.inepCode : '',
       };
     };
@@ -465,7 +477,7 @@ export const StudentList: React.FC<StudentListProps> = ({
     classes.forEach((cls) => {
       const c: any = cls;
       const unitId = c.schoolUnitId || '';
-      if (repUnitFilter !== 'ALL' && unitId !== repUnitFilter) return;
+      if (repUnitIds && !repUnitIds.has(unitId)) return;
       if (repSeriesFilter !== 'ALL' && String(c.gradeLevel || '').trim() !== repSeriesFilter) return;
       if (repClassFilter !== 'ALL' && cls.id !== repClassFilter) return;
       if (!shiftOk(c.shift)) return;
@@ -490,7 +502,7 @@ export const StudentList: React.FC<StudentListProps> = ({
     });
     if (repNoClass === 'SHOW' && repClassFilter === 'ALL' && repSeriesFilter === 'ALL' && repShiftFilter === 'ALL') {
       noClassByUnit.forEach((list, unitId) => {
-        if (repUnitFilter !== 'ALL' && unitId !== repUnitFilter) return;
+        if (repUnitIds && !repUnitIds.has(unitId)) return;
         rows.push({
           ...unitInfo(unitId),
           ...stats(list),
@@ -507,16 +519,20 @@ export const StudentList: React.FC<StudentListProps> = ({
       });
     }
     return rows;
-  }, [students, classes, schoolUnits, classMap, repUnitFilter, repSeriesFilter, repShiftFilter, repClassFilter, repNoClass]);
+  }, [students, classes, schoolUnits, classMap, repUnitIds, repSeriesFilter, repShiftFilter, repClassFilter, repNoClass]);
 
   const enrollmentReportFilters: AppliedFilterItem[] = useMemo(() => {
     const f: AppliedFilterItem[] = [];
-    if (repUnitFilter !== 'ALL') f.push({ label: 'Escola', value: (schoolUnits || []).find((u) => u.id === repUnitFilter)?.name || '' });
+    if (repUnitFilter !== 'ALL') {
+      const annexNames = repIncludeAnnexes === 'YES' ? annexesOf(repUnitFilter, schoolUnits).map((a) => a.name) : [];
+      const name = (schoolUnits || []).find((u) => u.id === repUnitFilter)?.name || '';
+      f.push({ label: 'Escola', value: `${name}${annexNames.length ? ` + anexa${annexNames.length === 1 ? '' : 's'}: ${annexNames.join(', ')}` : ''}` });
+    }
     if (repSeriesFilter !== 'ALL') f.push({ label: 'Série', value: repSeriesFilter });
     if (repShiftFilter !== 'ALL') f.push({ label: 'Turno', value: { MANH: 'Manhã', TARDE: 'Tarde', INTEGRAL: 'Integral', NOIT: 'Noite' }[repShiftFilter] || repShiftFilter });
     if (repClassFilter !== 'ALL') f.push({ label: 'Turma', value: classMap.get(repClassFilter) || '' });
     return f;
-  }, [repUnitFilter, repSeriesFilter, repShiftFilter, repClassFilter, schoolUnits, classMap]);
+  }, [repUnitFilter, repIncludeAnnexes, repSeriesFilter, repShiftFilter, repClassFilter, schoolUnits, classMap]);
 
   const enrollmentReportMetrics: SummaryMetricItem[] = useMemo(() => {
     const sum = (k: string) => enrollmentReportRows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
@@ -572,6 +588,15 @@ export const StudentList: React.FC<StudentListProps> = ({
   };
 
   // Motor central de filtragem com suporte a Unidade, Série, Turma e Filtros Avançados
+  const selectedUnitAnnexes = useMemo(
+    () => (selectedUnitFilter === 'ALL' ? [] : annexesOf(selectedUnitFilter, schoolUnits)),
+    [selectedUnitFilter, schoolUnits]
+  );
+  const annexIdsInFilter = useMemo(
+    () => new Set(includeAnnexes ? selectedUnitAnnexes.map((a) => a.id) : []),
+    [includeAnnexes, selectedUnitAnnexes]
+  );
+
   const filteredStudents = useMemo(() => {
     return students.filter((student) => {
       // 1. Busca textual abrangente (Nome, RA, CPF, E-mail, Responsável, Escola de Origem, Série)
@@ -603,7 +628,8 @@ export const StudentList: React.FC<StudentListProps> = ({
         const matchedUnitObj = availableSchoolUnits.find((u) => u.id === selectedUnitFilter);
         const unitName = matchedUnitObj ? matchedUnitObj.name.toLowerCase() : '';
 
-        const matchesUnitId = student.schoolUnitId === selectedUnitFilter;
+        const matchesUnitId =
+          student.schoolUnitId === selectedUnitFilter || (!!student.schoolUnitId && annexIdsInFilter.has(student.schoolUnitId));
         const matchesOrigin =
           student.schoolOriginName &&
           (student.schoolOriginName.toLowerCase() === unitName ||
@@ -704,6 +730,7 @@ export const StudentList: React.FC<StudentListProps> = ({
     availableSchoolUnits,
     searchTerm,
     selectedUnitFilter,
+    annexIdsInFilter,
     selectedSeriesFilter,
     selectedClassFilter,
     selectedShiftFilter,
@@ -771,7 +798,11 @@ export const StudentList: React.FC<StudentListProps> = ({
     // Unidade Escolar
     if (selectedUnitFilter !== 'ALL') {
       const u = availableSchoolUnits.find((item) => item.id === selectedUnitFilter);
-      list.push({ label: 'Unidade Escolar', value: u?.name || selectedUnitFilter });
+      const annexNames = includeAnnexes ? selectedUnitAnnexes.map((a) => a.name) : [];
+      list.push({
+        label: 'Unidade Escolar',
+        value: `${u?.name || selectedUnitFilter}${annexNames.length ? ` + anexa${annexNames.length === 1 ? '' : 's'}: ${annexNames.join(', ')}` : ''}`,
+      });
     } else {
       list.push({ label: 'Unidade Escolar', value: 'Todas as Unidades' });
     }
@@ -850,6 +881,8 @@ export const StudentList: React.FC<StudentListProps> = ({
     searchTerm,
     classMap,
     availableSchoolUnits,
+    includeAnnexes,
+    selectedUnitAnnexes,
   ]);
 
   // Resumo de métricas impresso no topo
@@ -1360,6 +1393,23 @@ export const StudentList: React.FC<StudentListProps> = ({
                   ))}
                 </select>
               </div>
+
+              {selectedUnitAnnexes.length > 0 && (
+                <label
+                  className={`px-2.5 py-2 rounded-xl text-xs font-bold border flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                    includeAnnexes ? 'bg-violet-100 border-violet-300 text-violet-900' : 'bg-white border-slate-200 text-slate-600'
+                  }`}
+                  title={`Juntar as escolas anexas: ${selectedUnitAnnexes.map((a) => a.name).join(', ')}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={includeAnnexes}
+                    onChange={(e) => setIncludeAnnexes(e.target.checked)}
+                    className="accent-violet-600"
+                  />
+                  + Anexas ({selectedUnitAnnexes.length})
+                </label>
+              )}
 
               {selectedUnitFilter !== 'ALL' && activeSelectedSchoolUnit && (
                 <button
@@ -2381,6 +2431,22 @@ export const StudentList: React.FC<StudentListProps> = ({
                 set: setRepUnitFilter,
                 opts: [{ v: 'ALL', t: 'Todas as escolas' }, ...(schoolUnits || []).map((u) => ({ v: u.id, t: u.name }))],
               },
+              ...(repUnitFilter !== 'ALL' && annexesOf(repUnitFilter, schoolUnits).length > 0
+                ? [
+                    {
+                      label: 'Escolas anexas',
+                      value: repIncludeAnnexes,
+                      set: setRepIncludeAnnexes,
+                      opts: [
+                        { v: 'NO', t: 'Só a escola escolhida' },
+                        {
+                          v: 'YES',
+                          t: `Incluir anexas (${annexesOf(repUnitFilter, schoolUnits).map((a) => a.name).join(', ')})`,
+                        },
+                      ],
+                    },
+                  ]
+                : []),
               {
                 label: 'Série',
                 value: repSeriesFilter,
@@ -2411,7 +2477,7 @@ export const StudentList: React.FC<StudentListProps> = ({
                 opts: [
                   { v: 'ALL', t: 'Todas as turmas' },
                   ...classes
-                    .filter((c) => repUnitFilter === 'ALL' || (c as any).schoolUnitId === repUnitFilter)
+                    .filter((c) => !repUnitIds || repUnitIds.has((c as any).schoolUnitId))
                     .map((c) => ({ v: c.id, t: classMap.get(c.id) || c.name })),
                 ],
               },
@@ -2466,7 +2532,7 @@ export const StudentList: React.FC<StudentListProps> = ({
             schoolUnitId: unitId,
             classId: st.classId,
             lines: [
-              ['Escola', unit?.name || st.schoolOriginName || 'Não informada'],
+              ['Escola', (unit && unitDisplayName(unit, schoolUnits)) || st.schoolOriginName || 'Não informada'],
               ['INEP', unit?.inepCode && /\d/.test(unit.inepCode) ? unit.inepCode : ''],
               ['Série', (cls as any)?.gradeLevel || st.series || ''],
               ['Turma', cls?.name || classMap.get(st.classId) || 'Sem turma'],
@@ -2483,6 +2549,19 @@ export const StudentList: React.FC<StudentListProps> = ({
                 set: setSelectedUnitFilter,
                 opts: [{ v: 'ALL', t: 'Todas as escolas' }, ...availableSchoolUnits.map((u) => ({ v: u.id, t: `${u.name} (${u.count})` }))],
               },
+              ...(selectedUnitAnnexes.length > 0
+                ? [
+                    {
+                      label: 'Escolas anexas',
+                      value: includeAnnexes ? 'YES' : 'NO',
+                      set: (v: string) => setIncludeAnnexes(v === 'YES'),
+                      opts: [
+                        { v: 'NO', t: 'Só a escola escolhida' },
+                        { v: 'YES', t: `Incluir anexas (${selectedUnitAnnexes.map((a) => a.name).join(', ')})` },
+                      ],
+                    },
+                  ]
+                : []),
               {
                 label: 'Série',
                 value: selectedSeriesFilter,
@@ -2692,6 +2771,7 @@ export const StudentList: React.FC<StudentListProps> = ({
         onClose={() => setIsSchoolUnitModalOpen(false)}
         onSave={handleSaveSchoolUnitModal}
         unitToEdit={schoolUnitToEdit}
+        allUnits={schoolUnits}
       />
 
       {/* Modal Dedicado de Edição Rápida de Cadastros e Pendências */}
