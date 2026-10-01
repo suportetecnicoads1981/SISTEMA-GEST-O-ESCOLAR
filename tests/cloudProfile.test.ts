@@ -19,7 +19,7 @@ describe('perfil na nuvem a partir do cadastro de usuários', () => {
   it('função da nuvem aceita o perfil ESCOLA e nunca dá Master', () => {
     const fn = readFileSync(join(__dirname, '../supabase/functions/gerenciar-conta-nuvem/index.ts'), 'utf8');
     expect(fn).toContain("'ESCOLA'");
-    expect(fn).toContain('delete m.master');
+    expect(fn).toContain("m.master = base.master === true ? true : null");
     expect(fn).toContain('callerIsMaster');
   });
   it('migração do perfil ESCOLA: só lê e grava a escola e as anexas, sem excluir', () => {

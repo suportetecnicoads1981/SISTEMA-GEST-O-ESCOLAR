@@ -334,7 +334,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         if (existing && existing.active === false) {
           await getSupabaseClient().auth.signOut({ scope: 'local' }).catch(() => {});
           setIsLoading(false);
-          setErrorMsg('Credenciais inválidas ou usuário inativo no banco de dados.');
+          // A senha conferiu na nuvem: o bloqueio é o cadastro estar inativo neste computador.
+          setErrorMsg('Este usuário está marcado como INATIVO no cadastro de usuários. Peça à conta Master para ativá-lo (Usuários & Permissões) e sincronizar este computador.');
           return;
         }
 

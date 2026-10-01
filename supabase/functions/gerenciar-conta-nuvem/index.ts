@@ -64,13 +64,13 @@ Deno.serve(async (req: Request) => {
       if (unitErr) return json({ success: false, error: unitErr.message }, 500);
       if (!unit) return json({ success: false, error: 'A escola de lotação ainda não está na nuvem. Sincronize e tente de novo.' }, 404);
     }
-    // Papel e escola na nuvem (master nunca é dado por aqui)
+    // Papel e escola na nuvem (master nunca é dado por aqui).
+    // Atenção: o Supabase JUNTA o app_metadata novo com o antigo (não substitui). Por isso as
+    // chaves que devem sumir vão com null explícito; senão um perfil ESCOLA antigo continuaria.
     const appMeta = (base: Record<string, unknown> = {}) => {
       const m: Record<string, unknown> = { ...base, role };
-      delete m.master;
-      if (base.master === true) m.master = true; // a própria conta Master continua Master
-      if (role === 'ESCOLA') m.school_unit_id = schoolUnitId;
-      else delete m.school_unit_id;
+      m.master = base.master === true ? true : null; // a própria conta Master continua Master
+      m.school_unit_id = role === 'ESCOLA' ? schoolUnitId : null;
       return m;
     };
     // Contas de servidor de escola têm função própria (criar-conta-servidor).
