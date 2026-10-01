@@ -51,6 +51,7 @@ import {
 import { UserManagementTable } from './UserManagementTable';
 import { hashPassword, PASSWORD_MASK } from '../../utils/passwordHasher';
 import { passwordProblem, generateStrongPassword, PASSWORD_RULE_TEXT } from '../../utils/passwordPolicy';
+import { cloudProfileFor, sameCloudProfile } from '../../services/rbac/cloudProfile';
 import { getSupabaseClient } from '../../services/datasync/supabaseClient';
 import { confirmDialog, notify } from '../../utils/dialogs';
 import { ModuleReportButton, reportDate } from '../common/ModuleReportButton';
@@ -444,7 +445,11 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
     // Senha nova ou alterada: cria/atualiza também o acesso na nuvem (Supabase Auth),
     // para que o usuário possa entrar em qualquer computador.
     const typedPassword = formData.password && formData.password !== PASSWORD_MASK ? formData.password : '';
-    if (typedPassword && updatedUserObj.email) {
+    // Lotação ou nível de acesso mudou num usuário que já tem acesso na nuvem: atualiza o perfil
+    // dele lá também (sem mexer na senha), para a nuvem restringir à escola certa.
+    const profileChanged =
+      !!editingUser && !sameCloudProfile(cloudProfileFor(editingUser as any), cloudProfileFor(updatedUserObj as any));
+    if (updatedUserObj.email && (typedPassword || profileChanged)) {
       syncCloudAccess(updatedUserObj, typedPassword);
     }
   };
@@ -464,7 +469,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
       // nas estações. A antiga rota /api/admin/cloud-user só existia no site publicado; na Sede
       // a chamada caía no servidor local e voltava "chave-de-acesso-invalida".
       const { data, error: fnError } = await getSupabaseClient().functions.invoke('gerenciar-conta-nuvem', {
-        body: { email: user.email, password: plainPassword, role: user.role, name: user.name },
+        body: { email: user.email, password: plainPassword, name: user.name, ...cloudProfileFor(user as any) },
       });
       let result: any = data || {};
       if (fnError) {

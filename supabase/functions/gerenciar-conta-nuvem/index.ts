@@ -17,7 +17,8 @@ const cors = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
-const CLOUD_ROLES = ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'];
+// ESCOLA: usuário lotado numa escola; na nuvem lê e grava só a escola dele e as anexas dela.
+const CLOUD_ROLES = ['ADMIN', 'ESCOLA', 'TEACHER', 'STUDENT', 'PARENT'];
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -43,17 +44,35 @@ Deno.serve(async (req: Request) => {
     const password = typeof body?.password === 'string' ? body.password : '';
     const role = String(body?.role || '').toUpperCase();
     const name = typeof body?.name === 'string' ? body.name.slice(0, 200) : '';
+    const schoolUnitId = String(body?.schoolUnitId || '').trim();
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return json({ success: false, error: 'E-mail inválido. O acesso na nuvem exige um e-mail válido.' }, 400);
     }
-    // Mesma regra do Supabase Auth (Email): 8+ caracteres, com minúscula, maiúscula e número
-    if (password.length < 8 || password.length > 72 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+    // Mesma regra do Supabase Auth (Email): 8+ caracteres, com minúscula, maiúscula e número.
+    // Sem senha: só atualiza o papel/escola de uma conta que já existe.
+    const weak = (p: string) => p.length < 8 || p.length > 72 || !/[a-z]/.test(p) || !/[A-Z]/.test(p) || !/[0-9]/.test(p);
+    if (password && weak(password)) {
       return json({ success: false, error: 'A senha precisa ter de 8 a 72 caracteres, com letra minúscula, letra maiúscula e número (ex.: Escola2026).' }, 400);
     }
     if (!CLOUD_ROLES.includes(role)) {
       return json({ success: false, error: `Papel inválido. Use: ${CLOUD_ROLES.join(', ')}.` }, 400);
     }
+    if (role === 'ESCOLA') {
+      if (!schoolUnitId) return json({ success: false, error: 'Informe a escola de lotação do usuário.' }, 400);
+      const { data: unit, error: unitErr } = await admin.from('school_units').select('id').eq('id', schoolUnitId).maybeSingle();
+      if (unitErr) return json({ success: false, error: unitErr.message }, 500);
+      if (!unit) return json({ success: false, error: 'A escola de lotação ainda não está na nuvem. Sincronize e tente de novo.' }, 404);
+    }
+    // Papel e escola na nuvem (master nunca é dado por aqui)
+    const appMeta = (base: Record<string, unknown> = {}) => {
+      const m: Record<string, unknown> = { ...base, role };
+      delete m.master;
+      if (base.master === true) m.master = true; // a própria conta Master continua Master
+      if (role === 'ESCOLA') m.school_unit_id = schoolUnitId;
+      else delete m.school_unit_id;
+      return m;
+    };
     // Contas de servidor de escola têm função própria (criar-conta-servidor).
     if (email.endsWith('@servidores.sucessoedu.app')) {
       return json({ success: false, error: 'Este e-mail é reservado às contas de servidor das escolas.' }, 400);
@@ -68,11 +87,12 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!existing) {
+      if (!password) return json({ success: false, error: 'Informe a senha para criar o acesso na nuvem.' }, 400);
       const { data: created, error } = await admin.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
-        app_metadata: { role },
+        app_metadata: appMeta(),
         user_metadata: name ? { name } : {},
       });
       if (error || !created?.user) return json({ success: false, error: error?.message || 'Não foi possível criar a conta na nuvem.' }, 500);
@@ -90,12 +110,14 @@ Deno.serve(async (req: Request) => {
     }
 
     const { error: updErr } = await admin.auth.admin.updateUserById(existing.id, {
-      password,
-      app_metadata: { ...(existing.app_metadata || {}), role },
+      ...(password ? { password } : {}),
+      app_metadata: appMeta(existing.app_metadata || {}),
       ...(name ? { user_metadata: { ...(existing.user_metadata || {}), name } } : {}),
     });
     if (updErr) return json({ success: false, error: updErr.message }, 500);
-    return json({ success: true, created: false, userId: existing.id, message: 'Senha e papel da conta na nuvem atualizados.' });
+    const what = password ? 'Senha e perfil' : 'Perfil';
+    const where = role === 'ESCOLA' ? ' (restrito à escola de lotação e anexas)' : '';
+    return json({ success: true, created: false, userId: existing.id, message: `${what} da conta na nuvem atualizados${where}.` });
   } catch (err) {
     return json({ success: false, error: String((err as Error)?.message || err) }, 500);
   }

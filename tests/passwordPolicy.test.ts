@@ -19,6 +19,6 @@ describe('regra de senha (igual à da nuvem)', () => {
     const ps = readFileSync(join(__dirname, '../public/offline/servidor_sucessoedu.ps1'), 'utf8');
     expect(ps).toContain("$password.Length -lt 8 -or $password -cnotmatch '[a-z]' -or $password -cnotmatch '[A-Z]' -or $password -notmatch '[0-9]'");
     const fn = readFileSync(join(__dirname, '../supabase/functions/gerenciar-conta-nuvem/index.ts'), 'utf8');
-    expect(fn).toContain('password.length < 8');
+    expect(fn).toContain('p.length < 8');
   });
 });

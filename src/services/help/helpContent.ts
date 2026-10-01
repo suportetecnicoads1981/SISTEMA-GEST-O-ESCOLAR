@@ -195,6 +195,8 @@ export const HELP_GENERAL: HelpModule = {
         'Servidor da Sede/escola: verificar e aplicar atualização exige estar logado no sistema; trocar o endereço de atualização e desfazer uma atualização só a conta Master (ou direto no computador do servidor).',
         'Regra de senha (igual em todo o sistema, na nuvem e no servidor): pelo menos 8 caracteres, com letra minúscula, letra maiúscula e número. Ex.: Escola2026. O botão "Gerar" do cadastro de usuários já cria uma senha dentro da regra.',
         'As senhas antigas continuam valendo; a regra vale ao criar ou trocar a senha.',
+        'Usuário lotado numa escola tem, também na nuvem, o perfil ESCOLA: em qualquer computador ele lê e grava só a escola dele e as anexas, e não consegue excluir registros pela nuvem (exclusões ficam com a Sede). Quem não tem escola de lotação (Rede / Coordenação) continua com acesso à rede toda.',
+        'Ao mudar a escola de lotação ou o nível de acesso de um usuário que já tem acesso na nuvem, basta salvar o cadastro (com a conta Master): o perfil na nuvem é atualizado junto, sem trocar a senha.',
       ],
       tip: 'Depois desta mudança, a conta Master precisa sair e entrar de novo na nuvem uma vez para a permissão nova valer.',
     },

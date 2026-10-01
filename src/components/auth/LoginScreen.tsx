@@ -313,10 +313,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       const cloud = email ? await trySupabaseSignIn(email, password) : null;
       if (cloud?.user) {
         const cloudRole = String(cloud.user.app_metadata?.role || '').toUpperCase();
-        const role: UserRole = (['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'].includes(cloudRole) ? cloudRole : 'STUDENT') as UserRole;
         const existing =
           (match && match.email?.toLowerCase() === email ? match : undefined) ||
           userAccounts.find((u) => u?.email?.toLowerCase() === email);
+        // ESCOLA (lotado numa escola): no sistema continua com o papel do cadastro (Secretaria da
+        // escola); a nuvem é que limita o que ele lê e grava à escola de lotação e anexas.
+        const cloudSchool = String(cloud.user.app_metadata?.school_unit_id || '').trim();
+        const role: UserRole = (
+          cloudRole === 'ESCOLA'
+            ? existing?.role || 'ADMIN'
+            : ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT'].includes(cloudRole)
+              ? cloudRole
+              : 'STUDENT'
+        ) as UserRole;
         // Master só quando a nuvem diz (app_metadata.master, definido só pelo servidor). Antes, qualquer
         // administrador da nuvem que entrasse num computador sem o cadastro dele virava Master.
         const cloudMaster = role === 'ADMIN' && cloud.user.app_metadata?.master === true;
@@ -330,7 +339,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         }
 
         const account: UserAccount = existing
-          ? { ...existing, role }
+          ? { ...existing, role, ...(cloudRole === 'ESCOLA' && cloudSchool ? { schoolUnitId: cloudSchool } : {}) }
           : {
               id: `usr-${cloud.user.id}`,
               name: String(cloud.user.user_metadata?.name || email.split('@')[0]),
@@ -343,7 +352,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               active: true,
               createdAt: new Date().toISOString(),
               permissions: getDefaultSectorPermissions(sector),
-            };
+              ...(cloudRole === 'ESCOLA' && cloudSchool ? { schoolUnitId: cloudSchool } : {}),
+            } as UserAccount;
 
         // Guarda a senha (em hash) para permitir o login também sem internet neste computador.
         const passwordHash = hashPassword(password);
