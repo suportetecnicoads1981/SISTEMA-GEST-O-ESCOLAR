@@ -588,6 +588,14 @@ export const StudentList: React.FC<StudentListProps> = ({
   };
 
   // Motor central de filtragem com suporte a Unidade, Série, Turma e Filtros Avançados
+  // Ordem dos blocos nos relatórios: a escola sede e logo depois as anexas dela
+  const schoolOrderKey = (unitId: string | undefined, fallbackName = '') => {
+    const unit = (schoolUnits || []).find((u) => u.id === unitId);
+    if (!unit) return `${fallbackName}|0|`;
+    const parent = unit.parentUnitId ? (schoolUnits || []).find((u) => u.id === unit.parentUnitId) : undefined;
+    return parent ? `${parent.name}|1|${unit.name}` : `${unit.name}|0|`;
+  };
+
   const selectedUnitAnnexes = useMemo(
     () => (selectedUnitFilter === 'ALL' ? [] : annexesOf(selectedUnitFilter, schoolUnits)),
     [selectedUnitFilter, schoolUnits]
@@ -1173,7 +1181,14 @@ export const StudentList: React.FC<StudentListProps> = ({
             </button>
           )}
           <button
-            onClick={() => setIsReportModalOpen(true)}
+            onClick={() => {
+              // O relatório abre com a escola (e as anexas) já escolhidas na lista
+              const unitOk = selectedUnitFilter !== 'ALL' && (schoolUnits || []).some((u) => u.id === selectedUnitFilter);
+              setRepUnitFilter(unitOk ? selectedUnitFilter : 'ALL');
+              setRepIncludeAnnexes(unitOk && includeAnnexes ? 'YES' : 'NO');
+              setRepClassFilter('ALL');
+              setIsReportModalOpen(true);
+            }}
             className="px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-200 transition-colors flex items-center gap-1.5 cursor-pointer"
             title="Relatório Estatístico de Matrículas"
           >
@@ -2416,6 +2431,7 @@ export const StudentList: React.FC<StudentListProps> = ({
         }}
         groupBy={(row: any) => ({
           key: row.unitKey,
+          sortKey: schoolOrderKey(row.unitId, row.school),
           schoolUnitId: row.unitId || undefined,
           lines: [
             ['Escola', row.school],
@@ -2529,6 +2545,7 @@ export const StudentList: React.FC<StudentListProps> = ({
           const unit = (schoolUnits || []).find((u) => u.id === unitId);
           return {
             key: `${unitId || st.schoolOriginName || '-'}|${st.classId || '-'}`,
+            sortKey: `${schoolOrderKey(unitId, st.schoolOriginName || '')}|${(cls as any)?.gradeLevel || st.series || ''}|${cls?.name || ''}`,
             schoolUnitId: unitId,
             classId: st.classId,
             lines: [

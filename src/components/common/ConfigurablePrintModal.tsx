@@ -68,7 +68,8 @@ export interface ConfigurablePrintModalProps {
    * Agrupa a impressão (ex.: por escola e turma). Cada grupo sai em página própria, com o
    * cabeçalho da escola e as linhas de identificação (escola, série, turma, turno...).
    */
-  groupBy?: (item: any) => { key: string; lines: [string, string][]; schoolUnitId?: string; classId?: string };
+  /** sortKey (opcional): ordem dos blocos; sem ele, a ordem é pela identificação (lines). */
+  groupBy?: (item: any) => { key: string; lines: [string, string][]; schoolUnitId?: string; classId?: string; sortKey?: string };
   /** Texto do total de cada grupo (padrão: "Total de alunos nesta relação"). */
   countLabel?: string;
   /** Linha de totais extra ao fim de cada grupo (ex.: soma de matriculados). */
@@ -175,22 +176,39 @@ export const ConfigurablePrintModal: React.FC<ConfigurablePrintModalProps> = ({
    */
   /** Grupos (escola/turma) em ordem de conferência, com as linhas em ordem alfabética. */
   const buildGroups = () => {
-    const groups = new Map<string, { lines: [string, string][]; schoolUnitId?: string; classId?: string; rows: any[] }>();
+    const groups = new Map<string, { lines: [string, string][]; schoolUnitId?: string; classId?: string; sortKey?: string; rows: any[] }>();
     for (const item of data) {
       const g = groupBy ? groupBy(item) : { key: 'todos', lines: [] as [string, string][] };
-      if (!groups.has(g.key)) groups.set(g.key, { lines: g.lines, schoolUnitId: (g as any).schoolUnitId, classId: (g as any).classId, rows: [] });
+      if (!groups.has(g.key)) groups.set(g.key, { lines: g.lines, schoolUnitId: (g as any).schoolUnitId, classId: (g as any).classId, sortKey: (g as any).sortKey, rows: [] });
       groups.get(g.key)!.rows.push(item);
     }
     // Um comparador só (localeCompare com idioma cria um novo a cada comparação: lento com 2.000 alunos).
     const byGroup = new Intl.Collator('pt-BR', { numeric: true }).compare;
     const byName = new Intl.Collator('pt-BR').compare;
     const ordered = Array.from(groups.values())
-      .map((g) => ({ g, k: g.lines.map((l) => l[1]).join('|') }))
+      .map((g) => ({ g, k: g.sortKey ?? g.lines.map((l) => l[1]).join('|') }))
       .sort((a, b) => byGroup(a.k, b.k))
       .map((x) => x.g);
     ordered.forEach((g) => g.rows.sort((a, b) => byName(String(a?.name || ''), String(b?.name || ''))));
     return ordered;
   };
+
+  /**
+   * Pré-visualização igual à impressão: com agrupamento (escola/turma), cada bloco começa com a
+   * identificação dele (ex.: escola sede e escola anexa aparecem separadas) e a numeração recomeça.
+   */
+  type PreviewItem = { header?: [string, string][]; row?: any; rowIdx: number };
+  const previewItems: PreviewItem[] = (() => {
+    if (!groupBy) return data.slice(0, PREVIEW_LIMIT).map((row, rowIdx) => ({ row, rowIdx }));
+    const out: PreviewItem[] = [];
+    let shown = 0;
+    for (const g of buildGroups()) {
+      if (shown >= PREVIEW_LIMIT) break;
+      out.push({ header: g.lines, rowIdx: -1 });
+      for (let i = 0; i < g.rows.length && shown < PREVIEW_LIMIT; i++, shown++) out.push({ row: g.rows[i], rowIdx: i });
+    }
+    return out;
+  })();
 
   const buildReportHtml = (mode: 'print' | 'word' = 'print'): string => {
     const word = mode === 'word';
@@ -892,9 +910,24 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
                           </td>
                         </tr>
                       ) : (
-                        data.slice(0, PREVIEW_LIMIT).map((row, rowIdx) => (
+                        previewItems.map((it, itIdx) => {
+                          if (it.header) return (
+                            <tr key={`g-${itIdx}`} className="bg-indigo-50/80">
+                              <td colSpan={activeColumns.length || 1} className="px-2 py-1.5 text-[11px] text-indigo-950 border-b border-indigo-200">
+                                {it.header
+                                  .filter(([, v]) => v)
+                                  .map(([k, v]) => (
+                                    <span key={k} className="mr-4 whitespace-nowrap">
+                                      <b>{k}:</b> {v}
+                                    </span>
+                                  ))}
+                              </td>
+                            </tr>
+                          );
+                          const { row, rowIdx } = it;
+                          return (
                           <tr
-                            key={rowIdx}
+                            key={`r-${itIdx}`}
                             className={showZebraStripes && rowIdx % 2 === 1 ? 'bg-slate-50/70' : 'bg-white'}
                           >
                             {activeColumns.map((col) => {
@@ -921,7 +954,8 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
                               );
                             })}
                           </tr>
-                        ))
+                          );
+                        })
                       )}
                       {data.length > PREVIEW_LIMIT && (
                         <tr className="no-print">
