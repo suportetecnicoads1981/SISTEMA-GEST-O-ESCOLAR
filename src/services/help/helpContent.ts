@@ -197,6 +197,7 @@ export const HELP_GENERAL: HelpModule = {
         'As senhas antigas continuam valendo; a regra vale ao criar ou trocar a senha.',
         'Usuário lotado numa escola tem, também na nuvem, o perfil ESCOLA: em qualquer computador ele lê e grava só a escola dele e as anexas, e não consegue excluir registros pela nuvem (exclusões ficam com a Sede). Quem não tem escola de lotação (Rede / Coordenação) continua com acesso à rede toda.',
         'Ao mudar a escola de lotação ou o nível de acesso de um usuário que já tem acesso na nuvem, basta salvar o cadastro (com a conta Master): o perfil na nuvem é atualizado junto, sem trocar a senha.',
+        'Computador novo ou com os dados do site limpos: no primeiro acesso entre com o e-mail (não com o login curto, como DAVI). Depois desse acesso o login curto volta a funcionar naquele computador.',
       ],
       tip: 'Depois desta mudança, a conta Master precisa sair e entrar de novo na nuvem uma vez para a permissão nova valer.',
     },

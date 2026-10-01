@@ -369,7 +369,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       // 2) Sem conta na nuvem ou sem internet: autenticação local deste computador.
       if (!match) {
         setIsLoading(false);
-        setErrorMsg('Credenciais inválidas ou usuário inativo no banco de dados.');
+        // Login curto (ex.: DAVI) num computador que ainda não conhece o usuário: sem o e-mail
+        // não há como conferir a senha na nuvem.
+        setErrorMsg(
+          cleanUser.includes('@')
+            ? 'Credenciais inválidas ou usuário inativo no banco de dados.'
+            : 'Este computador ainda não conhece este login. No primeiro acesso, entre com o seu e-mail (ex.: nome@gmail.com) e a senha; depois o login curto também funciona aqui.'
+        );
         return;
       }
 
