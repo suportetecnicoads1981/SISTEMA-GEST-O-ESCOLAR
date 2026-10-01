@@ -293,7 +293,9 @@ export function findClassForSeries(
   series: string,
   classes: SchoolClass[],
   allowUnlinkedClasses = false,
-  classLetter = ''
+  classLetter = '',
+  /** true: aluno sem letra só vai para turma sem letra (nunca "pega" a turma A, B...). */
+  strictNoLetter = false
 ): SchoolClass | undefined {
   if (!series) return undefined;
   const letter = String(classLetter || '').toUpperCase();
@@ -302,7 +304,8 @@ export function findClassForSeries(
   const pick = (list: SchoolClass[]) => {
     const candidates = list.filter(sameSeries);
     if (letter) return candidates.find((c) => classLetterOf(c) === letter);
-    return candidates.find((c) => !classLetterOf(c)) || candidates[0];
+    const noLetter = candidates.find((c) => !classLetterOf(c));
+    return strictNoLetter ? noLetter : noLetter || candidates[0];
   };
   if (unitId) {
     const inUnit = pick(classes.filter((c) => c.schoolUnitId === unitId));
@@ -1784,11 +1787,20 @@ export function processSheetWithHeaders(
       combos.set(key, entry);
     });
     const mixedShifts: string[] = [];
+    const noLetterBesideLetters: string[] = [];
+    // Série que tem turmas com letra no arquivo: os alunos sem letra viram uma turma própria,
+    // sem "tomar" a turma A (antes a turma A perdia a letra e os alunos dela ficavam sem turma).
+    const seriesWithLetters = new Set(Array.from(combos.values()).filter((c) => c.letter).map((c) => canonicalGrade(c.serie)));
     combos.forEach(({ serie, letter, shifts }) => {
       const ranked = Array.from(shifts.entries()).sort((a, b) => b[1] - a[1]);
       const shift = ranked[0]?.[0] || filters.defaultShift || 'MANHÃ';
       if (ranked.length > 1) mixedShifts.push(`${serie}${letter ? ` ${letter}` : ''} (${ranked.map(([s, n]) => `${n} ${s}`).join(', ')})`);
-      const found = findClassForSeries(targetUnit!.id, serie, allClasses, unlinkedAllowed, letter);
+      const strict = !letter && seriesWithLetters.has(canonicalGrade(serie));
+      if (strict) {
+        const n = Array.from(shifts.values()).reduce((a, b) => a + b, 0);
+        noLetterBesideLetters.push(`${serie} (${n} aluno${n === 1 ? '' : 's'})`);
+      }
+      const found = findClassForSeries(targetUnit!.id, serie, allClasses, unlinkedAllowed, letter, strict);
       const isNew = found && !classes.some((ex) => ex.id === found.id);
       if (!found && filters.autoRegisterSchoolUnit) {
         const cls = buildClassForSeries(targetUnit!, serie, shift, suggestedClasses.length, letter);
@@ -1796,13 +1808,20 @@ export function processSheetWithHeaders(
         allClasses.push(cls);
       } else if (isNew && found.shift !== shift) {
         // Turma nova criada antes com o turno padrão: acerta o turno pelo dos alunos
-        const fixed = { ...found, shift: shift as ClassShift, name: `${serie}${letter ? ` ${letter}` : ''} - ${shift}` } as SchoolClass;
+        // Mantém a letra da própria turma encontrada (nunca a apaga)
+        const keepLetter = letter || classLetterOf(found);
+        const fixed = { ...found, shift: shift as ClassShift, name: `${serie}${keepLetter ? ` ${keepLetter}` : ''} - ${shift}` } as SchoolClass;
         const ai = allClasses.findIndex((c) => c.id === found.id);
         if (ai >= 0) allClasses[ai] = fixed;
         const si = suggestedClasses.findIndex((c) => c.id === found.id);
         if (si >= 0) suggestedClasses[si] = fixed;
       }
     });
+    if (noLetterBesideLetters.length > 0) {
+      warnings.push(
+        `Alunos sem letra de turma numa série que tem turmas A, B, C...: ${noLetterBesideLetters.join('; ')}. Eles ficaram numa turma sem letra (ex.: "1º ANO - TARDE"). Peça à escola a letra correta e mude depois em Turmas.`
+      );
+    }
     if (mixedShifts.length > 0) {
       warnings.push(
         `Série com alunos em mais de um turno e sem letra de turma: ${mixedShifts.join('; ')}. A turma ficou com o turno da maioria; se forem turmas diferentes, informe a letra (ex.: 1º ANO A e 1º ANO B).`
@@ -1811,7 +1830,14 @@ export function processSheetWithHeaders(
   }
 
   students.forEach((std) => {
-    const cls = findClassForSeries(std.schoolUnitId, std.series, allClasses, unlinkedAllowed, std.classLetter);
+    const cls = findClassForSeries(
+      std.schoolUnitId,
+      std.series,
+      allClasses,
+      unlinkedAllowed,
+      std.classLetter,
+      !std.classLetter && students.some((o) => o.classLetter && canonicalGrade(o.series) === canonicalGrade(std.series))
+    );
     if (cls) {
       std.classId = cls.id;
       std.className = cls.name;

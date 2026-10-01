@@ -346,6 +346,14 @@ export const HELP_MODULES: HelpModule[] = [
         tip: 'A turma nova recebe o turno dos alunos dela (coluna TURNO da planilha padrão). Se a mesma série tiver alunos em dois turnos e sem letra, a turma fica com o turno da maioria e a conferência avisa: nesse caso, informe a letra (ex.: 1º ANO A e 1º ANO B). Levantamentos sem coluna de turno entram como MANHÃ.',
       },
       {
+        q: 'E se a planilha tiver 1º ANO A, B, C e também alunos só com "1º ANO", sem letra?',
+        a: 'Os alunos sem letra ficam numa turma própria, sem letra (ex.: "1º ANO - TARDE"), e as turmas A, B, C continuam com as letras e os alunos delas. A conferência avisa quantos alunos ficaram sem letra em cada série.',
+        steps: [
+          'Peça à escola a letra correta desses alunos (ex.: 1º ANO E).',
+          'Em Turmas, renomeie a turma sem letra, ou corrija a planilha e importe de novo.',
+        ],
+      },
+      {
         q: 'A aba "DADOS DA ESCOLA" da planilha padrão é importada?',
         a: 'Sim. A ficha da escola é lida junto com os alunos: nome, código INEP, CNPJ ou decreto, tipo da unidade, escola sede (se for anexa), endereço, CEP, telefone, e-mail, diretor(a), coordenador(a), secretário(a), salas, horário, internet, turnos e séries atendidas. Escola nova entra com esses dados; escola já cadastrada só tem completados os campos que ainda estavam vazios ou provisórios (o que a secretaria corrigiu à mão não é trocado).',
         steps: [
