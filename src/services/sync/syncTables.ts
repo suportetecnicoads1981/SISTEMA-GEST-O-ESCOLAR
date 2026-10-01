@@ -253,8 +253,9 @@ export const SYNC_TABLES: SyncTable[] = [
         : null,
     // Senha e marca de Master ficam só neste computador.
     toDoc: (u) => {
-      const { password, isMaster, ...rest } = u || {};
+      const { password, passwordOnServer, isMaster, ...rest } = u || {};
       void password;
+      void passwordOnServer;
       void isMaster;
       return rest;
     },

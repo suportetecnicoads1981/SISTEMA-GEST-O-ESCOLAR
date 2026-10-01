@@ -383,11 +383,68 @@ function parseHealth(code: number, body: any): LocalServerInfo | null {
   }
 }
 
+/**
+ * O servidor entrega o cadastro de usuários SEM os resumos de senha (marca passwordOnServer).
+ * Quem já entrou nesta estação continua com o resumo guardado aqui (para entrar mesmo com o
+ * servidor fora do ar); os demais conferem a senha no servidor.
+ */
+const STATION_USERS_KEY = 'sucessoedu_station_users_v1';
+
+/** Usuários que já entraram nesta estação (só eles guardam o resumo de senha aqui). */
+function stationUsers(): Set<string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STATION_USERS_KEY) || '[]');
+    return new Set(Array.isArray(raw) ? raw.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+/** Registra que o usuário entrou nesta estação (chamado no login). */
+export function rememberStationUser(userId: string | undefined | null): void {
+  if (!userId) return;
+  try {
+    const set = stationUsers();
+    set.add(String(userId));
+    localStorage.setItem(STATION_USERS_KEY, JSON.stringify(Array.from(set).slice(-50)));
+  } catch {
+    /* sem armazenamento */
+  }
+}
+
+export function keepLocalPasswords(
+  serverData: Record<string, any>,
+  local: Record<string, any> | null,
+  allowed: Set<string> = stationUsers()
+): Record<string, any> {
+  const incoming = serverData?.userAccounts;
+  if (!Array.isArray(incoming)) return serverData;
+  const localById = new Map<string, any>();
+  for (const u of Array.isArray(local?.userAccounts) ? local!.userAccounts : []) if (u && u.id != null) localById.set(String(u.id), u);
+  let changed = false;
+  const users = incoming.map((u: any) => {
+    if (!u || u.password || !u.passwordOnServer) return u;
+    const mine = localById.get(String(u.id));
+    // Cópias antigas guardavam o resumo de todos os usuários: fica só o de quem entrou aqui.
+    if (allowed.has(String(u.id)) && mine && typeof mine.password === 'string' && mine.password) {
+      changed = true;
+      return { ...u, password: mine.password };
+    }
+    return u;
+  });
+  return changed ? { ...serverData, userAccounts: users } : serverData;
+}
+
+/** O servidor desta estação confere usuário e senha (versão com privilégios)? */
+export function localServerChecksPasswords(): boolean {
+  return !!info?.permissions;
+}
+
 function adoptServerData(serverData: Record<string, any>, version: number) {
   const remaining = readQueue().map((q) => q.op);
   const local = readLocalData() || {};
   // Chaves que o servidor ainda não tem continuam com o valor desta estação.
-  const next = applyOps({ ...local, ...serverData }, remaining);
+  const next = applyOps({ ...local, ...keepLocalPasswords(serverData, local) }, remaining);
   const nextJson = JSON.stringify(next);
   syncEpoch++;
   if (nextJson !== JSON.stringify(local)) {
@@ -444,7 +501,7 @@ export async function bootstrapLocalServer(options: { dataKey: string; markIniti
       if (body.data && typeof body.data === 'object') {
         const remaining = readQueue().map((q) => q.op);
         const local = readLocalData() || {};
-        const next = applyOps({ ...local, ...body.data }, remaining);
+        const next = applyOps({ ...local, ...keepLocalPasswords(body.data, local) }, remaining);
         localStorage.setItem(dataKey, JSON.stringify(next));
         setLastVersion(Number(body.version) || 0);
         if (remaining.length) scheduleFlush(50);

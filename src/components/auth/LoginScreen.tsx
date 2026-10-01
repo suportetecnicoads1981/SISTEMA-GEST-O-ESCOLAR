@@ -43,10 +43,10 @@ import {
   verifyPassword,
   hasPasswordDefined,
   isPasswordHash,
-  MIN_PASSWORD_LENGTH,
 } from '../../utils/passwordHasher';
 
-import { openLocalServerSession } from '../../services/offline/localServerSync';
+import { openLocalServerSession, localServerChecksPasswords, rememberStationUser } from '../../services/offline/localServerSync';
+import { passwordProblem } from '../../utils/passwordPolicy';
 interface LoginScreenProps {
   userAccounts: UserAccount[];
   schoolUnits: SchoolUnit[];
@@ -361,6 +361,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         onPasswordUpdate?.({ ...account, password: passwordHash }, passwordHash);
         // Servidor da escola/Sede: abre a sessão do usuário (o servidor confere as permissões).
         void openLocalServerSession({ userId: account.id, login: account.login || email, password });
+        rememberStationUser(account.id);
         setIsLoading(false);
         setPassword('');
         onLoginSuccess({ ...account, password: passwordHash });
@@ -380,7 +381,38 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         return;
       }
 
+      // A senha deste usuário está guardada só no servidor da escola (a estação não recebe os
+      // resumos de senha): confere lá. Se o servidor aceitar, guarda o resumo nesta estação para
+      // ela também funcionar com o servidor fora do ar.
+      const serverHasPassword = !!(match as any).passwordOnServer;
+      const verifyOnServer = async (): Promise<boolean> => {
+        if (!serverHasPassword || !localServerChecksPasswords()) return false;
+        const r = await openLocalServerSession({ userId: match!.id, login: match!.login || match!.email, password });
+        if (!r.ok) {
+          setIsLoading(false);
+          setErrorMsg(r.message || 'O servidor da escola não confirmou o usuário e a senha.');
+          return false;
+        }
+        const localHash = hashPassword(password);
+        onPasswordUpdate?.({ ...match!, password: localHash }, localHash);
+        rememberStationUser(match!.id);
+        setIsLoading(false);
+        setPassword('');
+        onLoginSuccess({ ...match!, password: localHash });
+        return true;
+      };
+
       if (!hasPasswordDefined(match.password)) {
+        if (serverHasPassword) {
+          if (await verifyOnServer()) return;
+          if (!localServerChecksPasswords()) {
+            setIsLoading(false);
+            setErrorMsg(
+              'A senha deste usuário é conferida no servidor da escola, que não respondeu agora. Confira se o computador do servidor está ligado e tente de novo (ou entre com o e-mail, com internet).'
+            );
+          }
+          return;
+        }
         setIsLoading(false);
         if (match.cloudSynced) {
           // Conta gerenciada na nuvem: a senha é a cadastrada no Supabase pelo administrador.
@@ -395,6 +427,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       }
 
       if (!verifyPassword(match.password, password)) {
+        // Senha trocada em outro computador: o servidor da escola tem a senha atual.
+        if (serverHasPassword && localServerChecksPasswords()) {
+          await verifyOnServer();
+          return;
+        }
         setIsLoading(false);
         setErrorMsg(
           cloudFailRef.current === 'unreachable'
@@ -410,6 +447,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       }
 
       void openLocalServerSession({ userId: match.id, login: match.login || match.email, password });
+      rememberStationUser(match.id);
       setIsLoading(false);
       setPassword('');
       onLoginSuccess(match);
@@ -441,6 +479,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         const cloud = await trySupabaseSignIn(master.email.toLowerCase(), adminPassword);
         ok = String(cloud?.user?.app_metadata?.role || '').toUpperCase() === 'ADMIN';
       }
+      // Estação da rede: a senha do Master fica só no servidor da escola; confere lá.
+      if (!ok && (master as any).passwordOnServer && localServerChecksPasswords()) {
+        const r = await openLocalServerSession({ userId: master.id, login: master.login || master.email, password: adminPassword });
+        ok = r.ok;
+      }
       if (!ok) {
         setAdminError(
           cloudFailRef.current === 'unreachable' || cloudFailRef.current === 'offline'
@@ -464,8 +507,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     if (!firstAccessUser) return;
     setErrorMsg('');
 
-    if (newPassword.length < MIN_PASSWORD_LENGTH) {
-      setErrorMsg(`A senha deve ter pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`);
+    // Mesma regra da nuvem e do servidor da escola (8+ caracteres, minúscula, maiúscula e número)
+    const weak = passwordProblem(newPassword);
+    if (weak) {
+      setErrorMsg(weak);
       return;
     }
     if (newPassword !== confirmNewPassword) {
@@ -479,6 +524,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       onPasswordUpdate(userWithPassword, passwordHash);
     }
     void openLocalServerSession({ userId: firstAccessUser.id, login: firstAccessUser.login || firstAccessUser.email, password: newPassword });
+    rememberStationUser(firstAccessUser.id);
     setFirstAccessUser(null);
     setNewPassword('');
     setConfirmNewPassword('');
@@ -611,8 +657,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <div className="p-3 rounded-xl bg-amber-950/50 border border-amber-500/40 text-xs text-amber-200 flex items-start gap-2">
                 <Key className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
                 <span>
-                  Primeiro acesso de <strong>{firstAccessUser.name}</strong>. Cadastre a sua senha pessoal (mínimo de{' '}
-                  {MIN_PASSWORD_LENGTH} caracteres) para continuar.
+                  Primeiro acesso de <strong>{firstAccessUser.name}</strong>. Cadastre a sua senha pessoal para continuar: pelo menos 8 caracteres,
+                  com letra minúscula, letra maiúscula e número (ex.: Escola2026).
                 </span>
               </div>
               <input
@@ -1139,7 +1185,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   <Key className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
                   <span>
                     Primeiro acesso de <strong>{firstAccessUser.name}</strong>. Esta conta ainda não possui senha:
-                    cadastre uma senha pessoal (mínimo de {MIN_PASSWORD_LENGTH} caracteres) para continuar.
+                    cadastre uma senha pessoal para continuar: pelo menos 8 caracteres, com letra minúscula, letra maiúscula e número (ex.: Escola2026).
                   </span>
                 </div>
                 <div>

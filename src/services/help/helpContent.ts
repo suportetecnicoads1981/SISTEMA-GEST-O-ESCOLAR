@@ -199,6 +199,8 @@ export const HELP_GENERAL: HelpModule = {
         'Ao mudar a escola de lotação ou o nível de acesso de um usuário que já tem acesso na nuvem, basta salvar o cadastro (com a conta Master): o perfil na nuvem é atualizado junto, sem trocar a senha.',
         'Computador novo ou com os dados do site limpos: no primeiro acesso entre com o e-mail (não com o login curto, como DAVI). Depois desse acesso o login curto volta a funcionar naquele computador.',
         'Aviso "usuário marcado como INATIVO": a senha está certa, mas o cadastro está desativado. A conta Master ativa o usuário em Usuários & Permissões e sincroniza; depois ele entra normalmente.',
+        'Senhas na rede da escola: o Servidor da Sede/escola guarda as senhas (em resumo protegido) e NÃO as envia às estações. Na estação, a senha é conferida no servidor (ou na nuvem); depois do primeiro acesso, a estação guarda só o resumo de quem entrou nela, para funcionar mesmo com o servidor fora do ar.',
+        'Se aparecer "A senha deste usuário é conferida no servidor da escola, que não respondeu", confira se o computador do servidor está ligado, ou entre com o e-mail, com internet.',
       ],
       tip: 'Depois desta mudança, a conta Master precisa sair e entrar de novo na nuvem uma vez para a permissão nova valer.',
     },

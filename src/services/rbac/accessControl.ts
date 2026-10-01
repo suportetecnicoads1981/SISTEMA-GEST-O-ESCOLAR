@@ -159,7 +159,7 @@ export const ACCESS_RULES: Record<string, Rule> = {
     keys: 'MASTER',
     label: 'usuários e permissões',
     // Login e troca de senha do próprio acesso não são alteração de cadastro.
-    ignore: ['password', 'lastLogin', 'lastLoginAt', 'lastAccess', 'lastActivity', 'lastSeen', 'loginAttempts', 'mustChangePassword'],
+    ignore: ['password', 'passwordOnServer', 'lastLogin', 'lastLoginAt', 'lastAccess', 'lastActivity', 'lastSeen', 'loginAttempts', 'mustChangePassword'],
   },
   developerContact: { keys: 'MASTER', label: 'dados do desenvolvedor' },
 };

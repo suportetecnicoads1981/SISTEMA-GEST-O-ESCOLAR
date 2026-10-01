@@ -206,10 +206,57 @@ function Read-Body($ctx) {
     try { return $reader.ReadToEnd() } finally { $reader.Close() }
 }
 
-function Get-StoreJson {
+function Get-StoreJson($ctx) {
     $data = 'null'
-    if ($script:DataText) { $data = $script:DataText }
+    if ($script:DataText) {
+        # Estacoes da rede recebem o banco SEM os resumos de senha (ficam so no servidor; o login
+        # das estacoes e conferido aqui, em /api/local/login). O proprio computador do servidor
+        # continua recebendo tudo.
+        if ($null -ne $ctx -and [System.Net.IPAddress]::IsLoopback($ctx.Request.RemoteEndPoint.Address)) { $data = $script:DataText }
+        else { $data = Get-PublicDataText }
+    }
     return '{"version":' + $script:Version + ',"updatedAt":' + (ConvertTo-JsonString $script:UpdatedAt) + ',"data":' + $data + '}'
+}
+$script:PublicDataText = $null
+$script:PublicVersion = -1
+function Get-PublicDataText {
+    if ($script:PublicVersion -eq $script:Version -and $null -ne $script:PublicDataText) { return $script:PublicDataText }
+    $text = $script:DataText
+    if ($text -and $text.Contains('"password"')) {
+        $copy = ConvertFrom-JsonText $text
+        $users = Get-Val $copy 'userAccounts'
+        if (Test-IsList $users) {
+            foreach ($u in $users) {
+                if (-not (Test-IsMap $u)) { continue }
+                $pw = Get-Val $u 'password'
+                if ($null -ne $pw -and -not [string]::IsNullOrEmpty([string]$pw)) {
+                    $u['password'] = $null
+                    $u['passwordOnServer'] = $true
+                }
+            }
+        }
+        $text = ConvertTo-JsonText $copy
+    }
+    $script:PublicDataText = $text
+    $script:PublicVersion = $script:Version
+    return $text
+}
+# Gravacao vinda de estacao: registro de usuario sem senha (a estacao nao recebe os resumos)
+# mantem a senha guardada no servidor. Nunca apaga uma senha por falta do campo.
+function Restore-UserPassword($newUser, $oldUser) {
+    if (-not (Test-IsMap $newUser)) { return }
+    if ((Test-IsMap $newUser) -and ((Get-Val $newUser 'passwordOnServer') -ne $null)) { [void]$newUser.Remove('passwordOnServer') }
+    $pw = Get-Val $newUser 'password'
+    if ($null -ne $pw -and -not [string]::IsNullOrEmpty([string]$pw)) { return }
+    if (-not (Test-IsMap $oldUser)) { return }
+    $old = Get-Val $oldUser 'password'
+    if ($null -ne $old -and -not [string]::IsNullOrEmpty([string]$old)) { $newUser['password'] = $old }
+}
+function Restore-UserPasswords($newList, $oldList) {
+    if (-not (Test-IsList $newList) -or -not (Test-IsList $oldList)) { return }
+    $byId = @{}
+    foreach ($o in $oldList) { if (Test-IsMap $o) { $byId[[string](Get-Val $o 'id')] = $o } }
+    foreach ($n in $newList) { if (Test-IsMap $n) { Restore-UserPassword $n $byId[[string](Get-Val $n 'id')] } }
 }
 
 # ---------------------------------------------------------------- privilegios dos usuarios
@@ -294,7 +341,7 @@ function ConvertTo-JsonText($value) {
 }
 
 $AccessRulesJson = @'
-{"students":{"keys":["secretaria"],"label":"alunos"},"academicHistories":{"keys":["secretaria","documentos"],"label":"hist\u00f3ricos escolares"},"classes":{"keys":["turmas"],"label":"turmas"},"subjects":{"keys":["turmas"],"label":"disciplinas"},"courses":{"keys":["turmas"],"label":"cursos"},"schoolUnits":{"keys":["gestaoMunicipal"],"label":"escolas","ignore":["totalStudents","totalClasses","totalTeachers","syncStatus","lastSync"]},"municipalSecretary":{"keys":["gestaoMunicipal"],"label":"cadastro da SEMED"},"questions":{"keys":["questoes"],"label":"quest\u00f5es"},"bnccSkills":{"keys":["questoes"],"label":"habilidades BNCC"},"exams":{"keys":["provas"],"label":"provas"},"submissions":{"keys":["provas"],"label":"respostas de provas","createNeedsRead":true},"bnccAssessments":{"keys":["relatorios","portalProfessor","diarioClasse"],"label":"lan\u00e7amentos de habilidades BNCC"},"attendanceSheets":{"keys":["diarioClasse","portalProfessor"],"label":"frequ\u00eancia"},"lessonRegistries":{"keys":["diarioClasse","portalProfessor"],"label":"registros de aula"},"classGradeSheets":{"keys":["diarioClasse","portalProfessor"],"label":"notas"},"teacherLessonPlans":{"keys":["portalProfessor","diarioClasse"],"label":"planos de aula"},"teacherStudentNotes":{"keys":["portalProfessor","diarioClasse"],"label":"anota\u00e7\u00f5es do professor"},"communications":{"keys":["comunicacao"],"label":"comunicados","ignore":["readBy","reads","readCount","readReceipts","confirmedBy","views","viewCount","acknowledgedBy"]},"whatsappTemplates":{"keys":["comunicacao"],"label":"modelos de WhatsApp"},"whatsappConfig":{"keys":["comunicacao"],"label":"configura\u00e7\u00e3o do WhatsApp"},"dropoutAlertConfig":{"keys":["secretaria"],"label":"crit\u00e9rio do alerta de evas\u00e3o"},"settings":{"keys":["configuracoes"],"label":"configura\u00e7\u00f5es do sistema","ignore":["systemVersion","logoUrl","managementLogoUrl","lastBackupAt","lastBackupDate","lastSync","lastSyncAt","lastUpdateCheck"]},"userAccounts":{"keys":"MASTER","label":"usu\u00e1rios e permiss\u00f5es","ignore":["password","lastLogin","lastLoginAt","lastAccess","lastActivity","lastSeen","loginAttempts","mustChangePassword"]},"developerContact":{"keys":"MASTER","label":"dados do desenvolvedor"}}
+{"students":{"keys":["secretaria"],"label":"alunos"},"academicHistories":{"keys":["secretaria","documentos"],"label":"hist\u00f3ricos escolares"},"classes":{"keys":["turmas"],"label":"turmas"},"subjects":{"keys":["turmas"],"label":"disciplinas"},"courses":{"keys":["turmas"],"label":"cursos"},"schoolUnits":{"keys":["gestaoMunicipal"],"label":"escolas","ignore":["totalStudents","totalClasses","totalTeachers","syncStatus","lastSync"]},"municipalSecretary":{"keys":["gestaoMunicipal"],"label":"cadastro da SEMED"},"questions":{"keys":["questoes"],"label":"quest\u00f5es"},"bnccSkills":{"keys":["questoes"],"label":"habilidades BNCC"},"exams":{"keys":["provas"],"label":"provas"},"submissions":{"keys":["provas"],"label":"respostas de provas","createNeedsRead":true},"bnccAssessments":{"keys":["relatorios","portalProfessor","diarioClasse"],"label":"lan\u00e7amentos de habilidades BNCC"},"attendanceSheets":{"keys":["diarioClasse","portalProfessor"],"label":"frequ\u00eancia"},"lessonRegistries":{"keys":["diarioClasse","portalProfessor"],"label":"registros de aula"},"classGradeSheets":{"keys":["diarioClasse","portalProfessor"],"label":"notas"},"teacherLessonPlans":{"keys":["portalProfessor","diarioClasse"],"label":"planos de aula"},"teacherStudentNotes":{"keys":["portalProfessor","diarioClasse"],"label":"anota\u00e7\u00f5es do professor"},"communications":{"keys":["comunicacao"],"label":"comunicados","ignore":["readBy","reads","readCount","readReceipts","confirmedBy","views","viewCount","acknowledgedBy"]},"whatsappTemplates":{"keys":["comunicacao"],"label":"modelos de WhatsApp"},"whatsappConfig":{"keys":["comunicacao"],"label":"configura\u00e7\u00e3o do WhatsApp"},"dropoutAlertConfig":{"keys":["secretaria"],"label":"crit\u00e9rio do alerta de evas\u00e3o"},"settings":{"keys":["configuracoes"],"label":"configura\u00e7\u00f5es do sistema","ignore":["systemVersion","logoUrl","managementLogoUrl","lastBackupAt","lastBackupDate","lastSync","lastSyncAt","lastUpdateCheck"]},"userAccounts":{"keys":"MASTER","label":"usu\u00e1rios e permiss\u00f5es","ignore":["password","passwordOnServer","lastLogin","lastLoginAt","lastAccess","lastActivity","lastSeen","loginAttempts","mustChangePassword"]},"developerContact":{"keys":"MASTER","label":"dados do desenvolvedor"}}
 '@
 $SectorDefaultsJson = @'
 {"MASTER":{"dashboard":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"portalProfessor":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"diarioClasse":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"secretaria":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"turmas":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"documentos":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"comunicacao":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"questoes":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"provas":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"relatorios":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"gestaoMunicipal":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"usuarios":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true},"configuracoes":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":true,"canApprove":true}},"DIRETORIA":{"dashboard":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"portalProfessor":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"diarioClasse":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"secretaria":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"turmas":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"documentos":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"comunicacao":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"questoes":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"provas":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"relatorios":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"gestaoMunicipal":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"usuarios":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"configuracoes":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true}},"COORDENACAO":{"dashboard":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"portalProfessor":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"diarioClasse":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"secretaria":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"turmas":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"documentos":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"comunicacao":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"questoes":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"provas":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"relatorios":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"gestaoMunicipal":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"usuarios":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"configuracoes":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false}},"SECRETARIA":{"dashboard":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"portalProfessor":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"diarioClasse":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"secretaria":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"turmas":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"documentos":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"comunicacao":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"questoes":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"provas":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"relatorios":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"gestaoMunicipal":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"usuarios":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"configuracoes":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false}},"PROFESSOR":{"dashboard":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"portalProfessor":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":false},"diarioClasse":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":false},"secretaria":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"turmas":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"documentos":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"comunicacao":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"questoes":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":false},"provas":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":false},"relatorios":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"gestaoMunicipal":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"usuarios":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"configuracoes":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false}},"GESTOR_MUNICIPAL":{"dashboard":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"portalProfessor":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"diarioClasse":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"secretaria":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"turmas":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"documentos":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"comunicacao":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"questoes":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"provas":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"relatorios":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"gestaoMunicipal":{"canRead":true,"canCreate":true,"canEdit":true,"canDelete":false,"canApprove":true},"usuarios":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"configuracoes":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false}},"ALUNO":{"dashboard":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"portalProfessor":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"diarioClasse":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"secretaria":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"turmas":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"documentos":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"comunicacao":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"questoes":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"provas":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"relatorios":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"gestaoMunicipal":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"usuarios":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"configuracoes":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false}},"RESPONSAVEL":{"dashboard":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"portalProfessor":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"diarioClasse":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"secretaria":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"turmas":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"documentos":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"comunicacao":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"questoes":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"provas":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"relatorios":{"canRead":true,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"gestaoMunicipal":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"usuarios":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false},"configuracoes":{"canRead":false,"canCreate":false,"canEdit":false,"canDelete":false,"canApprove":false}}}
@@ -562,6 +609,7 @@ function Invoke-ApplyOp($work, $db, $op) {
     if ($t -eq 's') {
         $v = Get-Val $op 'v'
         if ($null -ne $v) { $v = $v.psobject.BaseObject }
+        if ($k -eq 'userAccounts') { Restore-UserPasswords $v (Get-WorkValue $work $db $k) }
         $db[$k] = $v
         $work.Remove($k)
         return
@@ -574,6 +622,11 @@ function Invoke-ApplyOp($work, $db, $op) {
     if ($t -eq 'u') {
         $val = Get-Val $op 'v'
         if ($null -ne $val) { $val = $val.psobject.BaseObject }
+        if ($k -eq 'userAccounts') {
+            $prev = $null
+            if ($has) { $prev = $w.list[$pos] }
+            Restore-UserPassword $val $prev
+        }
         if ($has) { $w.list[$pos] = $val }
         else { $w.idx[$id] = $w.list.Add($val) }
     } elseif ($t -eq 'd' -and $has) {
@@ -1020,7 +1073,7 @@ function Handle-Api($ctx, [string]$path, [string]$method) {
             return
         }
         '/api/local/store' {
-            if ($method -eq 'GET') { Send-Json $ctx 200 (Get-StoreJson); return }
+            if ($method -eq 'GET') { Send-Json $ctx 200 (Get-StoreJson $ctx); return }
             if ($method -eq 'PUT' -or $method -eq 'POST') {
                 # Gravacao do banco inteiro: so no primeiro acesso (banco vazio) ou pela conta Master.
                 # As gravacoes do dia a dia vao por /api/local/ops, com as permissoes conferidas.
@@ -1041,6 +1094,11 @@ function Handle-Api($ctx, [string]$path, [string]$method) {
                 $body = Read-Body $ctx
                 $trim = $body.TrimStart()
                 if ($trim.Length -lt 2 -or $trim[0] -ne '{') { Send-Json $ctx 400 '{"error":"conteudo-invalido"}'; return }
+                if ($script:DataText -and $body.Contains('"passwordOnServer"')) {
+                    $incoming = ConvertFrom-JsonText $body
+                    Restore-UserPasswords (Get-Val $incoming 'userAccounts') (Get-Val (Get-DbObject) 'userAccounts')
+                    $body = ConvertTo-JsonText $incoming
+                }
                 Save-Database $body
                 Write-Log ('Banco gravado pela estacao ' + $station + ' (' + $ctx.Request.RemoteEndPoint.Address + ') - versao ' + $script:Version + ', ' + [math]::Round($body.Length / 1KB) + ' KB')
                 Send-Json $ctx 200 ('{"version":' + $script:Version + ',"updatedAt":' + (ConvertTo-JsonString $script:UpdatedAt) + '}')
