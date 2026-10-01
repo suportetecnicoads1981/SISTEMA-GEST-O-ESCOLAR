@@ -356,6 +356,11 @@ export const HELP_MODULES: HelpModule[] = [
         tip: 'Se a linha "ESCOLA:" da aba ALUNOS vier vazia (planilha salva por outro programa), o nome da escola é tirado da ficha.',
       },
       {
+        q: 'Qual cidade, CEP e curso o aluno importado recebe?',
+        a: 'A planilha padrão não traz cidade nem CEP de cada aluno. Por isso o aluno recebe a cidade, a UF e o CEP da escola dele (aba DADOS DA ESCOLA). O curso vem pela série: Pré-escola e creche ficam em Educação Infantil, 1º ao 5º ano em Ensino Fundamental I, 6º ao 9º ano em Ensino Fundamental II e séries do médio em Ensino Médio.',
+        tip: 'Alunos importados por versões antigas com "Belém – PA, CEP 66000-000" são corrigidos para os dados da escola quando a planilha é importada de novo. O endereço exato do aluno continua sendo atualizado no cadastro dele.',
+      },
+      {
         q: 'Como a escola anexa fica ligada à escola sede na importação?',
         a: 'Pela ficha da anexa: tipo da unidade ESCOLA ANEXA e, em "Escola sede", o nome da escola principal. A escola sede não precisa informar suas anexas. Se a sede ainda não foi importada, o vínculo é feito pelo nome e a conferência avisa para importar a planilha dela também.',
         tip: 'Se a ficha trouxer escola sede, mas o tipo não for ESCOLA ANEXA, a conferência avisa e o vínculo não é feito. Para as demais escolas, o campo "Escola sede" fica em branco.',

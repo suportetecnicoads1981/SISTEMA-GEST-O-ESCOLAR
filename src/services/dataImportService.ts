@@ -1995,6 +1995,38 @@ function processRawRows(
   };
 }
 
+/** Valores fixos que versões antigas do importador gravavam no aluno (não são dados reais). */
+export const LEGACY_IMPORT_CITY = 'Belém';
+export const LEGACY_IMPORT_ZIP = '66000-000';
+
+/** Cidade, UF e CEP do aluno importado: da planilha, senão os da escola dele (nunca um valor fixo). */
+export function studentLocationFromUnit(
+  itemCity: string | undefined,
+  unit: Pick<SchoolUnit, 'city' | 'state' | 'zipCode'> | undefined
+): { city: string; state: string; zipCode: string } {
+  const t = (v: unknown) => (v == null ? '' : String(v).trim());
+  return {
+    city: t(itemCity) || t(unit?.city),
+    state: t(unit?.state).toUpperCase() || 'PA',
+    zipCode: t(unit?.zipCode),
+  };
+}
+
+/** Curso (segmento) pela série: Infantil, Fundamental I (1º ao 5º), Fundamental II (6º ao 9º) ou Médio. */
+export function courseIdForSeries(series: unknown): string {
+  const norm = String(series ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+  if (/PRE|MATERNAL|CRECHE|BERCARIO|INFANTIL/.test(norm)) return 'course-ei';
+  if (/MEDIO|\bEM\b/.test(norm)) return 'course-em';
+  const m = norm.match(/(\d+)\s*(º|O|°)?\s*ANO/);
+  const n = m ? Number(m[1]) : NaN;
+  if (n >= 1 && n <= 5) return 'course-ef1';
+  if (n >= 6 && n <= 9) return 'course-ef2';
+  return 'course-ef1';
+}
+
 // Converte os estudantes parsed em instâncias oficiais do modelo Student do SucessoEdu
 export function convertImportedStudentsToOfficial(
   importedList: ParsedImportStudent[],
@@ -2082,14 +2114,12 @@ export function convertImportedStudentsToOfficial(
       gender: filters.importGender ? item.gender : 'OTHER',
       raceColor: filters.importRaceColor ? item.raceColor : 'NAO_DECLARADA',
       address: filters.importAddress ? item.address : '',
-      city: item.city || 'Belém',
-      state: 'PA',
-      zipCode: '66000-000',
+      ...studentLocationFromUnit(item.city, unit),
       email: '',
       phone: '',
       guardianName: 'Pendente de Atualização Cadastral',
       guardianPhone: '',
-      courseId: 'crs-infantil',
+      courseId: courseIdForSeries(effectiveSeries),
       schoolUnitId: unitId,
       classId: matchedClass?.id || 'cls-default',
       status: 'ACTIVE',
@@ -2121,6 +2151,11 @@ export function convertImportedStudentsToOfficial(
         gender: officialStudent.gender,
         raceColor: officialStudent.raceColor,
         address: officialStudent.address || existing.address,
+        // Cidade/CEP fixos de versões antigas do importador são trocados pelos da escola
+        ...(existing.city === LEGACY_IMPORT_CITY && existing.zipCode === LEGACY_IMPORT_ZIP
+          ? { city: officialStudent.city, state: officialStudent.state, zipCode: officialStudent.zipCode }
+          : {}),
+        courseId: !existing.courseId || existing.courseId === 'crs-infantil' ? officialStudent.courseId : existing.courseId,
         schoolUnitId: officialStudent.schoolUnitId,
         classId: officialStudent.classId,
         series: officialStudent.series,
