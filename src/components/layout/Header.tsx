@@ -30,7 +30,9 @@ import {
 import { getLocalServerInfo, flushLocalChanges } from '../../services/offline/localServerSync';
 import { supabaseBatchQueue } from '../../services/supabaseBatchQueue';
 import { CloudSyncIndicator } from '../offline/CloudSyncIndicator';
-import { NotificationItem, UserRole, UserAccount } from '../../types';
+import { NotificationItem, UserRole, UserAccount, SchoolUnit } from '../../types';
+import { annexesOf } from '../../utils/schoolAnnexes';
+import type { SchoolFocus } from '../../services/rbac/schoolFocus';
 import { NotificationPopover } from '../notificacoes/NotificationPopover';
 import { formatPersonName } from '../../services/documentBranding';
 
@@ -61,6 +63,10 @@ interface HeaderProps {
   onOpenTour?: () => void;
   /** Abre o Tira-dúvidas do módulo atual (F1). */
   onOpenHelp?: () => void;
+  /** Escola em foco (só para quem vê a rede inteira): filtra todas as telas por uma escola. */
+  schoolUnits?: SchoolUnit[];
+  schoolFocus?: SchoolFocus | null;
+  onChangeSchoolFocus?: (focus: SchoolFocus | null) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -88,7 +94,20 @@ export const Header: React.FC<HeaderProps> = ({
   isStartMenuOpen = false,
   onOpenTour,
   onOpenHelp,
+  schoolUnits = [],
+  schoolFocus = null,
+  onChangeSchoolFocus,
 }) => {
+  // Opções da escola em foco: cada escola e, para a escola sede, "sede + anexas"
+  const focusOptions = [...schoolUnits]
+    .filter((u) => u.type !== 'SEDE_CENTRAL')
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+    .flatMap((u) => {
+      const annexes = annexesOf(u.id, schoolUnits);
+      const base = [{ value: u.id, label: u.parentUnitId ? `${u.name} (anexa)` : u.name }];
+      return annexes.length ? [...base, { value: `${u.id}|+`, label: `${u.name} + anexa${annexes.length === 1 ? '' : 's'}` }] : base;
+    });
+  const focusValue = schoolFocus?.unitId ? `${schoolFocus.unitId}${schoolFocus.withAnnexes ? '|+' : ''}` : '';
   // Cargo exibido abaixo do nome: o que foi cadastrado para o usuário (Título / Cargo),
   // e só na falta dele o perfil de acesso.
   const ROLE_FALLBACK: Record<string, string> = {
@@ -185,11 +204,44 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
+        {/* Escola em foco: quem vê a rede inteira escolhe com qual escola quer trabalhar */}
+        {onChangeSchoolFocus && focusOptions.length > 0 && (
+          <label
+            className={`hidden md:flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded-full border text-xs font-bold min-w-[150px] max-w-[260px] shrink ${
+              focusValue ? 'bg-amber-50 border-amber-300 text-amber-900' : 'bg-slate-50 border-slate-200 text-slate-600'
+            }`}
+            title={
+              focusValue
+                ? 'Escola em foco: todas as telas mostram só esta escola. Escolha "Toda a rede" para ver todas.'
+                : 'Escolha uma escola para trabalhar só com ela em todas as telas'
+            }
+          >
+            <School className="h-3.5 w-3.5 shrink-0" />
+            <select
+              value={focusValue}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) onChangeSchoolFocus(null);
+                else onChangeSchoolFocus({ unitId: v.replace(/\|\+$/, ''), withAnnexes: v.endsWith('|+') });
+              }}
+              className="bg-transparent min-w-0 w-full truncate cursor-pointer focus:outline-hidden"
+              aria-label="Escola em foco"
+            >
+              <option value="">Toda a rede</option>
+              {focusOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         {/* Indicador de Módulo Ativo */}
         {isNotDashboard && (
           <div
             id="header-active-module-badge"
-            className="hidden xl:flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 min-w-0 max-w-[320px] overflow-hidden"
+            className="hidden 2xl:flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 min-w-0 max-w-[320px] overflow-hidden"
           >
             {onGoBack && (
               <button
@@ -246,7 +298,7 @@ export const Header: React.FC<HeaderProps> = ({
             title="Tira-dúvidas: como usar este módulo (F1)"
           >
             <LifeBuoy className="h-3.5 w-3.5 text-sky-600" />
-            <span className="hidden xl:inline">Tira-dúvidas</span>
+            <span className="hidden 2xl:inline">Tira-dúvidas</span>
           </button>
         )}
 
@@ -273,7 +325,7 @@ export const Header: React.FC<HeaderProps> = ({
           title="Atualizar a tela (as alterações pendentes são enviadas antes)"
         >
           <RefreshCw className="h-3.5 w-3.5" />
-          <span className="hidden xl:inline">Atualizar</span>
+          <span className="hidden 2xl:inline">Atualizar</span>
         </button>
 
         {/* Botão do Tour Guiado */}
@@ -285,7 +337,7 @@ export const Header: React.FC<HeaderProps> = ({
             title="Abrir Tour Guiado do Sistema"
           >
             <Sparkles className="h-3.5 w-3.5 text-amber-600 group-hover:scale-110 transition-transform" />
-            <span className="hidden xl:inline">Tour Guiado</span>
+            <span className="hidden 2xl:inline">Tour Guiado</span>
           </button>
         )}
 
@@ -300,7 +352,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="h-8 w-8 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs font-black shrink-0">
               {userInitials}
             </div>
-            <div className="hidden xl:block leading-tight">
+            <div className="hidden 2xl:block leading-tight">
               <div className="text-xs font-black text-slate-900 truncate max-w-[140px]">
                 {formatPersonName(currentUser?.name) || 'Administrador'}
               </div>

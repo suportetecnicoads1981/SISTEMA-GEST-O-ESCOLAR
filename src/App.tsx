@@ -123,17 +123,23 @@ import { computeDropoutRisk, describeDropoutCriterion } from './utils/dropoutRis
 import { DropoutRiskAlertModal } from './components/common/DropoutRiskAlertModal';
 import { can as canAccess, canOpenTab, deniedTabMessage, describeDenials, enforceDataPermissions } from './services/rbac/accessControl';
 import { scopeDataToSchool, userSchoolScope } from './services/rbac/schoolScope';
+import { focusSchoolIds, readStoredFocus, restoreHiddenRecords, scopeDataToFocus, storeFocus, type SchoolFocus } from './services/rbac/schoolFocus';
 
 export default function App() {
   // setDataRaw: gravação sem checagem (dados vindos da nuvem, restauração, rotinas do sistema).
   // setData: gravação feita pelo operador — passa pelos privilégios do usuário (accessControl).
   const [data, setDataRaw] = useState(() => getStoredData());
   const accessActorRef = useRef<any>(null);
+  // Escolas da "escola em foco" (usuário da rede que escolheu uma escola no topo da tela)
+  const focusIdsRef = useRef<string[]>([]);
   const lastDeniedNoticeRef = useRef<{ text: string; at: number }>({ text: '', at: 0 });
   const setData = useCallback((action: React.SetStateAction<ReturnType<typeof getStoredData>>) => {
     setDataRaw((prev) => {
       const next = typeof action === 'function' ? (action as any)(prev) : action;
-      const { next: allowed, denied } = enforceDataPermissions(prev as any, next as any, accessActorRef.current);
+      const checked = enforceDataPermissions(prev as any, next as any, accessActorRef.current);
+      const denied = checked.denied;
+      // Com escola em foco, a tela não conhece os registros das outras escolas: nada delas é apagado.
+      const allowed = restoreHiddenRecords(prev as any, checked.next as any, focusIdsRef.current);
       if (denied.length) {
         const text = describeDenials(denied);
         const last = lastDeniedNoticeRef.current;
@@ -301,18 +307,44 @@ export default function App() {
   // ---- Escola de lotação: quem está lotado numa escola vê só os dados dela ----
   // O estado completo (data) continua inteiro para gravação e sincronização; as telas recebem viewData.
   const schoolScope = userSchoolScope(accessActor as any);
-  const viewData = useMemo(() => scopeDataToSchool(data, schoolScope), [data, schoolScope]);
+
+  // ---- Escola em foco: quem vê a rede inteira escolhe no topo com qual escola quer trabalhar ----
+  const [schoolFocus, setSchoolFocusState] = useState<SchoolFocus | null>(null);
+  const focusUserId = (accessActor as any)?.id || null;
+  useEffect(() => {
+    setSchoolFocusState(readStoredFocus(focusUserId));
+  }, [focusUserId]);
+  const handleChangeSchoolFocus = useCallback(
+    (focus: SchoolFocus | null) => {
+      setSchoolFocusState(focus);
+      storeFocus(focusUserId, focus);
+    },
+    [focusUserId]
+  );
+  const canChooseSchoolFocus = isAuthenticated && !schoolScope;
+  const focusIds = useMemo(() => {
+    if (!canChooseSchoolFocus || !schoolFocus) return [] as string[];
+    // Escola que não existe mais (ex.: apagada) volta para a rede inteira
+    if (!(data.schoolUnits || []).some((u) => u.id === schoolFocus.unitId)) return [] as string[];
+    return focusSchoolIds(schoolFocus, data.schoolUnits || []);
+  }, [canChooseSchoolFocus, schoolFocus, data.schoolUnits]);
+  focusIdsRef.current = focusIds;
+
+  const viewData = useMemo(
+    () => (schoolScope ? scopeDataToSchool(data, schoolScope) : scopeDataToFocus(data, focusIds)),
+    [data, schoolScope, focusIds]
+  );
 
   // ---- Risco de evasão por faltas sem justificativa (gatilho configurável no Censo) ----
   // Usuário lotado numa escola vê só os alunos dela; o Master e a rede veem todos.
   const riskScopeUnit = schoolScope || undefined;
   const dropoutRisk = useMemo(
     () =>
-      computeDropoutRisk(data.students || [], data.attendanceSheets || [], (data as any).dropoutAlertConfig, {
+      computeDropoutRisk((focusIds.length ? viewData.students : data.students) || [], data.attendanceSheets || [], (data as any).dropoutAlertConfig, {
         classes: data.classes || [],
         schoolUnitId: riskScopeUnit,
       }),
-    [data.students, data.attendanceSheets, (data as any).dropoutAlertConfig, data.classes, riskScopeUnit]
+    [data.students, viewData.students, focusIds.length, data.attendanceSheets, (data as any).dropoutAlertConfig, data.classes, riskScopeUnit]
   );
   const canSeeDropoutRisk = isAuthenticated && canOpenTab(accessActor, 'DROPOUT_CENSUS');
   const riskAckKey = `sucessoedu_risco_evasao_ciente_${accessActor?.id || 'anon'}`;
@@ -1926,6 +1958,9 @@ export default function App() {
         isStartMenuOpen={isStartMenuOpen}
         onOpenTour={() => setIsTourOpen(true)}
         onOpenHelp={() => setIsHelpOpen(true)}
+        schoolUnits={data.schoolUnits || []}
+        schoolFocus={focusIds.length ? schoolFocus : null}
+        onChangeSchoolFocus={canChooseSchoolFocus ? handleChangeSchoolFocus : undefined}
       />
 
       {/* Main Layout Shell */}
@@ -1943,10 +1978,10 @@ export default function App() {
           showDevBacklog={isDevBacklogOwner(currentUser?.email)}
           canOpenTab={(tab) => canOpenTab(accessActor, tab)}
           counts={{
-            students: data?.students?.length || 0,
-            exams: data?.exams?.length || 0,
+            students: viewData?.students?.length || 0,
+            exams: viewData?.exams?.length || 0,
             questions: data?.questions?.length || 0,
-            submissions: data?.submissions?.length || 0,
+            submissions: viewData?.submissions?.length || 0,
             schoolUnits: data?.schoolUnits?.length || 0,
             userAccounts: data?.userAccounts?.length || 0,
             unreadNotifications: unreadNotificationCount,

@@ -87,6 +87,13 @@ function inScope(collection: string, record: any, index: SchoolIndex, scope: str
   return NETWORK_WIDE_ALLOWED.has(collection);
 }
 
+/** O registro pertence a uma destas escolas? (sem escola: só os cadastros da rede, como provas) */
+export function recordInSchools(collection: string, record: any, index: SchoolIndex, ids: ReadonlySet<string>): boolean {
+  const school = recordSchool(collection, record, index);
+  if (school) return ids.has(school);
+  return NETWORK_WIDE_ALLOWED.has(collection);
+}
+
 /** Dados que o usuário enxerga: só os da escola dele (o estado completo não é alterado). */
 export function scopeDataToSchool<T extends Record<string, any>>(state: T, scope: string | null): T {
   if (!scope || !state) return state;

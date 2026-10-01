@@ -102,8 +102,18 @@ export const HELP_GENERAL: HelpModule = {
       tip: 'A tela completa, com a lista de usuários, o IP da rede e o último backup, é só do administrador Master: clique em "Acesso do administrador" e confirme o login e a senha dele. "Login simples" volta para a tela normal.',
     },
     {
+      q: 'Como trabalhar só com uma escola (escola em foco)?',
+      a: 'Quem vê a rede inteira (Sede / Secretaria, sem escola de lotação) escolhe no topo da tela, no campo da escola (ao lado do nome do sistema), com qual escola quer trabalhar. A partir daí, todas as telas (alunos, turmas, frequência, notas, relatórios, painéis e números do menu) mostram só os dados dessa escola. Para a escola sede, há também a opção "escola + anexas", que junta a sede com as anexas dela.',
+      steps: [
+        'Clique no campo da escola no topo e escolha a escola (ou "escola + anexas").',
+        'O campo fica amarelo enquanto houver uma escola em foco, para lembrar que as telas estão filtradas.',
+        'Para voltar a ver todas as escolas, escolha "Toda a rede".',
+      ],
+      tip: 'É só um filtro de visão: as permissões do usuário não mudam, o cadastro de escolas continua completo (para transferir um aluno, por exemplo) e nada das outras escolas é apagado. A escolha fica guardada neste computador para o seu usuário. Quem está lotado em uma escola não vê esse campo: ele já trabalha só com a escola dele.',
+    },
+    {
       q: 'Por que alguns botões do topo aparecem só com o ícone?',
-      a: 'Em telas menores, os botões do topo (Diagrama & IA, Novidades, Tira-dúvidas, Nuvem, Atualizar, Tour Guiado e o nome do usuário) mostram só o ícone, para nada ficar por cima de nada. Passe o mouse sobre o ícone para ver o nome. Em telas largas, os nomes voltam a aparecer.',
+      a: 'Em telas que não são bem largas, os botões do topo (Diagrama & IA, Novidades, Tira-dúvidas, Nuvem, Atualizar, Tour Guiado e o nome do usuário) mostram só o ícone, para nada ficar por cima de nada. Passe o mouse sobre o ícone para ver o nome. Em telas largas, os nomes voltam a aparecer.',
       tip: 'Do mesmo jeito, as barras de filtros (escola, série, turma) passam para a linha de baixo quando falta espaço, em vez de se sobreporem. As setas de rolagem do menu lateral ficam numa faixa própria, abaixo dos módulos.',
     },
     {
