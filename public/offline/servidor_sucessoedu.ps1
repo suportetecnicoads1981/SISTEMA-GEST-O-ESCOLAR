@@ -735,7 +735,8 @@ function Invoke-Login($ctx) {
         if ((Get-Val $user 'cloudSynced') -eq $true -and -not [System.Net.IPAddress]::IsLoopback($ctx.Request.RemoteEndPoint.Address)) {
             return @{ status = 401; body = '{"error":"conta-da-nuvem","message":"Esta conta ainda nao tem senha no servidor da escola. Entre uma vez no computador do servidor; depois ela funciona em todas as estacoes."}' }
         }
-        if ($password.Length -lt 6) { return @{ status = 400; body = '{"error":"senha-curta","message":"A senha deve ter pelo menos 6 caracteres."}' } }
+        # Mesma regra da nuvem: 8+ caracteres, com minuscula, maiuscula e numero
+        if ($password.Length -lt 8 -or $password -cnotmatch '[a-z]' -or $password -cnotmatch '[A-Z]' -or $password -notmatch '[0-9]') { return @{ status = 400; body = '{"error":"senha-fraca","message":"A senha precisa ter pelo menos 8 caracteres, com letra minuscula, letra maiuscula e numero (ex.: Escola2026)."}' } }
         $user['password'] = [string](New-PasswordHash $password)
         Save-Database (ConvertTo-JsonText $db) $true
         Write-Log ('Primeiro acesso: senha definida no servidor para ' + [string](Get-Val $user 'name'))

@@ -193,6 +193,8 @@ export const HELP_GENERAL: HelpModule = {
         'Contas de servidor das escolas (Servidor Remoto): só a conta Master cria, renova ou desliga.',
         'Quem entra pela nuvem num computador novo só vira Master se a conta for Master na nuvem; os demais administradores entram como Secretaria.',
         'Servidor da Sede/escola: verificar e aplicar atualização exige estar logado no sistema; trocar o endereço de atualização e desfazer uma atualização só a conta Master (ou direto no computador do servidor).',
+        'Regra de senha (igual em todo o sistema, na nuvem e no servidor): pelo menos 8 caracteres, com letra minúscula, letra maiúscula e número. Ex.: Escola2026. O botão "Gerar" do cadastro de usuários já cria uma senha dentro da regra.',
+        'As senhas antigas continuam valendo; a regra vale ao criar ou trocar a senha.',
       ],
       tip: 'Depois desta mudança, a conta Master precisa sair e entrar de novo na nuvem uma vez para a permissão nova valer.',
     },

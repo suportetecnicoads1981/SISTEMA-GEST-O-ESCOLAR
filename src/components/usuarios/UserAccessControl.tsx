@@ -50,6 +50,7 @@ import {
 } from '../../types';
 import { UserManagementTable } from './UserManagementTable';
 import { hashPassword, PASSWORD_MASK } from '../../utils/passwordHasher';
+import { passwordProblem, generateStrongPassword, PASSWORD_RULE_TEXT } from '../../utils/passwordPolicy';
 import { getSupabaseClient } from '../../services/datasync/supabaseClient';
 import { confirmDialog, notify } from '../../utils/dialogs';
 import { ModuleReportButton, reportDate } from '../common/ModuleReportButton';
@@ -292,11 +293,8 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
   };
 
   const generateRandomPassword = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$';
-    let pwd = 'Edu';
-    for (let i = 0; i < 6; i++) {
-      pwd += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
+    // Já sai dentro da regra da nuvem (8+ caracteres, minúscula, maiúscula e número)
+    const pwd = generateStrongPassword(12);
     setFormData((prev) => ({ ...prev, password: pwd }));
     setShowPassword(true);
   };
@@ -396,6 +394,14 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
     if (!formData.name.trim() || !formData.login.trim()) {
       notify('Preencha o Nome e o Login do usuário.');
       return;
+    }
+    // Senha nova ou trocada: mesma regra da nuvem (senão o acesso na nuvem é recusado)
+    if (formData.password && formData.password !== PASSWORD_MASK) {
+      const problem = passwordProblem(formData.password);
+      if (problem) {
+        notify(problem);
+        return;
+      }
     }
 
     const unit = schoolUnits.find((u) => u.id === formData.schoolUnitId);
@@ -1409,7 +1415,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                       type={showPassword ? 'text' : 'password'}
                       value={formData.password || ''}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      placeholder={editingUser ? 'Deixe em branco para manter a senha atual' : 'Senha do usuário...'}
+                      placeholder={editingUser ? 'Deixe em branco para manter a senha atual' : 'Ex.: Escola2026'}
                       className="w-full pl-3 pr-16 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono"
                     />
                     <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -1431,6 +1437,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                       </button>
                     </div>
                   </div>
+                  <p className="mt-1 text-[10px] text-slate-500">{PASSWORD_RULE_TEXT}</p>
                 </div>
 
                 <div>

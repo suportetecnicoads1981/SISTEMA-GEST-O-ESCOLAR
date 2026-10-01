@@ -47,8 +47,9 @@ Deno.serve(async (req: Request) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return json({ success: false, error: 'E-mail inválido. O acesso na nuvem exige um e-mail válido.' }, 400);
     }
-    if (password.length < 6 || password.length > 72) {
-      return json({ success: false, error: 'A senha deve ter entre 6 e 72 caracteres.' }, 400);
+    // Mesma regra do Supabase Auth (Email): 8+ caracteres, com minúscula, maiúscula e número
+    if (password.length < 8 || password.length > 72 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+      return json({ success: false, error: 'A senha precisa ter de 8 a 72 caracteres, com letra minúscula, letra maiúscula e número (ex.: Escola2026).' }, 400);
     }
     if (!CLOUD_ROLES.includes(role)) {
       return json({ success: false, error: `Papel inválido. Use: ${CLOUD_ROLES.join(', ')}.` }, 400);
