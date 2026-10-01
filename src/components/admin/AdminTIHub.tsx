@@ -377,7 +377,7 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
           </div>
 
           {/* Controles do Cabeçalho */}
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <div className="flex flex-wrap items-center gap-2.5 min-w-0 max-w-full">
             <button
               onClick={runHealthCheck}
               disabled={isHealthChecking}
@@ -388,7 +388,7 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
               <span>{isHealthChecking ? 'Diagnosticando...' : 'Diagnóstico de Saúde'}</span>
             </button>
 
-            <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-bold font-mono">
+            <div className="flex flex-wrap items-center gap-0.5 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-bold font-mono max-w-full">
               <button
                 onClick={() => setViewMode('DASHBOARD')}
                 className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${

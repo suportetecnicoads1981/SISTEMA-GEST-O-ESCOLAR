@@ -48,7 +48,7 @@ export const CloudSyncIndicator: React.FC<{ isAdmin?: boolean }> = ({ isAdmin })
         title={st.message || 'Sincronização com a nuvem'}
       >
         {busy ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Icon className="h-3.5 w-3.5" />}
-        <span className="hidden md:inline">Nuvem</span>
+        <span className="hidden xl:inline">Nuvem</span>
         {st.pending > 0 && <span className="px-1.5 rounded-full bg-white/80 text-[10px]">{st.pending}</span>}
       </button>
 

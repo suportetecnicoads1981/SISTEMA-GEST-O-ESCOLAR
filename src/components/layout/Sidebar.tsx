@@ -727,12 +727,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </nav>
 
-        {/* Floating Quick Scroll Buttons (visíveis quando expandido) */}
-        {isExpanded && (
+        {/* Botões de rolagem rápida: numa faixa própria abaixo do menu, para não cobrir os itens */}
+        {isExpanded && (showScrollTop || showScrollBottom) && (
           <div
-            className={`absolute bottom-2 ${
-              scrollbarPosition === 'left' ? 'right-2.5' : 'left-2.5'
-            } z-20 flex flex-col gap-1 pointer-events-none`}
+            className={`shrink-0 flex gap-1 px-3 py-1 border-t border-slate-800/70 ${
+              scrollbarPosition === 'left' ? 'justify-end' : 'justify-start'
+            }`}
           >
             {showScrollTop && (
               <button

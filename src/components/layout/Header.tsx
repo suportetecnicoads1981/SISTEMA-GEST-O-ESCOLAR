@@ -161,7 +161,7 @@ export const Header: React.FC<HeaderProps> = ({
       className="no-print h-14 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs"
     >
       {/* LADO ESQUERDO: Marca Oficial SucessoEdu + Pílula de Módulo Ativo */}
-      <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden mr-3">
         {/* Marca SucessoEdu com Ícone de Capelo */}
         <div
           id="header-brand-logo"
@@ -174,12 +174,12 @@ export const Header: React.FC<HeaderProps> = ({
             alt="SucessoEdu"
             className="h-9 w-9 rounded-xl shadow-xs group-hover:scale-105 transition-transform shrink-0"
           />
-          <div className="text-left leading-tight">
+          <div className="text-left leading-tight min-w-0">
             <div className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-2">
               <span>SucessoEdu</span>
-              <span className="hidden md:inline text-xs font-semibold text-slate-400 font-normal">| Gestão Educacional</span>
+              <span className="hidden 2xl:inline text-xs font-semibold text-slate-400 font-normal">| Gestão Educacional</span>
             </div>
-            <div className="text-[11px] font-bold text-blue-600 truncate max-w-[200px] sm:max-w-[320px]">
+            <div className="text-[11px] font-bold text-blue-600 truncate max-w-[160px] xl:max-w-[260px] 2xl:max-w-[320px]">
               {schoolName || 'Colégio Horizonte do Saber & Inovação'}
             </div>
           </div>
@@ -189,7 +189,7 @@ export const Header: React.FC<HeaderProps> = ({
         {isNotDashboard && (
           <div
             id="header-active-module-badge"
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 max-w-[320px] truncate"
+            className="hidden xl:flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 min-w-0 max-w-[320px] overflow-hidden"
           >
             {onGoBack && (
               <button
@@ -200,7 +200,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <ArrowLeft className="h-3.5 w-3.5" />
               </button>
             )}
-            <span className="text-slate-500 font-medium">Módulo:</span>
+            <span className="text-slate-500 font-medium shrink-0">Módulo:</span>
             <span className="text-slate-900 font-bold truncate" title={getShortTabLabel(activeTab)}>
               {getShortTabLabel(activeTab)}
             </span>
@@ -219,7 +219,7 @@ export const Header: React.FC<HeaderProps> = ({
             title="Ver Diagrama de Arquitetura e Central de Solicitações para IA"
           >
             <GitBranch className="h-3.5 w-3.5 text-indigo-600" />
-            <span className="hidden sm:inline">Diagrama & IA</span>
+            <span className="hidden 2xl:inline">Diagrama & IA</span>
           </button>
         )}
 
@@ -232,8 +232,8 @@ export const Header: React.FC<HeaderProps> = ({
             title="Ver Controle de Versões & Apresentação de Melhorias"
           >
             <Sparkles className="h-3.5 w-3.5 text-purple-600 group-hover:rotate-12 transition-transform" />
-            <span className="font-mono text-[11px] text-purple-800 font-bold">{currentVersion || 'v5.4.1'}</span>
-            <span className="hidden xl:inline text-[9px] bg-purple-200/80 text-purple-900 px-1.5 py-0.5 rounded-md font-sans uppercase">Novidades</span>
+            <span className="hidden lg:inline font-mono text-[11px] text-purple-800 font-bold">{currentVersion || 'v5.4.1'}</span>
+            <span className="hidden 2xl:inline text-[9px] bg-purple-200/80 text-purple-900 px-1.5 py-0.5 rounded-md font-sans uppercase">Novidades</span>
           </button>
         )}
 
@@ -246,7 +246,7 @@ export const Header: React.FC<HeaderProps> = ({
             title="Tira-dúvidas: como usar este módulo (F1)"
           >
             <LifeBuoy className="h-3.5 w-3.5 text-sky-600" />
-            <span className="hidden sm:inline">Tira-dúvidas</span>
+            <span className="hidden xl:inline">Tira-dúvidas</span>
           </button>
         )}
 
@@ -273,7 +273,7 @@ export const Header: React.FC<HeaderProps> = ({
           title="Atualizar a tela (as alterações pendentes são enviadas antes)"
         >
           <RefreshCw className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Atualizar</span>
+          <span className="hidden xl:inline">Atualizar</span>
         </button>
 
         {/* Botão do Tour Guiado */}
@@ -285,7 +285,7 @@ export const Header: React.FC<HeaderProps> = ({
             title="Abrir Tour Guiado do Sistema"
           >
             <Sparkles className="h-3.5 w-3.5 text-amber-600 group-hover:scale-110 transition-transform" />
-            <span className="hidden sm:inline">Tour Guiado</span>
+            <span className="hidden xl:inline">Tour Guiado</span>
           </button>
         )}
 
@@ -300,7 +300,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="h-8 w-8 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs font-black shrink-0">
               {userInitials}
             </div>
-            <div className="hidden lg:block leading-tight">
+            <div className="hidden xl:block leading-tight">
               <div className="text-xs font-black text-slate-900 truncate max-w-[140px]">
                 {formatPersonName(currentUser?.name) || 'Administrador'}
               </div>

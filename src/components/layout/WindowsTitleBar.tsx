@@ -386,7 +386,7 @@ export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
         </div>
 
         {/* CENTRO: TÍTULO DA JANELA DO WINDOWS */}
-        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-none text-slate-400 text-[11px] font-medium max-w-[40vw] truncate">
+        <div className="absolute left-1/2 -translate-x-1/2 hidden xl:flex items-center gap-2 pointer-events-none text-slate-400 text-[11px] font-medium max-w-[34vw] 2xl:max-w-[40vw] truncate">
           <span className="text-slate-200 font-bold truncate">
             {activeMeta.label}
           </span>

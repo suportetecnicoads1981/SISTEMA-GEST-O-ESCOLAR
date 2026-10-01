@@ -102,6 +102,11 @@ export const HELP_GENERAL: HelpModule = {
       tip: 'A tela completa, com a lista de usuários, o IP da rede e o último backup, é só do administrador Master: clique em "Acesso do administrador" e confirme o login e a senha dele. "Login simples" volta para a tela normal.',
     },
     {
+      q: 'Por que alguns botões do topo aparecem só com o ícone?',
+      a: 'Em telas menores, os botões do topo (Diagrama & IA, Novidades, Tira-dúvidas, Nuvem, Atualizar, Tour Guiado e o nome do usuário) mostram só o ícone, para nada ficar por cima de nada. Passe o mouse sobre o ícone para ver o nome. Em telas largas, os nomes voltam a aparecer.',
+      tip: 'Do mesmo jeito, as barras de filtros (escola, série, turma) passam para a linha de baixo quando falta espaço, em vez de se sobreporem. As setas de rolagem do menu lateral ficam numa faixa própria, abaixo dos módulos.',
+    },
+    {
       q: 'Como faço o Tour Guiado parar de aparecer toda vez que entro?',
       a: 'No Tour Guiado, deixe marcada a opção "Não mostrar mais ao entrar" e feche (ou conclua) o tour. Quando quiser rever, clique no botão "Tour Guiado" no alto da tela.',
     },

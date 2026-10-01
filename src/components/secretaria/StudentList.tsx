@@ -1345,9 +1345,9 @@ export const StudentList: React.FC<StudentListProps> = ({
       {/* Advanced Filter, Search, and School Management Bar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
         {/* Linha Principal: Busca + Unidade Escolar + Série + Turma + Botão Mais Filtros */}
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           {/* Campo de Busca Rápida */}
-          <div className="relative flex-1 min-w-[240px]">
+          <div className="relative flex-1 min-w-[220px] basis-[240px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               type="text"
@@ -1368,17 +1368,17 @@ export const StudentList: React.FC<StudentListProps> = ({
           </div>
 
           {/* Grupo de Filtros Centrais: Unidade Escolar + Série + Turma */}
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
             {/* 1. Filtro de Unidade Escolar / Polo com Ação Rápida de Edição */}
-            <div className="flex items-center gap-1.5 w-full sm:w-auto">
-              <div className="relative flex-1 sm:w-auto">
+            <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto min-w-0">
+              <div className="relative flex-1 sm:flex-none sm:w-auto min-w-0">
                 <div className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-indigo-600">
                   <Building2 className="h-3.5 w-3.5" />
                 </div>
                 <select
                   value={selectedUnitFilter}
                   onChange={(e) => setSelectedUnitFilter(e.target.value)}
-                  className={`w-full sm:w-auto pl-8 pr-7 py-2 text-xs rounded-xl border font-semibold transition-all cursor-pointer ${
+                  className={`w-full sm:w-auto sm:max-w-[300px] truncate pl-8 pr-7 py-2 text-xs rounded-xl border font-semibold transition-all cursor-pointer ${
                     selectedUnitFilter !== 'ALL'
                       ? 'border-indigo-400 bg-indigo-50/70 text-indigo-900 ring-2 ring-indigo-500/20'
                       : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
@@ -1456,7 +1456,7 @@ export const StudentList: React.FC<StudentListProps> = ({
               <select
                 value={selectedClassFilter}
                 onChange={(e) => setSelectedClassFilter(e.target.value)}
-                className={`w-full sm:w-auto pl-8 pr-7 py-2 text-xs rounded-xl border font-semibold transition-all cursor-pointer ${
+                className={`w-full sm:w-auto sm:max-w-[240px] truncate pl-8 pr-7 py-2 text-xs rounded-xl border font-semibold transition-all cursor-pointer ${
                   selectedClassFilter !== 'ALL'
                     ? 'border-emerald-400 bg-emerald-50/70 text-emerald-900 ring-2 ring-emerald-500/20'
                     : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
