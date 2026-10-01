@@ -927,6 +927,29 @@ export function parseSchoolFichaSheet(rows: any[][]): SchoolFicha | null {
   return ficha;
 }
 
+/**
+ * Duas escolas com o mesmo nome oficial (ex.: E.M.E.F CASTRO ALVES, conhecida como "ESCOLA CASTRO",
+ * e outra anexa conhecida como "ESCOLA CASTRO ALVES CANAÃ"): o nome de cadastro da segunda junta ao
+ * nome oficial as palavras próprias do nome conhecido ("E.M.E.F CASTRO ALVES CANAÃ").
+ * Devolve '' quando o nome conhecido não traz nenhuma palavra que diferencie.
+ */
+export function distinctSchoolName(official: string, known: string): string {
+  const generic = new Set([
+    'ESCOLA', 'MUNICIPAL', 'ESTADUAL', 'DE', 'DA', 'DO', 'DAS', 'DOS', 'E', 'ENSINO', 'FUNDAMENTAL', 'INFANTIL', 'EDUCACAO',
+    'EMEF', 'EMEIF', 'EMEI', 'EMIEIF', 'EMIEI', 'UNIDADE', 'ESCOLAR', 'ANEXO', 'ANEXA', 'POLO', 'SALA', 'EXTENSAO',
+  ]);
+  const plainWord = (w: string) => stripAccentsUpper(w).replace(/[^A-Z0-9]/g, '');
+  const officialWords = new Set(String(official || '').split(/[\s.\-]+/).map(plainWord).filter(Boolean));
+  const extra = String(known || '')
+    .toUpperCase()
+    .split(/\s+/)
+    .filter((w) => {
+      const p = plainWord(w);
+      return p && !officialWords.has(p) && !generic.has(p);
+    });
+  return extra.length ? `${String(official).trim().toUpperCase()} ${extra.join(' ')}` : '';
+}
+
 /** Id estável de uma escola pelo nome (o mesmo usado ao cadastrar pela importação). */
 export function importedUnitIdForName(name: string): string {
   return `unit-imp-${normalizeSchoolName(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
@@ -1465,7 +1488,26 @@ export function processSheetWithHeaders(
   const selectedUnit = filters.selectedSchoolUnitId
     ? schoolUnits.find((u) => u.id === filters.selectedSchoolUnitId || u.name === filters.selectedSchoolUnitId)
     : undefined;
-  const registeredUnit = schoolNameDetected ? findRegisteredSchoolUnit(schoolNameDetected, schoolUnits) : undefined;
+  let registeredUnit = schoolNameDetected ? findRegisteredSchoolUnit(schoolNameDetected, schoolUnits) : undefined;
+  // Mesmo nome oficial, mas a ficha traz outro nome conhecido que o da escola já cadastrada:
+  // é outra escola (ex.: segunda anexa da mesma sede) e não pode juntar os alunos com a primeira.
+  let unitsForNewSchool = schoolUnits;
+  if (!selectedUnit && registeredUnit && ficha?.tradeName) {
+    const own = String(registeredUnit.tradeName || '').trim();
+    const ownIsReal =
+      !!own && !/\(ANEXO DE|\(ESCOLA ANEXA\)/i.test(own) && normalizeSchoolName(own) !== normalizeSchoolName(registeredUnit.name);
+    const knownDiffers = ownIsReal && normalizeSchoolName(own) !== normalizeSchoolName(ficha.tradeName);
+    const distinct = knownDiffers ? distinctSchoolName(registeredUnit.name, ficha.tradeName) : '';
+    if (distinct && normalizeSchoolName(distinct) !== normalizeSchoolName(registeredUnit.name)) {
+      const sameName = registeredUnit;
+      warnings.push(
+        `Já existe a escola "${sameName.name}", conhecida como "${own}". Pelo nome conhecido da ficha ("${ficha.tradeName}"), esta planilha é de outra escola e entra como "${distinct}".`
+      );
+      schoolNameDetected = distinct;
+      registeredUnit = schoolUnits.find((u) => normalizeSchoolName(u.name) === normalizeSchoolName(distinct));
+      unitsForNewSchool = schoolUnits.filter((u) => u.id !== sameName.id);
+    }
+  }
   const schoolMessages: string[] = [];
 
   let targetUnit: SchoolUnit | undefined = selectedUnit || registeredUnit;
@@ -1484,7 +1526,7 @@ export function processSheetWithHeaders(
         schoolNameDetected,
         gradesServedText,
         fileName,
-        schoolUnits,
+        unitsForNewSchool,
         classes,
         filters.defaultShift || 'MANHÃ',
         tableSeries || undefined

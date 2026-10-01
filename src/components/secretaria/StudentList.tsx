@@ -50,6 +50,7 @@ import {
   PrintColumnConfig,
   AppliedFilterItem,
   SummaryMetricItem,
+  ConsolidatedTable,
 } from '../common/ConfigurablePrintModal';
 import {
   Student,
@@ -73,7 +74,8 @@ import { AttendanceSheet, ClassGradeSheet, NotificationItem } from '../../types'
 import { confirmDialog } from '../../utils/dialogs';
 
 import { moduleName } from '../../config/moduleNames';
-import { annexesOf, unitDisplayName } from '../../utils/schoolAnnexes';
+import { annexesOf, chosenAnnexIds, totalsBySchool, unitDisplayName } from '../../utils/schoolAnnexes';
+import { AnnexPicker } from './AnnexPicker';
 interface StudentListProps {
   students: Student[];
   classes: SchoolClass[];
@@ -122,7 +124,8 @@ export const StudentList: React.FC<StudentListProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUnitFilter, setSelectedUnitFilter] = useState('ALL');
   // Relatório conjunto: a escola sede escolhida + as escolas anexas dela
-  const [includeAnnexes, setIncludeAnnexes] = useState(false);
+  // Anexas marcadas para juntar com a escola sede escolhida (relatório conjunto)
+  const [annexChoice, setAnnexChoice] = useState<string[]>([]);
   const [selectedSeriesFilter, setSelectedSeriesFilter] = useState('ALL');
   const [selectedClassFilter, setSelectedClassFilter] = useState('ALL');
   const [selectedShiftFilter, setSelectedShiftFilter] = useState('ALL');
@@ -399,7 +402,7 @@ export const StudentList: React.FC<StudentListProps> = ({
 
   // ===== Relatório Oficial de Matrículas e Enturmação (filtros próprios) =====
   const [repUnitFilter, setRepUnitFilter] = useState('ALL');
-  const [repIncludeAnnexes, setRepIncludeAnnexes] = useState('NO');
+  const [repAnnexChoice, setRepAnnexChoice] = useState<string[]>([]);
   const [repSeriesFilter, setRepSeriesFilter] = useState('ALL');
   const [repShiftFilter, setRepShiftFilter] = useState('ALL');
   const [repClassFilter, setRepClassFilter] = useState('ALL');
@@ -433,9 +436,9 @@ export const StudentList: React.FC<StudentListProps> = ({
   const repUnitIds = useMemo(() => {
     if (repUnitFilter === 'ALL') return null;
     const ids = new Set([repUnitFilter]);
-    if (repIncludeAnnexes === 'YES') annexesOf(repUnitFilter, schoolUnits).forEach((a) => ids.add(a.id));
+    chosenAnnexIds(repUnitFilter, schoolUnits, repAnnexChoice).forEach((id) => ids.add(id));
     return ids;
-  }, [repUnitFilter, repIncludeAnnexes, schoolUnits]);
+  }, [repUnitFilter, repAnnexChoice, schoolUnits]);
 
   const enrollmentReportRows = useMemo(() => {
     const unitById = new Map((schoolUnits || []).map((u) => [u.id, u]));
@@ -524,7 +527,8 @@ export const StudentList: React.FC<StudentListProps> = ({
   const enrollmentReportFilters: AppliedFilterItem[] = useMemo(() => {
     const f: AppliedFilterItem[] = [];
     if (repUnitFilter !== 'ALL') {
-      const annexNames = repIncludeAnnexes === 'YES' ? annexesOf(repUnitFilter, schoolUnits).map((a) => a.name) : [];
+      const chosen = new Set(chosenAnnexIds(repUnitFilter, schoolUnits, repAnnexChoice));
+      const annexNames = annexesOf(repUnitFilter, schoolUnits).filter((a) => chosen.has(a.id)).map((a) => a.name);
       const name = (schoolUnits || []).find((u) => u.id === repUnitFilter)?.name || '';
       f.push({ label: 'Escola', value: `${name}${annexNames.length ? ` + anexa${annexNames.length === 1 ? '' : 's'}: ${annexNames.join(', ')}` : ''}` });
     }
@@ -532,7 +536,7 @@ export const StudentList: React.FC<StudentListProps> = ({
     if (repShiftFilter !== 'ALL') f.push({ label: 'Turno', value: { MANH: 'Manhã', TARDE: 'Tarde', INTEGRAL: 'Integral', NOIT: 'Noite' }[repShiftFilter] || repShiftFilter });
     if (repClassFilter !== 'ALL') f.push({ label: 'Turma', value: classMap.get(repClassFilter) || '' });
     return f;
-  }, [repUnitFilter, repIncludeAnnexes, repSeriesFilter, repShiftFilter, repClassFilter, schoolUnits, classMap]);
+  }, [repUnitFilter, repAnnexChoice, repSeriesFilter, repShiftFilter, repClassFilter, schoolUnits, classMap]);
 
   const enrollmentReportMetrics: SummaryMetricItem[] = useMemo(() => {
     const sum = (k: string) => enrollmentReportRows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
@@ -545,6 +549,116 @@ export const StudentList: React.FC<StudentListProps> = ({
       { label: 'Ocupação média', value: `${cap ? Math.round((sum('active') / cap) * 100) : 0}%` },
     ];
   }, [enrollmentReportRows]);
+
+  // Quadro totalizador: uma linha por escola (sede e anexas, ou todas as escolas) e o total geral
+  const buildConsolidated = (
+    groups: { schoolUnitId?: string; rows: any[] }[],
+    measure: (rows: any[]) => Record<string, number>,
+    cols: { key: string; label: string }[]
+  ): ConsolidatedTable | null => {
+    const { lines, total } = totalsBySchool(groups, measure);
+    if (lines.length < 2) return null;
+    const units = schoolUnits || [];
+    const unitOf = (id: string) => units.find((u) => u.id === id);
+    const sedeOf = (id: string) => unitOf(id)?.parentUnitId || id;
+    const sedes = new Set(lines.map((l) => sedeOf(l.unitId)));
+    const sameGroup = sedes.size === 1 && lines.some((l) => unitOf(l.unitId)?.parentUnitId);
+    const sedeId = sameGroup ? Array.from(sedes)[0] : undefined;
+    const name = (id: string) => {
+      const u = unitOf(id);
+      if (!u) return 'Escola não informada';
+      return u.parentUnitId ? `${u.name} (anexa)` : sameGroup ? `${u.name} (sede)` : u.name;
+    };
+    const inep = (id: string) => {
+      const v = unitOf(id)?.inepCode || '';
+      return /\d/.test(v) ? v : '';
+    };
+    return {
+      title: sameGroup
+        ? `Quadro totalizador: ${unitOf(sedeId!)?.name || 'escola sede'} e anexas`
+        : 'Quadro totalizador por escola',
+      schoolUnitId: sedeId,
+      note: sameGroup
+        ? 'O total geral soma a escola sede e as anexas escolhidas. O relatório individual de cada escola está nas páginas anteriores.'
+        : 'O total geral soma todas as escolas deste relatório. O relatório individual de cada escola está nas páginas anteriores.',
+      columns: [
+        { label: 'Nº', align: 'center' },
+        { label: 'Escola', align: 'left' },
+        { label: 'INEP', align: 'center' },
+        ...cols.map((c) => ({ label: c.label, align: 'center' as const })),
+      ],
+      rows: lines.map((l, i) => [i + 1, name(l.unitId), inep(l.unitId), ...cols.map((c) => l.values[c.key] ?? 0)]),
+      total: ['', sameGroup ? 'TOTAL GERAL (SEDE + ANEXAS)' : 'TOTAL GERAL', '', ...cols.map((c) => total[c.key] ?? 0)],
+    };
+  };
+
+  const enrollmentConsolidated = (groups: { schoolUnitId?: string; rows: any[] }[]) => {
+    const t = buildConsolidated(
+      groups,
+      (rows) => {
+        const sum = (k: string) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+        return {
+          classes: rows.filter((r) => r.className !== 'Sem enturmação').length,
+          enrolled: sum('enrolled'),
+          active: sum('active'),
+          male: sum('male'),
+          female: sum('female'),
+          transferred: sum('transferred'),
+          dropout: sum('dropout'),
+          capacity: sum('capacity'),
+          vacancies: sum('vacancies'),
+        };
+      },
+      [
+        { key: 'classes', label: 'Turmas' },
+        { key: 'enrolled', label: 'Matriculados' },
+        { key: 'active', label: 'Ativos' },
+        { key: 'male', label: 'Masc.' },
+        { key: 'female', label: 'Fem.' },
+        { key: 'transferred', label: 'Transferidos' },
+        { key: 'dropout', label: 'Evadidos' },
+        { key: 'capacity', label: 'Capacidade' },
+        { key: 'vacancies', label: 'Vagas' },
+      ]
+    );
+    if (!t) return null;
+    // Ocupação = ativos / capacidade, de cada escola e do total
+    const ai = t.columns.findIndex((c) => c.label === 'Ativos');
+    const ci = t.columns.findIndex((c) => c.label === 'Capacidade');
+    const occ = (r: (string | number)[]) => {
+      const cap = Number(r[ci]) || 0;
+      return `${cap ? Math.round(((Number(r[ai]) || 0) / cap) * 100) : 0}%`;
+    };
+    return {
+      ...t,
+      columns: [...t.columns, { label: 'Ocupação', align: 'center' as const }],
+      rows: t.rows.map((r) => [...r, occ(r)]),
+      total: [...t.total, occ(t.total)],
+    };
+  };
+
+  const studentListConsolidated = (groups: { schoolUnitId?: string; rows: any[] }[]) =>
+    buildConsolidated(
+      groups,
+      (rows: Student[]) => ({
+        classes: new Set(rows.map((st) => st.classId).filter(Boolean)).size,
+        students: rows.length,
+        active: rows.filter((st) => st.status === 'ACTIVE').length,
+        male: rows.filter((st) => st.gender === 'M').length,
+        female: rows.filter((st) => st.gender === 'F').length,
+        special: rows.filter((st) => st.hasMedicalReport || (Array.isArray(st.specialNeeds) ? st.specialNeeds.length > 0 : !!st.specialNeeds)).length,
+        pending: rows.filter((st) => (st.cadastralStatus || 'OK') !== 'OK').length,
+      }),
+      [
+        { key: 'classes', label: 'Turmas' },
+        { key: 'students', label: 'Alunos' },
+        { key: 'active', label: 'Ativos' },
+        { key: 'male', label: 'Masc.' },
+        { key: 'female', label: 'Fem.' },
+        { key: 'special', label: 'Com laudo / PCD' },
+        { key: 'pending', label: 'Pendências cadastrais' },
+      ]
+    );
 
   // Contagem de filtros ativos para badge visual
   const activeFiltersCount = useMemo(() => {
@@ -601,9 +715,10 @@ export const StudentList: React.FC<StudentListProps> = ({
     [selectedUnitFilter, schoolUnits]
   );
   const annexIdsInFilter = useMemo(
-    () => new Set(includeAnnexes ? selectedUnitAnnexes.map((a) => a.id) : []),
-    [includeAnnexes, selectedUnitAnnexes]
+    () => new Set(chosenAnnexIds(selectedUnitFilter, schoolUnits, annexChoice)),
+    [selectedUnitFilter, schoolUnits, annexChoice]
   );
+  const includeAnnexes = annexIdsInFilter.size > 0;
 
   const filteredStudents = useMemo(() => {
     return students.filter((student) => {
@@ -806,7 +921,7 @@ export const StudentList: React.FC<StudentListProps> = ({
     // Unidade Escolar
     if (selectedUnitFilter !== 'ALL') {
       const u = availableSchoolUnits.find((item) => item.id === selectedUnitFilter);
-      const annexNames = includeAnnexes ? selectedUnitAnnexes.map((a) => a.name) : [];
+      const annexNames = selectedUnitAnnexes.filter((a) => annexIdsInFilter.has(a.id)).map((a) => a.name);
       list.push({
         label: 'Unidade Escolar',
         value: `${u?.name || selectedUnitFilter}${annexNames.length ? ` + anexa${annexNames.length === 1 ? '' : 's'}: ${annexNames.join(', ')}` : ''}`,
@@ -889,7 +1004,7 @@ export const StudentList: React.FC<StudentListProps> = ({
     searchTerm,
     classMap,
     availableSchoolUnits,
-    includeAnnexes,
+    annexIdsInFilter,
     selectedUnitAnnexes,
   ]);
 
@@ -1185,7 +1300,7 @@ export const StudentList: React.FC<StudentListProps> = ({
               // O relatório abre com a escola (e as anexas) já escolhidas na lista
               const unitOk = selectedUnitFilter !== 'ALL' && (schoolUnits || []).some((u) => u.id === selectedUnitFilter);
               setRepUnitFilter(unitOk ? selectedUnitFilter : 'ALL');
-              setRepIncludeAnnexes(unitOk && includeAnnexes ? 'YES' : 'NO');
+              setRepAnnexChoice(unitOk ? Array.from(annexIdsInFilter) : []);
               setRepClassFilter('ALL');
               setIsReportModalOpen(true);
             }}
@@ -1409,22 +1524,11 @@ export const StudentList: React.FC<StudentListProps> = ({
                 </select>
               </div>
 
-              {selectedUnitAnnexes.length > 0 && (
-                <label
-                  className={`px-2.5 py-2 rounded-xl text-xs font-bold border flex items-center gap-1.5 cursor-pointer shrink-0 ${
-                    includeAnnexes ? 'bg-violet-100 border-violet-300 text-violet-900' : 'bg-white border-slate-200 text-slate-600'
-                  }`}
-                  title={`Juntar as escolas anexas: ${selectedUnitAnnexes.map((a) => a.name).join(', ')}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={includeAnnexes}
-                    onChange={(e) => setIncludeAnnexes(e.target.checked)}
-                    className="accent-violet-600"
-                  />
-                  + Anexas ({selectedUnitAnnexes.length})
-                </label>
-              )}
+              <AnnexPicker
+                annexes={selectedUnitAnnexes}
+                chosen={Array.from(annexIdsInFilter)}
+                onChange={setAnnexChoice}
+              />
 
               {selectedUnitFilter !== 'ALL' && activeSelectedSchoolUnit && (
                 <button
@@ -2425,6 +2529,7 @@ export const StudentList: React.FC<StudentListProps> = ({
         renderCell={(row: any, colId: string) => (colId === 'occupancy' ? `${row.occupancy}%` : row[colId] ?? '')}
         fileName="Relatorio_Matriculas_Enturmacao"
         countLabel="Total de turmas nesta relação"
+        consolidated={enrollmentConsolidated}
         groupSummary={(rows: any[]) => {
           const sum = (k: string) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
           return `Totais da escola: ${sum('enrolled')} matriculados • ${sum('active')} ativos • ${sum('male')} masc. / ${sum('female')} fem. • ${sum('transferred')} transferidos • ${sum('dropout')} evadidos • capacidade ${sum('capacity')} • vagas ${sum('vacancies')}`;
@@ -2447,22 +2552,6 @@ export const StudentList: React.FC<StudentListProps> = ({
                 set: setRepUnitFilter,
                 opts: [{ v: 'ALL', t: 'Todas as escolas' }, ...(schoolUnits || []).map((u) => ({ v: u.id, t: u.name }))],
               },
-              ...(repUnitFilter !== 'ALL' && annexesOf(repUnitFilter, schoolUnits).length > 0
-                ? [
-                    {
-                      label: 'Escolas anexas',
-                      value: repIncludeAnnexes,
-                      set: setRepIncludeAnnexes,
-                      opts: [
-                        { v: 'NO', t: 'Só a escola escolhida' },
-                        {
-                          v: 'YES',
-                          t: `Incluir anexas (${annexesOf(repUnitFilter, schoolUnits).map((a) => a.name).join(', ')})`,
-                        },
-                      ],
-                    },
-                  ]
-                : []),
               {
                 label: 'Série',
                 value: repSeriesFilter,
@@ -2507,7 +2596,8 @@ export const StudentList: React.FC<StudentListProps> = ({
                 ],
               },
             ].map((f) => (
-              <label key={f.label} className="flex flex-col gap-0.5">
+              <React.Fragment key={f.label}>
+              <label className="flex flex-col gap-0.5">
                 <span className="font-semibold text-slate-600">{f.label}</span>
                 <select
                   value={f.value}
@@ -2521,6 +2611,15 @@ export const StudentList: React.FC<StudentListProps> = ({
                   ))}
                 </select>
               </label>
+              {f.label === 'Escola' && (
+                <AnnexPicker
+                  variant="panel"
+                  annexes={annexesOf(repUnitFilter, schoolUnits)}
+                  chosen={chosenAnnexIds(repUnitFilter, schoolUnits, repAnnexChoice)}
+                  onChange={setRepAnnexChoice}
+                />
+              )}
+              </React.Fragment>
             ))}
           </div>
         }
@@ -2539,6 +2638,7 @@ export const StudentList: React.FC<StudentListProps> = ({
         defaultOrientation="landscape"
         renderCell={renderPrintStudentCell}
         fileName="Relacao_de_Estudantes"
+        consolidated={studentListConsolidated}
         groupBy={(st: Student) => {
           const cls = classes.find((c) => c.id === st.classId);
           const unitId = st.schoolUnitId || (cls as any)?.schoolUnitId;
@@ -2566,19 +2666,6 @@ export const StudentList: React.FC<StudentListProps> = ({
                 set: setSelectedUnitFilter,
                 opts: [{ v: 'ALL', t: 'Todas as escolas' }, ...availableSchoolUnits.map((u) => ({ v: u.id, t: `${u.name} (${u.count})` }))],
               },
-              ...(selectedUnitAnnexes.length > 0
-                ? [
-                    {
-                      label: 'Escolas anexas',
-                      value: includeAnnexes ? 'YES' : 'NO',
-                      set: (v: string) => setIncludeAnnexes(v === 'YES'),
-                      opts: [
-                        { v: 'NO', t: 'Só a escola escolhida' },
-                        { v: 'YES', t: `Incluir anexas (${selectedUnitAnnexes.map((a) => a.name).join(', ')})` },
-                      ],
-                    },
-                  ]
-                : []),
               {
                 label: 'Série',
                 value: selectedSeriesFilter,
@@ -2617,7 +2704,8 @@ export const StudentList: React.FC<StudentListProps> = ({
                 ],
               },
             ].map((f) => (
-              <label key={f.label} className="flex flex-col gap-0.5">
+              <React.Fragment key={f.label}>
+              <label className="flex flex-col gap-0.5">
                 <span className="font-semibold text-slate-600">{f.label}</span>
                 <select
                   value={f.value}
@@ -2631,6 +2719,15 @@ export const StudentList: React.FC<StudentListProps> = ({
                   ))}
                 </select>
               </label>
+              {f.label === 'Escola' && (
+                <AnnexPicker
+                  variant="panel"
+                  annexes={selectedUnitAnnexes}
+                  chosen={Array.from(annexIdsInFilter)}
+                  onChange={setAnnexChoice}
+                />
+              )}
+              </React.Fragment>
             ))}
           </div>
         }

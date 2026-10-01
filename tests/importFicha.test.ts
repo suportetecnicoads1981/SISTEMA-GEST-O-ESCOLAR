@@ -10,6 +10,7 @@ import {
   AGE_GRADE_PENDING,
   DUPLICATE_PENDING_PREFIX,
   convertImportedStudentsToOfficial,
+  distinctSchoolName,
 } from '../src/services/dataImportService';
 import { withoutReviewPendings, isTooOldBirthDate } from '../src/utils/studentDocuments';
 import type { SchoolUnit } from '../src/types';
@@ -180,6 +181,60 @@ describe('importação pela planilha padrão', () => {
     // Sede preenchida com tipo diferente de anexa: aviso, sem vínculo
     expect(u.isAnnex).toBeFalsy();
     expect(r.warnings.some((w: string) => w.includes('ESCOLA ANEXA'))).toBe(true);
+  });
+});
+
+describe('duas anexas com o mesmo nome oficial', () => {
+  const sede = { id: 'unit-imp-emieif-erminio-brito', name: 'E.M.I.E.I.F ERMINIO BRITO', gradesServed: [] } as unknown as SchoolUnit;
+  const castro = {
+    id: 'unit-imp-emef-castro-alves',
+    name: 'E.M.E.F CASTRO ALVES',
+    tradeName: 'ESCOLA CASTRO',
+    inepCode: '15575160',
+    type: 'ESCOLA_SATELITE',
+    isAnnex: true,
+    parentUnitId: sede.id,
+    gradesServed: ['1º ANO', '2º ANO', '3º ANO'],
+  } as unknown as SchoolUnit;
+  const planilhaCanaa = () =>
+    workbook(
+      [[1, 'MARIA REBECA SILVA SOUSA', `05/09/${Y - 7}`, 'F', 'PARDA', 'VILA 490', '-', 'NÃO', '1º ANO', 'INTEGRAL', '', '']],
+      { nome: 'E.M.E.F CASTRO ALVES', conhecida: 'ESCOLA CASTRO ALVES CANAÃ', inep: '15575160', tipo: 'ESCOLA ANEXA', sede: 'E.M.I.E.I.F ERMINIO BRITO', endereco: 'ZONA RURAL', diretor: 'CLEILDES' },
+      'ESCOLA: E.M.E.F CASTRO ALVES'
+    );
+
+  it('nome de cadastro pelo nome conhecido', () => {
+    expect(distinctSchoolName('E.M.E.F CASTRO ALVES', 'ESCOLA CASTRO ALVES CANAÃ')).toBe('E.M.E.F CASTRO ALVES CANAÃ');
+    expect(distinctSchoolName('E.M.E.F CASTRO ALVES', 'ESCOLA CASTRO')).toBe('');
+    expect(distinctSchoolName('E.M.E.F CASTRO ALVES', 'Escola Municipal Castro Alves')).toBe('');
+  });
+
+  it('a segunda anexa vira outra escola, ligada à mesma sede, sem juntar os alunos', async () => {
+    const [r] = (await parseFileResults(planilhaCanaa(), filters, [], [sede, castro])) as any[];
+    expect(r.errors).toEqual([]);
+    const u = r.suggestedSchoolUnit as SchoolUnit;
+    expect(u.id).not.toBe(castro.id);
+    expect(u.name).toBe('E.M.E.F CASTRO ALVES CANAÃ');
+    expect(u.tradeName).toBe('ESCOLA CASTRO ALVES CANAÃ');
+    expect(u.parentUnitId).toBe(sede.id);
+    expect(r.warnings.some((w: string) => w.includes('outra escola'))).toBe(true);
+  });
+
+  it('reimportar a mesma planilha usa a escola já separada', async () => {
+    const canaa = { ...castro, id: 'unit-imp-emef-castro-alves-canaa', name: 'E.M.E.F CASTRO ALVES CANAÃ', tradeName: 'ESCOLA CASTRO ALVES CANAÃ' } as SchoolUnit;
+    const [r] = (await parseFileResults(planilhaCanaa(), filters, [], [sede, castro, canaa])) as any[];
+    expect(r.schoolCheck.status).toBe('CADASTRADA');
+    expect((r.suggestedSchoolUnit as SchoolUnit).id).toBe(canaa.id);
+  });
+
+  it('a planilha da própria Castro Alves continua indo para ela', async () => {
+    const file = workbook(
+      [[1, 'ESTHER SILVERIO DIAS CHAGA', `10/03/${Y - 7}`, 'F', 'PARDA', 'VICINAL SILVANO', '-', 'NÃO', '1º ANO', 'INTEGRAL', '', '']],
+      { nome: 'E.M.E.F CASTRO ALVES', conhecida: 'ESCOLA CASTRO', inep: '15575160', tipo: 'ESCOLA ANEXA', sede: 'E.M.I.E.I.F ERMINIO BRITO', endereco: 'ZONA RURAL', diretor: 'CLEILDES' },
+      'ESCOLA: E.M.E.F CASTRO ALVES'
+    );
+    const [r] = (await parseFileResults(file, filters, [], [sede, castro])) as any[];
+    expect((r.suggestedSchoolUnit as SchoolUnit).id).toBe(castro.id);
   });
 });
 

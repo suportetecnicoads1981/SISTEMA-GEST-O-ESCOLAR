@@ -33,6 +33,10 @@ export interface StyledXlsxSection {
   summary?: string;
   /** Ex.: "Total de alunos nesta relação: 32". */
   countLine?: string;
+  /** Colunas próprias do bloco (ex.: quadro totalizador por escola); sem elas, usa as do relatório. */
+  columns?: StyledXlsxColumn[];
+  /** Última linha em negrito (linha do total geral). */
+  boldLastRow?: boolean;
 }
 
 export interface StyledXlsxOptions {
@@ -137,13 +141,17 @@ type SheetImage = { w: number; h: number; png: Uint8Array; x: number; y: number 
 
 /** Monta o XML de uma aba (timbre, título, blocos) e as logos a desenhar nela. */
 function renderSheet(opts: StyledXlsxOptions): { sheet: string; images: SheetImage[]; anchor: (xPx: number) => { col: number; off: number } } {
-  const ncol = Math.max(opts.columns.length, 1);
+  // Blocos com colunas próprias (quadro totalizador) podem ter mais colunas que o relatório.
+  const ncol = Math.max(opts.columns.length, ...opts.sections.map((sec) => sec.columns?.length || 0), 1);
   const last = colName(ncol - 1);
 
   // ---------- Larguras das colunas ----------
-  const widths = opts.columns.map((c, i) => {
-    let m = c.label.length;
-    for (const sec of opts.sections) for (const r of sec.rows) m = Math.max(m, String(r[i] ?? '').length);
+  const widths = Array.from({ length: ncol }, (_, i) => {
+    let m = String(opts.columns[i]?.label || '').length;
+    for (const sec of opts.sections) {
+      if (sec.columns?.[i]) m = Math.max(m, sec.columns[i].label.length);
+      for (const r of sec.rows) m = Math.max(m, String(r[i] ?? '').length);
+    }
     return Math.min(Math.max(m + 2, 5), 50);
   });
   // O timbre precisa de espaço para as logos dos dois lados e o texto no centro.
@@ -203,16 +211,18 @@ function renderSheet(opts: StyledXlsxOptions): { sheet: string; images: SheetIma
     if (si > 0) breaks.push(rows.length);
     const ident = (sec.lines || []).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join('     •     ');
     if (ident) full(ident, S.ident, 20);
-    add(opts.columns.map((c) => ({ v: c.label, s: S.head })), 30);
-    for (const r of sec.rows) {
+    const cols = sec.columns || opts.columns;
+    add(cols.map((c) => ({ v: c.label, s: S.head })), 30);
+    sec.rows.forEach((r, ri) => {
+      const bold = sec.boldLastRow && ri === sec.rows.length - 1;
       add(
-        opts.columns.map((c, i) => {
+        cols.map((c, i) => {
           const raw = r[i] ?? '';
-          const s = c.align === 'center' ? S.cellC : c.align === 'right' ? S.cellR : S.cellL;
+          const s = bold ? S.total : c.align === 'center' ? S.cellC : c.align === 'right' ? S.cellR : S.cellL;
           return { v: isNum(raw) ? Number(raw) : String(raw), s };
         })
       );
-    }
+    });
     if (sec.summary) full(sec.summary, S.total, 18);
     if (sec.countLine) full(sec.countLine, S.total, 18);
     if (opts.conference !== false) {

@@ -1,6 +1,6 @@
 // Escola sede (polo) e escolas anexas: vínculo, relatório conjunto e regras do cadastro.
 import { describe, it, expect } from 'vitest';
-import { annexesOf, parentOf, schoolGroupIds, unitDisplayName, annexLinkProblem, isAnnexUnit } from '../src/utils/schoolAnnexes';
+import { annexesOf, parentOf, schoolGroupIds, unitDisplayName, annexLinkProblem, isAnnexUnit, chosenAnnexIds, totalsBySchool } from '../src/utils/schoolAnnexes';
 import { schoolUnitPendings } from '../src/services/dataImportService';
 
 const units = [
@@ -42,5 +42,39 @@ describe('escola sede e anexas', () => {
     expect(schoolUnitPendings({ ...ok, inepCode: '' })).toEqual(['Código INEP Escolar']);
     expect(schoolUnitPendings({ ...ok, isAnnex: true })).toEqual(['Escola sede (escola anexa)']);
     expect(schoolUnitPendings({ ...ok, isAnnex: true, parentUnitId: 'erminio' })).toEqual([]);
+  });
+});
+
+describe('sede com várias anexas: escolha e quadro totalizador', () => {
+  const rede = [
+    { id: 'sede', name: 'E.M.I.E.I.F ERMINIO BRITO' },
+    { id: 'castro', name: 'E.M.E.F CASTRO ALVES', parentUnitId: 'sede' },
+    { id: 'canaa', name: 'E.M.E.F CANAÃ', parentUnitId: 'sede' },
+    { id: 'kanhok', name: 'E.M.E.I.F INDÍGENA KANHÕK' },
+    { id: 'ngonh', name: 'E.M.E.I.F INDÍGENA NGÔNH-RE', parentUnitId: 'kanhok' },
+  ];
+
+  it('entra só a anexa marcada, e anexas de outra sede são ignoradas', () => {
+    expect(chosenAnnexIds('sede', rede, ['canaa'])).toEqual(['canaa']);
+    expect(chosenAnnexIds('sede', rede, ['canaa', 'castro'])).toEqual(['canaa', 'castro']);
+    expect(chosenAnnexIds('sede', rede, ['ngonh'])).toEqual([]);
+    expect(chosenAnnexIds('sede', rede, [])).toEqual([]);
+    expect(chosenAnnexIds('ALL', rede, ['canaa'])).toEqual([]);
+  });
+
+  it('soma cada escola uma vez, na ordem dos blocos, e dá o total geral', () => {
+    const conta = (rows: { ativo: boolean }[]) => ({ alunos: rows.length, ativos: rows.filter((r) => r.ativo).length });
+    const { lines, total } = totalsBySchool(
+      [
+        { schoolUnitId: 'sede', rows: [{ ativo: true }, { ativo: true }] }, // turma A da sede
+        { schoolUnitId: 'sede', rows: [{ ativo: false }] }, // turma B da sede
+        { schoolUnitId: 'castro', rows: [{ ativo: true }] },
+        { schoolUnitId: 'canaa', rows: [{ ativo: true }, { ativo: true }] },
+      ],
+      conta
+    );
+    expect(lines.map((l) => l.unitId)).toEqual(['sede', 'castro', 'canaa']);
+    expect(lines[0].values).toEqual({ alunos: 3, ativos: 2 });
+    expect(total).toEqual({ alunos: 6, ativos: 5 });
   });
 });

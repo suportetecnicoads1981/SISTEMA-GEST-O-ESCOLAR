@@ -69,3 +69,39 @@ export function annexLinkProblem(unitId: string | undefined | null, parentId: st
   }
   return '';
 }
+
+/**
+ * Anexas escolhidas para o relatório conjunto: só as que ainda são anexas da sede
+ * (uma escolha antiga de outra sede é ignorada), na ordem alfabética das anexas.
+ */
+export function chosenAnnexIds(unitId: string | undefined | null, units: UnitLike[] | undefined | null, chosen: string[] | undefined | null): string[] {
+  const set = new Set(chosen || []);
+  return annexesOf(unitId, units)
+    .filter((a) => set.has(a.id))
+    .map((a) => a.id);
+}
+
+export interface SchoolTotalsLine {
+  unitId: string;
+  values: Record<string, number>;
+}
+
+/**
+ * Quadro totalizador: soma as medidas de cada escola (na ordem em que as escolas aparecem
+ * nos blocos do relatório: sede e depois as anexas) e o total geral de todas.
+ */
+export function totalsBySchool<T>(
+  groups: { schoolUnitId?: string; rows: T[] }[],
+  measure: (rows: T[]) => Record<string, number>
+): { lines: SchoolTotalsLine[]; total: Record<string, number> } {
+  const rowsBySchool = new Map<string, T[]>();
+  for (const g of groups) {
+    const id = text(g.schoolUnitId);
+    if (!rowsBySchool.has(id)) rowsBySchool.set(id, []);
+    rowsBySchool.get(id)!.push(...g.rows);
+  }
+  const lines = Array.from(rowsBySchool.entries()).map(([unitId, rows]) => ({ unitId, values: measure(rows) }));
+  const total: Record<string, number> = {};
+  for (const l of lines) for (const [k, v] of Object.entries(l.values)) total[k] = (total[k] || 0) + (Number(v) || 0);
+  return { lines, total };
+}

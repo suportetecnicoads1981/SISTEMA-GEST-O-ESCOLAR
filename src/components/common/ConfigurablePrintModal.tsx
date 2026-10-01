@@ -48,6 +48,17 @@ export interface SummaryMetricItem {
   color?: string;
 }
 
+/** Quadro totalizador ao fim do relatório: uma linha por escola e o total geral. */
+export interface ConsolidatedTable {
+  title: string;
+  note?: string;
+  /** Escola do timbre da página do quadro (a escola sede). */
+  schoolUnitId?: string;
+  columns: { label: string; align?: 'left' | 'center' | 'right' }[];
+  rows: (string | number)[][];
+  total: (string | number)[];
+}
+
 export interface ConfigurablePrintModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -74,6 +85,11 @@ export interface ConfigurablePrintModalProps {
   countLabel?: string;
   /** Linha de totais extra ao fim de cada grupo (ex.: soma de matriculados). */
   groupSummary?: (rows: any[]) => string;
+  /**
+   * Quadro totalizador (ex.: escola sede + anexas): recebe os blocos já ordenados e devolve a
+   * tabela de totais por escola com o total geral, ou null quando não se aplica (uma escola só).
+   */
+  consolidated?: (groups: { schoolUnitId?: string; rows: any[] }[]) => ConsolidatedTable | null;
 }
 
 export const ConfigurablePrintModal: React.FC<ConfigurablePrintModalProps> = ({
@@ -93,6 +109,7 @@ export const ConfigurablePrintModal: React.FC<ConfigurablePrintModalProps> = ({
   groupBy,
   countLabel = 'Total de alunos nesta relação',
   groupSummary,
+  consolidated,
 }) => {
   // Estado das colunas visíveis
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
@@ -198,11 +215,13 @@ export const ConfigurablePrintModal: React.FC<ConfigurablePrintModalProps> = ({
    * identificação dele (ex.: escola sede e escola anexa aparecem separadas) e a numeração recomeça.
    */
   type PreviewItem = { header?: [string, string][]; row?: any; rowIdx: number };
+  const previewGroups = groupBy ? buildGroups() : [];
+  const previewConsolidated = consolidated && groupBy ? consolidated(previewGroups) : null;
   const previewItems: PreviewItem[] = (() => {
     if (!groupBy) return data.slice(0, PREVIEW_LIMIT).map((row, rowIdx) => ({ row, rowIdx }));
     const out: PreviewItem[] = [];
     let shown = 0;
-    for (const g of buildGroups()) {
+    for (const g of previewGroups) {
       if (shown >= PREVIEW_LIMIT) break;
       out.push({ header: g.lines, rowIdx: -1 });
       for (let i = 0; i < g.rows.length && shown < PREVIEW_LIMIT; i++, shown++) out.push({ row: g.rows[i], rowIdx: i });
@@ -251,6 +270,28 @@ ${groupSummary ? `<p class="meta"><b>${h(groupSummary(g.rows))}</b></p>` : ''}
 <table class="conf"><tr><td>Conferido por: ________________________________________</td><td>Data: ____/____/________</td><td>Assinatura: ______________________________</td></tr></table>
 </${word ? 'div' : 'section'}>`;
     });
+    const cons = consolidated && groupBy ? consolidated(ordered) : null;
+    if (cons) {
+      const align = (a?: string) => `text-align:${a || 'left'}`;
+      const head = cons.columns.map((c) => `<th style="${align(c.align)}">${h(c.label)}</th>`).join('');
+      const body = cons.rows
+        .map((r) => `<tr>${cons.columns.map((c, i) => `<td style="${align(c.align)}">${h(String(r[i] ?? ''))}</td>`).join('')}</tr>`)
+        .join('');
+      const total = `<tr style="background:#e5e7eb;font-weight:bold">${cons.columns
+        .map((c, i) => `<td style="${align(c.align)}">${h(String(cons.total[i] ?? ''))}</td>`)
+        .join('')}</tr>`;
+      const pageBreak = sections.length ? (word ? `<br clear="all" style="page-break-before:always" />` : '') : '';
+      sections.push(`${pageBreak}<${word ? 'div' : 'section'} style="${sections.length && !word ? 'page-break-before:always;' : ''}">
+${letterheadHtml({ schoolUnitId: cons.schoolUnitId }, { word })}
+<h1>${h(title)}</h1>
+<p class="sub">${h(cons.title)}</p>
+${filtersLine ? `<p class="meta">Filtros aplicados: ${filtersLine}</p>` : ''}
+<table class="grid"><thead><tr>${head}</tr></thead><tbody>${body}${total}</tbody></table>
+${cons.note ? `<p class="meta">${h(cons.note)}</p>` : ''}
+<p class="meta">Emitido em ${h(now)}</p>
+<table class="conf"><tr><td>Conferido por: ________________________________________</td><td>Data: ____/____/________</td><td>Assinatura: ______________________________</td></tr></table>
+</${word ? 'div' : 'section'}>`);
+    }
     const printName = baseName();
     const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>${h(printName)}</title><style>
 ${
@@ -387,7 +428,23 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
           ),
           summary: groupSummary ? groupSummary(g.rows) : undefined,
           countLine: `${countLabel}: ${g.rows.length}`,
-        })),
+        })).concat(
+          (() => {
+            const cons = consolidated ? consolidated(groups) : null;
+            return cons
+              ? [
+                  {
+                    lines: [['Quadro totalizador', cons.title.replace(/^Quadro totalizador:?\s*/i, '') || 'por escola']] as [string, string][],
+                    columns: cons.columns,
+                    rows: [...cons.rows, cons.total],
+                    boldLastRow: true,
+                    summary: cons.note,
+                    countLine: undefined as any,
+                  },
+                ]
+              : [];
+          })()
+        ),
       });
     } catch (err) {
       console.error('Excel formatado falhou; gerando planilha simples.', err);
@@ -968,6 +1025,45 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
                     </tbody>
                   </table>
                 </div>
+                {previewConsolidated && (
+                  <div className="mt-4 border-2 border-violet-200 rounded-lg overflow-hidden">
+                    <div className="bg-violet-50 px-3 py-1.5 text-[11px] font-extrabold text-violet-950 uppercase">
+                      {previewConsolidated.title}
+                    </div>
+                    <div className="overflow-x-auto">
+                    <table className="w-full text-[10px] border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-800 uppercase font-extrabold">
+                          {previewConsolidated.columns.map((c, i) => (
+                            <th key={i} style={{ textAlign: c.align || 'left' }} className="px-2 py-1 border border-slate-200">
+                              {c.label}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {previewConsolidated.rows.map((r, ri) => (
+                          <tr key={ri}>
+                            {previewConsolidated.columns.map((c, i) => (
+                              <td key={i} style={{ textAlign: c.align || 'left' }} className={`px-2 py-1 border border-slate-200 text-slate-800 ${i === 1 ? 'min-w-[200px]' : 'whitespace-nowrap'}`}>
+                                {String(r[i] ?? '')}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                        <tr className="bg-slate-100 font-extrabold text-slate-900">
+                          {previewConsolidated.columns.map((c, i) => (
+                            <td key={i} style={{ textAlign: c.align || 'left' }} className="px-2 py-1 border border-slate-200">
+                              {String(previewConsolidated.total[i] ?? '')}
+                            </td>
+                          ))}
+                        </tr>
+                      </tbody>
+                    </table>
+                    </div>
+                    {previewConsolidated.note && <p className="px-3 py-1.5 text-[10px] text-slate-500">{previewConsolidated.note}</p>}
+                  </div>
+                )}
               </div>
 
               {/* Rodapé e Assinaturas */}
