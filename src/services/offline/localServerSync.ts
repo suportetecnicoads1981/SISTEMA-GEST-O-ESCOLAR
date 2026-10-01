@@ -802,7 +802,17 @@ export async function getServerUpdateInfo(): Promise<ServerUpdateInfo | null> {
 }
 
 async function postUpdate(path: string, body?: any): Promise<{ ok: boolean; message: string }> {
-  const r = await call<any>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }, 60000);
+  // O servidor só aceita atualizar com a sessão do usuário (trocar o endereço: só o Master).
+  const session = readSession();
+  const r = await call<any>(
+    path,
+    {
+      method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
+      headers: session ? { 'X-Sessao': session.token, 'X-Station': stationName() } : { 'X-Station': stationName() },
+    },
+    60000
+  );
   if (r.status === 202) return { ok: true, message: 'Verificação iniciada.' };
   return { ok: r.status === 200 && r.body?.ok !== false, message: r.body?.message || `HTTP ${r.status}` };
 }

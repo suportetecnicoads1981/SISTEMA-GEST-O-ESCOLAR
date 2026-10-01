@@ -1,5 +1,5 @@
 // Cria (ou renova/desliga) a conta de nuvem do Servidor Remoto de UMA escola.
-// Só um administrador logado pode chamar. A conta recebe o papel SERVIDOR e fica presa
+// Só a conta Master (app_metadata.master = true) pode chamar. A conta recebe o papel SERVIDOR e fica presa
 // à escola (app_metadata.school_unit_id): envia só o lote dessa escola e lê só os dados dela.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -29,8 +29,8 @@ Deno.serve(async (req: Request) => {
     const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
     const { data: caller, error: callerErr } = await admin.auth.getUser(token);
     if (callerErr || !caller?.user) return json({ error: 'Entre na nuvem com uma conta de administrador.' }, 401);
-    if (String(caller.user.app_metadata?.role || '').toUpperCase() !== 'ADMIN') {
-      return json({ error: 'Somente administradores podem criar contas de servidor.' }, 403);
+    if (String(caller.user.app_metadata?.role || '').toUpperCase() !== 'ADMIN' || caller.user.app_metadata?.master !== true) {
+      return json({ error: 'Somente a conta Master pode criar contas de servidor.' }, 403);
     }
 
     const body = await req.json().catch(() => ({}));

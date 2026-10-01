@@ -9,7 +9,6 @@ import { SQLiteDatabaseStatus, SQLiteTableSchema } from '../../types/instalaflow
 export class SQLiteConnector {
   private static isInitialized = false;
   private static isEncrypted = true;
-  private static encryptionKey = 'sucessoedu_prod_aes256_vault_key';
   private static inTransaction = false;
 
   /**

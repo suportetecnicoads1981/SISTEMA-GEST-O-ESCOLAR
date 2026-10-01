@@ -917,6 +917,24 @@ function Invoke-Rollback {
     return @{ ok = $true; message = 'Versao anterior restaurada.'; current = $script:AppBuiltAt }
 }
 
+# Atualizacao do servidor: so no proprio computador do servidor ou com sessao aberta.
+# Trocar o endereco de onde o servidor baixa as atualizacoes: so o Master (ou no proprio
+# computador do servidor). Antes, qualquer estacao com a chave podia apontar o servidor
+# para outro endereco e fazer ele baixar e rodar outro sistema.
+function Test-UpdateAllowed($ctx, [bool]$masterOnly) {
+    if ([System.Net.IPAddress]::IsLoopback($ctx.Request.RemoteEndPoint.Address)) { return $true }
+    $user = Get-SessionUser $ctx (Get-DbObject)
+    if (-not $user) { return $false }
+    if ($masterOnly) { return (Test-IsMasterUser $user) }
+    return $true
+}
+function Send-UpdateDenied($ctx, [bool]$masterOnly) {
+    $who = 'Entre no sistema com o seu usuario'
+    if ($masterOnly) { $who = 'Somente a conta Master' }
+    Write-Log ('Pedido de atualizacao recusado - estacao ' + [string]$ctx.Request.Headers['X-Station'] + ' (' + $ctx.Request.RemoteEndPoint.Address + ')')
+    Send-Json $ctx 403 ('{"ok":false,"error":"sem-permissao","message":"' + $who + ' pode fazer isso (ou use o computador do servidor)."}')
+}
+
 function Send-Result($ctx, [hashtable]$r) {
     $code = 200; if (-not $r.ok) { $code = 409 }
     Send-Json $ctx $code ($r | ConvertTo-Json -Compress)
@@ -958,22 +976,26 @@ function Handle-Api($ctx, [string]$path, [string]$method) {
         }
         '/api/local/update/check' {
             if ($method -ne 'POST') { Send-Json $ctx 405 '{"error":"metodo-nao-permitido"}'; return }
+            if (-not (Test-UpdateAllowed $ctx $false)) { Send-UpdateDenied $ctx $false; return }
             $started = Start-Updater
             Send-Json $ctx 202 ('{"started":' + ($(if ($started) { 'true' } else { 'false' })) + '}')
             return
         }
         '/api/local/update/apply' {
             if ($method -ne 'POST') { Send-Json $ctx 405 '{"error":"metodo-nao-permitido"}'; return }
+            if (-not (Test-UpdateAllowed $ctx $false)) { Send-UpdateDenied $ctx $false; return }
             Send-Result $ctx (Invoke-ApplyUpdate)
             return
         }
         '/api/local/update/rollback' {
             if ($method -ne 'POST') { Send-Json $ctx 405 '{"error":"metodo-nao-permitido"}'; return }
+            if (-not (Test-UpdateAllowed $ctx $true)) { Send-UpdateDenied $ctx $true; return }
             Send-Result $ctx (Invoke-Rollback)
             return
         }
         '/api/local/update/config' {
             if ($method -ne 'POST') { Send-Json $ctx 405 '{"error":"metodo-nao-permitido"}'; return }
+            if (-not (Test-UpdateAllowed $ctx $true)) { Send-UpdateDenied $ctx $true; return }
             $cfgIn = $null
             try { $cfgIn = (Read-Body $ctx) | ConvertFrom-Json } catch { }
             $u = ''

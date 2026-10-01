@@ -186,6 +186,17 @@ export const HELP_GENERAL: HelpModule = {
       tip: 'A opção só aparece quando a escola escolhida é sede de alguma anexa. Para ligar uma escola como anexa, veja a pergunta sobre juntar escolas em Rede Municipal & Polos.',
     },
     {
+      q: 'Quem pode criar acessos na nuvem e atualizar o servidor da Sede ou da escola?',
+      steps: [
+        'Acesso na nuvem (e-mail e senha para entrar em qualquer computador): só a conta Master cria ou altera. Outro administrador que tentar recebe o aviso "Somente a conta Master pode criar ou alterar acessos na nuvem".',
+        'A senha de uma conta Master só pode ser trocada pelo próprio dono.',
+        'Contas de servidor das escolas (Servidor Remoto): só a conta Master cria, renova ou desliga.',
+        'Quem entra pela nuvem num computador novo só vira Master se a conta for Master na nuvem; os demais administradores entram como Secretaria.',
+        'Servidor da Sede/escola: verificar e aplicar atualização exige estar logado no sistema; trocar o endereço de atualização e desfazer uma atualização só a conta Master (ou direto no computador do servidor).',
+      ],
+      tip: 'Depois desta mudança, a conta Master precisa sair e entrar de novo na nuvem uma vez para a permissão nova valer.',
+    },
+    {
       q: 'Duas escolas têm o mesmo nome oficial (ex.: duas anexas Castro Alves). Como a importação separa?',
       a: 'Pelo "Nome como a escola é conhecida", na aba DADOS DA ESCOLA da planilha. Se já existe uma escola com o mesmo nome oficial, mas conhecida por outro nome, a planilha entra como outra escola: o nome de cadastro junta o nome oficial com a palavra que diferencia (ex.: "ESCOLA CASTRO ALVES CANAÃ" entra como "E.M.E.F CASTRO ALVES CANAÃ"), ligada à mesma escola sede. A conferência da importação mostra um aviso explicando a separação.',
       tip: 'Preencha sempre o nome conhecido de cada escola anexa. Sem ele, duas escolas com o mesmo nome oficial seriam juntadas numa só. O nome de cadastro pode ser ajustado depois em Editar Escola.',

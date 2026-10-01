@@ -317,7 +317,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         const existing =
           (match && match.email?.toLowerCase() === email ? match : undefined) ||
           userAccounts.find((u) => u?.email?.toLowerCase() === email);
-        const sector: UserSector = existing?.sector || (role === 'ADMIN' ? 'MASTER' : role === 'TEACHER' ? 'PROFESSOR' : 'ALUNO');
+        // Master só quando a nuvem diz (app_metadata.master, definido só pelo servidor). Antes, qualquer
+        // administrador da nuvem que entrasse num computador sem o cadastro dele virava Master.
+        const cloudMaster = role === 'ADMIN' && cloud.user.app_metadata?.master === true;
+        const sector: UserSector = existing?.sector || (cloudMaster ? 'MASTER' : role === 'ADMIN' ? 'SECRETARIA' : role === 'TEACHER' ? 'PROFESSOR' : 'ALUNO');
 
         if (existing && existing.active === false) {
           await getSupabaseClient().auth.signOut({ scope: 'local' }).catch(() => {});
@@ -335,8 +338,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               email,
               role,
               sector,
-              sectorTitle: role === 'ADMIN' ? 'Administrador (Supabase)' : role === 'TEACHER' ? 'Corpo Docente' : 'Usuário',
-              isMaster: role === 'ADMIN',
+              sectorTitle: cloudMaster ? 'Administrador (Supabase)' : role === 'ADMIN' ? 'Secretaria' : role === 'TEACHER' ? 'Corpo Docente' : 'Usuário',
+              isMaster: cloudMaster,
               active: true,
               createdAt: new Date().toISOString(),
               permissions: getDefaultSectorPermissions(sector),

@@ -1,5 +1,7 @@
 // Cria (ou atualiza a senha/papel de) a conta de acesso na nuvem (Supabase Auth) de um usuário.
-// Só um administrador logado na nuvem pode chamar.
+// Só a conta Master (app_metadata.master = true) pode chamar: dados de login e cadastros de
+// acesso são exclusivos do Master. Ninguém troca a senha de uma conta Master pelo sistema,
+// a não ser o próprio Master.
 //
 // Por que é uma função da nuvem e não uma rota do site: na Sede e nas escolas o sistema é
 // servido pelo servidor local (PowerShell), que não tem a rota /api/admin/cloud-user. Lá a
@@ -30,8 +32,10 @@ Deno.serve(async (req: Request) => {
     if (callerErr || !caller?.user) {
       return json({ success: false, error: 'Entre na nuvem com uma conta de administrador e salve a senha novamente.' }, 401);
     }
-    if (String(caller.user.app_metadata?.role || '').toUpperCase() !== 'ADMIN') {
-      return json({ success: false, error: 'Somente administradores podem criar acessos na nuvem.' }, 403);
+    const callerIsMaster =
+      String(caller.user.app_metadata?.role || '').toUpperCase() === 'ADMIN' && caller.user.app_metadata?.master === true;
+    if (!callerIsMaster) {
+      return json({ success: false, error: 'Somente a conta Master pode criar ou alterar acessos na nuvem.' }, 403);
     }
 
     const body = await req.json().catch(() => ({}));
@@ -72,6 +76,11 @@ Deno.serve(async (req: Request) => {
       });
       if (error || !created?.user) return json({ success: false, error: error?.message || 'Não foi possível criar a conta na nuvem.' }, 500);
       return json({ success: true, created: true, userId: created.user.id, message: 'Acesso na nuvem criado com sucesso.' });
+    }
+
+    // Conta Master de outra pessoa: senha e papel só mudam pelo próprio dono.
+    if (existing.app_metadata?.master === true && existing.id !== caller.user.id) {
+      return json({ success: false, error: 'Esta é uma conta Master: só o próprio dono pode alterar a senha dela.' }, 403);
     }
 
     // Quem chama não pode rebaixar a si mesmo por engano (perderia o acesso de administrador).

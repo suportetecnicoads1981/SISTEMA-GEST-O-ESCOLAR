@@ -11,7 +11,7 @@ export class SupabaseSyncManager {
   private static config: SupabaseConfig = {
     url: 'https://cdxvhxqpixtbycghfsre.supabase.co',
     anonKey: 'sb_publishable_MdH_s87GSHw3HXEShUwy4Q_1JVMunnu',
-    serviceRoleKey: 'sb_publishable_MdH_s87GSHw3HXEShUwy4Q_1JVMunnu',
+    serviceRoleKey: '', // Nunca no navegador: a chave administrativa fica só nas funções da nuvem.
     isConnected: true,
     lastPingMs: 28,
     activeChannelsCount: 3,

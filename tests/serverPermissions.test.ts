@@ -46,3 +46,19 @@ describe('servidor da rede local: mesmas regras de permissão do sistema', () =>
     expect(ps).toContain('somente-master');
   });
 });
+
+describe('servidor da rede local: atualização protegida', () => {
+  const route = (path: string) => {
+    const at = ps.indexOf(`'${path}' {`);
+    expect(at).toBeGreaterThan(0);
+    return ps.slice(at, ps.indexOf('return\n        }', at));
+  };
+  it('trocar o endereço de atualização e desfazer: só Master ou no computador do servidor', () => {
+    expect(route('/api/local/update/config')).toContain('Test-UpdateAllowed $ctx $true');
+    expect(route('/api/local/update/rollback')).toContain('Test-UpdateAllowed $ctx $true');
+  });
+  it('verificar e aplicar a atualização: só com sessão aberta', () => {
+    expect(route('/api/local/update/check')).toContain('Test-UpdateAllowed $ctx $false');
+    expect(route('/api/local/update/apply')).toContain('Test-UpdateAllowed $ctx $false');
+  });
+});
