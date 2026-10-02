@@ -452,13 +452,6 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
         {onNavigate && (
           <div className="flex items-center gap-1.5 overflow-x-auto">
             <button
-              onClick={() => onNavigate('OMNI_DEPLOY')}
-              className="px-3 py-1 text-xs font-bold rounded-lg bg-[#1a73e8] text-white shadow-xs cursor-pointer flex items-center gap-1.5 hover:bg-blue-700 transition-colors"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              <span>OmniDeploy (Google M3)</span>
-            </button>
-            <button
               onClick={() => onNavigate('NETWORK_INSTALLER')}
               className="px-3 py-1 text-xs font-bold rounded-lg bg-indigo-600 text-white shadow-xs cursor-pointer flex items-center gap-1.5"
             >
@@ -492,34 +485,6 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
         Para escolas sem internet com banco único e envio de lote à Sede, use o pacote do Servidor Remoto acima.
       </div>
 
-      {/* Destaque OmniDeploy Google Material Design 3 */}
-      {onNavigate && (
-        <div className="p-4 rounded-2xl bg-[#1a73e8] text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-white/15">
-              <Sparkles className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/20 text-white">
-                  NOVO RECURSO
-                </span>
-                <span className="font-bold text-sm">OmniDeploy: Sistema de Gestão & Instalação Híbrida</span>
-              </div>
-              <p className="text-xs text-blue-100 mt-0.5">
-                Instalação com preservação de /data, validação de hash SHA-256, PrintCanvas e integração nativa com Firebase.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => onNavigate('OMNI_DEPLOY')}
-            className="px-4 py-2 bg-white text-[#1a73e8] hover:bg-blue-50 rounded-xl text-xs font-bold shadow-xs transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer"
-          >
-            <span>Acessar OmniDeploy</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
 
       {/* Top Header Banner */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">

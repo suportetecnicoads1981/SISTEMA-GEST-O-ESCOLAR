@@ -66,8 +66,9 @@ export default defineConfig(() => {
             'vendor-ui': ['lucide-react', 'motion'],
             'vendor-charts': ['recharts'],
             'vendor-data': ['xlsx', 'jszip'],
-            'standalone-generator': ['./src/utils/standaloneAppHtml', './src/utils/standaloneAppHtmlViews'],
-            'installer-scripts': ['./src/utils/installerGenerator', './src/utils/omniDeployGenerator'],
+            // Geradores de instaladores e do app offline NÃO são separados aqui de propósito:
+            // ficam nos módulos de TI carregados sob demanda (Central de Instalação/Atualizações),
+            // fora da abertura do sistema.
           },
         },
       },

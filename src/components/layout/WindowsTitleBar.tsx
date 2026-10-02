@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { isTabAvailable } from '../../config/features';
 import {
   GraduationCap,
   Minus,
@@ -290,28 +289,6 @@ export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
                   >
                     <Sliders className="w-3.5 h-3.5 text-slate-400" />
                     <span>{moduleName('ADMIN_TI')}</span>
-                  </button>
-                  {isTabAvailable('INSTALAFLOW') && (
-                  <button
-                    onClick={() => {
-                      onNavigate('INSTALAFLOW');
-                      setOpenMenu(null);
-                    }}
-                    className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 flex items-center gap-2 cursor-pointer"
-                  >
-                    <Server className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>{moduleName('INSTALAFLOW')}</span>
-                  </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      onNavigate('DATASYNC_PRO');
-                      setOpenMenu(null);
-                    }}
-                    className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 flex items-center gap-2 cursor-pointer"
-                  >
-                    <Database className="w-3.5 h-3.5 text-blue-400" />
-                    <span>{moduleName('DATASYNC_PRO')}</span>
                   </button>
                   <button
                     onClick={() => {

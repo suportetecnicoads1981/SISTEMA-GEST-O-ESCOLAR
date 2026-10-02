@@ -34,8 +34,6 @@ import {
 } from 'lucide-react';
 import { UserAccount, SchoolSettings, NexusAuditEntry } from '../../types';
 import { AuditService } from '../../services/nexus/AuditService';
-import { RelationalIntegrityDashboard } from './RelationalIntegrityDashboard';
-import { EnvironmentVariablesView } from './EnvironmentVariablesView';
 import { getStoredData, AppStateData } from '../../data/storage';
 
 interface AdminTIHubProps {
@@ -48,7 +46,7 @@ interface AdminTIHubProps {
 }
 
 type AdminCategory = 'ALL' | 'DEPLOY' | 'DATABASE' | 'SECURITY' | 'INFRA';
-type ViewMode = 'DASHBOARD' | 'CATALOG' | 'RELATIONAL_INTEGRITY' | 'ENV_VARS';
+type ViewMode = 'DASHBOARD' | 'CATALOG';
 
 export const AdminTIHub: React.FC<AdminTIHubProps> = ({
   onNavigate,
@@ -110,124 +108,19 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
   };
 
   const allModules = [
-    // 1. Provisionamento & Deploy
+    // Bancos de Dados & Sincronização
     {
-      id: 'OMNI_DEPLOY',
-      title: 'OmniDeploy Híbrido',
-      subtitle: 'Google Material 3 • Nuvem e Offline',
-      category: 'DEPLOY' as AdminCategory,
-      badge: 'Nuvem & Local',
-      badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
-      icon: Server,
-      iconColor: 'text-blue-600 bg-blue-50',
-      description:
-        'Painel unificado para orquestração de deploys híbridos com interface M3, sincronização contínua e status de instâncias locais e remotas.',
-      actionLabel: 'Abrir OmniDeploy',
-      shortcut: 'Alt + O',
-      highlight: true,
-    },
-    {
-      id: 'NEXUS_DEPLOYER',
-      title: 'NexusDeployer Cloud',
-      subtitle: 'Provisionamento & Updates 12/12',
-      category: 'DEPLOY' as AdminCategory,
-      badge: 'Root 12/12',
-      badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-      icon: Cpu,
-      iconColor: 'text-indigo-600 bg-indigo-50',
-      description:
-        'Gerenciamento de containers, pipelines automáticas de atualização na nuvem e provisionamento de serviços escolares em alta disponibilidade.',
-      actionLabel: 'Abrir NexusDeployer',
-      shortcut: 'Alt + D',
-      highlight: true,
-    },
-    {
-      id: 'NEXUS_INSTALL',
-      title: 'NexusInstall Manager',
-      subtitle: 'Rede Dinâmica & Portas UDP/HTTP',
-      category: 'DEPLOY' as AdminCategory,
-      badge: 'Rede & Build',
-      badgeColor: 'bg-cyan-50 text-cyan-700 border-cyan-200',
-      icon: Box,
-      iconColor: 'text-cyan-600 bg-cyan-50',
-      description:
-        'Detecção e alocação dinâmica de portas/IPs, paridade visual absoluta e empacotamento em 1 clique para estações de trabalho e laboratórios.',
-      actionLabel: 'Abrir NexusInstall',
-      shortcut: 'Alt + X',
-    },
-    {
-      id: 'NEXUS_BUILD',
-      title: 'NexusBuild Total .EXE',
-      subtitle: 'Instalador Autônomo Windows & Inno Setup',
-      category: 'DEPLOY' as AdminCategory,
-      badge: 'C:\\NexusBuild',
-      badgeColor: 'bg-amber-50 text-amber-700 border-amber-200',
-      icon: Wrench,
-      iconColor: 'text-amber-600 bg-amber-50',
-      description:
-        'Gera instaladores .exe autossuficientes com validação de 800MB em disco, verificação de portas TCP (netstat), serviço PostgreSQL 16.1 e firewall.',
-      actionLabel: 'Abrir NexusBuild',
-      shortcut: 'Alt + B',
-      highlight: true,
-    },
-
-    // 2. Bancos de Dados & Sincronização
-    {
-      id: 'DATASYNC_PRO',
-      title: 'DataSync Pro',
-      subtitle: 'Supabase Pro • Schema DDL & Armazenamento',
+      id: 'MUNICIPAL_SYNC',
+      title: 'Rede Municipal & Sincronização (.edusync)',
+      subtitle: 'Lotes das escolas • Consolidação na Sede',
       category: 'DATABASE' as AdminCategory,
-      badge: 'PostgreSQL / Supabase',
+      badge: 'Rede',
       badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
       icon: Database,
       iconColor: 'text-emerald-600 bg-emerald-50',
       description:
-        'Sincronização em tempo real de schemas DDL, imagens WebP com compressão leve e exportação de backups de recuperação com assinatura criptográfica.',
-      actionLabel: 'Abrir DataSync Pro',
-      shortcut: 'Alt + Y',
-      highlight: true,
-    },
-    {
-      id: 'DEBUG_FLOW',
-      title: 'DebugFlow • Auditoria Full-Stack',
-      subtitle: 'Scanner de Build, Bridge de Schemas & Backup Unificado',
-      category: 'DATABASE' as AdminCategory,
-      badge: 'Supabase Engine',
-      badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-      icon: ShieldAlert,
-      iconColor: 'text-indigo-600 bg-indigo-50',
-      description:
-        'Auditoria rigorosa de erros de compilação TypeScript, mapeamento de tabelas criadas no Dashboard Supabase e rotina de backup consolidado (Dump SQL + Frontend Assets).',
-      actionLabel: 'Abrir DebugFlow',
-      highlight: true,
-    },
-    {
-      id: 'INSTALAFLOW',
-      title: 'InstalaFlow Híbrido',
-      subtitle: 'Supabase Edition • Resolução de Conflitos',
-      category: 'DATABASE' as AdminCategory,
-      badge: 'Híbrido SQLite',
-      badgeColor: 'bg-teal-50 text-teal-700 border-teal-200',
-      icon: Layers,
-      iconColor: 'text-teal-600 bg-teal-50',
-      description:
-        'Deploy unificado com suporte a SQLite local offline para computadores de secretaria e sincronização incremental com o Supabase na nuvem.',
-      actionLabel: 'Abrir InstalaFlow',
-      shortcut: 'Alt + F',
-    },
-    {
-      id: 'RELATIONAL_INTEGRITY',
-      title: 'Integridade Relacional & Chaves Estrangeiras',
-      subtitle: 'Auditoria • Normalização & Restrições FK',
-      category: 'DATABASE' as AdminCategory,
-      badge: '100% Conforme',
-      badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      icon: ShieldCheck,
-      iconColor: 'text-emerald-600 bg-emerald-50',
-      description:
-        'Auditoria rigorosa de integridade referencial entre Alunos, Turmas, Disciplinas, Avaliações, Questões, Diários e Unidades Escolares com auto-cura de registros órfãos.',
-      actionLabel: 'Auditar Relações',
-      shortcut: 'Alt + R',
+        'Gera e importa os lotes .edusync das escolas (pendrive) e consolida os dados de todas as unidades na base da Secretaria.',
+      actionLabel: 'Abrir Rede Municipal',
       highlight: true,
     },
 
@@ -246,27 +139,13 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
       actionLabel: 'Gerenciar Usuários',
       shortcut: 'Alt + U',
     },
-    {
-      id: 'CLEANSLATE_HUB',
-      title: 'CleanSlate Enterprise Hub',
-      subtitle: 'Zero-Data • Ephemeral CLI & Integridade SHA-256',
-      category: 'SECURITY' as AdminCategory,
-      badge: 'Zero-Data',
-      badgeColor: 'bg-rose-50 text-rose-700 border-rose-200',
-      icon: ShieldCheck,
-      iconColor: 'text-rose-600 bg-rose-50',
-      description:
-        'Ambiente de segurança militar com updates em blocos de 64MB, limpeza efêmera de dados voláteis e verificação estrita de assinaturas digitais.',
-      actionLabel: 'Abrir CleanSlate',
-      shortcut: 'Alt + Z',
-    },
 
     // 4. Infraestrutura & Atualizações
     {
       id: 'NETWORK_INSTALLER',
       title: 'Instaladores de Rede & Backup',
       subtitle: 'Pacotes ZIP • Servidores Locais & Rotinas',
-      category: 'INFRA' as AdminCategory,
+      category: 'DEPLOY' as AdminCategory,
       badge: 'Offline / Rede',
       badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
       icon: Network,
@@ -304,7 +183,7 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
       shortcut: 'Alt + A',
     },
   ];
-  // Módulos experimentais ficam ocultos por padrão (ver src/config/features.ts).
+  // Painéis de demonstração desativados ficam fora (ver src/config/features.ts).
   const modules = allModules.filter((m) => isTabAvailable(m.id));
 
   const filteredModules = modules.filter((m) => {
@@ -397,17 +276,7 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                Dashboard (3 Colunas)
-              </button>
-              <button
-                onClick={() => setViewMode('RELATIONAL_INTEGRITY')}
-                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-                  viewMode === 'RELATIONAL_INTEGRITY'
-                    ? 'bg-emerald-600 text-white'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Integridade Relacional (FK)
+                Painel
               </button>
               <button
                 onClick={() => setViewMode('CATALOG')}
@@ -418,18 +287,6 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
                 }`}
               >
                 Catálogo Geral ({modules.length})
-              </button>
-              <button
-                onClick={() => setViewMode('ENV_VARS')}
-                className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
-                  viewMode === 'ENV_VARS'
-                    ? 'bg-purple-600 text-white'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-                title="Auditoria e teste em tempo real das Variáveis de Ambiente e Secrets"
-              >
-                <Key className="w-3.5 h-3.5 text-purple-300" />
-                <span>Variáveis de Ambiente (.env)</span>
               </button>
             </div>
           </div>
@@ -504,20 +361,6 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => setViewMode('ENV_VARS')}
-                    className="p-2 bg-indigo-50/60 hover:bg-indigo-100/80 rounded-xl border border-indigo-200 flex flex-col justify-between text-left transition-all cursor-pointer group"
-                    title="Clique para auditar e testar variáveis de ambiente (.env) e Secrets em tempo real"
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <span className="text-[10px] text-indigo-700 font-bold">ENV & SECRETS</span>
-                      <Key className="w-3 h-3 text-indigo-500 group-hover:rotate-12 transition-transform" />
-                    </div>
-                    <div className="flex items-center justify-between mt-1 w-full">
-                      <span className="font-bold text-slate-900 text-xs">.env Ativo</span>
-                      <span className="text-[10px] text-indigo-600 font-bold">Auditar →</span>
-                    </div>
-                  </button>
                 </div>
               </div>
 
@@ -581,30 +424,6 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
                 </div>
               </div>
 
-              {/* Sub-Card 4: Integridade Relacional & Chaves Estrangeiras */}
-              <div className="bg-emerald-50/70 rounded-2xl p-3.5 border border-emerald-200/80 space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-                  <span className="flex items-center gap-1.5 text-emerald-800">
-                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                    Integridade Relacional (FK)
-                  </span>
-                  <button
-                    onClick={() => setViewMode('RELATIONAL_INTEGRITY')}
-                    className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 cursor-pointer"
-                  >
-                    Auditar Relações →
-                  </button>
-                </div>
-                <div className="flex items-center justify-between p-2 bg-white rounded-xl border border-emerald-100 text-xs">
-                  <span className="text-slate-600 font-medium">Restrições Validadas</span>
-                  <span className="font-bold text-emerald-700 font-mono">100% Íntegro (13 Tabelas)</span>
-                </div>
-                <div className="flex items-center justify-between p-2 bg-white rounded-xl border border-emerald-100 text-xs">
-                  <span className="text-slate-600 font-medium">Registros Órfãos</span>
-                  <span className="text-emerald-600 font-bold font-mono">0 Inconsistências</span>
-                </div>
-              </div>
-
               {/* Botão de Disparo do Health Check */}
               <button
                 onClick={runHealthCheck}
@@ -630,182 +449,83 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
                       <Cpu className="h-5 w-5" />
                     </div>
                     <div>
-                      <h2 className="text-sm font-bold text-slate-900">Ferramentas de Deploy</h2>
+                      <h2 className="text-sm font-bold text-slate-900">Ferramentas de TI</h2>
                       <p className="text-[11px] text-slate-500 font-medium">
-                        Pipelines, instaladores .EXE e sincronização
+                        Instalação, acessos, rede e atualizações
                       </p>
                     </div>
                   </div>
 
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
-                    6 Módulos Prontos
+                    4 Ferramentas
                   </span>
                 </div>
 
-                {/* Lista de Acesso Rápido às Ferramentas Principais */}
+                {/* Ferramentas reais de TI (os painéis de demonstração foram desativados) */}
                 <div className="space-y-2.5 mt-3.5">
-                  {/* Ferramenta 1: OmniDeploy Híbrido */}
                   <div className="p-3 bg-slate-50 hover:bg-indigo-50/40 rounded-2xl border border-slate-200 hover:border-indigo-200 transition-all flex items-center justify-between gap-3 group">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="p-2 rounded-xl bg-blue-100/60 text-blue-700 shrink-0">
                         <Server className="h-4 w-4" />
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <h3 className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 truncate">
-                            OmniDeploy Híbrido
-                          </h3>
-                          <kbd className="text-[9px] font-mono px-1 py-0.2 bg-white rounded border border-slate-200 text-slate-500">
-                            Alt+O
-                          </kbd>
-                        </div>
-                        <p className="text-[10px] text-slate-500 truncate">
-                          Google Material 3 • Gestão de Nuvem e Offline
-                        </p>
+                        <h3 className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 truncate">Central de Instalação</h3>
+                        <p className="text-[10px] text-slate-500 truncate">Pacotes do Servidor Sede, escolas e estações</p>
                       </div>
                     </div>
                     <button
-                      onClick={() => onNavigate('OMNI_DEPLOY')}
+                      onClick={() => onNavigate('NETWORK_INSTALLER')}
                       className="px-3 py-1.5 rounded-xl bg-white group-hover:bg-indigo-600 text-slate-700 group-hover:text-white border border-slate-200 group-hover:border-indigo-600 text-xs font-bold transition-all shrink-0 cursor-pointer shadow-2xs"
                     >
                       Abrir
                     </button>
                   </div>
-
-                  {/* Ferramenta 2: NexusDeployer Cloud */}
                   <div className="p-3 bg-slate-50 hover:bg-indigo-50/40 rounded-2xl border border-slate-200 hover:border-indigo-200 transition-all flex items-center justify-between gap-3 group">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="p-2 rounded-xl bg-indigo-100/60 text-indigo-700 shrink-0">
-                        <Cpu className="h-4 w-4" />
+                      <div className="p-2 rounded-xl bg-purple-100/60 text-purple-700 shrink-0">
+                        <Lock className="h-4 w-4" />
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <h3 className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 truncate">
-                            NexusDeployer Cloud
-                          </h3>
-                          <kbd className="text-[9px] font-mono px-1 py-0.2 bg-white rounded border border-slate-200 text-slate-500">
-                            Alt+D
-                          </kbd>
-                        </div>
-                        <p className="text-[10px] text-slate-500 truncate">
-                          Provisionamento 12/12 &amp; Updates com Rollback
-                        </p>
+                        <h3 className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 truncate">Controle de Acesso</h3>
+                        <p className="text-[10px] text-slate-500 truncate">Usuários, perfis, senhas e contas na nuvem</p>
                       </div>
                     </div>
                     <button
-                      onClick={() => onNavigate('NEXUS_DEPLOYER')}
+                      onClick={() => onNavigate('USER_CONTROL')}
                       className="px-3 py-1.5 rounded-xl bg-white group-hover:bg-indigo-600 text-slate-700 group-hover:text-white border border-slate-200 group-hover:border-indigo-600 text-xs font-bold transition-all shrink-0 cursor-pointer shadow-2xs"
                     >
                       Abrir
                     </button>
                   </div>
-
-                  {/* Ferramenta 3: NexusBuild Total .EXE */}
-                  <div className="p-3 bg-slate-50 hover:bg-indigo-50/40 rounded-2xl border border-slate-200 hover:border-indigo-200 transition-all flex items-center justify-between gap-3 group">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="p-2 rounded-xl bg-amber-100/60 text-amber-700 shrink-0">
-                        <Wrench className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <h3 className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 truncate">
-                            NexusBuild Total .EXE
-                          </h3>
-                          <kbd className="text-[9px] font-mono px-1 py-0.2 bg-white rounded border border-slate-200 text-slate-500">
-                            Alt+B
-                          </kbd>
-                        </div>
-                        <p className="text-[10px] text-slate-500 truncate">
-                          Inno Setup com PostgreSQL 16.1 &amp; Firewall
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => onNavigate('NEXUS_BUILD')}
-                      className="px-3 py-1.5 rounded-xl bg-white group-hover:bg-indigo-600 text-slate-700 group-hover:text-white border border-slate-200 group-hover:border-indigo-600 text-xs font-bold transition-all shrink-0 cursor-pointer shadow-2xs"
-                    >
-                      Abrir
-                    </button>
-                  </div>
-
-                  {/* Ferramenta 4: NexusInstall Manager */}
-                  <div className="p-3 bg-slate-50 hover:bg-indigo-50/40 rounded-2xl border border-slate-200 hover:border-indigo-200 transition-all flex items-center justify-between gap-3 group">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="p-2 rounded-xl bg-cyan-100/60 text-cyan-700 shrink-0">
-                        <Box className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <h3 className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 truncate">
-                            NexusInstall Manager
-                          </h3>
-                          <kbd className="text-[9px] font-mono px-1 py-0.2 bg-white rounded border border-slate-200 text-slate-500">
-                            Alt+X
-                          </kbd>
-                        </div>
-                        <p className="text-[10px] text-slate-500 truncate">
-                          Detecção de portas UDP e empacotamento 1-clique
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => onNavigate('NEXUS_INSTALL')}
-                      className="px-3 py-1.5 rounded-xl bg-white group-hover:bg-indigo-600 text-slate-700 group-hover:text-white border border-slate-200 group-hover:border-indigo-600 text-xs font-bold transition-all shrink-0 cursor-pointer shadow-2xs"
-                    >
-                      Abrir
-                    </button>
-                  </div>
-
-                  {/* Ferramenta 5: DataSync Pro */}
                   <div className="p-3 bg-slate-50 hover:bg-indigo-50/40 rounded-2xl border border-slate-200 hover:border-indigo-200 transition-all flex items-center justify-between gap-3 group">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="p-2 rounded-xl bg-emerald-100/60 text-emerald-700 shrink-0">
                         <Database className="h-4 w-4" />
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <h3 className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 truncate">
-                            DataSync Pro
-                          </h3>
-                          <kbd className="text-[9px] font-mono px-1 py-0.2 bg-white rounded border border-slate-200 text-slate-500">
-                            Alt+Y
-                          </kbd>
-                        </div>
-                        <p className="text-[10px] text-slate-500 truncate">
-                          Sincronização Supabase &amp; Schemas DDL
-                        </p>
+                        <h3 className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 truncate">Rede Municipal (.edusync)</h3>
+                        <p className="text-[10px] text-slate-500 truncate">Lotes das escolas e consolidação na Sede</p>
                       </div>
                     </div>
                     <button
-                      onClick={() => onNavigate('DATASYNC_PRO')}
+                      onClick={() => onNavigate('MUNICIPAL_SYNC')}
                       className="px-3 py-1.5 rounded-xl bg-white group-hover:bg-indigo-600 text-slate-700 group-hover:text-white border border-slate-200 group-hover:border-indigo-600 text-xs font-bold transition-all shrink-0 cursor-pointer shadow-2xs"
                     >
                       Abrir
                     </button>
                   </div>
-
-                  {/* Ferramenta 6: InstalaFlow Híbrido */}
                   <div className="p-3 bg-slate-50 hover:bg-indigo-50/40 rounded-2xl border border-slate-200 hover:border-indigo-200 transition-all flex items-center justify-between gap-3 group">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="p-2 rounded-xl bg-teal-100/60 text-teal-700 shrink-0">
-                        <Layers className="h-4 w-4" />
+                      <div className="p-2 rounded-xl bg-amber-100/60 text-amber-700 shrink-0">
+                        <RefreshCw className="h-4 w-4" />
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <h3 className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 truncate">
-                            InstalaFlow Híbrido
-                          </h3>
-                          <kbd className="text-[9px] font-mono px-1 py-0.2 bg-white rounded border border-slate-200 text-slate-500">
-                            Alt+F
-                          </kbd>
-                        </div>
-                        <p className="text-[10px] text-slate-500 truncate">
-                          Deploy Híbrido SQLite e Nuvem Supabase
-                        </p>
+                        <h3 className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 truncate">Atualizações do Sistema</h3>
+                        <p className="text-[10px] text-slate-500 truncate">Versões publicadas e notas de atualização</p>
                       </div>
                     </div>
                     <button
-                      onClick={() => onNavigate('INSTALAFLOW')}
+                      onClick={() => onNavigate('SYSTEM_UPDATES')}
                       className="px-3 py-1.5 rounded-xl bg-white group-hover:bg-indigo-600 text-slate-700 group-hover:text-white border border-slate-200 group-hover:border-indigo-600 text-xs font-bold transition-all shrink-0 cursor-pointer shadow-2xs"
                     >
                       Abrir
@@ -816,12 +536,12 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
 
               {/* Ação rápida para ver todo o catálogo */}
               <div className="pt-3 border-t border-slate-100 mt-3 flex items-center justify-between text-xs">
-                <span className="text-slate-500 font-medium">Outros módulos: CleanSlate, Rede, OTA</span>
+                <span className="text-slate-500 font-medium">Todos os módulos de TI</span>
                 <button
                   onClick={() => setViewMode('CATALOG')}
                   className="font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 cursor-pointer"
                 >
-                  <span>Ver Todos os 11 Módulos</span>
+                  <span>Ver catálogo</span>
                   <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -933,16 +653,6 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
                 </div>
               </div>
 
-              {/* Rodapé com Ação de Laudo Técnico e Relatório */}
-              <div className="pt-3 border-t border-slate-100 mt-3 space-y-2">
-                <button
-                  onClick={() => onNavigate('NEXUS_DEPLOYER')}
-                  className="w-full py-2 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-indigo-200"
-                >
-                  <FileText className="h-3.5 w-3.5" />
-                  <span>Gerar Laudo Técnico em PDF (NexusDeployer)</span>
-                </button>
-              </div>
             </div>
           </div>
         </div>
@@ -1046,10 +756,6 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
                   <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
                     <button
                       onClick={() => {
-                        if (item.id === 'RELATIONAL_INTEGRITY') {
-                          setViewMode('RELATIONAL_INTEGRITY');
-                          return;
-                        }
                         onNavigate(item.id);
                       }}
                       className="w-full py-2 px-3 rounded-xl bg-slate-50 group-hover:bg-indigo-600 text-slate-700 group-hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs group-hover:shadow-indigo-500/25"
@@ -1065,38 +771,6 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
         </div>
       )}
 
-      {/* ======================================================== */}
-      {/* MODO 3: DIAGNÓSTICO DE INTEGRIDADE RELACIONAL (FK & SCHEMAS) */}
-      {/* ======================================================== */}
-      {viewMode === 'RELATIONAL_INTEGRITY' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-200">
-            <button
-              onClick={() => setViewMode('DASHBOARD')}
-              className="inline-flex items-center text-xs font-bold text-slate-700 hover:text-slate-950 bg-slate-100 hover:bg-slate-200 px-3.5 py-2 rounded-xl transition cursor-pointer"
-            >
-              <ArrowLeft className="w-4 h-4 mr-1.5" />
-              Voltar ao Painel Geral de TI
-            </button>
-            <span className="text-xs text-slate-500 font-mono">
-              Diagnóstico Estrutural de Chaves Estrangeiras &amp; Restrições
-            </span>
-          </div>
-
-          <RelationalIntegrityDashboard
-            appData={appData}
-            onUpdateData={(d) => setAppData(d)}
-            onRefresh={runHealthCheck}
-          />
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* MODO 4: AUDITORIA E TESTE DE VARIÁVEIS DE AMBIENTE & SECRETS */}
-      {/* ======================================================== */}
-      {viewMode === 'ENV_VARS' && (
-        <EnvironmentVariablesView onBack={() => setViewMode('DASHBOARD')} />
-      )}
 
       {/* Painel de Recomendações de TI & Boas Práticas */}
       <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -1106,19 +780,18 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
             <span>Dica de Infraestrutura: Instalação Limpa do Servidor Escolar</span>
           </div>
           <p className="text-xs text-slate-600 leading-relaxed max-w-3xl">
-            Para novas estações na secretaria ou servidores locais da escola, utilize o{' '}
-            <strong>NexusBuild Total .EXE</strong> ou os instaladores compactos do{' '}
-            <strong>InstalaFlow</strong>. Eles já configuram permissões de firewall, serviço do
-            PostgreSQL na porta validada e atalhos únicos oficiais na Área de Trabalho.
+            Para o Servidor Sede, servidores das escolas e novas estações, gere o pacote na{' '}
+            <strong>Central de Instalação</strong>. Ele já configura o servidor local, a
+            inicialização automática e o atalho único oficial na Área de Trabalho.
           </p>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
           <button
-            onClick={() => onNavigate('NEXUS_BUILD')}
+            onClick={() => onNavigate('NETWORK_INSTALLER')}
             className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
           >
-            <span>Ir para NexusBuild (.EXE)</span>
+            <span>Ir para a Central de Instalação</span>
             <ChevronRight className="h-3.5 w-3.5" />
           </button>
         </div>

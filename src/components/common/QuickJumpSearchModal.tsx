@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { isTabAvailable } from '../../config/features';
 import {
   Search,
   X,
@@ -47,7 +48,7 @@ interface NavDestination {
   description: string;
 }
 
-export const NAV_DESTINATIONS: NavDestination[] = [
+const ALL_NAV_DESTINATIONS: NavDestination[] = [
   // Visão Geral
   {
     id: 'MAIN_DASHBOARD',
@@ -267,6 +268,9 @@ export const NAV_DESTINATIONS: NavDestination[] = [
     description: 'Detalhes da versão SucessoEdu, contatos de suporte de TI e termos técnicos.',
   },
 ];
+
+// Painéis de demonstração desativados ficam fora da busca e dos atalhos.
+export const NAV_DESTINATIONS = ALL_NAV_DESTINATIONS.filter((d) => !d.id || isTabAvailable(d.id));
 
 export const QuickJumpSearchModal: React.FC<QuickJumpSearchModalProps> = ({
   isOpen,

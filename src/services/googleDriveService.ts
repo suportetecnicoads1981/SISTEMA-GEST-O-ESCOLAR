@@ -10,9 +10,9 @@ import {
 import firebaseConfig from '../../firebase-applet-config.json';
 import { SystemUpdatePackage, AutoBackupSnapshot } from '../types';
 
-// Target Google Drive account and folder definitions
-export const TARGET_GOOGLE_DRIVE_ACCOUNT = 'suportetecnicoads@gmail.com';
-export const OFFICIAL_DRIVE_UPDATES_FOLDER_NAME = 'Atualizações e melhorias';
+// Target Google Drive account and folder definitions (constantes leves em config/googleDrive.ts)
+import { TARGET_GOOGLE_DRIVE_ACCOUNT, OFFICIAL_DRIVE_UPDATES_FOLDER_NAME } from '../config/googleDrive';
+export { TARGET_GOOGLE_DRIVE_ACCOUNT, OFFICIAL_DRIVE_UPDATES_FOLDER_NAME };
 
 // Scopes required for Google Drive File Operations and Google Picker
 export const GOOGLE_DRIVE_SCOPES = [

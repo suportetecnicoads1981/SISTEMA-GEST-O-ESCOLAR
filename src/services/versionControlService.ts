@@ -211,10 +211,10 @@ export function getTargetTabForImprovement(improvement: SystemUpdateImprovement)
     return { tabId: 'ADMIN_TI', label: moduleName('ADMIN_TI') };
   }
   if (title.includes('datasync') || title.includes('supabase') || title.includes('ddl')) {
-    return { tabId: 'DATASYNC_PRO', label: moduleName('DATASYNC_PRO') };
+    return { tabId: 'MUNICIPAL_SYNC', label: moduleName('MUNICIPAL_SYNC') };
   }
   if (title.includes('diagrama') || title.includes('arquitetura')) {
-    return { tabId: 'ARCHITECTURE_DIAGRAM', label: moduleName('ARCHITECTURE_DIAGRAM') };
+    return { tabId: 'ADMIN_TI', label: moduleName('ADMIN_TI') };
   }
   if (title.includes('diário') || title.includes('frequência') || title.includes('chamada')) {
     return { tabId: 'CLASS_DIARY', label: moduleName('CLASS_DIARY') };

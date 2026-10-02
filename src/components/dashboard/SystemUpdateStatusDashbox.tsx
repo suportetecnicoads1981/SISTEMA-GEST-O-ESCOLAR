@@ -16,7 +16,7 @@ import {
   Check,
   Cloud,
 } from 'lucide-react';
-import { TARGET_GOOGLE_DRIVE_ACCOUNT } from '../../services/googleDriveService';
+import { TARGET_GOOGLE_DRIVE_ACCOUNT } from '../../config/googleDrive';
 
 interface SystemUpdateStatusDashboxProps {
   systemVersion?: string;

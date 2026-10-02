@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { isTabAvailable } from '../config/features';
 
 import { moduleName } from '../config/moduleNames';
 export interface ShortcutDefinition {
@@ -12,7 +13,7 @@ export interface ShortcutDefinition {
   isAction?: boolean;
 }
 
-export const SYSTEM_SHORTCUTS: ShortcutDefinition[] = [
+const ALL_SYSTEM_SHORTCUTS: ShortcutDefinition[] = [
   // Essenciais
   {
     id: 'dashboard',
@@ -218,6 +219,9 @@ export const SYSTEM_SHORTCUTS: ShortcutDefinition[] = [
     isAction: true,
   },
 ];
+
+// Painéis de demonstração desativados ficam fora da busca e dos atalhos.
+export const SYSTEM_SHORTCUTS = ALL_SYSTEM_SHORTCUTS.filter((d) => !d.tabId || isTabAvailable(d.tabId));
 
 interface UseGlobalKeyboardShortcutsOptions {
   onNavigate: (tabId: string) => void;

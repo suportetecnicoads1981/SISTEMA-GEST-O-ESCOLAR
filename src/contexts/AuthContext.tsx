@@ -3,7 +3,6 @@ import { User, Session } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../services/datasync/supabaseClient';
 import { UserRole, UserProfile, ROLES } from '../types';
 import { normalizeRole } from '../utils/roleNormalizer';
-import { subscribeToFirebaseAuth } from '../services/firebaseAuthService';
 
 interface AuthContextType {
   user: User | null;
@@ -184,18 +183,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    // Assinatura Firebase Auth complementar para garantir sincronização
-    const unsubscribeFirebase = subscribeToFirebaseAuth((fbUser, fbProfile) => {
-      if (!isMounted) return;
-      if (fbProfile && (!profile || profile.role !== fbProfile.role)) {
-        setProfile(fbProfile);
-      }
-    });
+    // A antiga assinatura do Firebase Auth foi retirada (01/10/2026): o login é só pelo
+    // Supabase/senha local, e ela carregava o Firestore (~1 MB) na abertura do sistema.
+    // Além disso, após entrar no Google Drive ela podia trocar o perfil por "STUDENT".
 
     return () => {
       isMounted = false;
       subscription.unsubscribe();
-      unsubscribeFirebase();
     };
   }, []);
 

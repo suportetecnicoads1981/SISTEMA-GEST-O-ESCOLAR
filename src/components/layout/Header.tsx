@@ -147,7 +147,7 @@ export const Header: React.FC<HeaderProps> = ({
       setCurrentDateTime(formatted);
     };
     updateTime();
-    const interval = setInterval(updateTime, 1000);
+    const interval = setInterval(updateTime, 15000); // relógio em minutos: atualizar a cada segundo só gastava processamento
     return () => clearInterval(interval);
   }, []);
 

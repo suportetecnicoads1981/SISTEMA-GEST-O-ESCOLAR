@@ -1018,31 +1018,31 @@ export const HELP_MODULES: HelpModule[] = [
       },
     ],
   },
-  ...[
-    ['ARCHITECTURE_DIAGRAM', 'Diagrama & Solicitações IA'],
-    ['ADMIN_TI', 'Hub de Engenharia & TI'],
-    ['OMNI_DEPLOY', 'Deploy em Nuvem & Docker'],
-    ['NEXUS_DEPLOYER', 'Gerador de Pacotes Windows'],
-    ['NEXUS_INSTALL', 'Instalador Rápido de Estação'],
-    ['NEXUS_BUILD', 'Compilador & Empacotador'],
-    ['CLEANSLATE_HUB', 'Manutenção de Banco & Cache'],
-    ['INSTALAFLOW', 'Assistente Passo a Passo'],
-    ['DATASYNC_PRO', 'Sincronização Remota (.edusync)'],
-    ['DEBUG_FLOW', 'DebugFlow & Auditoria Full-Stack'],
-  ].map(
-    ([id]): HelpModule => ({
-      id,
-      title: moduleName(id),
-      where: `Menu > ${moduleGroup(id)} > ${moduleName(id)}`,
-      summary: TECNICO,
-      faq: [
-        { q: 'Preciso usar este módulo?', a: TECNICO },
-        ...(id === 'DATASYNC_PRO' || id === 'NEXUS_INSTALL' || id === 'NEXUS_DEPLOYER'
-          ? [{ q: 'Onde faço isso no dia a dia?', a: `Envio de lotes: ${moduleName('MUNICIPAL_SYNC')}. Instalação de servidor e estações: ${moduleName('NETWORK_INSTALLER')} (Alt+I).` }]
-          : []),
-      ],
-    })
-  ),
+  {
+    id: 'ADMIN_TI',
+    title: moduleName('ADMIN_TI'),
+    where: `Menu > ${moduleGroup('ADMIN_TI')} > ${moduleName('ADMIN_TI')}`,
+    summary: TECNICO,
+    faq: [
+      { q: 'Preciso usar este módulo?', a: TECNICO },
+      {
+        q: 'Onde faço as tarefas de TI no dia a dia?',
+        a: `Instalação do Servidor Sede, servidores das escolas e estações: ${moduleName('NETWORK_INSTALLER')} (Alt+I). Envio e consolidação de lotes .edusync: ${moduleName('MUNICIPAL_SYNC')}. Usuários, senhas e contas na nuvem: ${moduleName('USER_CONTROL')}. Versões publicadas: ${moduleName('SYSTEM_UPDATES')}.`,
+      },
+      {
+        q: 'Onde foram parar o OmniDeploy, NexusBuild, InstalaFlow, DataSync Pro (SQL Architect) e o Diagrama?',
+        a: 'Foram desativados em 01/10/2026 para deixar o sistema mais leve. Eram painéis de demonstração: mostravam resultados simulados (por exemplo "SQL executado" ou "atualização aplicada") sem fazer nada de verdade, e o navegador precisava baixá-los mesmo sem uso. Nenhum dado foi perdido. As funções reais continuam na Central de Instalação, na Rede Municipal (.edusync), no Controle de Acesso e em Atualizações do Sistema.',
+      },
+      {
+        q: 'Por que a Central de Instalação, Atualizações ou a Rede Municipal mostram "Carregando" na primeira vez?',
+        a: 'Para o sistema abrir mais rápido em todos os computadores, esses módulos (os mais pesados, usados quase só pela TI e pela Sede) agora são baixados só quando você os abre. A primeira abertura leva um instante; depois fica na memória. Se o sistema foi atualizado com a janela aberta, ele recarrega a página sozinho uma vez para buscar a versão nova.',
+      },
+      {
+        q: 'Cliquei num atalho antigo e apareceu "Painel desativado". É erro?',
+        a: 'Não. O atalho levava a um painel de demonstração que foi retirado. Use a Central de TI para chegar às ferramentas reais.',
+      },
+    ],
+  },
 ];
 
 export function helpForTab(tab: string | undefined): HelpModule | null {

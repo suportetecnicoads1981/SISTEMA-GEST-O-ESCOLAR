@@ -64,7 +64,6 @@ import { ExamManager } from './components/provas/ExamManager';
 import { StudentExamRoom } from './components/provas/StudentExamRoom';
 import { AssessmentResultsReport } from './components/relatorios/AssessmentResultsReport';
 import { PedagogicalDashboard } from './components/relatorios/PedagogicalDashboard';
-import { MunicipalSyncModule } from './components/municipal/MunicipalSyncModule';
 import { CommunicationModule } from './components/comunicacao/CommunicationModule';
 import { WhatsAppModule } from './components/comunicacao/WhatsAppModule';
 import { UserAccessControl } from './components/usuarios/UserAccessControl';
@@ -75,9 +74,7 @@ import {
 import { normalizeRole, getRolePreferenceSafely } from './utils/roleNormalizer';
 import { AuthBarrier } from './components/auth/AuthBarrier';
 import { FeedbackSuggestionsModal } from './components/common/FeedbackSuggestionsModal';
-import { NetworkInstaller } from './components/config/NetworkInstaller';
 import { DevBacklogModule, isDevBacklogOwner } from './components/admin/DevBacklogModule';
-import { SystemUpdateModule } from './components/config/SystemUpdateModule';
 import { AboutSystem } from './components/sobre/AboutSystem';
 import { LoginScreen } from './components/auth/LoginScreen';
 import { TopOverviewBanner } from './components/layout/TopOverviewBanner';
@@ -101,16 +98,12 @@ import { isDemoLog } from './services/whatsapp/whatsappAssist';
 import type { WhatsAppPrefill } from './components/comunicacao/WhatsAppModule';
 import { DatabaseAutomatorService } from './services/databaseAutomatorService';
 
-import { NexusBuildHub } from './components/nexusbuild/NexusBuildHub';
-import { SystemArchitectureHub } from './components/architecture/SystemArchitectureHub';
-import { OmniDeployHub } from './components/omnideploy/OmniDeployHub';
-import { NexusDeployerHub } from './components/nexusdeployer/NexusDeployerHub';
-import { NexusInstallHub } from './components/nexusinstall/NexusInstallHub';
-import { CleanSlateHub } from './components/cleanslate/CleanSlateHub';
-import { InstalaFlowHub } from './components/instalaflow/InstalaFlowHub';
-import { DataSyncProHub } from './components/datasync/DataSyncProHub';
-import { DebugFlowHub } from './components/debugflow/DebugFlowHub';
-import { AdminTIHub } from './components/admin/AdminTIHub';
+import { lazyModule } from './utils/lazyModule';
+// Módulos de TI pesados (geradores de instaladores e do app offline) só carregam quando abertos.
+const NetworkInstaller = lazyModule(() => import('./components/config/NetworkInstaller').then((m) => ({ default: m.NetworkInstaller })));
+const SystemUpdateModule = lazyModule(() => import('./components/config/SystemUpdateModule').then((m) => ({ default: m.SystemUpdateModule })));
+const MunicipalSyncModule = lazyModule(() => import('./components/municipal/MunicipalSyncModule').then((m) => ({ default: m.MunicipalSyncModule })));
+const AdminTIHub = lazyModule(() => import('./components/admin/AdminTIHub').then((m) => ({ default: m.AdminTIHub })));
 import { isTabAvailable } from './config/features';
 import { notify, confirmDialog } from './utils/dialogs';
 import { getLocalServerInfo } from './services/offline/localServerSync';
@@ -1778,10 +1771,7 @@ export default function App() {
     }
 
     if (!isTabAvailable(target)) {
-      triggerPushNotification(
-        '🧪 Módulo experimental',
-        'Este painel é demonstrativo e está oculto nesta instalação. Ative VITE_SHOW_EXPERIMENTAL_MODULES para exibi-lo.'
-      );
+      notify('Este painel de demonstração foi desativado para deixar o sistema mais leve. Os recursos reais estão na Central de TI.', 'Painel desativado');
       return;
     }
 
@@ -2282,6 +2272,7 @@ export default function App() {
 
             {/* TAB: GESTÃO MUNICIPAL & POLOS REMOTOS FORA DA REDE (.edusync) */}
             {activeTab === 'MUNICIPAL_SYNC' && (
+              <Suspense fallback={<ModuleLoadingFallback moduleName="Rede Municipal & Polos" />}>
               <MunicipalSyncModule
                 schoolUnits={data?.schoolUnits || []}
                 syncLogs={data?.syncLogs || []}
@@ -2327,6 +2318,7 @@ export default function App() {
                 onBack={() => handleNavigate('MAIN_DASHBOARD')}
                 onNavigate={handleNavigate}
               />
+              </Suspense>
             )}
 
             {/* TAB: MURAL DE COMUNICADOS */}
@@ -2377,6 +2369,7 @@ export default function App() {
 
             {/* TAB: ATUALIZAÇÕES WEB & HISTÓRICO DO SISTEMA */}
             {activeTab === 'SYSTEM_UPDATES' && (
+              <Suspense fallback={<ModuleLoadingFallback moduleName="Atualizações do Sistema" />}>
               <SystemUpdateModule
                 currentVersion={viewData.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
                 updatePackages={viewData.systemUpdates || []}
@@ -2386,6 +2379,7 @@ export default function App() {
                 onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
                 currentUser={currentUser}
               />
+              </Suspense>
             )}
 
             {/* TAB: CONTROLE DE USUÁRIOS & NÍVEIS DE ACESSO POR SETOR */}
@@ -2414,94 +2408,13 @@ export default function App() {
               </Suspense>
             )}
 
-            {/* TAB: OMNIDEPLOY - SISTEMA DE GESTÃO E INSTALAÇÃO HÍBRIDA (GOOGLE MATERIAL 3) */}
-            {activeTab === 'OMNI_DEPLOY' && (
-              <Suspense fallback={<ModuleLoadingFallback moduleName="OmniDeploy Gestão Híbrida" />}>
-                <OmniDeployHub
-                  schoolName={viewData.settings?.name || 'SucessoEdu Gestão Educacional'}
-                  onNavigate={handleNavigate}
-                  onBack={handleGoBack}
-                />
-              </Suspense>
-            )}
-
-            {/* TAB: NEXUS DEPLOYER - PROVISIONAMENTO E UPDATES NA NUVEM */}
-            {activeTab === 'NEXUS_DEPLOYER' && (
-              <Suspense fallback={<ModuleLoadingFallback moduleName="Nexus Deployer & Nuvem" />}>
-                <NexusDeployerHub
-                  schoolName={viewData.settings?.name || 'SucessoEdu Gestão Educacional'}
-                  onNavigate={handleNavigate}
-                  onBack={handleGoBack}
-                />
-              </Suspense>
-            )}
-
-            {/* TAB: NEXUS INSTALL - GERENCIADOR DE MÓDULOS, REDE DINÂMICA E INSTALADOR COMPACTO */}
-            {activeTab === 'NEXUS_INSTALL' && (
-              <Suspense fallback={<ModuleLoadingFallback moduleName="Nexus Install & Gerenciador de Rede" />}>
-                <NexusInstallHub
-                  onNavigate={handleNavigate}
-                  onBack={handleGoBack}
-                />
-              </Suspense>
-            )}
-
-            {/* TAB: SUCESSOEDU SISTEMA - SISTEMA DE DIAGNÓSTICO, INSTALAÇÃO E EMPACOTAMENTO TOTAL (C:\SucessoEduSistema) */}
-            {activeTab === 'NEXUS_BUILD' && (
-              <Suspense fallback={<ModuleLoadingFallback moduleName="Nexus Build Hub & Empacotador" />}>
-                <NexusBuildHub
-                  onNavigate={handleNavigate}
-                  onBack={handleGoBack}
-                />
-              </Suspense>
-            )}
-
-            {/* TAB: CLEANSLATE ENTERPRISE HUB - ELECTRON, REACT & SUPABASE */}
-            {activeTab === 'CLEANSLATE_HUB' && (
-              <Suspense fallback={<ModuleLoadingFallback moduleName="CleanSlate Enterprise Hub" />}>
-                <CleanSlateHub
-                  schoolName={viewData.settings?.name || 'SucessoEdu Gestão Educacional'}
-                  onNavigate={handleNavigate}
-                  onBack={handleGoBack}
-                />
-              </Suspense>
-            )}
-
-            {/* TAB: INSTALAFLOW - SISTEMA DE GESTÃO DE DEPLOY E INSTALAÇÃO HÍBRIDA (SUPABASE EDITION) */}
-            {activeTab === 'INSTALAFLOW' && (
-              <Suspense fallback={<ModuleLoadingFallback moduleName="InstalaFlow Deploy & Instalação" />}>
-                <InstalaFlowHub onNavigate={handleNavigate} />
-              </Suspense>
-            )}
-
-            {/* TAB: DATASYNC PRO - SISTEMA INTEGRADO SUPABASE (SCHEMA DDL + WEBP + RECOVERY ZIP) */}
-            {activeTab === 'DATASYNC_PRO' && (
-              <Suspense fallback={<ModuleLoadingFallback moduleName="DataSync Pro & Supabase Engine" />}>
-                <DataSyncProHub />
-              </Suspense>
-            )}
-
-            {/* TAB: DEBUGFLOW - AUDITORIA DE INTEGRIDADE E SINCRONIZAÇÃO FULL-STACK */}
-            {activeTab === 'DEBUG_FLOW' && (
-              <Suspense fallback={<ModuleLoadingFallback moduleName="DebugFlow & Auditoria Full-Stack" />}>
-                <DebugFlowHub onBack={handleGoBack} onNavigateToTab={handleNavigate} />
-              </Suspense>
-            )}
-
             {/* TAB: INSTALADOR DE REDE LOCAL, NUVEM E BACKUP */}
             {activeTab === 'NETWORK_INSTALLER' && (
-              <NetworkInstaller
-                onBack={handleGoBack}
-                onNavigate={handleNavigate}
-                isAdmin={currentRole === 'ADMIN'}
-              />
-            )}
-
-            {/* TAB: DIAGRAMA DE ARQUITETURA & CENTRAL DE SOLICITAÇÕES PARA IA */}
-            {activeTab === 'ARCHITECTURE_DIAGRAM' && (
-              <Suspense fallback={<ModuleLoadingFallback moduleName="Diagrama de Arquitetura do Sistema" />}>
-                <SystemArchitectureHub
-                  onNavigateToTab={handleNavigate}
+              <Suspense fallback={<ModuleLoadingFallback moduleName="Central de Instalação" />}>
+                <NetworkInstaller
+                  onBack={handleGoBack}
+                  onNavigate={handleNavigate}
+                  isAdmin={currentRole === 'ADMIN'}
                 />
               </Suspense>
             )}
