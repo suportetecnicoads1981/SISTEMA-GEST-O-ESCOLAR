@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { z } from 'zod';
 import { annexesOf, parentOf } from '../../utils/schoolAnnexes';
+import { activeStudentsOfUnit, hasCadastralPending, isSpecialEducationStudent, isValidInep, schoolPerformance } from '../../utils/networkIndicators';
 import {
   Building2,
   Upload,
@@ -52,6 +53,7 @@ import {
   Exam,
   ExamSubmission,
   AcademicHistory,
+  ClassGradeSheet,
   SchoolSettings,
   MunicipalSecretaryInfo,
 } from '../../types';
@@ -81,6 +83,8 @@ interface MunicipalSyncModuleProps {
   exams?: Exam[];
   submissions?: ExamSubmission[];
   academicHistories?: AcademicHistory[];
+  /** Notas lançadas nos diários (para o quadro de desempenho real). */
+  classGradeSheets?: ClassGradeSheet[];
   settings?: SchoolSettings;
   municipalSecretary?: MunicipalSecretaryInfo;
   onUpdateSchoolUnits?: (units: SchoolUnit[]) => void;
@@ -222,6 +226,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
     isLoading,
   } = useDataValidation(props);
 
+  const classGradeSheets = props?.classGradeSheets ?? [];
   const settings = props?.settings;
   const municipalSecretary = props?.municipalSecretary;
   const onUpdateSchoolUnits = props?.onUpdateSchoolUnits;
@@ -540,24 +545,37 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
   // -------------------------------------------------------------
   // MUNICIPAL CENSUS AGGREGATES
   // -------------------------------------------------------------
+  // Só dados lançados no sistema: nada de estimativas (IDEB, aprovação, transporte etc.).
+  const censusRows = useMemo(
+    () =>
+      schoolUnits.map((u) => {
+        const list = activeStudentsOfUnit(u.id, students as any[], classes as any[]);
+        return {
+          unit: u,
+          specialEducation: list.filter(isSpecialEducationStudent).length,
+          pending: list.filter(hasCadastralPending).length,
+        };
+      }),
+    [schoolUnits, students, classes]
+  );
   const censusStats = useMemo(() => {
-    const totalRedeStudents = schoolUnits.reduce((acc, u) => acc + u.totalStudents, 0) || 1390;
-    const totalRedeTeachers = schoolUnits.reduce((acc, u) => acc + u.totalTeachers, 0) || 98;
-    const totalRedeClasses = schoolUnits.reduce((acc, u) => acc + u.totalClasses, 0) || 45;
-
     return {
-      totalStudents: totalRedeStudents,
-      totalTeachers: totalRedeTeachers,
-      totalClasses: totalRedeClasses,
+      totalStudents: schoolUnits.reduce((acc, u) => acc + (u.totalStudents || 0), 0),
+      totalTeachers: schoolUnits.reduce((acc, u) => acc + (u.totalTeachers || 0), 0),
+      totalClasses: schoolUnits.reduce((acc, u) => acc + (u.totalClasses || 0), 0),
       totalUnits: schoolUnits.length,
-      specialNeedsCount: Math.round(totalRedeStudents * 0.065),
-      transportCount: Math.round(totalRedeStudents * 0.38),
-      feedBeneficiaries: totalRedeStudents,
-      idebProjetado: 6.4,
-      taxaAprovacao: 94.2,
-      taxaEvasao: 1.8,
+      specialNeedsCount: censusRows.reduce((acc, r) => acc + r.specialEducation, 0),
+      pendingCount: censusRows.reduce((acc, r) => acc + r.pending, 0),
     };
-  }, [schoolUnits]);
+  }, [schoolUnits, censusRows]);
+  const performanceRows = useMemo(
+    () =>
+      schoolUnits
+        .map((u) => ({ unit: u, perf: schoolPerformance(u.id, classes as any[], classGradeSheets as any[]) }))
+        .sort((x, y) => (y.perf.overall ?? -1) - (x.perf.overall ?? -1) || x.unit.name.localeCompare(y.unit.name)),
+    [schoolUnits, classes, classGradeSheets]
+  );
+  const hasAnyGrade = performanceRows.some((r) => r.perf.gradesCount > 0);
 
   if (isLoading) {
     return <LoadingSpinner />;
@@ -721,12 +739,12 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
             <span className="text-lg font-black text-white">{censusStats.totalStudents.toLocaleString('pt-BR')} Alunos</span>
           </div>
           <div className="bg-white/5 rounded-xl p-2.5">
-            <span className="text-[10px] text-emerald-200 uppercase font-semibold block">IDEB Estimado Municipal</span>
-            <span className="text-lg font-black text-emerald-300">{censusStats.idebProjetado} (Meta Atingida)</span>
+            <span className="text-[10px] text-emerald-200 uppercase font-semibold block">Turmas na Rede</span>
+            <span className="text-lg font-black text-white">{censusStats.totalClasses.toLocaleString('pt-BR')} Turmas</span>
           </div>
           <div className="bg-white/5 rounded-xl p-2.5">
-            <span className="text-[10px] text-emerald-200 uppercase font-semibold block">Taxa de Aprovação</span>
-            <span className="text-lg font-black text-white">{censusStats.taxaAprovacao}%</span>
+            <span className="text-[10px] text-emerald-200 uppercase font-semibold block">Educação Especial</span>
+            <span className="text-lg font-black text-white">{censusStats.specialNeedsCount.toLocaleString('pt-BR')} Alunos</span>
           </div>
         </div>
 
@@ -1415,7 +1433,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                 </span>
                 <span className="text-2xl font-black text-slate-900">{schoolUnits.length}</span>
                 <span className="text-xs text-emerald-700 font-semibold block mt-0.5">
-                  {linkedUnitsCount} 100% Vinculadas à SEMED
+                  {linkedUnitsCount} de {schoolUnits.length} vinculadas à SEMED
                 </span>
               </div>
               <div className="h-12 w-12 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
@@ -1915,7 +1933,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                 Quadro Geral do Censo Educacional do Município (Educacenso / MEC)
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Relatório unificado de matrículas, educação inclusiva, transporte escolar e infraestrutura para prestação de contas oficial.
+                Matrículas, turmas, educação especial e pendências de cadastro de cada escola, calculadas com os dados lançados no sistema.
               </p>
             </div>
 
@@ -1933,25 +1951,25 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
             <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200">
               <span className="text-[10px] uppercase font-bold text-emerald-800">Total de Matrículas</span>
               <p className="text-2xl font-black text-emerald-900">{censusStats.totalStudents}</p>
-              <span className="text-[11px] text-emerald-700">100% informadas</span>
+              <span className="text-[11px] text-emerald-700">Alunos ativos cadastrados</span>
             </div>
 
             <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-200">
               <span className="text-[10px] uppercase font-bold text-indigo-800">Educação Especial (AEE)</span>
               <p className="text-2xl font-black text-indigo-900">{censusStats.specialNeedsCount}</p>
-              <span className="text-[11px] text-indigo-700">Com plano de atendimento</span>
+              <span className="text-[11px] text-indigo-700">AEE, condição ou CID no cadastro</span>
             </div>
 
             <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
-              <span className="text-[10px] uppercase font-bold text-amber-800">Transporte Escolar</span>
-              <p className="text-2xl font-black text-amber-900">{censusStats.transportCount}</p>
-              <span className="text-[11px] text-amber-700">Rotas rurais e urbanas</span>
+              <span className="text-[10px] uppercase font-bold text-amber-800">Pendências de Cadastro</span>
+              <p className="text-2xl font-black text-amber-900">{censusStats.pendingCount}</p>
+              <span className="text-[11px] text-amber-700">Alunos com dados a completar</span>
             </div>
 
             <div className="p-4 bg-purple-50 rounded-xl border border-purple-200">
-              <span className="text-[10px] uppercase font-bold text-purple-800">Alimentação Escolar (PNAE)</span>
-              <p className="text-2xl font-black text-purple-900">{censusStats.feedBeneficiaries}</p>
-              <span className="text-[11px] text-purple-700">100% de cobertura</span>
+              <span className="text-[10px] uppercase font-bold text-purple-800">Turmas</span>
+              <p className="text-2xl font-black text-purple-900">{censusStats.totalClasses}</p>
+              <span className="text-[11px] text-purple-700">Cadastradas na rede</span>
             </div>
           </div>
 
@@ -1964,30 +1982,34 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                   <th className="p-3">Unidade Escolar</th>
                   <th className="p-3">Distrito / Localização</th>
                   <th className="p-3 text-center">Matrículas</th>
+                  <th className="p-3 text-center">Turmas</th>
                   <th className="p-3 text-center">Docentes</th>
-                  <th className="p-3 text-center">AEE (Inclusão)</th>
-                  <th className="p-3 text-center">Transporte</th>
-                  <th className="p-3 text-center">Status Censo</th>
+                  <th className="p-3 text-center">Educação Especial</th>
+                  <th className="p-3 text-center">Cadastro</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {schoolUnits.map((u) => (
+                {censusRows.map(({ unit: u, specialEducation, pending }) => (
                   <tr key={u.id} className="hover:bg-slate-50">
                     <td className="p-3 font-mono font-semibold text-slate-600">{u.inepCode}</td>
                     <td className="p-3 font-bold text-slate-800">{u.name}</td>
                     <td className="p-3 text-slate-500">{u.district}</td>
                     <td className="p-3 text-center font-bold text-slate-900">{u.totalStudents}</td>
-                    <td className="p-3 text-center text-slate-700">{u.totalTeachers}</td>
-                    <td className="p-3 text-center text-indigo-700 font-semibold">
-                      {Math.round(u.totalStudents * 0.065)}
+                    <td className="p-3 text-center text-slate-700">{u.totalClasses}</td>
+                    <td className="p-3 text-center text-slate-700" title={u.totalTeachers ? '' : 'Não informado no cadastro da escola'}>
+                      {u.totalTeachers || '—'}
                     </td>
-                    <td className="p-3 text-center text-amber-700 font-semibold">
-                      {Math.round(u.totalStudents * 0.38)}
-                    </td>
+                    <td className="p-3 text-center text-indigo-700 font-semibold">{specialEducation}</td>
                     <td className="p-3 text-center">
-                      <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                        HOMOLOGADO
-                      </span>
+                      {!isValidInep(u.inepCode) ? (
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800">INEP PENDENTE</span>
+                      ) : pending > 0 ? (
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                          {pending} ALUNO{pending > 1 ? 'S' : ''} COM PENDÊNCIA
+                        </span>
+                      ) : (
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">SEM PENDÊNCIAS</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -2008,44 +2030,46 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
               Quadro de Desempenho & Comparativo da Rede Municipal
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              Métricas comparativas entre as escolas do município para direcionamento de projetos de nivelamento e capacitação docente.
+              Médias calculadas somente com as notas já lançadas nos diários de classe. IDEB e taxa de aprovação não são
+              calculados aqui: o IDEB é divulgado pelo INEP/MEC e a aprovação só se conhece no fechamento do ano letivo.
             </p>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-slate-200">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
-                <tr>
-                  <th className="p-3">Posição</th>
-                  <th className="p-3">Unidade Escolar</th>
-                  <th className="p-3 text-center">Média Geral</th>
-                  <th className="p-3 text-center">Língua Portuguesa</th>
-                  <th className="p-3 text-center">Matemática</th>
-                  <th className="p-3 text-center">Taxa Aprovação</th>
-                  <th className="p-3 text-center font-bold text-emerald-700">IDEB Estimado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {schoolUnits.map((u, idx) => (
-                  <tr key={u.id} className="hover:bg-slate-50">
-                    <td className="p-3 font-black text-slate-500">#{idx + 1}</td>
-                    <td className="p-3 font-bold text-slate-800">{u.name}</td>
-                    <td className="p-3 text-center font-bold text-indigo-700">
-                      {(7.8 - idx * 0.3).toFixed(1)}
-                    </td>
-                    <td className="p-3 text-center text-slate-700">{(8.0 - idx * 0.2).toFixed(1)}</td>
-                    <td className="p-3 text-center text-slate-700">{(7.5 - idx * 0.3).toFixed(1)}</td>
-                    <td className="p-3 text-center">
-                      <span className="font-semibold text-emerald-700">{96 - idx * 2}%</span>
-                    </td>
-                    <td className="p-3 text-center font-black text-emerald-700 bg-emerald-50/50">
-                      {(6.8 - idx * 0.3).toFixed(1)}
-                    </td>
+          {!hasAnyGrade ? (
+            <div className="p-8 rounded-xl border border-dashed border-slate-300 bg-slate-50 text-center space-y-1">
+              <p className="text-sm font-bold text-slate-700">Ainda não há notas lançadas na rede.</p>
+              <p className="text-xs text-slate-500">
+                O quadro será preenchido automaticamente à medida que os professores lançarem as notas nos diários.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+                  <tr>
+                    <th className="p-3">Posição</th>
+                    <th className="p-3">Unidade Escolar</th>
+                    <th className="p-3 text-center">Média Geral</th>
+                    <th className="p-3 text-center">Língua Portuguesa</th>
+                    <th className="p-3 text-center">Matemática</th>
+                    <th className="p-3 text-center">Notas lançadas</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {performanceRows.map(({ unit: u, perf }, idx) => (
+                    <tr key={u.id} className="hover:bg-slate-50">
+                      <td className="p-3 font-black text-slate-500">{perf.overall === null ? '—' : `#${idx + 1}`}</td>
+                      <td className="p-3 font-bold text-slate-800">{u.name}</td>
+                      <td className="p-3 text-center font-bold text-indigo-700">{perf.overall === null ? '—' : perf.overall.toFixed(1)}</td>
+                      <td className="p-3 text-center text-slate-700">{perf.portuguese === null ? '—' : perf.portuguese.toFixed(1)}</td>
+                      <td className="p-3 text-center text-slate-700">{perf.math === null ? '—' : perf.math.toFixed(1)}</td>
+                      <td className="p-3 text-center text-slate-500">{perf.gradesCount || 'Sem notas'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

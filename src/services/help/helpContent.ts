@@ -748,6 +748,10 @@ export const HELP_MODULES: HelpModule[] = [
     summary: 'Escolas da rede, envio de lotes das escolas para a Sede e consolidação na Secretaria.',
     faq: [
       {
+        q: 'De onde vêm os números do Censo e do Quadro de Desempenho?',
+        a: 'Somente dos dados lançados no sistema; nada é estimado. Matrículas e turmas: alunos ativos e turmas cadastradas em cada escola. Educação Especial: alunos com AEE, condição especial, necessidade ou CID marcados no cadastro. Docentes: o número informado no cadastro da escola ("—" quando não informado). A coluna Cadastro mostra "INEP PENDENTE" quando a escola não tem código INEP de 8 dígitos e quantos alunos têm pendências no cadastro. No Quadro de Desempenho, as médias (geral, Língua Portuguesa e Matemática) são calculadas só com as notas já lançadas nos diários; enquanto não houver notas, aparece "Ainda não há notas lançadas na rede". IDEB, taxa de aprovação, transporte e alimentação escolar foram retirados porque não há esses dados no sistema (o IDEB é divulgado pelo INEP/MEC).',
+      },
+      {
         q: 'Como tiro a relação das escolas da rede?',
         steps: ['Aplique os filtros da tela (busca, escola, turma, situação etc.).', 'Clique no botão verde "Relatório".', 'Marque as colunas que quer no relatório (as mais usadas já vêm marcadas).', 'Confira a pré-visualização.', 'Escolha: "Imprimir / Salvar em PDF", "Excel", "Word" ou "CSV".'],
         a: 'Na lista de unidades escolares, clique em "Relatório". Saem as escolas filtradas na tela com INEP, zona, diretor(a), telefone e a quantidade de turmas e de alunos ativos contada pelos cadastros atuais. Endereço, e-mail, coordenação e secretaria podem ser incluídos marcando as colunas.',

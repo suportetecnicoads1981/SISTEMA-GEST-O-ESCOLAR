@@ -2281,6 +2281,7 @@ export default function App() {
                 exams={data?.exams || []}
                 submissions={data?.submissions || []}
                 academicHistories={data?.academicHistories || []}
+                classGradeSheets={data?.classGradeSheets || []}
                 settings={data?.settings || DEFAULT_SCHOOL_SETTINGS}
                 municipalSecretary={{
                   ...(data?.municipalSecretary || DEFAULT_MUNICIPAL_SECRETARY),
