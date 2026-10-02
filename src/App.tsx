@@ -2404,6 +2404,13 @@ export default function App() {
                   onNavigate={handleNavigate}
                   onBack={handleGoBack}
                   userAccountsCount={viewData.userAccounts?.length || 0}
+                  counts={{
+                    schools: (viewData.schoolUnits || []).length,
+                    classes: (viewData.classes || []).length,
+                    students: (viewData.students || []).length,
+                    activeUsers: (viewData.userAccounts || []).filter((u) => u.active !== false).length,
+                  }}
+                  auditLogs={viewData.auditLogs || []}
                 />
               </Suspense>
             )}
