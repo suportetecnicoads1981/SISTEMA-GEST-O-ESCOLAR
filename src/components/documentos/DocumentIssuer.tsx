@@ -79,6 +79,12 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
   const selectedClass = (classes || []).find((c) => c.id === selectedStudent?.classId);
   // Notas do aluno: Diário de Notas da turma + histórico escolar. Nunca usa o histórico de
   // outro aluno (antes, sem histórico, o documento pegava o do primeiro aluno da lista).
+  // Última transferência de saída registrada (rede ou fora da rede), para a declaração de transferência.
+  const lastOutTransfer = useMemo(
+    () => [...((selectedStudent as any)?.transfers || [])].reverse().find((t: any) => t.kind === 'REDE' || t.kind === 'SAIDA_EXTERNA') || null,
+    [selectedStudent]
+  );
+
   const matchedHistory = useMemo(() => {
     if (!selectedStudent) return null;
     const own = (histories || []).filter((h) => h?.studentId === selectedStudent.id);
@@ -712,6 +718,16 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
                 <p>
                   Declaramos que a pedido do responsável legal, foi expedida a transferência do(a) aluno(a) <strong className="text-slate-900">{selectedStudent?.name}</strong>, matrícula <strong>{raText}</strong>, CPF <strong>{cpfText}</strong>, regularmente enturmado(a) na turma <strong>{selectedClass?.name}</strong>.
                 </p>
+                {lastOutTransfer && (
+                  <p>
+                    Destino: <strong>{lastOutTransfer.kind === 'REDE' ? lastOutTransfer.toUnitName : lastOutTransfer.externalSchoolName}</strong>
+                    {lastOutTransfer.kind === 'SAIDA_EXTERNA' && (lastOutTransfer.externalCity || lastOutTransfer.externalState)
+                      ? ` – ${[lastOutTransfer.externalCity, lastOutTransfer.externalState].filter(Boolean).join('/')}`
+                      : ''}
+                    {lastOutTransfer.kind === 'REDE' ? ' (rede municipal de ensino)' : ''}, em{' '}
+                    {lastOutTransfer.date ? lastOutTransfer.date.split('-').reverse().join('/') : '—'}.
+                  </p>
+                )}
                 <p>
                   O histórico escolar definitivo e a pasta de documentos serão emitidos no prazo regimental de até 30 (trinta) dias.
                 </p>

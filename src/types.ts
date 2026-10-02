@@ -186,6 +186,42 @@ export interface Student {
   dropoutObservation?: string;
   dropoutIntervention?: DropoutIntervention;
   enrollmentYear?: number;
+
+  /** Movimentações do aluno (transferências entre escolas da rede, entrada de fora e saída para fora da rede). */
+  transfers?: StudentTransfer[];
+}
+
+/**
+ * Registro de uma transferência. Fica guardado na ficha do aluno para sempre, mostrando
+ * de onde ele veio e para onde foi.
+ * - REDE: entre duas escolas da rede municipal (o aluno continua o mesmo cadastro, com o mesmo RA).
+ * - ENTRADA_EXTERNA: chegou de uma escola de fora da rede municipal.
+ * - SAIDA_EXTERNA: saiu para uma escola de fora da rede municipal (situação "Transferido").
+ */
+export type StudentTransferKind = 'REDE' | 'ENTRADA_EXTERNA' | 'SAIDA_EXTERNA';
+export type ExternalNetworkType = 'ESTADUAL' | 'MUNICIPAL_OUTRO' | 'PARTICULAR' | 'FEDERAL' | 'OUTRA';
+
+export interface StudentTransfer {
+  id: string;
+  kind: StudentTransferKind;
+  /** Data da transferência (AAAA-MM-DD). */
+  date: string;
+  fromUnitId?: string;
+  fromUnitName?: string;
+  fromClassId?: string;
+  fromClassName?: string;
+  toUnitId?: string;
+  toUnitName?: string;
+  toClassId?: string;
+  toClassName?: string;
+  /** Escola de fora da rede (origem na ENTRADA_EXTERNA, destino na SAIDA_EXTERNA). */
+  externalSchoolName?: string;
+  externalCity?: string;
+  externalState?: string;
+  externalNetwork?: ExternalNetworkType;
+  reason?: string;
+  registeredBy?: string;
+  registeredAt: string;
 }
 
 export interface SchoolClass {

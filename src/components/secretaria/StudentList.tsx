@@ -9,6 +9,7 @@ import {
   Award,
   FileText,
   Edit2,
+  ArrowRightLeft,
   Trash2,
   Phone,
   Mail,
@@ -76,6 +77,16 @@ import { confirmDialog } from '../../utils/dialogs';
 import { moduleName } from '../../config/moduleNames';
 import { annexesOf, chosenAnnexIds, totalsBySchool, unitDisplayName } from '../../utils/schoolAnnexes';
 import { AnnexPicker } from './AnnexPicker';
+import { TransferStudentModal } from './TransferStudentModal';
+import {
+  MOVEMENT_FILTER_LABEL,
+  MovementFilter,
+  destinationText,
+  lastTransferDate,
+  matchesMovement,
+  movementUsesOriginSchool,
+  originText,
+} from '../../services/students/transfers';
 interface StudentListProps {
   students: Student[];
   classes: SchoolClass[];
@@ -99,6 +110,14 @@ interface StudentListProps {
   ) => void;
   onBack?: () => void;
   onNavigate?: (tab: string, payload?: any) => void;
+  /** Transferências: cadastro completo de escolas e turmas da rede (destino). */
+  allSchoolUnits?: SchoolUnit[];
+  allClasses?: SchoolClass[];
+  /** Escolas de destino permitidas para este usuário (null = rede inteira). */
+  transferDestinationIds?: string[] | null;
+  currentUserName?: string;
+  /** Alunos da rede inteira (para o filtro "enviados" achar quem saiu da escola). */
+  allStudents?: Student[];
 }
 
 export const StudentList: React.FC<StudentListProps> = ({
@@ -120,6 +139,11 @@ export const StudentList: React.FC<StudentListProps> = ({
   onBatchImportStudents,
   onBack,
   onNavigate,
+  allSchoolUnits,
+  allClasses,
+  transferDestinationIds = null,
+  currentUserName,
+  allStudents,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUnitFilter, setSelectedUnitFilter] = useState('ALL');
@@ -134,6 +158,8 @@ export const StudentList: React.FC<StudentListProps> = ({
   const [selectedSpecialFilter, setSelectedSpecialFilter] = useState('ALL');
   const [selectedZoneFilter, setSelectedZoneFilter] = useState('ALL');
   const [selectedGenderFilter, setSelectedGenderFilter] = useState('ALL');
+  const [selectedMovementFilter, setSelectedMovementFilter] = useState<MovementFilter>('ALL');
+  const [transferStudent, setTransferStudent] = useState<Student | null>(null);
   const [showAdvancedFilterDrawer, setShowAdvancedFilterDrawer] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -668,6 +694,7 @@ export const StudentList: React.FC<StudentListProps> = ({
     if (selectedSpecialFilter !== 'ALL') count++;
     if (selectedZoneFilter !== 'ALL') count++;
     if (selectedGenderFilter !== 'ALL') count++;
+    if (selectedMovementFilter !== 'ALL') count++;
     return count;
   }, [
     searchTerm,
@@ -680,6 +707,7 @@ export const StudentList: React.FC<StudentListProps> = ({
     selectedSpecialFilter,
     selectedZoneFilter,
     selectedGenderFilter,
+    selectedMovementFilter,
   ]);
 
   // Função para limpar todos os filtros
@@ -694,6 +722,7 @@ export const StudentList: React.FC<StudentListProps> = ({
     setSelectedSpecialFilter('ALL');
     setSelectedZoneFilter('ALL');
     setSelectedGenderFilter('ALL');
+    setSelectedMovementFilter('ALL');
   };
 
   // Motor central de filtragem com suporte a Unidade, Série, Turma e Filtros Avançados
@@ -716,7 +745,17 @@ export const StudentList: React.FC<StudentListProps> = ({
   const includeAnnexes = annexIdsInFilter.size > 0;
 
   const filteredStudents = useMemo(() => {
-    return students.filter((student) => {
+    // "Enviados para outra escola da rede": o aluno já está em outra escola, então a busca usa
+    // a rede inteira e o filtro de escola passa a valer pela escola de ORIGEM da transferência.
+    const byOrigin = selectedMovementFilter !== 'ALL' && movementUsesOriginSchool(selectedMovementFilter);
+    const movementUnitIds =
+      selectedUnitFilter === 'ALL' ? null : new Set<string>([selectedUnitFilter, ...Array.from(annexIdsInFilter)]);
+    const base = byOrigin && allStudents ? allStudents : students;
+    return base.filter((student) => {
+      // 0. Movimentação (transferências)
+      if (selectedMovementFilter !== 'ALL') {
+        if (!matchesMovement(student, selectedMovementFilter, movementUnitIds)) return false;
+      }
       // 1. Busca textual abrangente (Nome, RA, CPF, E-mail, Responsável, Escola de Origem, Série)
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
@@ -741,8 +780,8 @@ export const StudentList: React.FC<StudentListProps> = ({
         }
       }
 
-      // 2. Filtro por Unidade Escolar
-      if (selectedUnitFilter !== 'ALL') {
+      // 2. Filtro por Unidade Escolar (nos filtros de transferência pela rede, já aplicado acima)
+      if (selectedUnitFilter !== 'ALL' && !byOrigin) {
         const matchedUnitObj = availableSchoolUnits.find((u) => u.id === selectedUnitFilter);
         const unitName = matchedUnitObj ? matchedUnitObj.name.toLowerCase() : '';
 
@@ -857,6 +896,8 @@ export const StudentList: React.FC<StudentListProps> = ({
     selectedSpecialFilter,
     selectedZoneFilter,
     selectedGenderFilter,
+    selectedMovementFilter,
+    allStudents,
   ]);
 
   // Paginação da listagem de alunos
@@ -903,6 +944,9 @@ export const StudentList: React.FC<StudentListProps> = ({
       { id: 'specialNeeds', label: 'PCD / Condição', align: 'left', width: '90px', defaultVisible: false },
       { id: 'medicalReport', label: 'Laudo', align: 'center', width: '50px', defaultVisible: false },
       { id: 'schoolOrigin', label: 'Escola / Polo', align: 'left', width: '110px', defaultVisible: false },
+      { id: 'transferOrigin', label: 'Procedência', align: 'left', width: '150px', defaultVisible: false },
+      { id: 'transferDestination', label: 'Transferência / Destino', align: 'left', width: '170px', defaultVisible: false },
+      { id: 'transferDate', label: 'Data da Transferência', align: 'center', width: '85px', defaultVisible: false },
       { id: 'guardian', label: 'Responsável', align: 'left', width: '110px', defaultVisible: true },
       { id: 'signature', label: 'Assinatura / Rubrica', align: 'center', width: '130px', defaultVisible: true },
     ],
@@ -981,6 +1025,11 @@ export const StudentList: React.FC<StudentListProps> = ({
       });
     }
 
+    // Movimentação (transferências)
+    if (selectedMovementFilter !== 'ALL') {
+      list.push({ label: 'Movimentação', value: MOVEMENT_FILTER_LABEL[selectedMovementFilter] });
+    }
+
     // Termo de Busca
     if (searchTerm.trim()) {
       list.push({ label: 'Termo de Busca', value: `"${searchTerm.trim()}"` });
@@ -988,6 +1037,7 @@ export const StudentList: React.FC<StudentListProps> = ({
 
     return list;
   }, [
+    selectedMovementFilter,
     selectedUnitFilter,
     selectedSeriesFilter,
     selectedClassFilter,
@@ -1060,7 +1110,13 @@ export const StudentList: React.FC<StudentListProps> = ({
       case 'medicalReport':
         return student.hasMedicalReport ? 'SIM' : 'NÃO';
       case 'schoolOrigin':
-        return student.schoolOriginName || 'Sede';
+        return student.schoolOriginName || '—';
+      case 'transferOrigin':
+        return originText(student);
+      case 'transferDestination':
+        return destinationText(student);
+      case 'transferDate':
+        return lastTransferDate(student);
       case 'guardian':
         return student.guardianName || '—';
       case 'signature':
@@ -1735,6 +1791,25 @@ export const StudentList: React.FC<StudentListProps> = ({
                 <option value="F">Feminino</option>
                 <option value="M">Masculino</option>
                 <option value="OTHER">Outro / Não Declarado</option>
+              </select>
+            </div>
+
+            {/* 7. Movimentação (transferências) */}
+            <div className="sm:col-span-2 lg:col-span-2">
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                <ArrowRightLeft className="h-3 w-3 text-slate-400" />
+                Movimentação / Transferências
+              </label>
+              <select
+                value={selectedMovementFilter}
+                onChange={(e) => setSelectedMovementFilter(e.target.value as MovementFilter)}
+                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 bg-white font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              >
+                {(Object.keys(MOVEMENT_FILTER_LABEL) as MovementFilter[]).map((k) => (
+                  <option key={k} value={k}>
+                    {MOVEMENT_FILTER_LABEL[k]}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -2412,6 +2487,14 @@ export const StudentList: React.FC<StudentListProps> = ({
                           </button>
 
                           <button
+                            onClick={() => setTransferStudent(student)}
+                            title="Transferir aluno (entre escolas da rede, para fora ou registrar procedência)"
+                            className="p-1 text-amber-600 hover:bg-amber-50 rounded-md transition-colors cursor-pointer"
+                          >
+                            <ArrowRightLeft className="h-4 w-4" />
+                          </button>
+
+                          <button
                             onClick={() => handleOpenEditModal(student)}
                             title="Editar Matrícula e Situação Cadastral"
                             className="p-1 text-slate-600 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
@@ -2624,11 +2707,22 @@ export const StudentList: React.FC<StudentListProps> = ({
         }
       />
 
+      {/* TRANSFERÊNCIA DE ALUNO (rede, fora da rede, procedência) */}
+      <TransferStudentModal
+        student={transferStudent}
+        schoolUnits={allSchoolUnits && allSchoolUnits.length ? allSchoolUnits : schoolUnits}
+        classes={allClasses && allClasses.length ? allClasses : classes}
+        allowedDestinationIds={transferDestinationIds ? new Set(transferDestinationIds) : null}
+        registeredBy={currentUserName}
+        onClose={() => setTransferStudent(null)}
+        onSave={(st) => onSaveStudent(st)}
+      />
+
       {/* PAINEL DE IMPRESSÃO CONFIGURÁVEL (COLUNAS, FILTROS E CABEÇALHOS) */}
       <ConfigurablePrintModal
         isOpen={isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}
-        title="Relação Nominal de Estudantes - Livro de Matrículas 2026"
+        title={`Relação Nominal de Estudantes - Livro de Matrículas ${new Date().getFullYear()}`}
         subtitle="Diário oficial de frequência, matrículas e controle de turmas da Secretaria de Educação"
         columns={studentPrintColumns}
         data={filteredStudents}
@@ -2701,6 +2795,12 @@ export const StudentList: React.FC<StudentListProps> = ({
                   { v: 'CONCLUDED', t: 'Concluído' },
                   { v: 'SUSPENDED', t: 'Trancado / Suspenso' },
                 ],
+              },
+              {
+                label: 'Movimentação',
+                value: selectedMovementFilter,
+                set: (v: string) => setSelectedMovementFilter(v as MovementFilter),
+                opts: (Object.keys(MOVEMENT_FILTER_LABEL) as MovementFilter[]).map((k) => ({ v: k, t: MOVEMENT_FILTER_LABEL[k] })),
               },
             ].map((f) => (
               <React.Fragment key={f.label}>

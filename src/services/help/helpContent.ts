@@ -383,6 +383,29 @@ export const HELP_MODULES: HelpModule[] = [
     summary: 'Matrículas, cadastro dos alunos, importação de listas, filtros, impressão e pendências do Censo.',
     faq: [
       {
+        q: 'Como transfiro um aluno para outra escola da rede municipal?',
+        steps: [
+          `Em ${moduleName('STUDENTS')}, na linha do aluno, clique no botão de transferência (setas laranja).`,
+          'Escolha "Para escola da rede", a data, a escola de destino e, se já souber, a turma.',
+          'Informe o motivo (ex.: mudança de endereço) e clique em "Confirmar transferência".',
+        ],
+        a: 'O aluno continua com o mesmo cadastro e o mesmo RA e passa para a escola de destino. Notas, frequência e histórico já lançados continuam registrados na escola de origem. A transferência fica gravada na ficha com data, escola e turma de origem e de destino e quem registrou, e aparece no "Histórico de transferências" da mesma janela.',
+        tip: 'Usuário lotado numa escola só transfere para a própria escola ou para as anexas dela. A transferência para outra escola da rede é registrada pela Secretaria (usuário sem lotação).',
+      },
+      {
+        q: 'E quando o aluno vai para uma escola de fora da rede, ou chega de fora?',
+        a: 'No mesmo botão de transferência: "Para fora da rede" registra a escola de destino (nome, cidade, UF e rede: estadual, particular, outro município, federal) e a situação do aluno passa a "Transferido". "Veio de fora da rede" registra a escola de origem de um aluno que chegou de fora; a escola e a turma atuais não mudam. A Declaração de Transferência passa a trazer a escola de destino e a data.',
+      },
+      {
+        q: 'Como tiro a relação de alunos transferidos entre escolas ou vindos de fora da rede?',
+        steps: [
+          'Clique em "Mais Filtros" e escolha "Movimentação / Transferências" (o mesmo filtro aparece no painel de "Imprimir lista filtrada").',
+          '"Transferidos entre escolas da rede" mostra quem entrou ou saiu da escola escolhida pela rede; "Recebidos" e "Enviados" separam os dois sentidos. "Vindos de fora da rede municipal" e "Transferidos para fora da rede" mostram as movimentações externas.',
+          'Clique em "Imprimir lista filtrada" e marque as colunas "Procedência", "Transferência / Destino" e "Data da Transferência". Saem em PDF, Word e Excel.',
+        ],
+        tip: 'Em "Enviados", o filtro de escola vale pela escola de ORIGEM: aparecem os alunos que saíram dela, mesmo já estando na escola nova.',
+      },
+      {
         q: 'Por que a cor/raça aparece "Não declarado" e o gênero "Não informado"?',
         a: 'Quando o campo não foi preenchido, o sistema mostra e grava exatamente isso, em vez de assumir "Parda" ou "Feminino" (o que alterava os números do Censo). Abra o cadastro do aluno e escolha a opção correta.',
       },

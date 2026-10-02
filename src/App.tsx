@@ -113,6 +113,7 @@ import { computeDropoutRisk, describeDropoutCriterion } from './utils/dropoutRis
 import { DropoutRiskAlertModal } from './components/common/DropoutRiskAlertModal';
 import { can as canAccess, canOpenTab, deniedTabMessage, describeDenials, enforceDataPermissions } from './services/rbac/accessControl';
 import { scopeDataToSchool, userSchoolScope } from './services/rbac/schoolScope';
+import { annexesOf } from './utils/schoolAnnexes';
 import { focusSchoolIds, readStoredFocus, restoreHiddenRecords, scopeDataToFocus, storeFocus, type SchoolFocus } from './services/rbac/schoolFocus';
 import { moduleName } from './config/moduleNames';
 
@@ -288,6 +289,20 @@ export default function App() {
   // ---- Escola de lotação: quem está lotado numa escola vê só os dados dela ----
   // O estado completo (data) continua inteiro para gravação e sincronização; as telas recebem viewData.
   const schoolScope = userSchoolScope(accessActor as any);
+  // Transferências: lotado numa escola só transfere para ela e as anexas; a rede inteira é da Secretaria.
+  const transferScopeIds = useMemo(
+    () => (schoolScope ? [schoolScope, ...annexesOf(schoolScope, data?.schoolUnits || []).map((u) => u.id)] : null),
+    [schoolScope, data?.schoolUnits]
+  );
+  const transferStudentsPool = useMemo(() => {
+    const all = data?.students || [];
+    if (!transferScopeIds) return all;
+    const ids = new Set(transferScopeIds);
+    // Lotado: além dos próprios alunos, só os que SAÍRAM da escola dele (para o filtro "enviados").
+    return all.filter(
+      (st) => ids.has(st.schoolUnitId || '') || (st.transfers || []).some((t) => t.fromUnitId && ids.has(t.fromUnitId))
+    );
+  }, [data?.students, transferScopeIds]);
 
   // ---- Escola em foco: quem vê a rede inteira escolhe no topo com qual escola quer trabalhar ----
   const [schoolFocus, setSchoolFocusState] = useState<SchoolFocus | null>(null);
@@ -1994,6 +2009,11 @@ export default function App() {
                 onIssueDocument={handleIssueDocument}
                 onBack={handleGoBack}
                 onNavigate={handleNavigate}
+                allSchoolUnits={data?.schoolUnits || []}
+                allClasses={data?.classes || []}
+                transferDestinationIds={transferScopeIds}
+                currentUserName={currentUser?.name}
+                allStudents={transferStudentsPool}
               />
             )}
 
