@@ -47,7 +47,6 @@ import {
   NotificationItem,
 } from '../../types';
 import { CadastralPendingCensusDashbox } from './CadastralPendingCensusDashbox';
-import { SystemUpdateStatusDashbox } from './SystemUpdateStatusDashbox';
 
 import { moduleName } from '../../config/moduleNames';
 import { DropoutRiskResult, describeDropoutCriterion } from '../../utils/dropoutRiskEngine';
@@ -129,7 +128,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
       id: 'anom-incomplete-census-cadastral',
       level: 'WARNING',
       title: `${incompleteCensusStudents.length} Cadastro(s) com Pendência nos Polos Remotos & Censo`,
-      description: 'Alunos matriculados via planilhas de polos remotos (ex: Maria da Praia) aguardando laudo PCD, CPF ou dados civis.',
+      description: 'Alunos com dados a completar no cadastro (laudo PCD, CPF, dados civis etc.).',
       actionTab: 'STUDENTS',
       actionLabel: 'Ver Pendências na Secretaria',
       metricBadge: `${incompleteCensusStudents.length} pendentes`,
@@ -154,8 +153,8 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
     detectedAnomalies.push({
       id: 'anom-pending-sync-units',
       level: 'CRITICAL',
-      title: `${pendingSyncUnits} Polo(s) Escolar(es) com Sincronização Atrasada`,
-      description: 'Unidades satélites operando offline que estão há mais de 7 dias sem importação de pacote .edusync.',
+      title: `${pendingSyncUnits} Escola(s) com Sincronização Pendente`,
+      description: 'Escolas marcadas como pendentes ou que nunca enviaram lote .edusync.',
       actionTab: 'MUNICIPAL_SYNC',
       actionLabel: 'Sincronizar Polos',
       metricBadge: `${pendingSyncUnits} polos pendentes`,
@@ -193,7 +192,8 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
   // 5. Check classes near max capacity
   const fullClasses = classes.filter((c) => {
     const classCount = students.filter((s) => s.classId === c.id && s.status === 'ACTIVE').length;
-    return classCount >= c.maxCapacity;
+    const cap = Number(c.maxCapacity || (c as any).capacity) || 0;
+    return cap > 0 && classCount >= cap;
   });
   if (fullClasses.length > 0) {
     detectedAnomalies.push({
@@ -206,17 +206,6 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
       metricBadge: `${fullClasses.length} turmas lotadas`,
     });
   }
-
-  // 6. Good practices / Info status
-  detectedAnomalies.push({
-    id: 'anom-backup-ok',
-    level: 'INFO',
-    title: 'Auditoria & Integridade do Banco de Dados Operando 100%',
-    description: 'Armazenamento local persistente ativo com conformidade da Lei Geral de Proteção de Dados (LGPD).',
-    actionTab: 'NETWORK_INSTALLER',
-    actionLabel: 'Ver Instalador & Backup',
-    metricBadge: 'Seguro',
-  });
 
   const filteredAnomalies = detectedAnomalies.filter((a) => {
     if (activeAlertFilter === 'CRITICAL') return a.level === 'CRITICAL';
@@ -354,7 +343,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
             <Building2 className="h-4 w-4 text-indigo-600" />
             <span>Indicadores de Unidades Escolares & Censo Discente por Situação</span>
           </div>
-          <span className="text-xs text-slate-500 font-medium">Ano Letivo Vigente: 2026</span>
+          <span className="text-xs text-slate-500 font-medium">Ano letivo: {new Date().getFullYear()}</span>
         </div>
 
         {/* Grid of Metric Cards */}
@@ -373,7 +362,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
             <div className="text-2xl font-black text-slate-900">{totalUnits}</div>
             <div className="text-xs font-bold text-slate-700 mt-1">Escolas Ativas</div>
             <div className="text-[10px] text-slate-400 mt-0.5">
-              {offlineUnits > 0 ? `${offlineUnits} polos rurais/off` : '100% online'}
+              {offlineUnits > 0 ? `${offlineUnits} sem internet (cadastro)` : 'escolas cadastradas'}
             </div>
           </div>
 
@@ -390,7 +379,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
             </div>
             <div className="text-2xl font-black text-slate-900">{activeStudents.length}</div>
             <div className="text-xs font-bold text-slate-700 mt-1">Alunos Ativos</div>
-            <div className="text-[10px] text-emerald-600 mt-0.5">Frequência regular</div>
+            <div className="text-[10px] text-emerald-600 mt-0.5">situação Ativo</div>
           </div>
 
           {/* Card 3: Alunos Transferidos */}
@@ -406,7 +395,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
             </div>
             <div className="text-2xl font-black text-slate-900">{transferredStudents.length}</div>
             <div className="text-xs font-bold text-slate-700 mt-1">Transferidos</div>
-            <div className="text-[10px] text-slate-400 mt-0.5">Guia emitida</div>
+            <div className="text-[10px] text-slate-400 mt-0.5">situação Transferido</div>
           </div>
 
           {/* Card 4: Alunos Concluídos */}
@@ -422,7 +411,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
             </div>
             <div className="text-2xl font-black text-slate-900">{concludedStudents.length}</div>
             <div className="text-xs font-bold text-slate-700 mt-1">Concluídos</div>
-            <div className="text-[10px] text-slate-400 mt-0.5">Certificados prontos</div>
+            <div className="text-[10px] text-slate-400 mt-0.5">situação Concluído</div>
           </div>
 
           {/* Card 5: Alunos Suspensos / Trancados */}
@@ -438,7 +427,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
             </div>
             <div className="text-2xl font-black text-slate-900">{suspendedStudents.length}</div>
             <div className="text-xs font-bold text-slate-700 mt-1">Trancados / Evasão</div>
-            <div className="text-[10px] text-rose-600 mt-0.5">Demanda busca ativa</div>
+            <div className="text-[10px] text-rose-600 mt-0.5">trancados ou evadidos</div>
           </div>
 
           {/* Card 6: Total de Turmas */}
@@ -453,8 +442,8 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
               <span className="text-[10px] font-bold text-purple-600">Salas</span>
             </div>
             <div className="text-2xl font-black text-slate-900">{classes.length}</div>
-            <div className="text-xs font-bold text-slate-700 mt-1">Turmas Ativas</div>
-            <div className="text-[10px] text-purple-600 mt-0.5">Matrizes alocadas</div>
+            <div className="text-xs font-bold text-slate-700 mt-1">Turmas</div>
+            <div className="text-[10px] text-purple-600 mt-0.5">cadastradas</div>
           </div>
         </div>
       </div>
@@ -474,10 +463,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
       {/* ========================================================= */}
       {/* DASHBOX DE STATUS COM NOVAS ATUALIZAÇÕES DISPONÍVEIS & OTA */}
       {/* ========================================================= */}
-      <SystemUpdateStatusDashbox
-        systemVersion={settings?.systemVersion || 'v5.5.0 Enterprise'}
-        onNavigateToUpdates={() => onNavigate('SYSTEM_UPDATES')}
-      />
+
 
       {/* ========================================================= */}
       {/* SEÇÃO 2: TELA DE NOTIFICAÇÕES, ALERTAS DE ANOMALIAS & PENDÊNCIAS */}
@@ -837,10 +823,6 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
               <div className="h-12 w-12 rounded-2xl bg-emerald-50 group-hover:bg-emerald-600 text-emerald-600 group-hover:text-white flex items-center justify-center transition-colors">
                 <MessageSquare className="h-6 w-6" />
               </div>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Online
-              </span>
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-sm group-hover:text-emerald-600 transition-colors">

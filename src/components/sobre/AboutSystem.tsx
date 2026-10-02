@@ -1,3 +1,4 @@
+import { appVersionText } from '../../config/appVersion';
 import React, { useState, useRef, useMemo } from 'react';
 import {
   Info,
@@ -45,10 +46,10 @@ const DEFAULT_DEVELOPER_CONTACT: DeveloperContact = {
   name: 'Equipe SucessoEdu',
   company: 'SucessoEdu Gestão Educacional',
   email: 'suportetecnicoads@gmail.com',
-  phone: '(00) 00000-0000',
+  phone: '',
   supportAvailability: 'Seg. a Sex., 8h às 18h',
   license: 'Licença Enterprise',
-  systemVersion: 'v5.4.2-ENTERPRISE',
+  systemVersion: '',
 };
 
 /**
@@ -273,7 +274,7 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
         <div className="relative z-10 space-y-4 max-w-3xl">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
             <Sparkles className="h-3.5 w-3.5" />
-            SucessoEdu Gestão Educacional • Versão 5.0 Enterprise
+            SucessoEdu Gestão Educacional • {appVersionText()}
           </div>
           <h1 className="text-2xl sm:text-4xl font-black tracking-tight">
             Plataforma Unificada de Gestão Escolar, Inteligência Pedagógica & Censo Municipal
@@ -722,10 +723,12 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
                   {safeContact.email}
                 </a>
               </div>
-              <div className="text-slate-800 font-semibold flex items-center gap-2">
-                <span className="text-slate-400">WhatsApp / Fone:</span>
-                <span className="text-slate-900 font-bold">{safeContact.phone}</span>
-              </div>
+              {safeContact.phone && !/^\(?0{2}\)?\s*0{4,5}-?0{4}$/.test(safeContact.phone.trim()) && (
+                <div className="text-slate-800 font-semibold flex items-center gap-2">
+                  <span className="text-slate-400">WhatsApp / Fone:</span>
+                  <span className="text-slate-900 font-bold">{safeContact.phone}</span>
+                </div>
+              )}
               <div className="text-slate-500 text-[11px] leading-relaxed">
                 {safeContact.supportAvailability}
               </div>
@@ -743,34 +746,25 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
                     className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold border border-indigo-200 transition cursor-pointer flex items-center gap-1"
                   >
                     <Sparkles className="w-3 h-3 text-indigo-600" />
-                    <span>Ver Novidades</span>
+                    <span>Atualizações</span>
                   </button>
                 )}
               </div>
               <div className="flex items-center justify-between">
                 <div className="text-slate-900 font-bold text-sm font-mono">
-                  {safeContact.systemVersion || 'v5.4.1-ENTERPRISE'}
+                  {appVersionText()}
                 </div>
                 {onOpenVersionControl && (
                   <button
                     onClick={onOpenVersionControl}
                     className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1 cursor-pointer"
                   >
-                    Controle de Versões &rarr;
+                    Atualizações &rarr;
                   </button>
                 )}
               </div>
               <div className="text-slate-600 text-[11px] leading-relaxed">
                 {safeContact.license}
-              </div>
-              <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-emerald-700 font-bold text-[11px]">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  Software Homologado &amp; Ativo
-                </div>
-                <span className="text-[10px] font-mono text-slate-400 bg-white px-2 py-0.5 rounded border border-slate-200">
-                  C:\SucessoEdu
-                </span>
               </div>
             </div>
           </div>

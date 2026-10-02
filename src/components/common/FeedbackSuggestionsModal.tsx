@@ -1,3 +1,4 @@
+import { appVersionText } from '../../config/appVersion';
 import React, { useState } from 'react';
 import {
   MessageSquare,
@@ -39,12 +40,14 @@ export const FeedbackSuggestionsModal: React.FC<FeedbackSuggestionsModalProps> =
   const [description, setDescription] = useState('');
   const [userContactName, setUserContactName] = useState(currentUser?.name || '');
   const [userContactPhone, setUserContactPhone] = useState(currentUser?.phone || '');
-  const [schoolUnitName, setSchoolUnitName] = useState(settings?.name || 'Colégio SucessoEdu');
+  const [schoolUnitName, setSchoolUnitName] = useState(settings?.name || '');
   const [isSent, setIsSent] = useState(false);
 
   if (!isOpen) return null;
 
-  const targetWhatsApp = (developerContact.whatsapp || developerContact.phone || '5511987654321').replace(/\D/g, '');
+  const rawPhone = String(developerContact.whatsapp || developerContact.phone || '').replace(/\D/g, '');
+  // Número de exemplo (só zeros) não conta: sem número real, a mensagem vai por e-mail.
+  const targetWhatsApp = /^0*$/.test(rawPhone) ? '' : rawPhone;
 
   const handleSendToWhatsApp = (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,7 +71,7 @@ export const FeedbackSuggestionsModal: React.FC<FeedbackSuggestionsModalProps> =
 *Remetente:* ${userContactName || 'Operador do Sistema'} (${currentUser?.sectorTitle || 'Secretaria / Gestão'})
 *Escola / Instituição:* ${schoolUnitName}
 *Contato:* ${userContactPhone || 'Não informado'}
-*Versão do Sistema:* ${developerContact.systemVersion || 'v5.0.0-Enterprise'}
+*Versão do Sistema:* ${appVersionText()}
 *Data/Hora:* ${new Date().toLocaleString('pt-BR')}
 
 *Mensagem Detalhada:*
@@ -78,9 +81,12 @@ ${description}
 _Mensagem gerada via Módulo de Feedback e Sugestões do SucessoEdu._`;
 
     const encoded = encodeURIComponent(textPayload);
-    const whatsappUrl = `https://api.whatsapp.com/send?phone=${targetWhatsApp}&text=${encoded}`;
-
-    window.open(whatsappUrl, '_blank');
+    if (targetWhatsApp) {
+      window.open(`https://api.whatsapp.com/send?phone=${targetWhatsApp}&text=${encoded}`, '_blank');
+    } else {
+      const to = developerContact.email || 'suportetecnicoads@gmail.com';
+      window.open(`mailto:${to}?subject=${encodeURIComponent(`SucessoEdu - ${subject || feedbackType}`)}&body=${encoded}`, '_blank');
+    }
     setIsSent(true);
     setTimeout(() => {
       setIsSent(false);
@@ -121,10 +127,11 @@ _Mensagem gerada via Módulo de Feedback e Sugestões do SucessoEdu._`;
             <div className="h-16 w-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
               <CheckCircle2 className="h-8 w-8" />
             </div>
-            <h3 className="text-lg font-bold text-slate-900">Mensagem Direcionada ao WhatsApp!</h3>
+            <h3 className="text-lg font-bold text-slate-900">Mensagem preparada!</h3>
             <p className="text-xs text-slate-600 max-w-md mx-auto">
-              Sua solicitação foi formatada e enviada diretamente para o programador responsável (
-              {developerContact.name} - {developerContact.phone}).
+              {targetWhatsApp
+                ? 'O WhatsApp foi aberto com a mensagem pronta. Confirme o envio por lá.'
+                : 'O e-mail foi aberto com a mensagem pronta. Confirme o envio no seu programa de e-mail.'}
             </p>
           </div>
         ) : (

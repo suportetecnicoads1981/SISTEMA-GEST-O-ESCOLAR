@@ -284,7 +284,7 @@ export const Header: React.FC<HeaderProps> = ({
             title="Ver Controle de Versões & Apresentação de Melhorias"
           >
             <Sparkles className="h-3.5 w-3.5 text-purple-600 group-hover:rotate-12 transition-transform" />
-            <span className="hidden lg:inline font-mono text-[11px] text-purple-800 font-bold">{currentVersion || 'v5.4.1'}</span>
+            <span className="hidden lg:inline font-mono text-[11px] text-purple-800 font-bold">{currentVersion || ''}</span>
             <span className="hidden 2xl:inline text-[9px] bg-purple-200/80 text-purple-900 px-1.5 py-0.5 rounded-md font-sans uppercase">Novidades</span>
           </button>
         )}

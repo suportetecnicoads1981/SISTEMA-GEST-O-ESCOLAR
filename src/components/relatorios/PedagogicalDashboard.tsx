@@ -1,3 +1,4 @@
+import { appVersionText } from '../../config/appVersion';
 import React, { useState, useMemo, useEffect } from 'react';
 import { FlexChart } from '../common/FlexChart';
 import {
@@ -246,8 +247,14 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
   // Generate pedagogical report for selected exam
   const report: PedagogicalReport | null = useMemo(() => {
     if (!selectedExam) return null;
-    return generatePedagogicalReport(selectedExam, questions, students, submissions);
-  }, [selectedExam, questions, students, submissions]);
+    // Filtro "Turma": considera só as entregas dos alunos da turma escolhida.
+    const subs =
+      selectedClassId === 'ALL'
+        ? submissions
+        : submissions.filter((sub) => students.find((st) => st.id === sub.studentId)?.classId === selectedClassId);
+    if (!subs.some((sub) => sub.examId === selectedExam.id)) return null;
+    return generatePedagogicalReport(selectedExam, questions, students, subs);
+  }, [selectedExam, questions, students, submissions, selectedClassId]);
 
   const handleGenerateAiInsight = async () => {
     if (!selectedExam) return;
@@ -263,7 +270,7 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
         examTitle: selectedExam.title,
         subject: selectedExam.subject,
         className,
-        averageScore: report ? Number(report.averageScore.toFixed(1)) : 7.0,
+        averageScore: report ? Number(report.averageScore.toFixed(1)) : 0,
         commonErrors: report?.commonErrors?.map((e) => ({ topic: e.topic, errorRate: e.errorPercentage })) || [],
         topicMastery,
       });
@@ -801,10 +808,6 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs bg-emerald-500/20 text-emerald-300 font-bold px-3 py-1 rounded-full border border-emerald-400/30 flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping"></span>
-              Transmissão ao Vivo
-            </span>
             <button
               onClick={() => setIsPresentationMode(false)}
               className="px-3 py-1 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-lg cursor-pointer"
@@ -825,8 +828,8 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
           >
             <span className={`text-xs font-bold ${cardSubtextClass} uppercase mb-1`}>Alunos Ativos</span>
             <div className="flex items-baseline gap-2">
-              <span className={`text-2xl font-bold ${titleClass}`}>{students.length}</span>
-              <span className="text-emerald-500 text-xs font-medium">+100% matriculados</span>
+              <span className={`text-2xl font-bold ${titleClass}`}>{students.filter((s) => s.status === 'ACTIVE').length}</span>
+              <span className="text-emerald-500 text-xs font-medium">situação Ativo</span>
             </div>
           </div>
         )}
@@ -842,7 +845,7 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
             </span>
             <div className="flex items-baseline gap-2">
               <span className={`text-2xl font-bold ${titleClass}`}>
-                {report ? report.averageScore.toFixed(2) : '7.80'}
+                {report ? report.averageScore.toFixed(2) : '—'}
               </span>
               <span className="text-emerald-500 text-xs font-medium">
                 Meta: {selectedExam?.passingScore || 6.0} pts
@@ -860,25 +863,23 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
             <span className={`text-xs font-bold ${cardSubtextClass} uppercase mb-1`}>Taxa de Aprovação</span>
             <div className="flex items-baseline gap-2">
               <span className={`text-2xl font-bold ${titleClass}`}>
-                {report ? `${report.approvalRate.toFixed(0)}%` : '92%'}
+                {report ? `${report.approvalRate.toFixed(0)}%` : '—'}
               </span>
-              <span className="text-indigo-500 text-xs font-medium">Auto-avaliados</span>
+              <span className="text-indigo-500 text-xs font-medium">{report ? 'na prova selecionada' : 'sem prova corrigida'}</span>
             </div>
           </div>
         )}
 
-        {/* Metric 4: Status do Servidor */}
+        {/* Metric 4: Provas corrigidas (o antigo "Status Servidor" era fixo) */}
         {dashBoxes.tileServer && (
           <div
             id="bento-tile-server"
             className={`col-span-12 sm:col-span-6 lg:col-span-3 ${cardBgClass} rounded-2xl border p-4 shadow-xs flex flex-col justify-center transition-all`}
           >
-            <span className={`text-xs font-bold ${cardSubtextClass} uppercase mb-1`}>Status Servidor</span>
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 truncate">
-                \\SRV-ACAD-01\DATABASE
-              </span>
+            <span className={`text-xs font-bold ${cardSubtextClass} uppercase mb-1`}>Provas Corrigidas</span>
+            <div className="flex items-baseline gap-2">
+              <span className={`text-2xl font-bold ${titleClass}`}>{submissions.length}</span>
+              <span className="text-indigo-500 text-xs font-medium">entregas registradas</span>
             </div>
           </div>
         )}
@@ -923,19 +924,19 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
               <div>
                 <p className={`text-[10px] ${cardSubtextClass} uppercase font-bold`}>Erro Comum Recorrente</p>
                 <p className="text-xs font-bold text-rose-500">
-                  {report?.commonErrors?.[0]?.topic || 'Cálculo de Proporção'}
+                  {report?.commonErrors?.[0]?.topic || '—'}
                 </p>
               </div>
               <div>
                 <p className={`text-[10px] ${cardSubtextClass} uppercase font-bold`}>Meta de Aproveitamento</p>
                 <p className={`text-xs font-bold ${titleClass}`}>
-                  {report ? `${report.approvalRate.toFixed(1)}% atingido` : '85.2% atingido'}
+                  {report ? `${report.approvalRate.toFixed(1)}% atingido` : '—'}
                 </p>
               </div>
               <div>
                 <p className={`text-[10px] ${cardSubtextClass} uppercase font-bold`}>Tempo Médio</p>
                 <p className="text-xs font-bold text-indigo-600">
-                  {report ? `${Math.floor(report.averageTimeSpentSeconds / 60)} min` : '18 min'}
+                  {report && report.averageTimeSpentSeconds > 0 ? `${Math.floor(report.averageTimeSpentSeconds / 60)} min` : '—'}
                 </p>
               </div>
             </div>
@@ -954,9 +955,6 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
                   <BrainCircuit className="h-4 w-4 text-indigo-200" />
                   Diagnóstico IA (Gemini)
                 </h3>
-                <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-mono font-bold text-indigo-100">
-                  gemini-3.8-flash
-                </span>
               </div>
 
               <div className="space-y-2.5">
@@ -1009,10 +1007,6 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
                 <span>{isGeneratingAiInsight ? 'Sintetizando com Gemini AI...' : 'Gerar Diagnóstico IA da Turma'}</span>
               </button>
 
-              <div className="text-[11px] text-indigo-100 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 flex items-center justify-between">
-                <span>Mapeamento BNCC</span>
-                <span className="font-bold text-emerald-300">100% Coberto</span>
-              </div>
             </div>
           </div>
         )}
@@ -1128,7 +1122,7 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
               <div>
                 <p className="text-xs font-bold text-white">SucessoEdu Gestão Educacional</p>
                 <p className="text-[10px] text-slate-400 font-mono">
-                  suportetecnicoads@gmail.com | Versão 2.4.0
+                  suportetecnicoads@gmail.com | {appVersionText()}
                 </p>
               </div>
               <div className="px-3 py-1 bg-indigo-600 rounded-lg font-bold text-white text-xs shadow-sm">

@@ -761,7 +761,7 @@ export function PrintExportModal<T>({
                 )}
 
                 <div className="text-center text-[9px] text-slate-400 mt-6 pt-2 border-t border-slate-100 flex items-center justify-between">
-                  <span>SucessoEdu Gestão Educacional v5.0 • Documento Oficial Autenticado</span>
+                  <span>SucessoEdu Gestão Educacional</span>
                   <span>Total de Registros: {items.length}</span>
                 </div>
               </div>

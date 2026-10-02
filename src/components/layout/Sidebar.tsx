@@ -238,7 +238,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           id: 'ARCHITECTURE_DIAGRAM',
           label: moduleName('ARCHITECTURE_DIAGRAM'),
           icon: GitBranch,
-          badge: '18 Módulos',
           shortcut: 'Alt+A',
         },
       ],
@@ -347,7 +346,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           id: 'ADMIN_TI',
           label: moduleName('ADMIN_TI'),
           icon: Server,
-          badge: '12 Painéis',
         },
         {
           id: 'OMNI_DEPLOY',
@@ -463,7 +461,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </span>
                 <span className="text-[9px] text-emerald-400 font-bold flex items-center gap-1 group-hover/ver:text-emerald-300">
                   <Sparkles className="w-2.5 h-2.5 text-amber-400" />
-                  <span>{currentVersion || 'v5.4.1'}</span>
+                  <span>{currentVersion || ''}</span>
                 </span>
               </div>
             </div>
@@ -853,7 +851,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {isExpanded ? (
           <>
             <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-[10px]">{isPinned ? 'Fixada' : 'Auto-Hide'}</span>
             </div>
             <button
@@ -872,7 +869,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </>
         ) : (
-          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Sistema Online / Modo Local Ativo" />
+          <div className="w-2 h-2 rounded-full bg-slate-600" />
         )}
       </div>
     </aside>

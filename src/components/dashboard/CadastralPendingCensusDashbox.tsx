@@ -143,7 +143,7 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
         s.address.toLowerCase().includes('pendente') ||
         s.pendingFields?.some((f) => f.toLowerCase().includes('endereço') || f.toLowerCase().includes('endereco'))
     ).length;
-    const totalPolos = schoolOptions.length || (schoolUnits.length > 0 ? schoolUnits.length : 1);
+    const totalPolos = schoolOptions.length || schoolUnits.length;
 
     return {
       totalIncomplete,

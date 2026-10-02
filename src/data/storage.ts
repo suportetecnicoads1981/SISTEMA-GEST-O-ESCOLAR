@@ -946,7 +946,7 @@ export function generatePedagogicalReport(
   const avgTime =
     scores.length > 0
       ? Math.round(examSubmissions.reduce((a, b) => a + b.timeSpentSeconds, 0) / totalSubs)
-      : 1200;
+      : 0;
 
   // Compute question hit rate stats and common distractor errors
   const commonErrors: CommonQuestionError[] = [];

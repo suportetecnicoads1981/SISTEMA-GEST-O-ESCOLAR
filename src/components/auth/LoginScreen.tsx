@@ -62,7 +62,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   schoolUnits,
   onLoginSuccess,
   onPasswordUpdate,
-  systemVersion = 'v5.4.0-ENTERPRISE',
+  systemVersion = '',
   companyLogoUrl,
 }) => {
   const [username, setUsername] = useState('');

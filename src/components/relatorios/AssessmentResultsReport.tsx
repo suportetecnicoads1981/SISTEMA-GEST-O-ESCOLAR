@@ -128,9 +128,9 @@ export const AssessmentResultsReport: React.FC<AssessmentResultsReportProps> = (
     return submissions.map((sub) => {
       const student = studentsById.get(sub.studentId);
       const studentClass = student ? classesById.get(student.classId) : undefined;
-      const schoolUnit = studentClass?.schoolUnitId
-        ? schoolUnitsById.get(studentClass.schoolUnitId)
-        : schoolUnits[0];
+      // Escola pela turma do aluno (ou pelo vínculo dele); nunca a primeira escola da lista.
+      const unitId = studentClass?.schoolUnitId || student?.schoolUnitId;
+      const schoolUnit = unitId ? schoolUnitsById.get(unitId) : undefined;
       const exam = examsById.get(sub.examId);
 
       // Determine segment / school level
@@ -159,8 +159,8 @@ export const AssessmentResultsReport: React.FC<AssessmentResultsReportProps> = (
         className: studentClass?.name || 'Turma Não Identificada',
         gradeLevel,
         segment,
-        schoolUnitId: schoolUnit?.id || 'unit-default',
-        schoolUnitName: schoolUnit?.name || 'Unidade Sede Central',
+        schoolUnitId: schoolUnit?.id || 'sem-escola',
+        schoolUnitName: schoolUnit?.name || 'Escola não identificada',
         schoolZone: schoolUnit?.locationZone === 'ZONA_RURAL' || schoolUnit?.locationZone === 'RURAL' ? 'Rural' : 'Urbana',
         examTitle: exam?.title || 'Avaliação Geral',
         subjectName: exam?.subject || 'Geral',
@@ -447,7 +447,7 @@ export const AssessmentResultsReport: React.FC<AssessmentResultsReportProps> = (
         unit: '%',
         defaultChartType: 'BAR_HORIZONTAL',
         benchmarkValue: 70,
-        benchmarkLabel: 'Meta Municipal (70%)',
+        benchmarkLabel: 'Referência (70%)',
       },
       {
         id: 'grade_level',
@@ -463,7 +463,7 @@ export const AssessmentResultsReport: React.FC<AssessmentResultsReportProps> = (
         unit: '%',
         defaultChartType: 'BAR_VERTICAL',
         benchmarkValue: 70,
-        benchmarkLabel: 'Meta SME (70%)',
+        benchmarkLabel: 'Referência (70%)',
       },
       {
         id: 'proficiency_dist',
@@ -492,7 +492,7 @@ export const AssessmentResultsReport: React.FC<AssessmentResultsReportProps> = (
         unit: '%',
         defaultChartType: 'BAR_VERTICAL',
         benchmarkValue: 75,
-        benchmarkLabel: 'Meta IDEB (75%)',
+        benchmarkLabel: 'Referência (75%)',
       },
       {
         id: 'subject_ranking',
@@ -867,7 +867,7 @@ export const AssessmentResultsReport: React.FC<AssessmentResultsReportProps> = (
             <span className="text-xs font-semibold text-slate-500">entregas</span>
           </div>
           <div className="mt-2 text-[11px] text-slate-500">
-            Amostra válida em {classes.length} turmas da rede
+            Em {new Set(filteredSubmissions.map((sb: any) => sb.classId).filter((c: string) => c && c !== '—')).size} turma(s)
           </div>
         </div>
 
@@ -988,7 +988,7 @@ export const AssessmentResultsReport: React.FC<AssessmentResultsReportProps> = (
                 unit="%"
                 defaultChartType="BAR_HORIZONTAL"
                 benchmarkValue={70}
-                benchmarkLabel="Meta SME (70%)"
+                benchmarkLabel="Referência (70%)"
                 height={290}
                 onOpenFullCustomizer={() => {
                   setChartCustomizerInitialDataset('school_ranking');
@@ -1035,7 +1035,7 @@ export const AssessmentResultsReport: React.FC<AssessmentResultsReportProps> = (
               unit="%"
               defaultChartType="BAR_VERTICAL"
               benchmarkValue={70}
-              benchmarkLabel="Meta Municipal (70%)"
+              benchmarkLabel="Referência (70%)"
               height={280}
               onOpenFullCustomizer={() => {
                 setChartCustomizerInitialDataset('grade_level');
@@ -1319,7 +1319,7 @@ export const AssessmentResultsReport: React.FC<AssessmentResultsReportProps> = (
           },
           {
             label: 'Ano Letivo',
-            value: '2026',
+            value: String(new Date().getFullYear()),
           },
         ]}
         summaryMetrics={[

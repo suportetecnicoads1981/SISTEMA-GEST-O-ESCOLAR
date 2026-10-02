@@ -20,6 +20,7 @@ import {
   Box,
 } from 'lucide-react';
 import { TAB_METADATA } from './WorkspaceTabsBar';
+import { getLocalServerInfo } from '../../services/offline/localServerSync';
 
 interface WindowsTaskbarProps {
   activeTab: string;
@@ -51,6 +52,18 @@ export const WindowsTaskbar: React.FC<WindowsTaskbarProps> = ({
   totalClasses = 0,
 }) => {
   const [currentTime, setCurrentTime] = useState('');
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine !== false));
+  useEffect(() => {
+    const on = () => setIsOnline(true);
+    const off = () => setIsOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+    };
+  }, []);
+  const localServer = getLocalServerInfo();
   const [currentDate, setCurrentDate] = useState('');
   const [showCalendarFlyout, setShowCalendarFlyout] = useState(false);
   const [isAutoHide, setIsAutoHide] = useState<boolean>(() => {
@@ -141,8 +154,8 @@ export const WindowsTaskbar: React.FC<WindowsTaskbarProps> = ({
                 <span className="font-bold text-blue-400">{totalClasses}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Servidor Local:</span>
-                <span className="font-bold text-emerald-400">Porta 3000 (Ativo)</span>
+                <span className="text-slate-400">Servidor:</span>
+                <span className="font-bold text-emerald-400">{localServer ? localServer.serverName || 'rede local' : 'link publicado'}</span>
               </div>
             </div>
           </div>
@@ -252,18 +265,11 @@ export const WindowsTaskbar: React.FC<WindowsTaskbarProps> = ({
         {/* LADO DIREITO: BANDEJA DO SISTEMA (SYSTEM TRAY) */}
         <div className="flex items-center gap-2 shrink-0 pl-2">
           {/* Indicador de Status Operacional */}
-          <div
-            className="hidden lg:flex items-center gap-1.5 text-[10px] font-medium text-slate-400 px-2 py-0.5 bg-slate-950/40 rounded-md border border-slate-800"
-            title="Todos os subsistemas do SucessoEdu operando normalmente"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Pronto</span>
-          </div>
 
           {/* Indicadores de Hardware / Rede */}
           <div className="flex items-center gap-1.5 px-1.5 py-1 text-slate-400">
-            <div title="Rede Local Conectada e Servidor Autônomo Ativo">
-              <Wifi className="w-3.5 h-3.5 text-emerald-400" />
+            <div title={isOnline ? 'Este computador está com rede' : 'Este computador está sem rede'}>
+              <Wifi className={`w-3.5 h-3.5 ${isOnline ? 'text-emerald-400' : 'text-red-400'}`} />
             </div>
             <div title="Áudio e Efeitos do Sistema Ativados">
               <Volume2 className="w-3.5 h-3.5 text-slate-400" />

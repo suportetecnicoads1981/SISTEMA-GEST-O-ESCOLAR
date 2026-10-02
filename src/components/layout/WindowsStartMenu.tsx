@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { isTabAvailable } from '../../config/features';
+import { appVersionLabel } from '../../config/appVersion';
 import {
   LayoutDashboard,
   Users,
@@ -172,11 +173,10 @@ export const WindowsStartMenu: React.FC<WindowsStartMenuProps> = ({
           </div>
           <div className="min-w-0">
             <div className="text-sm font-bold text-white truncate flex items-center gap-1.5">
-              <span>{currentUser?.name || 'Administrador Master'}</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>{currentUser?.name || ''}</span>
             </div>
             <div className="text-[11px] text-indigo-400 font-medium truncate">
-              {schoolName || 'Escola Polo Municipal'}
+              {schoolName || ''}
             </div>
           </div>
         </div>
@@ -306,6 +306,7 @@ export const WindowsStartMenu: React.FC<WindowsStartMenuProps> = ({
               <div className="text-[10px] font-semibold truncate w-full">Versões</div>
             </button>
 
+            {onOpenArchitectureDiagram && (
             <button
               onClick={() => {
                 onClose();
@@ -316,6 +317,7 @@ export const WindowsStartMenu: React.FC<WindowsStartMenuProps> = ({
               <GitBranch className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform mb-1" />
               <div className="text-[10px] font-semibold truncate w-full">Diagrama</div>
             </button>
+            )}
 
             <button
               onClick={() => {
@@ -335,7 +337,7 @@ export const WindowsStartMenu: React.FC<WindowsStartMenuProps> = ({
       <div className="p-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between shrink-0 relative">
         <div className="flex items-center gap-2 text-xs text-slate-400">
           <Clock className="w-3.5 h-3.5 text-indigo-400" />
-          <span>SucessoEdu v5.5 • Online</span>
+          <span>SucessoEdu • {appVersionLabel() || 'versão não identificada'}</span>
         </div>
 
         <div className="relative">

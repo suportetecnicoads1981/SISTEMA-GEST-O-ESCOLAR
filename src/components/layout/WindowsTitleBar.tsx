@@ -324,8 +324,9 @@ export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
                     className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-800 text-slate-200 flex items-center gap-2 cursor-pointer"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                    <span>Controle de Versões &amp; Novidades</span>
+                    <span>Versão e Atualizações</span>
                   </button>
+                  {onOpenArchitectureDiagram && (
                   <button
                     onClick={() => {
                       onOpenArchitectureDiagram?.();
@@ -336,6 +337,7 @@ export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
                     <GitBranch className="w-3.5 h-3.5 text-indigo-400" />
                     <span>Diagrama de Arquitetura</span>
                   </button>
+                  )}
                   <button
                     onClick={() => {
                       onOpenShortcutsModal?.();

@@ -78,9 +78,6 @@ import { DevBacklogModule, isDevBacklogOwner } from './components/admin/DevBackl
 import { AboutSystem } from './components/sobre/AboutSystem';
 import { LoginScreen } from './components/auth/LoginScreen';
 import { TopOverviewBanner } from './components/layout/TopOverviewBanner';
-import { WelcomeUpdateModal } from './components/common/WelcomeUpdateModal';
-import { VersionControlModal } from './components/version/VersionControlModal';
-import { ModulesArchitectureDiagramModal } from './components/config/ModulesArchitectureDiagramModal';
 import { UniversalDataImportModal } from './components/secretaria/UniversalDataImportModal';
 import { WorkspaceTabsBar } from './components/layout/WorkspaceTabsBar';
 import { WindowsTitleBar } from './components/layout/WindowsTitleBar';
@@ -99,6 +96,7 @@ import type { WhatsAppPrefill } from './components/comunicacao/WhatsAppModule';
 import { DatabaseAutomatorService } from './services/databaseAutomatorService';
 
 import { lazyModule } from './utils/lazyModule';
+import { appVersionLabel } from './config/appVersion';
 // Módulos de TI pesados (geradores de instaladores e do app offline) só carregam quando abertos.
 const NetworkInstaller = lazyModule(() => import('./components/config/NetworkInstaller').then((m) => ({ default: m.NetworkInstaller })));
 const SystemUpdateModule = lazyModule(() => import('./components/config/SystemUpdateModule').then((m) => ({ default: m.SystemUpdateModule })));
@@ -174,16 +172,6 @@ export default function App() {
   });
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [isUniversalImportModalOpen, setIsUniversalImportModalOpen] = useState(false);
-  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(() => {
-    try {
-      return localStorage.getItem('sucessoedu_show_welcome_modal') === 'true';
-    } catch {
-      return false;
-    }
-  });
-  const [lastUpdatePackage, setLastUpdatePackage] = useState<SystemUpdatePackage | null>(null);
-  const [isArchitectureDiagramModalOpen, setIsArchitectureDiagramModalOpen] = useState(false);
-  const [isVersionControlModalOpen, setIsVersionControlModalOpen] = useState(false);
   const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   // Tira-dúvidas (botão no alto da tela e tecla F1)
@@ -1642,67 +1630,6 @@ export default function App() {
     }));
   };
 
-  // System Update Handlers
-  const handleApplySystemUpdate = (pkg: SystemUpdatePackage) => {
-    try {
-      localStorage.setItem('sucessoedu_active_version', pkg.version);
-      localStorage.setItem(
-        'sucessoedu_last_downloaded_version',
-        JSON.stringify({
-          version: pkg.version,
-          title: pkg.title,
-          date: new Date().toISOString(),
-          checksum: pkg.sha256Checksum,
-          size: pkg.sizeFormatted,
-        })
-      );
-    } catch {}
-
-    setData((prev) => {
-      const existing = (prev.systemUpdatePackages || []).findIndex((p) => p.id === pkg.id);
-      let updated: SystemUpdatePackage[];
-      if (existing >= 0) {
-        updated = [...(prev.systemUpdatePackages || [])];
-        updated[existing] = { ...pkg, isInstalled: true, installedAt: new Date().toISOString() };
-      } else {
-        updated = [{ ...pkg, isInstalled: true, installedAt: new Date().toISOString() }, ...(prev.systemUpdatePackages || [])];
-      }
-      return {
-        ...prev,
-        settings: {
-          ...prev.settings,
-          systemVersion: pkg.version,
-        },
-        // Os dados do desenvolvedor (Sobre o Sistema) não são alterados pela instalação de pacotes.
-        systemUpdatePackages: updated,
-      };
-    });
-    logSecurityAudit(
-      'SISTEMA',
-      currentUser?.id || 'usr-master-001',
-      currentUser?.name || 'Administrador',
-      currentUser?.role || 'ADMIN',
-      currentUser?.sector || 'MASTER',
-      `Pacote de Atualização ${pkg.version} instalado no sistema por ${currentUser?.name || 'Administrador'}.`
-    );
-    setLastUpdatePackage(pkg);
-    setIsWelcomeModalOpen(true);
-    try {
-      localStorage.setItem('sucessoedu_show_welcome_modal', 'true');
-    } catch {}
-    triggerPushNotification(
-      '🚀 Atualização Instalada',
-      `O sistema foi atualizado com sucesso para a versão ${pkg.version}.`
-    );
-  };
-
-  const handleCloseWelcomeModal = () => {
-    setIsWelcomeModalOpen(false);
-    try {
-      localStorage.removeItem('sucessoedu_show_welcome_modal');
-    } catch {}
-  };
-
   const handleNavigate = (tab: string, payload?: any) => {
     let target = tab;
     if (tab === 'USER_ACCESS') target = 'USER_CONTROL';
@@ -1851,7 +1778,7 @@ export default function App() {
       <LoginScreen
         userAccounts={data.userAccounts || []}
         schoolUnits={data.schoolUnits || []}
-        systemVersion={data.settings?.systemVersion || 'v5.4.0-ENTERPRISE'}
+        systemVersion={appVersionLabel()}
         onPasswordUpdate={handlePasswordUpdate}
         onLoginSuccess={(user) => {
           setCurrentUser(user);
@@ -1909,8 +1836,7 @@ export default function App() {
         schoolName={viewData.settings?.name}
         onNavigate={handleNavigate}
         onOpenQuickSearch={() => setIsQuickSearchOpen(true)}
-        onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
-        onOpenArchitectureDiagram={() => setIsArchitectureDiagramModalOpen(true)}
+        onOpenVersionControl={() => handleNavigate('SYSTEM_UPDATES')}
         onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
         onToggleSidebar={() => setIsSidebarCollapsed((prev) => !prev)}
         isSidebarCollapsed={isSidebarCollapsed}
@@ -1940,9 +1866,8 @@ export default function App() {
         onOpenNotificationModal={() => setIsNotificationModalOpen(true)}
         onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
         onOpenQuickSearch={() => setIsQuickSearchOpen(true)}
-        onOpenArchitectureDiagram={() => setIsArchitectureDiagramModalOpen(true)}
-        onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
-        currentVersion={viewData.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
+        onOpenVersionControl={() => handleNavigate('SYSTEM_UPDATES')}
+        currentVersion={appVersionLabel()}
         onLogout={handleLogout}
         onToggleStartMenu={() => setIsStartMenuOpen((prev) => !prev)}
         isStartMenuOpen={isStartMenuOpen}
@@ -1961,8 +1886,8 @@ export default function App() {
           onSelectTab={(tab) => handleNavigate(tab)}
           onLogout={handleLogout}
           onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
-          onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
-          currentVersion={viewData.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
+          onOpenVersionControl={() => handleNavigate('SYSTEM_UPDATES')}
+          currentVersion={appVersionLabel()}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
           showDevBacklog={isDevBacklogOwner(currentUser?.email)}
@@ -2372,13 +2297,10 @@ export default function App() {
             {activeTab === 'SYSTEM_UPDATES' && (
               <Suspense fallback={<ModuleLoadingFallback moduleName="Atualizações do Sistema" />}>
               <SystemUpdateModule
-                currentVersion={viewData.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
-                updatePackages={viewData.systemUpdates || []}
-                onApplyUpdate={handleApplySystemUpdate}
                 onBack={handleGoBack}
                 onNavigate={handleNavigate}
-                onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
                 currentUser={currentUser}
+                isAdmin={currentRole === 'ADMIN'}
               />
               </Suspense>
             )}
@@ -2441,7 +2363,7 @@ export default function App() {
                 onUpdateSettings={handleUpdateSettings}
                 onBack={handleGoBack}
                 onNavigate={handleNavigate}
-                onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
+                onOpenVersionControl={() => handleNavigate('SYSTEM_UPDATES')}
                 canEditDeveloper={[authenticatedAccount, currentUser].some((u: any) => u?.isMaster || u?.sector === 'MASTER')}
               />
             )}
@@ -2461,7 +2383,7 @@ export default function App() {
         onOpenNotifications={() => setIsNotificationModalOpen(true)}
         unreadNotificationsCount={unreadNotificationCount}
         schoolName={data?.settings?.name}
-        totalStudents={data?.students?.length || 0}
+        totalStudents={(data?.students || []).filter((s) => s.status === 'ACTIVE').length}
         totalClasses={data?.classes?.length || 0}
       />
 
@@ -2474,8 +2396,7 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         schoolName={viewData.settings?.name}
-        onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
-        onOpenArchitectureDiagram={() => setIsArchitectureDiagramModalOpen(true)}
+        onOpenVersionControl={() => handleNavigate('SYSTEM_UPDATES')}
         onOpenShortcutsModal={() => setIsShortcutsModalOpen(true)}
       />
 
@@ -2550,35 +2471,6 @@ export default function App() {
         }}
         settings={viewData.settings}
         currentUser={currentUser}
-      />
-
-      {/* TELA DE BOAS-VINDAS PÓS-ATUALIZAÇÃO COM NOVIDADES */}
-      <WelcomeUpdateModal
-        isOpen={isWelcomeModalOpen}
-        onClose={handleCloseWelcomeModal}
-        onNavigate={handleNavigate}
-        currentVersion={viewData.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
-        updatePackage={lastUpdatePackage}
-        onOpenManual={() => handleNavigate('SYSTEM_UPDATES')}
-        onOpenDiagram={() => setIsArchitectureDiagramModalOpen(true)}
-        onOpenVersionControl={() => setIsVersionControlModalOpen(true)}
-      />
-
-      {/* MODAL OFICIAL DE CONTROLE DE VERSÕES E APRESENTAÇÃO DE MELHORIAS */}
-      <VersionControlModal
-        isOpen={isVersionControlModalOpen}
-        onClose={() => setIsVersionControlModalOpen(false)}
-        currentVersion={viewData.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
-        packages={viewData.systemUpdates || []}
-        onNavigateToModule={handleNavigate}
-      />
-
-      {/* DIAGRAMA OFICIAL DE ARQUITETURA DOS 17 MÓDULOS & CENTRAL DE SOLICITAÇÕES IA */}
-      <ModulesArchitectureDiagramModal
-        isOpen={isArchitectureDiagramModalOpen}
-        onClose={() => setIsArchitectureDiagramModalOpen(false)}
-        version={viewData.settings?.systemVersion || 'v5.4.1-ENTERPRISE'}
-        onNavigateToTab={handleNavigate}
       />
 
       {/* MÓDULO UNIVERSAL DE IMPORTAÇÃO DE DADOS & POLOS REMOTOS */}
