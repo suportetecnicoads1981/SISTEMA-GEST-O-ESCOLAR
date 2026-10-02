@@ -116,7 +116,7 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     title: moduleName('MAIN_DASHBOARD'),
-    subtitle: 'Indicadores e Métricas em Tempo Real',
+    subtitle: 'Indicadores e alertas da rede',
     description:
       'O painel principal consolida o total de matrículas, frequência média, fluxo de caixa e alertas gerenciais para tomada rápida de decisões.',
     icon: LayoutDashboard,
@@ -128,7 +128,7 @@ const TOUR_STEPS: TourStep[] = [
     title: moduleName('STUDENTS'),
     subtitle: 'Gestão Completa de Matrizes e Estudantes',
     description:
-      'Cadastre alunos, gerencie histórico escolar, transferências, status cadastral e emita certificados e históricos oficiais com validação.',
+      'Cadastre alunos, gerencie histórico escolar, transferências, status cadastral e emita certificados, históricos e declarações.',
     icon: Users,
     accentColor: 'from-emerald-600 to-teal-600',
     targetTab: 'STUDENTS',
@@ -158,7 +158,7 @@ const TOUR_STEPS: TourStep[] = [
     title: moduleName('ADMIN_TI'),
     subtitle: 'Instalação, Backup e Sincronização',
     description:
-      'Painéis avançados para gerenciamento de banco de dados local/nuvem, exportação de instaladores offline e atualizações OTA.',
+      'Situação do servidor e da nuvem, instaladores da rede local, controle de acesso e atualizações do sistema.',
     icon: Server,
     accentColor: 'from-slate-700 to-slate-900',
     targetTab: 'ADMIN_TI',

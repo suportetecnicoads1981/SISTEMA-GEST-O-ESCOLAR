@@ -73,7 +73,7 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
     municipalSecretaryId: 'semed-cumaru-do-norte',
     municipalSecretaryName: 'Secretaria Municipal de Educação – SEMED',
     municipalSecretaryCnpj: '30.676.114/0001-17',
-    linkageCode: 'VINC-SEMED-PA-001',
+    linkageCode: '',
     linkageDecree: '',
     logoUrl: '',
     managementLogoUrl: defaultManagementLogo || '',
@@ -216,18 +216,19 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
       syncStatus: formData.syncStatus || 'NUNCA_SINCRONIZADO',
       lastSyncDate: unitToEdit?.lastSyncDate || undefined,
       gradesServed: formData.gradesServed || [],
-      gradesServedText: formData.gradesServedText || (formData.gradesServed && formData.gradesServed.length > 0 ? formData.gradesServed.join(', ') : 'Educação Básica'),
-      offeredStages: formData.offeredStages || ['ENSINO_FUNDAMENTAL_I', 'ENSINO_FUNDAMENTAL_II'],
+      gradesServedText: formData.gradesServedText || (formData.gradesServed && formData.gradesServed.length > 0 ? formData.gradesServed.join(', ') : undefined),
+      // Só o que foi informado (antes gravava etapas, turnos, horário e capacidade de exemplo).
+      offeredStages: formData.offeredStages || undefined,
       offeredGrades: formData.offeredGrades || [],
-      offeredShifts: formData.offeredShifts || ['MATUTINO', 'VESPERTINO'],
-      operatingHours: formData.operatingHours || '07:00 às 17:30',
-      maxCapacityStudents: formData.maxCapacityStudents || 350,
-      maxCapacityClasses: formData.maxCapacityClasses || 12,
+      offeredShifts: formData.offeredShifts || undefined,
+      operatingHours: formData.operatingHours || undefined,
+      maxCapacityStudents: formData.maxCapacityStudents || undefined,
+      maxCapacityClasses: formData.maxCapacityClasses || undefined,
       isLinkedToSecretary: formData.isLinkedToSecretary !== false,
       municipalSecretaryId: formData.municipalSecretaryId || 'semed-cumaru-do-norte',
       municipalSecretaryName: formData.municipalSecretaryName || 'Secretaria Municipal de Educação – SEMED',
       municipalSecretaryCnpj: formData.municipalSecretaryCnpj || '30.676.114/0001-17',
-      linkageCode: formData.linkageCode || 'VINC-SEMED-PA-001',
+      linkageCode: formData.linkageCode || '',
       linkageDate: formData.linkageDate || new Date().toISOString(),
       linkageDecree: formData.linkageDecree || '',
       isAnnex: isAnnex || undefined,
@@ -286,8 +287,8 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
                   <span className="font-bold text-emerald-950 text-xs">
                     Vínculo Central: Secretaria Municipal de Educação – SEMED
                   </span>
-                  <span className="px-1.5 py-0.2 rounded-sm bg-emerald-600 text-white font-mono text-[9px] font-bold">
-                    HOMOLOGADA
+                  <span className={`px-1.5 py-0.2 rounded-sm text-white font-mono text-[9px] font-bold ${formData.isLinkedToSecretary !== false ? 'bg-emerald-600' : 'bg-slate-500'}`}>
+                    {formData.isLinkedToSecretary !== false ? 'VINCULADA' : 'NÃO VINCULADA'}
                   </span>
                 </div>
                 <p className="text-[11px] text-emerald-800">
@@ -738,7 +739,7 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
                 <input
                   type="number"
                   min={1}
-                  value={formData.totalClassrooms || 6}
+                  value={formData.totalClassrooms || ''}
                   onChange={(e) => setFormData({ ...formData, totalClassrooms: Number(e.target.value) })}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold text-center"
                 />

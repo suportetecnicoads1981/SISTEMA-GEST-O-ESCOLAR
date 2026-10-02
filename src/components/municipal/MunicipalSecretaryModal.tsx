@@ -142,7 +142,7 @@ export const MunicipalSecretaryModal: React.FC<MunicipalSecretaryModalProps> = (
           <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-900 flex items-start gap-2.5">
             <ShieldCheck className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
             <div className="space-y-0.5">
-              <p className="font-bold text-xs">Entidade Gestora Central Homologada</p>
+              <p className="font-bold text-xs">Cadastro da Secretaria (entidade gestora)</p>
               <p className="text-[11px] text-emerald-800 leading-relaxed">
                 As informações deste cadastro central são carimbadas nos relatórios oficiais,
                 certidões de vínculo, boletins e nos pacotes de sincronização offline (.edusync) de

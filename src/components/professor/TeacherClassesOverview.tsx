@@ -222,7 +222,7 @@ export const TeacherClassesOverview: React.FC<TeacherClassesOverviewProps> = ({
                         {cls.name}
                       </h4>
                       <p className="text-[11px] text-slate-500 mt-0.5">
-                        {cls.roomNumber || 'Sala Padrão'}
+                        {cls.roomNumber || '—'}
                       </p>
                     </div>
 

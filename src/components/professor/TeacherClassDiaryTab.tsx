@@ -160,7 +160,7 @@ export const TeacherClassDiaryTab: React.FC<TeacherClassDiaryTabProps> = ({
       term: selectedTerm,
       contentTaught,
       bnccSkillCodes: selectedBnccCodes,
-      methodology: methodology || 'Aula expositiva dialogada e resolução de atividades práticas.',
+      methodology: methodology || '',
       homework: homework || undefined,
       pedagogicalObservations: pedagogicalObservations || undefined,
       occurrences: occurrences || undefined,
@@ -216,7 +216,7 @@ export const TeacherClassDiaryTab: React.FC<TeacherClassDiaryTabProps> = ({
           <div><strong>Turma:</strong> ${activeClass?.name} (${activeClass?.shift})</div>
           <div><strong>Componente Curricular:</strong> ${activeSubject?.name}</div>
           <div><strong>Docente Responsável:</strong> ${teacherName}</div>
-          <div><strong>Período:</strong> ${selectedTerm} / 2026</div>
+          <div><strong>Período:</strong> ${selectedTerm} / ${(activeClass?.schoolYear || new Date().getFullYear())}</div>
         </div>
 
         <table>

@@ -117,7 +117,7 @@ export const WindowsStartMenu: React.FC<WindowsStartMenuProps> = ({
 
   // Aplicativos / Módulos Fixados no Menu Iniciar Vertical Direito
   const pinnedApps = [
-    { id: 'MAIN_DASHBOARD', name: moduleName('MAIN_DASHBOARD'), desc: 'Dashbox, Anomalias & Gráficos', icon: LayoutDashboard, color: 'bg-blue-600', group: 'Geral' },
+    { id: 'MAIN_DASHBOARD', name: moduleName('MAIN_DASHBOARD'), desc: 'Indicadores e alertas da rede', icon: LayoutDashboard, color: 'bg-blue-600', group: 'Geral' },
     { id: 'STUDENTS', name: moduleName('STUDENTS'), desc: 'Secretaria Acadêmica & Censo', icon: Users, color: 'bg-indigo-600', group: 'Acadêmico' },
     { id: 'CLASSES', name: moduleName('CLASSES'), desc: 'Enturmação, Salas e Matrizes', icon: Layers, color: 'bg-purple-600', group: 'Acadêmico' },
     { id: 'CLASS_DIARY', name: moduleName('CLASS_DIARY'), desc: 'Chamadas e Aulas Ministradas', icon: BookOpen, color: 'bg-emerald-600', group: 'Pedagógico' },
@@ -169,7 +169,7 @@ export const WindowsStartMenu: React.FC<WindowsStartMenuProps> = ({
       <div className="p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-md shadow-indigo-600/30 shrink-0">
-            {currentUser?.isMaster ? 'AD' : currentUser?.name?.substring(0, 2).toUpperCase() || 'SE'}
+            {(currentUser?.name || '').trim().split(/\s+/).filter(Boolean).map((w: string) => w[0]).slice(0, 2).join('').toUpperCase() || '—'}
           </div>
           <div className="min-w-0">
             <div className="text-sm font-bold text-white truncate flex items-center gap-1.5">
@@ -230,8 +230,8 @@ export const WindowsStartMenu: React.FC<WindowsStartMenuProps> = ({
         >
           <DownloadCloud className="w-4 h-4 text-emerald-400 shrink-0" />
           <div className="min-w-0">
-            <div className="text-[11px] font-bold truncate">Atualizações OTA</div>
-            <div className="text-[9px] text-emerald-300/80 truncate">Google Drive Sync</div>
+            <div className="text-[11px] font-bold truncate">Atualizações</div>
+            <div className="text-[9px] text-emerald-300/80 truncate">Versões publicadas</div>
           </div>
         </button>
       </div>

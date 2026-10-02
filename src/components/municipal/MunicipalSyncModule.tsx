@@ -190,12 +190,12 @@ const useDataValidation = (props?: MunicipalSyncModuleProps) => {
         totalClasses: linkedClasses > 0 ? linkedClasses : Number(u?.totalClasses ?? 0),
         totalTeachers: Number(u?.totalTeachers ?? 0),
         name: u?.name ?? 'Escola Municipal',
-        inepCode: u?.inepCode ?? '00000000',
-        district: u?.district ?? 'Centro',
+        inepCode: u?.inepCode ?? '',
+        district: u?.district ?? '',
         address: u?.address ?? '',
-        city: u?.city ?? 'Município',
-        state: u?.state ?? 'SP',
-        directorName: u?.directorName ?? 'Direção Geral',
+        city: u?.city ?? '',
+        state: u?.state ?? '',
+        directorName: u?.directorName ?? '',
         };
       });
   }, [rawSchoolUnits, students, classes]);
@@ -576,6 +576,20 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
     [schoolUnits, classes, classGradeSheets]
   );
   const hasAnyGrade = performanceRows.some((r) => r.perf.gradesCount > 0);
+  // Prévia do lote: mesmas regras do gerador (só registros da escola escolhida).
+  const exportPreview = useMemo(() => {
+    const id = selectedUnitForExportId;
+    const cls = classes.filter((c: any) => c?.schoolUnitId === id);
+    const classIds = new Set(cls.map((c: any) => String(c.id)));
+    const sts = students.filter((st: any) => (st?.schoolUnitId ? st.schoolUnitId === id : classIds.has(String(st?.classId))));
+    const studentIds = new Set(sts.map((st: any) => String(st.id)));
+    const exs = exams.filter((e: any) => (e?.schoolUnitId ? e.schoolUnitId === id : e?.classId ? classIds.has(String(e.classId)) : false));
+    const examIds = new Set(exs.map((e: any) => String(e.id)));
+    const subs = submissions.filter(
+      (sb: any) => studentIds.has(String(sb?.studentId)) || examIds.has(String(sb?.examId)) || classIds.has(String(sb?.classId))
+    );
+    return { students: sts.length, classes: cls.length, exams: exs.length, submissions: subs.length };
+  }, [selectedUnitForExportId, students, classes, exams, submissions]);
 
   if (isLoading) {
     return <LoadingSpinner />;
@@ -771,7 +785,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                 ? 'Supabase Realtime Ativo • Sincronização Contínua'
                 : realtimeStatus === 'SYNCING'
                 ? 'Sincronizando Alterações do Banco de Dados...'
-                : 'Sincronização Local • Pronto'}
+                : 'Tempo real desligado (envio pelo botão ou pela sincronização automática)'}
             </span>
             {realtimeChangeSummary && (
               <span className="px-2 py-0.5 rounded-md bg-emerald-950/80 text-emerald-200 text-[10px] border border-emerald-500/30">
@@ -1190,7 +1204,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                     <div className="min-w-0 flex-1">
                       <h4 className="font-bold text-slate-900 text-sm leading-snug">{unit.name}</h4>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[11px] text-slate-500 font-mono">INEP: {unit.inepCode}</span>
+                        <span className="text-[11px] text-slate-500 font-mono">INEP: {unit.inepCode || '—'}</span>
                         {unit.tradeName && (
                           <span className="text-[10px] text-slate-400 font-medium">({unit.tradeName})</span>
                         )}
@@ -1201,11 +1215,11 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                   <div className="text-xs text-slate-600 space-y-1 pt-2 border-t border-slate-100">
                     <div className="flex items-center gap-1.5 text-slate-500">
                       <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                      <span className="truncate">{unit.address || unit.district}, {unit.city || 'Município'} - {unit.state || 'SP'}</span>
+                      <span className="truncate">{[unit.address || unit.district, [unit.city, unit.state].filter(Boolean).join(' - ')].filter(Boolean).join(', ') || 'Endereço não informado'}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-slate-500">
                       <GraduationCap className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                      <span className="truncate">Direção: {unit.directorName}</span>
+                      <span className="truncate">Direção: {unit.directorName || '—'}</span>
                     </div>
                   </div>
 
@@ -1245,7 +1259,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                     </div>
 
                     <span className="text-[10px] font-mono text-slate-400">
-                      {unit.linkageCode || 'VINC-SEMED'}
+                      {unit.linkageCode || '—'}
                     </span>
                   </div>
                 </div>
@@ -1397,7 +1411,6 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                 <span className="text-xs font-bold text-slate-900 block font-mono">
                   {activeSecretary.phone}
                 </span>
-                <span className="text-[10px] text-slate-500">Horário: 08:00 às 14:00 (Seg a Sex)</span>
               </div>
 
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
@@ -1556,12 +1569,12 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                           </div>
                         </td>
                         <td className="p-3 font-mono font-semibold text-slate-700">
-                          {u.inepCode}
+                          {u.inepCode || '—'}
                         </td>
                         <td className="p-3">
                           <div className="flex flex-wrap items-center gap-1">
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-800">
-                              {u.type === 'SEDE_CENTRAL' ? 'Sede Central' : 'Polo Satélite'}
+                              {u.type === 'SEDE_CENTRAL' ? 'Sede Central' : u.type === 'ESCOLA_POLO' ? 'Escola Polo' : u.type === 'ESCOLA_SATELITE' ? 'Polo Satélite' : 'Escola'}
                             </span>
                             <span
                               className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -1575,10 +1588,10 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                           </div>
                         </td>
                         <td className="p-3 text-slate-800 font-medium">
-                          {u.directorName}
+                          {u.directorName || '—'}
                         </td>
                         <td className="p-3 font-mono text-[11px] text-slate-600">
-                          {u.linkageCode || 'VINC-SEMED-PA-001'}
+                          {u.linkageCode || '—'}
                         </td>
                         <td className="p-3 text-center">
                           {isLinked ? (
@@ -1636,7 +1649,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
               Exportar Pacote de Sincronização da Unidade Escolar Satélite
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              Gera um arquivo compacto criptografado contendo todos os dados cadastrados nesta escola para ser transportado via pendrive ou e-mail até a Secretaria Municipal de Educação.
+              Gera um arquivo .edusync, com verificação de integridade (SHA-256), contendo os dados cadastrados nesta escola para ser transportado via pendrive ou e-mail até a Secretaria Municipal de Educação.
             </p>
           </div>
 
@@ -1661,7 +1674,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                 >
                   {schoolUnits.map((u) => (
                     <option key={u.id} value={u.id}>
-                      {u.name} (INEP: {u.inepCode}) - {u.district}
+                      {u.name} (INEP: {u.inepCode || '—'}) - {u.district}
                     </option>
                   ))}
                 </select>
@@ -1683,24 +1696,24 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
               {/* Data Breakdown of Packet */}
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
                 <span className="text-xs font-bold text-slate-700 block">
-                  Conteúdo incluído no pacote:
+                  Conteúdo da escola escolhida que vai no pacote:
                 </span>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="flex justify-between p-2 bg-white rounded-lg border border-slate-100">
                     <span className="text-slate-500">Estudantes:</span>
-                    <span className="font-bold text-slate-800">{students.length}</span>
+                    <span className="font-bold text-slate-800">{exportPreview.students}</span>
                   </div>
                   <div className="flex justify-between p-2 bg-white rounded-lg border border-slate-100">
                     <span className="text-slate-500">Turmas & Matrizes:</span>
-                    <span className="font-bold text-slate-800">{classes.length}</span>
+                    <span className="font-bold text-slate-800">{exportPreview.classes}</span>
                   </div>
                   <div className="flex justify-between p-2 bg-white rounded-lg border border-slate-100">
                     <span className="text-slate-500">Provas & Exames:</span>
-                    <span className="font-bold text-slate-800">{exams.length}</span>
+                    <span className="font-bold text-slate-800">{exportPreview.exams}</span>
                   </div>
                   <div className="flex justify-between p-2 bg-white rounded-lg border border-slate-100">
                     <span className="text-slate-500">Gabaritos / Correções:</span>
-                    <span className="font-bold text-slate-800">{submissions.length}</span>
+                    <span className="font-bold text-slate-800">{exportPreview.submissions}</span>
                   </div>
                 </div>
               </div>
@@ -1991,7 +2004,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
               <tbody className="divide-y divide-slate-100">
                 {censusRows.map(({ unit: u, specialEducation, pending }) => (
                   <tr key={u.id} className="hover:bg-slate-50">
-                    <td className="p-3 font-mono font-semibold text-slate-600">{u.inepCode}</td>
+                    <td className="p-3 font-mono font-semibold text-slate-600">{u.inepCode || '—'}</td>
                     <td className="p-3 font-bold text-slate-800">{u.name}</td>
                     <td className="p-3 text-slate-500">{u.district}</td>
                     <td className="p-3 text-center font-bold text-slate-900">{u.totalStudents}</td>

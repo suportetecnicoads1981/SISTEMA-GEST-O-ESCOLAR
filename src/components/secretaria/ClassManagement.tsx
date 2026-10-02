@@ -38,6 +38,8 @@ import { triggerPrint, downloadPrintableHtml } from '../../utils/printHelper';
 import { confirmDialog } from '../../utils/dialogs';
 
 import { moduleName } from '../../config/moduleNames';
+
+const CURRENT_YEAR = new Date().getFullYear();
 interface ClassManagementProps {
   classes: SchoolClass[];
   courses: Course[];
@@ -116,7 +118,7 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
     return Array.from(map.values()).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, 'pt-BR'));
   }, [classes, filterUnit]);
   const yearOptions = useMemo(
-    () => Array.from(new Set(classes.map((c) => String(c.schoolYear || 2026)))).sort().reverse(),
+    () => Array.from(new Set(classes.map((c) => String(c.schoolYear || CURRENT_YEAR)))).sort().reverse(),
     [classes]
   );
   const classPrintRef = useRef<HTMLDivElement>(null);
@@ -126,8 +128,8 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
     gradeLevel: '1º Ano - Ensino Fundamental',
     segment: 'ENSINO_FUNDAMENTAL',
     shift: 'MATUTINO',
-    schoolYear: 2026,
-    maxCapacity: 35,
+    schoolYear: CURRENT_YEAR,
+    maxCapacity: 0,
     roomNumber: 'Sala 101',
     classTeacher: '',
     schoolUnitId: schoolUnits[0]?.id || '',
@@ -145,7 +147,7 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
           (filterShift === 'VESPERTINO' && cls.shift === 'TARDE');
         const matchesUnit = filterUnit === 'ALL' || cls.schoolUnitId === filterUnit;
         const matchesGrade = filterGrade === 'ALL' || gradeKey(cls.gradeLevel) === filterGrade;
-        const matchesYear = filterYear === 'ALL' || String(cls.schoolYear || 2026) === filterYear;
+        const matchesYear = filterYear === 'ALL' || String(cls.schoolYear || CURRENT_YEAR) === filterYear;
         return matchesSearch && matchesShift && matchesUnit && matchesGrade && matchesYear;
       })
       // Escola primeiro (quando mostra todas), depois a turma em ordem alfabética
@@ -232,7 +234,7 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
       case 'vacancies':
         return vacancies === null ? '—' : String(vacancies);
       case 'schoolYear':
-        return String(c.schoolYear || 2026);
+        return String(c.schoolYear || CURRENT_YEAR);
       case 'signature':
         return <div className="h-4 border-b border-slate-400 w-full" />;
       default:
@@ -248,8 +250,8 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
       gradeLevel: '1º Ano - Ensino Fundamental',
       segment: 'ENSINO_FUNDAMENTAL',
       shift: 'MATUTINO',
-      schoolYear: 2026,
-      maxCapacity: 35,
+      schoolYear: CURRENT_YEAR,
+      maxCapacity: 0,
       roomNumber: 'Sala 101',
       classTeacher: '',
       schoolUnitId: schoolUnits[0]?.id || '',
@@ -280,8 +282,8 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
       gradeLevel: formData.gradeLevel || '1º Ano - Ensino Fundamental',
       segment: (formData.segment as any) || 'ENSINO_FUNDAMENTAL',
       shift: (formData.shift as any) || 'MATUTINO',
-      schoolYear: Number(formData.schoolYear) || 2026,
-      maxCapacity: Number(formData.maxCapacity) || 35,
+      schoolYear: Number(formData.schoolYear) || CURRENT_YEAR,
+      maxCapacity: Number(formData.maxCapacity) || 0, // vazio = capacidade não informada
       roomNumber: formData.roomNumber?.trim() || 'Sala 101',
       classTeacher: formData.classTeacher?.trim() || '',
       schoolUnitId: formData.schoolUnitId || schoolUnits[0]?.id || '',
@@ -338,8 +340,8 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
           const parts = line.includes(';') ? line.split(';') : line.split(',');
           const name = parts[0]?.replace(/"/g, '').trim() || `Turma ${idx + 1}`;
           const shift = (parts[1]?.replace(/"/g, '').trim().toUpperCase() as any) || 'MATUTINO';
-          const room = parts[2]?.replace(/"/g, '').trim() || `Sala ${100 + idx}`;
-          const teacher = parts[3]?.replace(/"/g, '').trim() || 'Prof. Coordenador';
+          const room = parts[2]?.replace(/"/g, '').trim() || '';
+          const teacher = parts[3]?.replace(/"/g, '').trim() || '';
 
           imported.push({
             id: `class-imp-${Date.now()}-${idx}`,
@@ -347,8 +349,8 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
             gradeLevel: '1º Ano - Ensino Fundamental',
             segment: 'ENSINO_FUNDAMENTAL',
             shift,
-            schoolYear: 2026,
-            maxCapacity: 35,
+            schoolYear: CURRENT_YEAR,
+            maxCapacity: 0,
             roomNumber: room,
             classTeacher: teacher,
           });
@@ -793,7 +795,7 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
       <ConfigurablePrintModal
         isOpen={isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}
-        title="Quadro Geral de Turmas, Horários & Capacidade - 2026"
+        title={`Quadro Geral de Turmas, Horários & Capacidade - ${CURRENT_YEAR}`}
         subtitle="Planejamento acadêmico, alocação de salas e distribuição de matrículas da Rede Escolar"
         columns={classPrintColumns}
         data={sortedClasses}
@@ -992,7 +994,7 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Ano Calendário</label>
                   <input
                     type="number"
-                    value={formData.schoolYear || 2026}
+                    value={formData.schoolYear || CURRENT_YEAR}
                     onChange={(e) => setFormData({ ...formData, schoolYear: Number(e.target.value) })}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200"
                   />
@@ -1004,7 +1006,7 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Capacidade Máxima</label>
                   <input
                     type="number"
-                    value={formData.maxCapacity || 35}
+                    value={formData.maxCapacity || ''}
                     onChange={(e) => setFormData({ ...formData, maxCapacity: Number(e.target.value) })}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200"
                   />

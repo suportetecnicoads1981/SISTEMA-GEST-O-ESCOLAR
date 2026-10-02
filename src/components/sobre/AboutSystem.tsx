@@ -47,8 +47,8 @@ const DEFAULT_DEVELOPER_CONTACT: DeveloperContact = {
   company: 'SucessoEdu Gestão Educacional',
   email: 'suportetecnicoads@gmail.com',
   phone: '',
-  supportAvailability: 'Seg. a Sex., 8h às 18h',
-  license: 'Licença Enterprise',
+  supportAvailability: '',
+  license: '',
   systemVersion: '',
 };
 
@@ -153,8 +153,10 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
             });
           }
         }
-        setLogoSuccessMsg(true);
-        setTimeout(() => setLogoSuccessMsg(false), 3500);
+        if (onUpdateSettings) {
+          setLogoSuccessMsg(true);
+          setTimeout(() => setLogoSuccessMsg(false), 3500);
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -703,10 +705,12 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
                   <span className="font-semibold">CNPJ:</span> {safeContact.cnpj}
                 </div>
               )}
-              <div className="text-slate-500 flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                <span>{safeContact.location || 'Brasil'}</span>
-              </div>
+              {safeContact.location && (
+                <div className="text-slate-500 flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                  <span>{safeContact.location}</span>
+                </div>
+              )}
             </div>
 
             <div className="space-y-3 bg-slate-50 p-5 rounded-2xl border border-slate-200 text-xs">
@@ -799,7 +803,7 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
           </div>
           <h3 className="text-sm font-bold text-slate-900">Unificação de Polos Remotos (.edusync)</h3>
           <p className="text-xs text-slate-500 leading-relaxed">
-            Escolas rurais e satélites operam sem internet e exportam pacotes criptografados que são unificados na central SME para o Censo Escolar.
+            Escolas rurais e satélites operam sem internet e exportam lotes .edusync com verificação de integridade (SHA-256) que são unificados na central SME para o Censo Escolar.
           </p>
         </div>
       </div>
@@ -841,19 +845,19 @@ export const AboutSystem: React.FC<AboutSystemProps> = ({
           <div className="space-y-2 text-slate-700 divide-y divide-slate-100">
             <div className="pt-1.5 flex justify-between">
               <span className="text-slate-400">Frontend:</span>
-              <span className="font-semibold text-slate-900">React 18 + TypeScript + Vite + Tailwind CSS</span>
+              <span className="font-semibold text-slate-900">React + TypeScript + Vite + Tailwind CSS</span>
             </div>
             <div className="pt-1.5 flex justify-between">
-              <span className="text-slate-400">Backend & API:</span>
-              <span className="font-semibold text-slate-900">Node.js Express (RESTful, Discovery, Port 3000)</span>
+              <span className="text-slate-400">Servidores:</span>
+              <span className="font-semibold text-slate-900 text-right">Servidor local na rede (Sede e escolas) + nuvem Supabase</span>
             </div>
             <div className="pt-1.5 flex justify-between">
               <span className="text-slate-400">Gráficos & Métricas:</span>
-              <span className="font-semibold text-slate-900">Recharts & D3 Data Pipelines</span>
+              <span className="font-semibold text-slate-900">Recharts</span>
             </div>
             <div className="pt-1.5 flex justify-between">
-              <span className="text-slate-400">Conformidade Legal:</span>
-              <span className="font-semibold text-emerald-700">MEC / BNCC / LDB 9394/96 / LGPD</span>
+              <span className="text-slate-400">Banco de dados na nuvem:</span>
+              <span className="font-semibold text-slate-900 text-right">PostgreSQL (Supabase) com acesso por perfil</span>
             </div>
           </div>
         </div>

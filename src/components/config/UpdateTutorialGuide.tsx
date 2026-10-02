@@ -513,7 +513,7 @@ export const UpdateTutorialGuide: React.FC<UpdateTutorialGuideProps> = ({
             </span>
             <p className="text-xs text-amber-800 leading-relaxed">
               <strong>Causa:</strong> Ocorre quando o instalador é extraído em uma pasta com caracteres especiais como parênteses (ex: <code>Downloads\Pacote (6)</code>).<br/>
-              <strong>Solução:</strong> A versão 5.4+ possui proteção blindada contra caminhos especiais. Caso use versão anterior, renomeie a pasta removendo os parênteses antes de executar.
+              <strong>Solução:</strong> Renomeie a pasta removendo os parênteses (ex.: <code>C:\Instalador</code>) e execute de novo.
             </p>
           </div>
 

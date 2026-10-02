@@ -103,6 +103,7 @@ import { generateUpdateManualHtml } from '../../utils/updatePackageHelper';
 import { confirmDialog, notify } from '../../utils/dialogs';
 
 import { moduleName } from '../../config/moduleNames';
+import { getLocalServerInfo } from '../../services/offline/localServerSync';
 interface NetworkInstallerProps {
   onBack?: () => void;
   onNavigate?: (tab: string, payload?: any) => void;
@@ -191,6 +192,12 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
 
   const fetchServerInfo = async () => {
     try {
+      // Só um servidor da rede local informa o IP certo. Pelo link publicado, /api/server-info
+      // devolveria o endereço da nuvem, que não serve para os instaladores.
+      if (!getLocalServerInfo()) {
+        setPingStatus({ status: 'idle', message: 'Página aberta pelo link publicado: informe o IP do Servidor Sede da rede.' });
+        return;
+      }
       const res = await fetch('/api/server-info');
       if (res.ok) {
         const data = await res.json();
@@ -246,7 +253,7 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
       if (res.ok) {
         setPingStatus({
           status: 'success',
-          message: `Servidor respondeu em ${latency} ms.`,
+          message: `O servidor que abriu esta página respondeu em ${latency} ms.`,
           latency,
         });
       } else {
@@ -1623,7 +1630,7 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    IP Alvo para Teste:
+                    IP do Servidor Sede (vai nos instaladores):
                   </label>
                   <input
                     type="text"
@@ -1660,7 +1667,7 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
                   className="px-4 py-2 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <RefreshCw className={`h-4 w-4 ${isScanning ? 'animate-spin' : ''}`} />
-                  <span>{isScanning ? 'Varrendo Sub-rede...' : 'Varredura Automática de Servidores'}</span>
+                  <span>{isScanning ? 'Procurando...' : 'Procurar o servidor desta página'}</span>
                 </button>
 
                 <button
@@ -1741,8 +1748,9 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
                   </div>
                 </div>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Ativo & Protegido
+                  {latestAutoBackup?.createdAt
+                    ? `Última cópia: ${new Date(latestAutoBackup.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`
+                    : 'Nenhuma cópia ainda'}
                 </span>
               </div>
 

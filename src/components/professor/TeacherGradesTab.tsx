@@ -233,7 +233,7 @@ export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
       subjectId: activeSubject.id,
       subjectName: activeSubject.name,
       teacherName: teacherName || activeSubject.teacherName || 'Docente Responsável',
-      schoolYear: 2026,
+      schoolYear: (activeClass?.schoolYear || new Date().getFullYear()),
       term: selectedTerm as any,
       grades: gradesArray,
       averagePassingGrade: passingScore,
@@ -266,13 +266,19 @@ export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
     });
 
     const triggerNote = '';
-    setSaveSuccessAlert(`Pauta de Notas do ${selectedTerm} (${activeClass.name} - ${activeSubject.name}) salva e homologada com sucesso!${triggerNote}`);
+    setSaveSuccessAlert(`Pauta de Notas do ${selectedTerm} (${activeClass.name} - ${activeSubject.name}) salva com sucesso! Ela segue para a homologação da Secretaria.${triggerNote}`);
     setTimeout(() => setSaveSuccessAlert(null), 5000);
   };
 
   // Class Stats
-  const gradesList = classStudents.map((st) => localGrades[st.id]?.termAverage || 0);
-  const classAvg = gradesList.length > 0 ? (gradesList.reduce((a, b) => a + b, 0) / gradesList.length).toFixed(1) : '0.0';
+  // Média só de quem tem nota lançada (aluno sem nota não conta como zero).
+  const hasScore = (g: any) =>
+    !!g && [g.assessment1, g.assessment2, g.activitiesScore, g.examScore, g.recoveryScore].some((v) => typeof v === 'number' && Number.isFinite(v));
+  const gradesList = classStudents
+    .map((st) => localGrades[st.id])
+    .filter(hasScore)
+    .map((g: any) => Number(g.termAverage) || 0);
+  const classAvg = gradesList.length > 0 ? (gradesList.reduce((a, b) => a + b, 0) / gradesList.length).toFixed(1) : '—';
   const approvedCount = classStudents.filter((st) => (localGrades[st.id]?.status || '') === 'APROVADO').length;
   const recoveryCount = classStudents.filter((st) => (localGrades[st.id]?.status || '') === 'RECUPERACAO').length;
   const failedCount = classStudents.filter((st) => (localGrades[st.id]?.status || '') === 'REPROVADO').length;
@@ -322,7 +328,7 @@ export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
           <div><strong>Turma:</strong> ${activeClass?.name} (${activeClass?.shift})</div>
           <div><strong>Componente Curricular:</strong> ${activeSubject?.name}</div>
           <div><strong>Docente Responsável:</strong> ${teacherName}</div>
-          <div><strong>Período:</strong> ${selectedTerm} / 2026 (Média de Corte: ${passingScore.toFixed(1)})</div>
+          <div><strong>Período:</strong> ${selectedTerm} / ${(activeClass?.schoolYear || new Date().getFullYear())} (Média de Corte: ${passingScore.toFixed(1)})</div>
         </div>
 
         <table>

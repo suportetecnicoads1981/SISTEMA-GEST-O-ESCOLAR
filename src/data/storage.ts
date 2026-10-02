@@ -982,7 +982,7 @@ export function generatePedagogicalReport(
     });
 
     // Find most selected wrong option
-    let mostChosenOptionText = 'Respostas discursivas incompletas ou em branco';
+    let mostChosenOptionText = q.type === 'ESSAY_KEYWORD' ? 'Respostas discursivas abaixo do esperado' : 'Sem alternativa errada predominante';
     let highestCount = 0;
 
     Object.entries(wrongDistractorCounts).forEach(([optId, count]) => {
@@ -990,7 +990,7 @@ export function generatePedagogicalReport(
         highestCount = count;
         const opt = q.options?.find((o) => o.id === optId);
         if (opt) {
-          mostChosenOptionText = `Alternativa: "${opt.text}" (${opt.explanation || 'Distrator conceitual'})`;
+          mostChosenOptionText = opt.explanation ? `Alternativa: "${opt.text}" (${opt.explanation})` : `Alternativa: "${opt.text}"`;
         }
       }
     });
@@ -1003,7 +1003,7 @@ export function generatePedagogicalReport(
         questionCode: q.code,
         topic: q.topic,
         questionStem: q.stem,
-        correctOptionText: correctOpt?.text || q.modelAnswer || 'Gabarito Oficial',
+        correctOptionText: correctOpt?.text || q.modelAnswer || '—',
         mostChosenWrongOption: mostChosenOptionText,
         errorCount: totalSubs - correctForThisQ,
         totalAnswers: totalSubs,

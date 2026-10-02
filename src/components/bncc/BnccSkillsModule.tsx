@@ -939,7 +939,7 @@ const ChartsSection: React.FC<{
           {card(
             'Desenvolvimento por habilidade',
             '% de alunos em D ou PD em cada habilidade',
-            <FlexChart storageKey="bncc-por-habilidade" title="Desenvolvimento por habilidade" data={bySkill} xKey="name" series={[{ key: 'desenvolvida', name: '% desenvolvida', color: '#4f46e5' }]} defaultType="bar" yDomain={[0, 100]} unit="%" referenceValue={70} referenceLabel="Meta 70%" height={260} />
+            <FlexChart storageKey="bncc-por-habilidade" title="Desenvolvimento por habilidade" data={bySkill} xKey="name" series={[{ key: 'desenvolvida', name: '% desenvolvida', color: '#4f46e5' }]} defaultType="bar" yDomain={[0, 100]} unit="%" referenceValue={70} referenceLabel="Referência 70%" height={260} />
           )}
           {card(
             'Evolução por bimestre',

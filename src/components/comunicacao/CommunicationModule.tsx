@@ -231,7 +231,7 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
     if (sendPushNotification) {
       onTriggerPushNotification(
         `📢 ${title}`,
-        `${content.substring(0, 100)}... (Enviado pela Direção/Docência)`
+        `${content.substring(0, 100)}${content.length > 100 ? '...' : ''} (comunicado publicado)`
       );
     }
 
@@ -881,7 +881,7 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
                 Redigir Novo Comunicado Institucional
               </h3>
               <p className="text-xs text-slate-500">
-                Transmita mensagens oficiais com notificações push e anexos para alunos, pais e docentes.
+                Publique comunicados oficiais com anexos no mural de alunos, pais e docentes.
               </p>
             </div>
 
@@ -1145,7 +1145,7 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
                 />
                 <div className="flex items-center gap-1.5">
                   <Smartphone className="h-4 w-4 text-indigo-600" />
-                  <span>Disparar Notificação Push no Navegador</span>
+                  <span>Mostrar aviso de confirmação neste computador</span>
                 </div>
               </label>
 

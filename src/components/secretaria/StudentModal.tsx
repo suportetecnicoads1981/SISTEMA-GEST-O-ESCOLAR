@@ -80,8 +80,8 @@ export const StudentModal: React.FC<StudentModalProps> = ({
     cpf: '',
     rg: '',
     birthDate: '',
-    gender: 'F',
-    colorRace: 'PARDO',
+    gender: '' as any,
+    colorRace: 'NAO_DECLARADO' as any,
     schoolUnitId: schoolUnits[0]?.id || '',
     email: '',
     phone: '',
@@ -117,22 +117,15 @@ export const StudentModal: React.FC<StudentModalProps> = ({
     if (studentToEdit) {
       setFormData({
         ...studentToEdit,
-        colorRace: studentToEdit.colorRace || 'PARDO',
+        colorRace: studentToEdit.colorRace || ('NAO_DECLARADO' as any),
         schoolUnitId: studentToEdit.schoolUnitId || schoolUnits[0]?.id || '',
         cidCodes: studentToEdit.cidCodes || [],
         specialNeeds: studentToEdit.specialNeeds || [],
         hasAeeSupport: studentToEdit.hasAeeSupport || false,
         cadastralStatus: studentToEdit.cadastralStatus || 'OK',
         medicalObservations: studentToEdit.medicalObservations || '',
-        dropoutIntervention: studentToEdit.dropoutIntervention || {
-          searchStatus: 'EM_BUSCA_ATIVA',
-          responsibleAgent: 'Equipe de Acompanhamento SME',
-          caseOpenedDate: studentToEdit.dropoutDate || new Date().toISOString().split('T')[0],
-          contactAttempts: [],
-          conselhoTutelarNotified: false,
-          crasNotified: false,
-          actionsTaken: '',
-        },
+        // Intervenção só existe quando registrada na Busca Ativa (nada é criado automaticamente).
+        dropoutIntervention: studentToEdit.dropoutIntervention,
       });
     } else {
       // RA em branco: ao salvar recebe o provisório e a nuvem entrega o número definitivo.
@@ -142,8 +135,8 @@ export const StudentModal: React.FC<StudentModalProps> = ({
         cpf: '',
         rg: '',
         birthDate: '',
-        gender: 'F',
-        colorRace: 'PARDO',
+        gender: '' as any,
+        colorRace: 'NAO_DECLARADO' as any,
         schoolUnitId: schoolUnits[0]?.id || '',
         email: '',
         phone: '',
@@ -168,15 +161,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
         dropoutReason: undefined,
         dropoutDate: undefined,
         dropoutObservation: '',
-        dropoutIntervention: {
-          searchStatus: 'EM_BUSCA_ATIVA',
-          responsibleAgent: 'Equipe Multiprofissional SME',
-          caseOpenedDate: new Date().toISOString().split('T')[0],
-          contactAttempts: [],
-          conselhoTutelarNotified: false,
-          crasNotified: false,
-          actionsTaken: '',
-        },
+        dropoutIntervention: undefined,
       });
     }
     setError('');
@@ -285,8 +270,8 @@ export const StudentModal: React.FC<StudentModalProps> = ({
       cpf: cpfNow === 'OK' ? formatCpf(formData.cpf) : '',
       rg: formData.rg?.trim() || '',
       birthDate: formData.birthDate || '',
-      gender: (formData.gender as 'M' | 'F' | 'OTHER') || 'F',
-      colorRace: (formData.colorRace as StudentColorRace) || 'PARDO',
+      gender: (formData.gender as 'M' | 'F' | 'OTHER') || ('' as any),
+      colorRace: (formData.colorRace as StudentColorRace) || ('NAO_DECLARADO' as any),
       schoolUnitId: formData.schoolUnitId || schoolUnits[0]?.id || '',
       email: formData.email?.trim() || '',
       phone: formData.phone?.trim() || '',
@@ -499,10 +484,11 @@ export const StudentModal: React.FC<StudentModalProps> = ({
                   Gênero
                 </label>
                 <select
-                  value={formData.gender || 'F'}
+                  value={formData.gender || ''}
                   onChange={(e) => setFormData({ ...formData, gender: e.target.value as any })}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                 >
+                  <option value="">Não informado</option>
                   <option value="F">Feminino</option>
                   <option value="M">Masculino</option>
                   <option value="OTHER">Outro / Não Declarado</option>
@@ -515,7 +501,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
                   Cor / Raça / Etnia (Censo Escolar / MEC) *
                 </label>
                 <select
-                  value={formData.colorRace || 'PARDO'}
+                  value={formData.colorRace || 'NAO_DECLARADO'}
                   onChange={(e) => setFormData({ ...formData, colorRace: e.target.value as StudentColorRace })}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >

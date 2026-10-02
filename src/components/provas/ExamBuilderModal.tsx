@@ -208,7 +208,7 @@ export const ExamBuilderModal: React.FC<ExamBuilderModalProps> = ({
       description: formData.description?.trim() || '',
       subject: formData.subject || 'Geral',
       classId: formData.classId || classes[0]?.id || '',
-      teacherName: formData.teacherName?.trim() || 'Professor Titular',
+      teacherName: formData.teacherName?.trim() || '',
       schoolYear: Number(formData.schoolYear) || 2026,
       term: (formData.term as any) || '1º Bimestre',
       totalPoints: Number(formData.totalPoints) || 10.0,

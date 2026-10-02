@@ -166,22 +166,22 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
 
     // Recalcular pendências remanescentes
     const pendingList: string[] = [];
-    const finalCpf = cpfNow === 'OK' ? formatCpf(formData.cpf) : '000.000.000-00';
+    const finalCpf = cpfNow === 'OK' ? formatCpf(formData.cpf) : '';
     if (cpfNow !== 'OK') {
       pendingList.push('CPF do Aluno');
     }
 
-    const finalBirth = formData.birthDate?.trim() || '2020-01-01';
+    const finalBirth = formData.birthDate?.trim() || '';
     if (!formData.birthDate || formData.birthDate.trim() === '' || finalBirth === '2020-01-01') {
       pendingList.push('Data de Nascimento');
     }
 
-    const finalGuardian = formData.guardianName?.trim() || 'Pendente de Atualização Cadastral';
+    const finalGuardian = formData.guardianName?.trim() || '';
     if (!formData.guardianName || formData.guardianName.trim() === '' || finalGuardian.includes('Pendente')) {
       pendingList.push('Nome da Mãe / Responsável');
     }
 
-    const finalAddress = formData.address?.trim() || 'Endereço pendente';
+    const finalAddress = formData.address?.trim() || '';
     if (!formData.address || formData.address.trim() === '' || finalAddress.toLowerCase().includes('pendente')) {
       pendingList.push('Endereço');
     }
@@ -477,10 +477,11 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
                   Cor / Raça (Censo IBGE)
                 </label>
                 <select
-                  value={formData.raceColor || 'PARDA'}
+                  value={formData.raceColor || ''}
                   onChange={(e) => setFormData({ ...formData, raceColor: e.target.value as any, colorRace: e.target.value as any })}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-hidden bg-white"
                 >
+                  <option value="">Não informada</option>
                   <option value="PARDA">Parda</option>
                   <option value="BRANCA">Branca</option>
                   <option value="PRETA">Preta</option>
@@ -636,10 +637,11 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
                   Zona de Residência
                 </label>
                 <select
-                  value={formData.locationZone || 'ZONA_RURAL'}
-                  onChange={(e) => setFormData({ ...formData, locationZone: e.target.value as LocationZone })}
+                  value={formData.locationZone || ''}
+                  onChange={(e) => setFormData({ ...formData, locationZone: (e.target.value || undefined) as LocationZone })}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-hidden bg-white"
                 >
+                  <option value="">Não informada</option>
                   <option value="ZONA_RURAL">Zona Rural / Ribeirinha</option>
                   <option value="ZONA_URBANA">Zona Urbana</option>
                 </select>
@@ -679,10 +681,11 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
                   Turno
                 </label>
                 <select
-                  value={formData.shift || 'MANHÃ'}
+                  value={formData.shift || ''}
                   onChange={(e) => setFormData({ ...formData, shift: e.target.value as ClassShift })}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-hidden bg-white"
                 >
+                  <option value="">Não informado</option>
                   <option value="MANHÃ">Manhã</option>
                   <option value="TARDE">Tarde</option>
                   <option value="INTEGRAL">Integral</option>
@@ -697,7 +700,7 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={formData.series || 'PRÉ II'}
+                  value={formData.series || ''}
                   onChange={(e) => setFormData({ ...formData, series: e.target.value })}
                   placeholder="Ex: PRÉ II, 1º ANO"
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-hidden uppercase"

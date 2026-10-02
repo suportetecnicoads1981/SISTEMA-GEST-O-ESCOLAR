@@ -118,14 +118,14 @@ export const TeacherLessonPlanningTab: React.FC<TeacherLessonPlanningTabProps> =
       subjectId: activeSubject.id,
       subjectName: activeSubject.name,
       term: selectedTerm as any,
-      schoolYear: 2026,
+      schoolYear: (activeClass?.schoolYear || new Date().getFullYear()),
       title,
       generalObjective,
       bnccSkillCodes: selectedBnccCodes,
       plannedLessonsCount: plannedLessons,
       executedLessonsCount: executedLessons,
-      methodologies: methodologies || 'Metodologia ativa, aulas expositivas dialogadas e resolução orientada de problemas.',
-      assessmentCriteria: assessmentCriteria || 'Avaliação formativa contínua, participação, trabalhos individuais e prova bimestral.',
+      methodologies: methodologies || '',
+      assessmentCriteria: assessmentCriteria || '',
       resourcesNeeded: resourcesNeeded || undefined,
       status,
       createdAt: new Date().toISOString(),
@@ -307,7 +307,7 @@ export const TeacherLessonPlanningTab: React.FC<TeacherLessonPlanningTabProps> =
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md">
-                        {plan.term} • 2026
+                        {plan.term} • {(plan as any).schoolYear || new Date().getFullYear()}
                       </span>
                       <h5 className="text-sm font-bold text-slate-900 mt-1.5 leading-snug">
                         {plan.title}

@@ -43,6 +43,18 @@ import {
   CADASTRAL_STATUS_INFO,
   ACTIVE_SEARCH_STATUS_INFO,
 } from '../../types';
+
+// Aluno evadido sem nenhuma intervenção registrada aparece como tal (não como "Em Busca Ativa").
+const SEARCH_STATUS_VIEW: Record<string, { label: string; color: string; bg: string; border: string; badge: string }> = {
+  SEM_INTERVENCAO: {
+    label: 'Sem intervenção registrada',
+    color: 'text-slate-700',
+    bg: 'bg-slate-50',
+    border: 'border-slate-200',
+    badge: 'bg-slate-100 text-slate-700',
+  },
+  ...ACTIVE_SEARCH_STATUS_INFO,
+};
 import {
   CustomizableChartModal,
   ChartDatasetOption,
@@ -140,7 +152,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
         selectedReasonFilter === 'ALL' || student.dropoutReason === selectedReasonFilter;
 
       // Status da Busca Ativa
-      const studentSearchStatus = student.dropoutIntervention?.searchStatus || 'EM_BUSCA_ATIVA';
+      const studentSearchStatus = student.dropoutIntervention?.searchStatus || 'SEM_INTERVENCAO';
       const matchesSearchStatus =
         selectedSearchStatusFilter === 'ALL' || studentSearchStatus === selectedSearchStatusFilter;
 
@@ -222,6 +234,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
   // Estatísticas por Status de Busca Ativa
   const statsBySearchStatus = useMemo(() => {
     const counts: Record<string, number> = {
+      SEM_INTERVENCAO: 0,
       EM_BUSCA_ATIVA: 0,
       RESGATADO_REINSERIDO: 0,
       MUDOU_MUNICIPIO: 0,
@@ -229,7 +242,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
       EVASAO_CONFIRMADA: 0,
     };
     chartDropped.forEach((s) => {
-      const st = s.dropoutIntervention?.searchStatus || 'EM_BUSCA_ATIVA';
+      const st = s.dropoutIntervention?.searchStatus || 'SEM_INTERVENCAO';
       counts[st] = (counts[st] || 0) + 1;
     });
     return counts;
@@ -242,14 +255,10 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
     let urbanTotal = 0;
     let urbanDropped = 0;
 
-    const isRural = (s: Student) => {
-      if (s.locationZone) return s.locationZone.includes('RURAL');
-      const addr = (s.address || '').toLowerCase() + ' ' + (s.neighborhood || '').toLowerCase();
-      return addr.includes('rural') || addr.includes('sitio') || addr.includes('fazenda') || addr.includes('vila') || addr.includes('povoado') || addr.includes('assentamento');
-    };
-
+    // Só a zona informada no cadastro (sem deduzir pelo endereço); sem zona fica fora da comparação.
     chartStudents.forEach((s) => {
-      if (isRural(s)) {
+      if (!s.locationZone) return;
+      if (s.locationZone.includes('RURAL')) {
         ruralTotal++;
         if (s.status === 'EVADIDO') ruralDropped++;
       } else {
@@ -278,17 +287,18 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
       { id: 'FUND2', label: '11 a 14 anos (Fund. II)', min: 11, max: 14 },
       { id: 'MEDIO', label: '15 a 17 anos (Ensino Médio)', min: 15, max: 17 },
       { id: 'EJA_ADULTO', label: '18 anos ou mais (EJA)', min: 18, max: 120 },
+      { id: 'SEM_DATA', label: 'Sem data de nascimento', min: -1, max: -1 },
     ];
 
     const getAge = (birthDateStr: string): number => {
-      if (!birthDateStr) return 12;
+      if (!birthDateStr) return -1;
       const birth = new Date(birthDateStr);
-      if (isNaN(birth.getTime())) return 12;
+      if (isNaN(birth.getTime())) return -1;
       const today = new Date();
       let age = today.getFullYear() - birth.getFullYear();
       const m = today.getMonth() - birth.getMonth();
       if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-      return age >= 0 ? age : 12;
+      return age >= 0 ? age : -1;
     };
 
     return groups.map((g) => {
@@ -369,7 +379,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
         id: 'search_status',
         title: 'Status & Eficácia da Busca Ativa Municipal',
         subtitle: 'Casos em acompanhamento pelas equipes multiprofissionais da SME',
-        data: Object.entries(ACTIVE_SEARCH_STATUS_INFO).map(([key, info]) => {
+        data: Object.entries(SEARCH_STATUS_VIEW).map(([key, info]) => {
           const count = statsBySearchStatus[key] || 0;
           const percentage = chartDroppedCount > 0 ? (count / chartDroppedCount) * 100 : 0;
           return {
@@ -496,7 +506,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
           phone: s.phone || s.guardianPhone || '',
           dropoutDate: d ? `${d[3]}/${d[2]}/${d[1]}` : s.dropoutDate || '',
           reason: reasonInfo?.label || 'Outros',
-          searchStatus: String(interv?.searchStatus || 'EM_BUSCA_ATIVA').replace(/_/g, ' '),
+          searchStatus: SEARCH_STATUS_VIEW[interv?.searchStatus || 'SEM_INTERVENCAO']?.label || String(interv?.searchStatus),
           agent: interv?.responsibleAgent || '',
           conselho: interv?.conselhoTutelarNotified ? 'Sim' : 'Não',
         };
@@ -550,7 +560,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
         `"${s.dropoutDate || ''}"`,
         `"${reasonInfo?.mecCode || 'MEC-99'}"`,
         `"${reasonInfo?.label || 'Outros'}"`,
-        `"${interv?.searchStatus || 'EM_BUSCA_ATIVA'}"`,
+        `"${SEARCH_STATUS_VIEW[interv?.searchStatus || 'SEM_INTERVENCAO']?.label || interv?.searchStatus}"`,
         `"${interv?.responsibleAgent || ''}"`,
         `"${interv?.conselhoTutelarNotified ? 'SIM' : 'NÃO'}"`,
         `"${interv?.conselhoTutelarProtocol || ''}"`,
@@ -635,9 +645,10 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
       dropoutIntervention: {
         ...currentInterv,
         searchStatus: newStatus,
+        conselhoTutelarNotified: newStatus === 'ENCAMINHADO_CONSELHO' ? true : currentInterv.conselhoTutelarNotified,
         resolutionDate: isReinserted ? new Date().toISOString().split('T')[0] : currentInterv.resolutionDate,
         resolutionNotes: isReinserted
-          ? 'Estudante resgatado com sucesso pela Busca Ativa e reinserido na rotina pedagógica escolar.'
+          ? currentInterv.resolutionNotes || 'Aluno reinserido na escola (registrado na Busca Ativa).'
           : currentInterv.resolutionNotes,
       },
     };
@@ -708,7 +719,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
             onClick={() => {
               if (censusPrintRef.current) {
                 triggerPrint(censusPrintRef.current, {
-                  title: 'Relatório Oficial do Censo Municipal de Evasão Escolar & Busca Ativa 2026',
+                  title: `Relatório Oficial do Censo Municipal de Evasão Escolar & Busca Ativa ${new Date().getFullYear()}`,
                   documentCategory: 'SECRETARIA MUNICIPAL DE EDUCAÇÃO - CENSO MEC',
                 });
               } else {
@@ -931,7 +942,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
                 <CustomizableChartCard
                   title="Status & Eficácia da Busca Ativa Municipal"
                   subtitle="Casos em acompanhamento pelas equipes da SME"
-                  data={Object.entries(ACTIVE_SEARCH_STATUS_INFO).map(([key, info]) => {
+                  data={Object.entries(SEARCH_STATUS_VIEW).map(([key, info]) => {
                     const count = statsBySearchStatus[key] || 0;
                     const percentage = chartDroppedCount > 0 ? (count / chartDroppedCount) * 100 : 0;
                     return {
@@ -1082,7 +1093,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
             </p>
           </div>
           <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full self-start sm:self-auto">
-            Ano Censitário: 2026
+            Ano Censitário: {new Date().getFullYear()}
           </span>
         </div>
 
@@ -1204,7 +1215,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
               className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 bg-white font-medium focus:ring-2 focus:ring-indigo-500"
             >
               <option value="ALL">Todos os Status</option>
-              {Object.entries(ACTIVE_SEARCH_STATUS_INFO).map(([k, info]) => (
+              {Object.entries(SEARCH_STATUS_VIEW).map(([k, info]) => (
                 <option key={k} value={k}>
                   {info.label}
                 </option>
@@ -1331,8 +1342,8 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
                   const reasonInfo = student.dropoutReason
                     ? DROPOUT_REASON_INFO[student.dropoutReason]
                     : DROPOUT_REASON_INFO['OUTROS'];
-                  const searchStatus = student.dropoutIntervention?.searchStatus || 'EM_BUSCA_ATIVA';
-                  const searchInfo = ACTIVE_SEARCH_STATUS_INFO[searchStatus];
+                  const searchStatus = student.dropoutIntervention?.searchStatus || 'SEM_INTERVENCAO';
+                  const searchInfo = SEARCH_STATUS_VIEW[searchStatus] || SEARCH_STATUS_VIEW.SEM_INTERVENCAO;
                   const cadastralInfo = CADASTRAL_STATUS_INFO[student.cadastralStatus || 'OK'];
 
                   return (

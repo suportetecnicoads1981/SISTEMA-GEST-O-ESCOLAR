@@ -37,6 +37,10 @@ export const HELP_GENERAL: HelpModule = {
   where: 'Vale para todo o sistema',
   summary: 'Entrar, sair, sincronizar com a nuvem, atalhos e o que fazer quando algo parece errado.',
   faq: [
+    {
+      q: 'Os números das telas são reais?',
+      a: 'Sim. Desde 01/10/2026 o sistema mostra só dados lançados: quando ainda não há registro (por exemplo, nenhuma chamada ou nota lançada), aparece "—" em vez de um número de exemplo. Foram retirados percentuais fixos, notas e IDEB estimados, selos "Homologado" e status "Online" que não vinham de verificação real, e os botões que carregavam alunos de exemplo. Importações deixam em branco (e marcam como pendência) o que não veio na planilha, em vez de inventar CPF, telefone, endereço ou turma. Em 02/10/2026 foi feita uma varredura em todas as telas: saíram o sino com "6" fixo, os rankings com escolas sem prova (média 0%), as médias que contavam aluno sem nota como zero, os anos "2026" fixos (agora vem o ano da turma), os textos padrão gravados em diários, planos e questões, e os rótulos "dados simulados" em bases reais.',
+    },
       {
         q: 'O nome de um módulo aparece diferente em algum lugar?',
         a: 'Não deveria. Cada módulo tem um nome só, o mesmo do menu lateral, e ele aparece igual nas abas abertas, na barra de tarefas, no título da janela, no selo "Módulo:" do cabeçalho, na trilha de navegação, na busca rápida (Ctrl+K), nos atalhos de teclado, nos cartões do Início, no título da própria tela e aqui no Tira-dúvidas.',
@@ -113,7 +117,7 @@ export const HELP_GENERAL: HelpModule = {
     },
     {
       q: 'Por que alguns botões do topo aparecem só com o ícone?',
-      a: 'Em telas que não são bem largas, os botões do topo (Diagrama & IA, Novidades, Tira-dúvidas, Nuvem, Atualizar, Tour Guiado e o nome do usuário) mostram só o ícone, para nada ficar por cima de nada. Passe o mouse sobre o ícone para ver o nome. Em telas largas, os nomes voltam a aparecer.',
+      a: 'Em telas que não são bem largas, os botões do topo (versão, Tira-dúvidas, Nuvem, Atualizar, Tour Guiado e o nome do usuário) mostram só o ícone, para nada ficar por cima de nada. Passe o mouse sobre o ícone para ver o nome. Em telas largas, os nomes voltam a aparecer.',
       tip: 'Do mesmo jeito, as barras de filtros (escola, série, turma) passam para a linha de baixo quando falta espaço, em vez de se sobreporem. As setas de rolagem do menu lateral ficam numa faixa própria, abaixo dos módulos.',
     },
     {
@@ -379,6 +383,10 @@ export const HELP_MODULES: HelpModule[] = [
     summary: 'Matrículas, cadastro dos alunos, importação de listas, filtros, impressão e pendências do Censo.',
     faq: [
       {
+        q: 'Por que a cor/raça aparece "Não declarado" e o gênero "Não informado"?',
+        a: 'Quando o campo não foi preenchido, o sistema mostra e grava exatamente isso, em vez de assumir "Parda" ou "Feminino" (o que alterava os números do Censo). Abra o cadastro do aluno e escolha a opção correta.',
+      },
+      {
         q: 'Como matriculo um aluno novo?',
         steps: ['Clique em "Nova Matrícula".', 'Preencha os dados do aluno e do responsável.', 'Escolha a escola e a turma.', 'Salve.'],
         tip: 'Antes, confira se o aluno já não está cadastrado usando a busca (nome, RA ou CPF), para não duplicar. O RA não é digitado: a nuvem entrega o número logo após salvar (até lá aparece como provisório).',
@@ -531,6 +539,10 @@ export const HELP_MODULES: HelpModule[] = [
     summary: 'Acompanhamento de alunos evadidos ou em risco, visitas, resgate e exportação para o Educacenso.',
     faq: [
       {
+        q: 'O que significam "Sem intervenção registrada" e "Sem data de nascimento" nos gráficos?',
+        a: 'Aluno evadido sem nenhuma ação da Busca Ativa registrada aparece como "Sem intervenção registrada" (antes era contado como "Em Busca Ativa"). Aluno sem data de nascimento fica na faixa "Sem data de nascimento" (antes entrava como se tivesse 12 anos). A comparação Rural x Urbana usa só a zona informada no cadastro. "Acionar Conselho" agora também marca o aluno como notificado ao Conselho Tutelar.',
+      },
+      {
         q: 'Como funciona o alerta de risco de evasão por faltas?',
         a: 'O sistema conta as faltas SEM justificativa de cada aluno lançadas no Diário & Frequência (falta justificada não conta). Quando o aluno atinge o limite definido, ele entra no painel "Risco de evasão por faltas sem justificativa" deste módulo, aparece no cartão de risco do Início, gera um aviso na Central de Notificações e abre uma janela de atenção na tela de quem acompanha o Censo. Alunos transferidos, concluintes ou já evadidos não entram na conta.',
         tip: 'Quem está lotado numa escola vê só os alunos dela; a Secretaria e o Master veem a rede toda.',
@@ -576,6 +588,10 @@ export const HELP_MODULES: HelpModule[] = [
     where: `Menu > ${moduleGroup('DOCUMENTS')} > ${moduleName('DOCUMENTS')} (Alt+O)`,
     summary: 'Emissão de declaração de matrícula, declaração de transferência, histórico escolar, boletim e certificado de conclusão.',
     faq: [
+      {
+        q: 'Apareceu um aviso amarelo antes de imprimir o certificado ou a declaração. O que é?',
+        a: 'O certificado afirma que o aluno concluiu o curso e a declaração afirma matrícula regular. Se o histórico não registra "Aprovado" ou se a situação do aluno não é "Ativo", o sistema avisa para conferir antes de emitir. O aviso não sai na impressão. Ano letivo, faltas e médias vêm do cadastro; o que não foi lançado aparece como "-".',
+      },
       {
         q: 'O boletim sai sem disciplinas. De onde vêm as notas?',
         a: 'O boletim e o histórico usam as notas do Diário de Notas da turma do aluno (lançadas pelos professores por bimestre) e, quando houver, as do histórico escolar. Nota não lançada aparece como "-". A frequência é calculada pelas chamadas registradas; sem chamadas, aparece "sem registro". O documento nunca usa as notas de outro aluno.',
@@ -720,6 +736,10 @@ export const HELP_MODULES: HelpModule[] = [
     where: `Menu > ${moduleGroup('QUESTION_BANK')} > ${moduleName('QUESTION_BANK')}`,
     summary: 'Cadastro de questões com gabarito e habilidades BNCC, impressão e importação.',
     faq: [
+      {
+        q: 'Por que algumas questões não entraram na importação?',
+        a: 'Questão objetiva sem gabarito, sem alternativas ou sem enunciado não é importada: o sistema não escolhe mais a "Alternativa A" como certa por conta própria. Inclua a linha "Gabarito: X" (no texto) ou a coluna de gabarito (na planilha) e importe de novo. O sistema avisa quantas ficaram de fora.',
+      },
       {
         q: 'Como exporto a relação de questões?',
         steps: ['Aplique os filtros da tela (busca, escola, turma, situação etc.).', 'Clique no botão verde "Relatório".', 'Marque as colunas que quer no relatório (as mais usadas já vêm marcadas).', 'Confira a pré-visualização.', 'Escolha: "Imprimir / Salvar em PDF", "Excel", "Word" ou "CSV".'],
@@ -996,8 +1016,18 @@ export const HELP_MODULES: HelpModule[] = [
     id: 'SYSTEM_UPDATES',
     title: moduleName('SYSTEM_UPDATES'),
     where: `Menu > ${moduleGroup('SYSTEM_UPDATES')} > ${moduleName('SYSTEM_UPDATES')}`,
-    summary: 'Catálogo de versões publicadas do sistema.',
-    faq: [{ q: 'Preciso fazer algo aqui?', a: 'Normalmente não. Para atualizar um servidor instalado, use Instaladores & Backup (Alt+I) > "Verificar atualização agora".' }],
+    summary: 'Versão em uso, atualização do servidor da rede e cópias de segurança deste computador.',
+    faq: [
+      { q: 'Preciso fazer algo aqui?', a: 'Normalmente não. Pelo link publicado, a versão nova chega sozinha. Num servidor da rede (Sede ou escola), o quadro "Servidor da rede local" mostra a versão baixada e o botão para aplicar.' },
+      {
+        q: 'Qual é a versão do sistema?',
+        a: 'A versão é a data e a hora em que o sistema foi publicado (ex.: "Versão de 01/10/2026 22:05"). Ela aparece no topo desta tela, no menu lateral e na tela de entrada. Os antigos números "v5.4", "v5.5" etc. eram fictícios e foram retirados.',
+      },
+      {
+        q: 'Para onde foram o Google Drive, os pacotes .edupkg e o "Controle de Versões"?',
+        a: 'Foram retirados em 01/10/2026 porque eram simulados: mostravam "conectado", "enviado" e "atualização concluída" sem fazer nada de verdade. As funções reais são: atualização do servidor (quadro desta tela ou da Central de Instalação), cópia de segurança (botão "Fazer cópia agora", que baixa o arquivo .json) e o banco do servidor em C:\\SucessoEdu\\data.',
+      },
+    ],
   },
   {
     id: 'ABOUT',

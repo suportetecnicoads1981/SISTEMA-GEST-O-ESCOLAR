@@ -313,7 +313,7 @@ export function ClassDiaryModule({
       term: selectedTerm,
       contentTaught: lessonContentInput,
       bnccSkillCodes: selectedBnccCodes,
-      methodology: lessonMethodologyInput || 'Aula expositiva dialogada e exercícios.',
+      methodology: lessonMethodologyInput || '',
       homework: lessonHomeworkInput,
       pedagogicalObservations: lessonObservationsInput,
       occurrences: lessonOccurrencesInput,
@@ -329,7 +329,7 @@ export function ClassDiaryModule({
     setLessonObservationsInput('');
     setLessonOccurrencesInput('');
     setSelectedBnccCodes([]);
-    setSavedSuccessAlert('Registro de aula do diário gravado e assinado digitalmente!');
+    setSavedSuccessAlert('Registro de aula gravado no diário!');
     setTimeout(() => setSavedSuccessAlert(null), 3500);
   };
 

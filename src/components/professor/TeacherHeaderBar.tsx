@@ -80,8 +80,7 @@ export const TeacherHeaderBar: React.FC<TeacherHeaderBarProps> = ({
                 Portal do Docente
               </span>
               <span className="text-[11px] font-bold text-emerald-400 bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-800/50 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Ano Letivo 2026
+                Ano Letivo {teacherClasses[0]?.schoolYear || new Date().getFullYear()}
               </span>
             </div>
 

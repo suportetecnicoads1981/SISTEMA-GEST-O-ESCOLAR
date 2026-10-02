@@ -175,22 +175,20 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
         imported = Array.isArray(parsed) ? parsed : [parsed];
       } else {
         const lines = trimmed.split('\n').filter((l) => l.trim().length > 0);
-        const defaultClassId = classes[0]?.id || 'TURMA-3A';
-        const defaultQuestionIds = questions.slice(0, 5).map((q) => q.id);
 
         lines.forEach((line, idx) => {
           if (idx === 0 && line.toLowerCase().includes('título')) return;
           const parts = line.includes(';') ? line.split(';') : line.split(',');
           const title = parts[0]?.replace(/"/g, '').trim() || `Avaliação ${idx + 1}`;
-          const subject = parts[1]?.replace(/"/g, '').trim() || 'Matemática';
-          const teacher = parts[2]?.replace(/"/g, '').trim() || 'Prof. Coordenador';
+          const subject = parts[1]?.replace(/"/g, '').trim() || '';
+          const teacher = parts[2]?.replace(/"/g, '').trim() || '';
 
           imported.push({
             id: `exam-imp-${Date.now()}-${idx}`,
             title,
-            description: `Avaliação importada para a disciplina de ${subject}`,
+            description: subject ? `Avaliação importada (${subject})` : 'Avaliação importada',
             subject,
-            classId: defaultClassId,
+            classId: '', // a turma e as questões são escolhidas depois, na edição da prova
             teacherName: teacher,
             schoolYear: new Date().getFullYear(),
             term: '1º Bimestre',
@@ -199,12 +197,8 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
             timeLimitMinutes: 60,
             randomizeQuestions: true,
             randomizeOptions: true,
-            questions: defaultQuestionIds.map((qid, qIdx) => ({
-              questionId: qid,
-              points: 2,
-              customOrder: qIdx + 1,
-            })),
-            status: 'PUBLISHED',
+            questions: [],
+            status: 'DRAFT',
             autoCorrectionRules: {
               partialCreditForKeywords: true,
               caseSensitive: false,

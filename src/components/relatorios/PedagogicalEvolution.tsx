@@ -123,7 +123,6 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
   const [selectedClassId, setSelectedClassId] = useState<string>(() => classes[0]?.id || 'ALL');
   const [selectedStudentId, setSelectedStudentId] = useState<string>(() => students[0]?.id || '');
   const [selectedSubject, setSelectedSubject] = useState<string>('ALL');
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('ALL'); // 'ALL' | '1º Bimestre' | '2º Bimestre' | '3º Bimestre' | '4º Bimestre'
   const [searchStudentTerm, setSearchStudentTerm] = useState<string>('');
 
   // Customizable Chart Modal State
@@ -529,7 +528,7 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
           <span>Filtros Pedagógicos & Segmentação</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {/* Turma */}
           <div>
             <label className="block text-[11px] font-bold text-slate-600 mb-1">Turma / Matriz:</label>
@@ -586,21 +585,6 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
             </select>
           </div>
 
-          {/* Período Letivo */}
-          <div>
-            <label className="block text-[11px] font-bold text-slate-600 mb-1">Etapa de Avaliação:</label>
-            <select
-              value={selectedPeriod}
-              onChange={(e) => setSelectedPeriod(e.target.value)}
-              className="w-full text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="ALL">Ano Letivo Completo (4 Bimestres)</option>
-              <option value="1º Bimestre">1º Bimestre</option>
-              <option value="2º Bimestre">2º Bimestre</option>
-              <option value="3º Bimestre">3º Bimestre</option>
-              <option value="4º Bimestre">4º Bimestre</option>
-            </select>
-          </div>
         </div>
       </div>
 
@@ -713,10 +697,6 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
                 <span className="text-3xl font-black text-indigo-600">{stats.attendance === null ? '—' : `${stats.attendance}%`}</span>
                 <span className="text-xs text-slate-400 ml-1.5">{stats.attendance === null ? 'sem registro no histórico' : 'presença'}</span>
               </div>
-              <div className="flex items-center gap-1 text-xs text-slate-500">
-                <Calendar className="h-3.5 w-3.5 text-indigo-500" />
-                <span>200 dias letivos previstos</span>
-              </div>
             </div>
           </div>
 
@@ -797,7 +777,6 @@ export const PedagogicalEvolution: React.FC<PedagogicalEvolutionProps> = ({
 
               <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500">
                 <span>Coordenação Pedagógica</span>
-                <span className="font-mono text-[11px]">Atualizado em: {new Date().toLocaleDateString('pt-BR')}</span>
               </div>
             </div>
           </div>

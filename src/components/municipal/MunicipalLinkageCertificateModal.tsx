@@ -189,7 +189,7 @@ export const MunicipalLinkageCertificateModal: React.FC<
           {/* Título do Documento */}
           <div className="cert-title text-center py-2">
             <span className="inline-block px-3 py-1 bg-slate-100 text-slate-800 font-mono text-xs font-bold rounded-md uppercase border border-slate-300">
-              Ofício Circular nº 01/2026 – Gabinete SEMED / PMCN
+              Ofício Circular nº ______/{new Date().getFullYear()} – Gabinete SEMED / PMCN
             </span>
             <h2 className="text-base font-black text-slate-900 mt-2 uppercase tracking-wide">
               CERTIDÃO GERAL DE VINCULAÇÃO E HOMOLOGAÇÃO DA REDE ESCOLAR MUNICIPAL
@@ -290,7 +290,7 @@ export const MunicipalLinkageCertificateModal: React.FC<
             </div>
             <div>
               <span className="block text-[10px] font-bold text-slate-500 uppercase">
-                Corpo Docente Ativo
+                Docentes (informados)
               </span>
               <span className="cert-num text-base font-black text-slate-900">{totalTeachers}</span>
             </div>

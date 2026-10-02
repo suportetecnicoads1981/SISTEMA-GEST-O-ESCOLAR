@@ -116,7 +116,7 @@ export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
                 Deseja realmente encerrar a sessão de trabalho no <strong>SucessoEdu Gestão Educacional</strong>?
               </p>
               <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-[11px] text-slate-400">
-                Todos os dados e alterações já foram gravados com sucesso no banco de dados local.
+                As alterações são gravadas automaticamente. Se houver envio pendente ao servidor ou à nuvem, ele continua na próxima vez que o sistema for aberto.
               </div>
             </div>
 
@@ -371,7 +371,7 @@ export const WindowsTitleBar: React.FC<WindowsTitleBarProps> = ({
           </span>
           <span className="text-slate-600 hidden md:inline">—</span>
           <span className="text-slate-400 hidden md:inline truncate">
-            {schoolName || 'Colégio Horizonte do Saber'}
+            {schoolName || ''}
           </span>
         </div>
 

@@ -134,8 +134,8 @@ export const AssessmentResultsReport: React.FC<AssessmentResultsReportProps> = (
       const exam = examsById.get(sub.examId);
 
       // Determine segment / school level
-      let segment = studentClass?.segment || 'ENSINO_FUNDAMENTAL';
-      let gradeLevel = studentClass?.gradeLevel || 'Ensino Fundamental';
+      let segment = studentClass?.segment || 'NAO_IDENTIFICADO';
+      let gradeLevel = studentClass?.gradeLevel || 'Não identificado';
 
       // Score percentage
       const totalPoints = exam?.totalPoints || 10;
@@ -161,7 +161,11 @@ export const AssessmentResultsReport: React.FC<AssessmentResultsReportProps> = (
         segment,
         schoolUnitId: schoolUnit?.id || 'sem-escola',
         schoolUnitName: schoolUnit?.name || 'Escola não identificada',
-        schoolZone: schoolUnit?.locationZone === 'ZONA_RURAL' || schoolUnit?.locationZone === 'RURAL' ? 'Rural' : 'Urbana',
+        schoolZone: !schoolUnit?.locationZone
+          ? 'Não informada'
+          : schoolUnit.locationZone === 'ZONA_RURAL' || schoolUnit.locationZone === 'RURAL'
+            ? 'Rural'
+            : 'Urbana',
         examTitle: exam?.title || 'Avaliação Geral',
         subjectName: exam?.subject || 'Geral',
         totalPoints,
@@ -269,7 +273,7 @@ export const AssessmentResultsReport: React.FC<AssessmentResultsReportProps> = (
       map.set(u.id, {
         schoolUnitId: u.id,
         schoolName: u.name,
-        schoolZone: isRural ? 'Rural' : 'Urbana',
+        schoolZone: !u.locationZone ? 'Não informada' : isRural ? 'Rural' : 'Urbana',
         totalCount: 0,
         sumPct: 0,
         avancado: 0,
@@ -304,7 +308,9 @@ export const AssessmentResultsReport: React.FC<AssessmentResultsReportProps> = (
       else entry.abaixoBasico += 1;
     });
 
+    // Escola sem nenhuma prova corrigida não entra no ranking (não é "média 0%").
     return Array.from(map.values())
+      .filter((item) => item.totalCount > 0)
       .map((item) => {
         const avg = item.totalCount > 0 ? Math.round(item.sumPct / item.totalCount) : 0;
         return {
@@ -426,7 +432,6 @@ export const AssessmentResultsReport: React.FC<AssessmentResultsReportProps> = (
     return Array.from(map.values()).map((s) => ({
       name: s.subject,
       value: Math.round(s.sumPct / (s.count || 1)),
-      secondaryValue: 70,
     }));
   }, [enrichedSubmissions]);
 
@@ -486,7 +491,6 @@ export const AssessmentResultsReport: React.FC<AssessmentResultsReportProps> = (
         data: schoolAggregates.map((s) => ({
           name: s.schoolName,
           value: s.passRate,
-          secondaryValue: 75,
         })),
         valueLabel: 'Taxa de Aprovação/Proficiência',
         unit: '%',
@@ -1304,7 +1308,7 @@ export const AssessmentResultsReport: React.FC<AssessmentResultsReportProps> = (
             value:
               selectedSchoolUnitId === 'ALL'
                 ? 'Todas as Unidades da Rede'
-                : schoolUnitsById.get(selectedSchoolUnitId)?.name || 'Sede Central',
+                : schoolUnitsById.get(selectedSchoolUnitId)?.name || 'Escola não identificada',
           },
           {
             label: 'Nível / Etapa',

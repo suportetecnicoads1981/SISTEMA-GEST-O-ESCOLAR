@@ -96,7 +96,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
   const activeStudents = students.filter((s) => s.status === 'ACTIVE');
   const transferredStudents = students.filter((s) => s.status === 'TRANSFERRED');
   const concludedStudents = students.filter((s) => s.status === 'CONCLUDED');
-  const suspendedStudents = students.filter((s) => s.status === 'SUSPENDED');
+  const suspendedStudents = students.filter((s) => s.status === 'SUSPENDED' || s.status === 'EVADIDO');
   const unassignedClassStudents = students.filter((s) => !s.classId || s.classId === '');
 
   // School Units Metrics
@@ -255,7 +255,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
           {/* Quick Info User / Master Badge */}
           <div className="flex flex-wrap sm:flex-nowrap gap-3 shrink-0">
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15 text-center min-w-[130px]">
-              <span className="text-[11px] font-bold text-indigo-200 block uppercase">Unidades Ativas</span>
+              <span className="text-[11px] font-bold text-indigo-200 block uppercase">Escolas</span>
               <span className="text-3xl font-black text-white">{totalUnits}</span>
               <span className="text-[10px] text-emerald-300 block mt-0.5">
                 {synchronizedUnits} Sincronizadas
@@ -360,7 +360,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
               <span className="text-[10px] font-bold text-indigo-600">Rede</span>
             </div>
             <div className="text-2xl font-black text-slate-900">{totalUnits}</div>
-            <div className="text-xs font-bold text-slate-700 mt-1">Escolas Ativas</div>
+            <div className="text-xs font-bold text-slate-700 mt-1">Escolas Cadastradas</div>
             <div className="text-[10px] text-slate-400 mt-0.5">
               {offlineUnits > 0 ? `${offlineUnits} sem internet (cadastro)` : 'escolas cadastradas'}
             </div>
@@ -540,7 +540,6 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
             <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
               <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto mb-2" />
               <div className="font-bold text-sm text-slate-700">Nenhuma pendência encontrada nesta categoria</div>
-              <div className="text-xs text-slate-400 mt-1">Todos os registros e regras estão operando em conformidade total.</div>
             </div>
           ) : (
             filteredAnomalies.map((item) => {
@@ -881,7 +880,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
                 {moduleName('ADMIN_TI')}
               </h3>
               <p className="text-xs text-slate-600 mt-1">
-                Painel unificado com todos os 11 módulos de Deploy, Cloud, Builds .EXE e Segurança.
+                Situação do servidor e da nuvem, instalação, acessos, rede municipal e atualizações.
               </p>
             </div>
             <div className="text-[11px] font-bold text-indigo-600 flex items-center gap-1 pt-2 border-t border-indigo-100">

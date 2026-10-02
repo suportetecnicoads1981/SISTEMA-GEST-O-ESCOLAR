@@ -284,7 +284,8 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
 
   // Overall student performance progress evolution
   const evolutionData = useMemo(() => {
-    return exams.map((ex) => {
+    // Só provas com entregas: prova sem entrega não é "média zero".
+    return exams.filter((ex) => submissions.some((s) => s.examId === ex.id)).map((ex) => {
       const exSubs = submissions.filter((s) => s.examId === ex.id);
       const avg =
         exSubs.length > 0
@@ -928,9 +929,9 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
                 </p>
               </div>
               <div>
-                <p className={`text-[10px] ${cardSubtextClass} uppercase font-bold`}>Meta de Aproveitamento</p>
+                <p className={`text-[10px] ${cardSubtextClass} uppercase font-bold`}>Taxa de Aprovação</p>
                 <p className={`text-xs font-bold ${titleClass}`}>
-                  {report ? `${report.approvalRate.toFixed(1)}% atingido` : '—'}
+                  {report ? `${report.approvalRate.toFixed(1)}%` : '—'}
                 </p>
               </div>
               <div>
@@ -1124,9 +1125,6 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
                 <p className="text-[10px] text-slate-400 font-mono">
                   suportetecnicoads@gmail.com | {appVersionText()}
                 </p>
-              </div>
-              <div className="px-3 py-1 bg-indigo-600 rounded-lg font-bold text-white text-xs shadow-sm">
-                Cloud & Offline Ready
               </div>
             </div>
           </div>
@@ -1363,7 +1361,7 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
                     { key: 'tileStudents', label: 'Card: Alunos Ativos' },
                     { key: 'tileAverage', label: 'Card: Média Geral dos Simulados' },
                     { key: 'tileApproval', label: 'Card: Taxa de Aprovação' },
-                    { key: 'tileServer', label: 'Card: Status do Servidor Local / Cloud' },
+                    { key: 'tileServer', label: 'Card: Provas Corrigidas' },
                     { key: 'tileEvolution', label: 'Gráfico: Evolução de Desempenho Pedagógico' },
                     { key: 'tileBimonthlyEvolution', label: 'Gráfico: Evolução Multidisciplinar Bimestral (Recharts)' },
                     { key: 'tileAiDiagnosis', label: 'Card: Central de Provas Automática & BNCC' },

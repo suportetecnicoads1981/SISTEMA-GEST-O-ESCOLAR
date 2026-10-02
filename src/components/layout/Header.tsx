@@ -127,13 +127,12 @@ export const Header: React.FC<HeaderProps> = ({
       .trim()
       .split(/\s+/)
       .filter((w) => w && !/^(d[aeo]s?|e)$/i.test(w));
-    if (!words.length) return 'AD';
+    if (!words.length) return '—';
     const first = words[0].charAt(0);
     const last = words.length > 1 ? words[words.length - 1].charAt(0) : words[0].charAt(1);
     return (first + last).toUpperCase();
   })();
   const [currentDateTime, setCurrentDateTime] = useState('');
-  const [serverPingOk, setServerPingOk] = useState(true);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
@@ -149,15 +148,6 @@ export const Header: React.FC<HeaderProps> = ({
     updateTime();
     const interval = setInterval(updateTime, 15000); // relógio em minutos: atualizar a cada segundo só gastava processamento
     return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    fetch('/api/ping')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.pong) setServerPingOk(true);
-      })
-      .catch(() => setServerPingOk(true)); // Fallback
   }, []);
 
   // Filter notifications for active persona
@@ -199,7 +189,7 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="hidden 2xl:inline text-xs font-semibold text-slate-400 font-normal">| Gestão Educacional</span>
             </div>
             <div className="text-[11px] font-bold text-blue-600 truncate max-w-[160px] xl:max-w-[260px] 2xl:max-w-[320px]">
-              {schoolName || 'Colégio Horizonte do Saber & Inovação'}
+              {schoolName || ''}
             </div>
           </div>
         </div>
@@ -354,7 +344,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <div className="hidden 2xl:block leading-tight">
               <div className="text-xs font-black text-slate-900 truncate max-w-[140px]">
-                {formatPersonName(currentUser?.name) || 'Administrador'}
+                {formatPersonName(currentUser?.name) || '—'}
               </div>
               {/* Cargo/função do cadastro do usuário (Usuários & Permissões > Título / Cargo) */}
               <div
@@ -464,9 +454,11 @@ export const Header: React.FC<HeaderProps> = ({
             className="p-2 text-slate-700 hover:text-blue-600 hover:bg-slate-100 rounded-xl transition-colors border border-slate-200 cursor-pointer flex items-center justify-center relative bg-slate-50 shadow-2xs"
           >
             <Bell className="h-4 w-4" />
-            <span className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 rounded-full bg-rose-600 text-white text-[10px] font-black flex items-center justify-center shadow-xs">
-              {unreadRoleNotifications.length > 0 ? unreadRoleNotifications.length : '6'}
-            </span>
+            {unreadRoleNotifications.length > 0 && (
+              <span className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 rounded-full bg-rose-600 text-white text-[10px] font-black flex items-center justify-center shadow-xs">
+                {unreadRoleNotifications.length}
+              </span>
+            )}
           </button>
 
           {isPopoverOpen && (

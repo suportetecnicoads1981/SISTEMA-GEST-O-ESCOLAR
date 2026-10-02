@@ -228,7 +228,7 @@ export const TeacherAttendanceTab: React.FC<TeacherAttendanceTabProps> = ({
       }
     });
 
-    const triggerNote = enqueuedCount > 0 ? ` ${enqueuedCount} aviso(s) de falta enviado(s) para a Central de WhatsApp, em "Aguardando envio".` : '';
+    const triggerNote = enqueuedCount > 0 ? ` ${enqueuedCount} falta(s) registrada(s). Com os avisos de falta ativos na Central de WhatsApp, eles aparecem em "Aguardando envio" (nada é enviado automaticamente).` : '';
     setSaveSuccessAlert(`Chamada do dia ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')} (${activeClass.name}) salva com sucesso!${triggerNote}`);
     setTimeout(() => setSaveSuccessAlert(null), 5000);
   };

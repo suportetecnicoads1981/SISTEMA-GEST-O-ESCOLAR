@@ -66,6 +66,14 @@ export const UninstallationModule: React.FC<UninstallationModuleProps> = ({
   const [cleanNotification, setCleanNotification] = useState<string | null>(null);
 
   const isClean = isDatabaseClean(currentData);
+  // Só é "demonstração" quando a base foi criada com os dados de teste (marca gravada pelo sistema).
+  const isDemoBase = (() => {
+    try {
+      return localStorage.getItem('sucessoedu_database_mode') === 'DEMO';
+    } catch {
+      return false;
+    }
+  })();
 
   const downloadFile = (content: string, filename: string) => {
     const isWindowsScript = /\.(bat|cmd|vbs|reg|ini)$/i.test(filename);
@@ -165,7 +173,7 @@ export const UninstallationModule: React.FC<UninstallationModuleProps> = ({
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                  <Sparkles className="h-3 w-3" /> Modo Demonstração (Com Dados de Teste)
+                  <Sparkles className="h-3 w-3" /> {isDemoBase ? 'Base de demonstração (dados de teste)' : 'Base em uso (dados cadastrados)'}
                 </span>
               )}
             </div>
@@ -207,7 +215,7 @@ export const UninstallationModule: React.FC<UninstallationModuleProps> = ({
               {currentData?.students?.length || 0}
             </div>
             <p className="text-[10px] text-slate-500 mt-0.5">
-              {(currentData?.students?.length || 0) === 0 ? 'Base limpa (0 registros)' : 'Dados simulados ativos'}
+              {(currentData?.students?.length || 0) === 0 ? 'Base limpa (0 registros)' : 'alunos cadastrados neste computador'}
             </p>
           </div>
 
@@ -220,7 +228,7 @@ export const UninstallationModule: React.FC<UninstallationModuleProps> = ({
               {currentData.classes.length}
             </div>
             <p className="text-[10px] text-slate-500 mt-0.5">
-              {currentData.classes.length === 0 ? 'Nenhuma turma cadastrada' : 'Turmas de exemplo ativas'}
+              {currentData.classes.length === 0 ? 'Nenhuma turma cadastrada' : 'turmas cadastradas'}
             </p>
           </div>
 
@@ -233,20 +241,20 @@ export const UninstallationModule: React.FC<UninstallationModuleProps> = ({
               {currentData.questions.length + currentData.exams.length}
             </div>
             <p className="text-[10px] text-slate-500 mt-0.5">
-              {currentData.questions.length === 0 ? 'Banco de questões zerado' : 'Itens de teste disponíveis'}
+              {currentData.questions.length === 0 ? 'Banco de questões zerado' : 'questões e provas cadastradas'}
             </p>
           </div>
 
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
             <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[11px] font-bold uppercase">Admin Master Geral</span>
+              <span className="text-[11px] font-bold uppercase">Primeiro usuário cadastrado</span>
               <ShieldCheck className="h-4 w-4 text-emerald-600" />
             </div>
             <div className="text-xs font-bold text-slate-900 truncate">
-              {currentData.userAccounts?.[0]?.name || 'Admin Master'}
+              {currentData.userAccounts?.[0]?.name || '—'}
             </div>
-            <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">
-              Preservado e Ativo (Chave Mestre)
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              {(currentData.userAccounts || []).length} usuário(s) no cadastro
             </p>
           </div>
         </div>
@@ -286,7 +294,7 @@ export const UninstallationModule: React.FC<UninstallationModuleProps> = ({
 
             <div className="space-y-3 text-xs">
               <p className="text-slate-700 leading-relaxed">
-                Esta operação irá <strong className="text-rose-700">remover todos os dados fictícios de demonstração</strong> (alunos, turmas, notas, avaliações e histórico escolar), preparando o sistema para implantação oficial.
+                Esta operação irá <strong className="text-rose-700">apagar todos os dados deste computador</strong> (alunos, turmas, notas, avaliações e histórico escolar){isDemoBase ? ', que hoje são os dados de demonstração,' : ' — inclusive dados reais já cadastrados —'} preparando o sistema para uma implantação do zero.
               </p>
 
               <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 space-y-1">

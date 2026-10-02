@@ -128,7 +128,7 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
     generalAverage: NaN as any,
     attendanceRate: NaN as any,
     finalResult: 'EM_CURSO',
-    observations: 'Registro acadêmico em processamento ou aguardando consolidação das avaliações do período.',
+    observations: '',
     issuedAt: new Date().toISOString(),
   };
 
@@ -268,7 +268,7 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
               {moduleName('DOCUMENTS')}
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Gere certificados autenticados, históricos escolares e declarações com layout oficial pronto para impressão
+              Gere certificados, históricos escolares e declarações com layout oficial pronto para impressão
             </p>
           </div>
           <div className="flex items-center gap-2.5">
@@ -340,6 +340,18 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
         </div>
       </div>
 
+      {/* Avisos (não saem na impressão): o documento afirma fatos que o cadastro ainda não confirma */}
+      {selectedStudent && documentType === 'CERTIFICADO_CONCLUSAO' && matchedHistory?.finalResult !== 'APROVADO' && (
+        <div className="max-w-4xl mx-auto p-3 rounded-xl border border-amber-300 bg-amber-50 text-xs text-amber-900 font-semibold">
+          Atenção: o histórico deste aluno não registra resultado final "Aprovado". O certificado afirma a conclusão do curso; confira antes de emitir.
+        </div>
+      )}
+      {selectedStudent && documentType === 'DECLARACAO_MATRICULA' && selectedStudent.status && selectedStudent.status !== 'ACTIVE' && (
+        <div className="max-w-4xl mx-auto p-3 rounded-xl border border-amber-300 bg-amber-50 text-xs text-amber-900 font-semibold">
+          Atenção: a situação deste aluno no cadastro não é "Ativo". A declaração afirma matrícula regular; confira antes de emitir.
+        </div>
+      )}
+
       {/* Printable Paper Document Container */}
       <div className="flex justify-center">
         <div
@@ -394,7 +406,7 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
                 </div>
 
                 <p className="text-sm sm:text-base text-slate-700 leading-relaxed max-w-2xl mx-auto text-justify sm:text-center">
-                  concluiu com êxito no ano letivo de <strong>{selectedClass?.schoolYear || 2026}</strong> o curso de{' '}
+                  concluiu com êxito no ano letivo de <strong>{selectedClass?.schoolYear || new Date().getFullYear()}</strong> o curso de{' '}
                   <strong className="text-indigo-950 font-bold uppercase">{selectedClass?.segment === 'ENSINO_MEDIO' ? 'Ensino Médio Regular' : selectedClass?.name}</strong>, tendo cumprido integralmente todas as exigências curriculares, carga horária e critérios regimentais de avaliação da aprendizagem.
                 </p>
 
@@ -471,7 +483,7 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
                 </div>
                 <div className="col-span-2">
                   <span className="text-slate-500 block text-[10px] uppercase font-bold">Ano Letivo:</span>
-                  <span className="font-semibold text-slate-900">{selectedClass?.schoolYear || 2026}</span>
+                  <span className="font-semibold text-slate-900">{selectedClass?.schoolYear || new Date().getFullYear()}</span>
                 </div>
               </div>
 
@@ -502,7 +514,7 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
                           <td className="border border-slate-300 p-2 text-center">{g(rec.bimonthlyGrades?.b3)}</td>
                           <td className="border border-slate-300 p-2 text-center">{g(rec.bimonthlyGrades?.b4)}</td>
                           <td className="border border-slate-300 p-2 text-center font-bold text-indigo-900">{g(rec.finalGrade)}</td>
-                          <td className="border border-slate-300 p-2 text-center">{rec.totalAbsences ?? 0}</td>
+                          <td className="border border-slate-300 p-2 text-center">{rec.totalAbsences ?? '-'}</td>
                           <td className="border border-slate-300 p-2 text-center font-semibold text-emerald-700">
                             {statusText(rec.status)}
                           </td>
@@ -533,7 +545,7 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
               <div className="text-xs text-slate-700 border border-slate-200 p-3 rounded-lg bg-slate-50 space-y-1">
                 <p className="font-bold text-slate-900">Observações Regimentais:</p>
                 <p>{safeHistory.observations || 'Sem observações adicionais.'} {customObservation}</p>
-                <p className="text-[11px] text-slate-500">Escala de avaliação: 0,0 a 10,0. Média mínima para aprovação: 6,0. Frequência mínima obrigatória: 75%.</p>
+                <p className="text-[11px] text-slate-500">Escala de avaliação: 0,0 a 10,0.</p>
               </div>
 
               {/* Signatures */}
@@ -586,7 +598,7 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
                 </div>
 
                 <p>
-                  encontra-se regularmente matriculado(a) no ano letivo de <strong>{selectedClass?.schoolYear || 2026}</strong>, cursando a turma <strong>{selectedClass?.name}</strong> no turno <strong>{selectedClass?.shift}</strong>.
+                  encontra-se regularmente matriculado(a) no ano letivo de <strong>{selectedClass?.schoolYear || new Date().getFullYear()}</strong>, cursando a turma <strong>{selectedClass?.name}</strong> no turno <strong>{selectedClass?.shift}</strong>.
                 </p>
 
                 {attendancePct !== null && (
@@ -625,7 +637,7 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
               <div className="text-center border-b border-slate-300 pb-3">
                 <h1 className="text-lg font-bold uppercase text-slate-900">{settings.name}</h1>
                 <h2 className="text-sm font-bold text-indigo-900 uppercase">Boletim Escolar de Desempenho e Frequência</h2>
-                <p className="text-xs text-slate-500">Ano Letivo {selectedClass?.schoolYear || 2026} • {selectedClass?.name}</p>
+                <p className="text-xs text-slate-500">Ano Letivo {selectedClass?.schoolYear || new Date().getFullYear()} • {selectedClass?.name}</p>
               </div>
 
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs flex justify-between">
@@ -662,7 +674,7 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
                         <td className="p-2 border text-center">{g(r.bimonthlyGrades?.b3)}</td>
                         <td className="p-2 border text-center">{g(r.bimonthlyGrades?.b4)}</td>
                         <td className="p-2 border text-center font-bold text-indigo-900">{g(r.finalGrade)}</td>
-                        <td className="p-2 border text-center">{r.totalAbsences ?? 0}</td>
+                        <td className="p-2 border text-center">{r.totalAbsences ?? '-'}</td>
                         <td className="p-2 border text-center font-semibold text-emerald-700">{statusText(r.status)}</td>
                       </tr>
                     ))

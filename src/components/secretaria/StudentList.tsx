@@ -291,30 +291,25 @@ export const StudentList: React.FC<StudentListProps> = ({
       if (s.series) gradesServedSet.add(s.series);
     });
 
-    const isRural =
-      availableItem.name.toLowerCase().includes('praia') ||
-      availableItem.name.toLowerCase().includes('brito') ||
-      availableItem.name.toLowerCase().includes('rural') ||
-      availableItem.type === 'POLO_REMOTO';
-
     const synthUnit: SchoolUnit = {
       id: availableItem.id.startsWith('unit-') ? availableItem.id : `unit-${availableItem.id}`,
       name: availableItem.name,
       tradeName: availableItem.name.replace(/^ESCOLA:\s*/i, '').trim(),
       inepCode: 'Pendente de Regularização no Censo',
       type: availableItem.type === 'POLO_REMOTO' ? 'ESCOLA_POLO' : availableItem.type === 'SEDE_CENTRAL' ? 'SEDE_CENTRAL' : 'ESCOLA_SATELITE',
-      locationZone: isRural ? 'ZONA_RURAL' : 'ZONA_URBANA',
+      // Escola ainda não cadastrada: campos ficam vazios até a Secretaria preencher (nada inventado).
+      locationZone: undefined,
       cadastralStatus: 'INCOMPLETE',
       totalStudents: studentsInSchool.length || availableItem.count,
       totalTeachers: 0,
       totalClasses: 0,
       hasInternet: false,
       syncStatus: 'PENDENTE',
-      district: isRural ? 'Comunidade / Zona Rural' : 'Sede Municipal',
-      address: 'Localidade da Escola (Aguardando Regularização Cadastral pela Secretaria)',
-      directorName: 'Diretoria / Coordenação (Pendente de Cadastro)',
-      phone: '(00) Pendente',
-      email: 'secretaria.escola@educacao.gov.br',
+      district: '',
+      address: '',
+      directorName: '',
+      phone: '',
+      email: '',
       gradesServed: Array.from(gradesServedSet),
       gradesServedText: Array.from(gradesServedSet).join(', ') || undefined,
       pendingFields: [
@@ -2118,7 +2113,7 @@ export const StudentList: React.FC<StudentListProps> = ({
                 {activeSelectedSchoolUnit.address || 'Endereço aguardando preenchimento'}
               </p>
               <span className="text-[11px] text-slate-500 mt-0.5 block">
-                {activeSelectedSchoolUnit.city || 'São Paulo'} - {activeSelectedSchoolUnit.state || 'SP'}
+                {[activeSelectedSchoolUnit.city, activeSelectedSchoolUnit.state].filter(Boolean).join(' - ') || 'Cidade não informada'}
                 {activeSelectedSchoolUnit.zipCode ? ` • CEP: ${activeSelectedSchoolUnit.zipCode}` : ''}
               </span>
             </div>

@@ -160,7 +160,7 @@ export const ExcelStudentImportModal: React.FC<ExcelStudentImportModalProps> = (
           return {
             name,
             enrollmentNumber: ra,
-            cpf: cpf || '000.000.000-00',
+            cpf: cpf || '',
             birthDate,
             gradeLevel: gradeLevel || matchedClass?.gradeLevel || '',
             classId: matchedClass?.id || '',

@@ -65,6 +65,22 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
     });
   }, [students]);
 
+  // Dados reais de cada aluno (sem valores de exemplo quando faltam).
+  const schoolOf = (s: Student) =>
+    s.schoolOriginName || schoolUnits.find((u) => u.id === s.schoolUnitId)?.name || '—';
+  const seriesOf = (s: Student) => s.series || classes.find((c) => c.id === s.classId)?.gradeLevel || '—';
+  const shiftOf = (s: Student) => s.shift || classes.find((c) => c.id === s.classId)?.shift || '—';
+  const pendingsOf = (s: Student): string[] => {
+    if (s.pendingFields && s.pendingFields.length > 0) return s.pendingFields;
+    const out: string[] = [];
+    if (isCpfPending(s.cpf)) out.push('CPF');
+    if (!s.birthDate) out.push('Data de nascimento');
+    if (!s.address || s.address.toLowerCase().includes('pendente')) out.push('Endereço');
+    if (s.medicalClassification && s.medicalClassification !== 'Não declarada' && !s.hasMedicalReport) out.push('Laudo');
+    if (s.cadastralStatus === 'PENDING_DOCS') out.push('Documentos');
+    return out.length ? out : ['Cadastro a revisar'];
+  };
+
   // Lista única de escolas/polos encontrados nos cadastros com pendência
   const schoolOptions = useMemo(() => {
     const set = new Set<string>();
@@ -143,7 +159,7 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
         s.address.toLowerCase().includes('pendente') ||
         s.pendingFields?.some((f) => f.toLowerCase().includes('endereço') || f.toLowerCase().includes('endereco'))
     ).length;
-    const totalPolos = schoolOptions.length || schoolUnits.length;
+    const totalPolos = schoolOptions.length;
 
     return {
       totalIncomplete,
@@ -181,18 +197,15 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
           <tbody>
             ${filteredList
               .map((s, idx) => {
-                const pendings =
-                  s.pendingFields && s.pendingFields.length > 0
-                    ? s.pendingFields.join(', ')
-                    : 'CPF, Documento Civil, Laudo';
-                const school = s.schoolOriginName || 'Polo Remoto';
+                const pendings = pendingsOf(s).join(', ');
+                const school = schoolOf(s);
                 return `
                 <tr style="border-bottom: 1px solid #e2e8f0; background-color: ${idx % 2 === 0 ? '#ffffff' : '#fcfcfd'};">
                   <td style="padding: 6px; border: 1px solid #e2e8f0;">${s.enrollmentNumber}</td>
                   <td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: bold;">${s.name}</td>
                   <td style="padding: 6px; border: 1px solid #e2e8f0;">${school}</td>
-                  <td style="padding: 6px; border: 1px solid #e2e8f0;">${s.series || 'PRÉ II'} (${s.shift || 'MANHÃ'})</td>
-                  <td style="padding: 6px; border: 1px solid #e2e8f0;">${s.medicalClassification || 'A Avaliar'}</td>
+                  <td style="padding: 6px; border: 1px solid #e2e8f0;">${seriesOf(s)} (${shiftOf(s)})</td>
+                  <td style="padding: 6px; border: 1px solid #e2e8f0;">${s.medicalClassification || '—'}</td>
                   <td style="padding: 6px; border: 1px solid #e2e8f0;">${s.hasMedicalReport ? 'SIM' : 'NÃO / PENDENTE'}</td>
                   <td style="padding: 6px; border: 1px solid #e2e8f0; color: #b45309;">${pendings}</td>
                 </tr>
@@ -226,13 +239,13 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
     const rows = filteredList.map((s) => [
       `"${s.enrollmentNumber}"`,
       `"${s.name}"`,
-      `"${s.schoolOriginName || 'Polo Remoto'}"`,
-      `"${s.series || 'PRÉ II'}"`,
-      `"${s.shift || 'MANHÃ'}"`,
+      `"${schoolOf(s)}"`,
+      `"${seriesOf(s)}"`,
+      `"${shiftOf(s)}"`,
       `"${s.birthDate || ''}"`,
       `"${s.medicalClassification || ''}"`,
       `"${s.hasMedicalReport ? 'SIM' : 'NÃO/PENDENTE'}"`,
-      `"${(s.pendingFields || []).join('; ')}"`,
+      `"${pendingsOf(s).join('; ')}"`,
     ]);
 
     const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
@@ -267,7 +280,7 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
               Dashbox de Pendências de Dados Cadastrais dos Polos Remotos & Censo
             </h2>
             <p className="text-xs text-amber-100/90 max-w-2xl mt-0.5">
-              Alunos importados de planilhas de polos remotos (ex: Maria da Praia) incluídos no sistema com vagas garantidas. A Secretaria deve coletar os documentos pendentes antes do fechamento do Censo Escolar.
+              Alunos com dados cadastrais incompletos (CPF, nascimento, endereço, laudo ou documentos). A Secretaria deve coletar os documentos pendentes antes do fechamento do Censo Escolar.
             </p>
           </div>
         </div>
@@ -419,7 +432,7 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {filteredList.slice(0, 50).map((student) => {
-                  const schoolName = student.schoolOriginName || schoolUnits.find((u) => u.id === student.schoolUnitId)?.name || 'Polo Remoto';
+                  const schoolName = schoolOf(student);
                   return (
                     <tr key={student.id} className="hover:bg-amber-50/40 transition-colors">
                       <td className="p-3">
@@ -436,15 +449,15 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
 
                       <td className="p-3">
                         <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md font-semibold text-[11px]">
-                          {student.series || 'PRÉ II'}
+                          {seriesOf(student)}
                         </span>
-                        <span className="ml-1 text-[11px] text-slate-500">({student.shift || 'MANHÃ'})</span>
+                        <span className="ml-1 text-[11px] text-slate-500">({shiftOf(student)})</span>
                       </td>
 
                       <td className="p-3">
                         <div className="flex flex-col gap-1">
                           <span className="text-[11px] text-slate-700">
-                            <strong>PCD:</strong> {student.medicalClassification || 'A Avaliar'}
+                            <strong>PCD:</strong> {student.medicalClassification || '—'}
                           </span>
                           <span
                             className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold w-fit ${
@@ -460,10 +473,7 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
 
                       <td className="p-3">
                         <div className="flex flex-wrap gap-1">
-                          {(student.pendingFields && student.pendingFields.length > 0
-                            ? student.pendingFields
-                            : ['CPF', 'Certidão']
-                          ).map((field, idx) => (
+                          {pendingsOf(student).map((field, idx) => (
                             <span
                               key={idx}
                               className="px-2 py-0.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-md text-[10px] font-bold"

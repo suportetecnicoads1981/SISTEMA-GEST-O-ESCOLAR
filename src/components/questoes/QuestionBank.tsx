@@ -915,13 +915,13 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
               {/* Header Institucional */}
               <div className="border-b-2 border-slate-900 pb-4 text-center space-y-1">
                 <h1 className="text-base font-bold uppercase tracking-wider font-sans">
-                  SISTEMA DE ENSINO & GESTÃO ESCOLAR - BANCO OFICIAL DE QUESTÕES
+                  SISTEMA DE ENSINO & GESTÃO ESCOLAR - BANCO DE QUESTÕES
                 </h1>
                 <p className="text-xs text-slate-600 font-sans">
-                  CADERNO DE ITENS AVALIATIVOS ALINHADOS À BNCC • ANO LETIVO 2026
+                  CADERNO DE ITENS AVALIATIVOS ALINHADOS À BNCC • ANO LETIVO {new Date().getFullYear()}
                 </p>
                 <div className="pt-2 text-xs font-sans flex justify-between border-t border-slate-200 mt-2 text-slate-700">
-                  <span>Data: ___/___/2026</span>
+                  <span>Data: ___/___/{new Date().getFullYear()}</span>
                   <span>Estudante: __________________________________________________</span>
                   <span>Turma: _________</span>
                 </div>

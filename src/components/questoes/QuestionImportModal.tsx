@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { notify } from '../../utils/dialogs';
 import {
   X,
   Upload,
@@ -204,20 +205,18 @@ export const QuestionImportModal: React.FC<QuestionImportModalProps> = ({
       return list.map((item: any, i: number) => ({
         id: item.id || `q-imp-json-${Date.now()}-${i}`,
         code: item.code || `IMP-JSON-${i + 1}`,
-        subject: item.subject || 'Matemática',
-        topic: item.topic || 'Conteúdo Avaliado',
-        gradeLevel: item.gradeLevel || '3º Ano',
+        subject: item.subject || 'Geral',
+        topic: item.topic || '',
+        gradeLevel: item.gradeLevel || '',
         bnccSkill: item.bnccSkill || undefined,
         difficulty: item.difficulty || 'MEDIO',
         type: item.type || 'MULTIPLE_CHOICE',
-        stem: item.stem || 'Sem enunciado informado.',
-        options: item.options || [
-          { id: 'opt-1', text: 'Alternativa A (Gabarito)', isCorrect: true },
-          { id: 'opt-2', text: 'Alternativa B', isCorrect: false },
-        ],
+        stem: item.stem || '',
+        // Sem alternativas no arquivo: nada é inventado (a questão fica fora da importação).
+        options: item.options || [],
         essayKeywords: item.essayKeywords,
         modelAnswer: item.modelAnswer,
-        explanation: item.explanation || 'Resolução oficial.',
+        explanation: item.explanation || '',
         authorTeacher: item.authorTeacher || 'Importação JSON',
         tags: item.tags || ['Importado'],
         createdAt: new Date().toISOString().split('T')[0],
@@ -235,15 +234,15 @@ export const QuestionImportModal: React.FC<QuestionImportModalProps> = ({
         return rows.map((row, idx) => {
           const cols = row.split(delimiter).map((c) => c.trim().replace(/^["']|["']$/g, ''));
           const subject = cols[0] || 'Geral';
-          const topic = cols[1] || 'Tópico Geral';
+          const topic = cols[1] || '';
           const difficulty = (cols[2]?.toUpperCase() === 'DIFICIL' || cols[2]?.toUpperCase() === 'FACIL' ? cols[2].toUpperCase() : 'MEDIO') as any;
-          const stem = cols[3] || 'Enunciado não informado';
+          const stem = cols[3] || '';
           const optA = cols[4] || 'Opção A';
           const optB = cols[5] || 'Opção B';
           const optC = cols[6] || 'Opção C';
           const optD = cols[7] || 'Opção D';
-          const gabarito = cols[8]?.trim().toUpperCase() || 'A';
-          const explanation = cols[9] || 'Resolução padrão.';
+          const gabarito = cols[8]?.trim().toUpperCase() || ''; // sem gabarito: questão não é importada
+          const explanation = cols[9] || '';
           const bncc = cols[10] || undefined;
 
           const options = [
@@ -258,7 +257,7 @@ export const QuestionImportModal: React.FC<QuestionImportModalProps> = ({
             code: `CSV-${String(idx + 1).padStart(2, '0')}`,
             subject,
             topic,
-            gradeLevel: '3º Ano',
+            gradeLevel: '',
             bnccSkill: bncc,
             difficulty,
             type: 'MULTIPLE_CHOICE' as const,
@@ -290,10 +289,10 @@ export const QuestionImportModal: React.FC<QuestionImportModalProps> = ({
     return questionBlocks.map((block, idx) => {
       const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
       let subject = 'Geral';
-      let topic = 'Avaliação Geral';
+      let topic = '';
       let bncc: string | undefined = undefined;
-      let gabarito = 'A';
-      let explanation = 'Resolução explicativa padrão.';
+      let gabarito = ''; // sem "Gabarito:" no texto, a questão não é importada
+      let explanation = '';
       let stemLines: string[] = [];
       const options: { id: string; text: string; isCorrect: boolean }[] = [];
 
@@ -335,25 +334,18 @@ export const QuestionImportModal: React.FC<QuestionImportModalProps> = ({
         opt.isCorrect = letter === gabarito;
       });
 
-      if (options.length === 0) {
-        options.push(
-          { id: `opt-${idx}-a`, text: 'Alternativa A (Gabarito Padrão)', isCorrect: true },
-          { id: `opt-${idx}-b`, text: 'Alternativa B', isCorrect: false },
-          { id: `opt-${idx}-c`, text: 'Alternativa C', isCorrect: false },
-          { id: `opt-${idx}-d`, text: 'Alternativa D', isCorrect: false }
-        );
-      }
+
 
       return {
         id: `q-imp-txt-${Date.now()}-${idx}`,
         code: `TXT-${String(idx + 1).padStart(2, '0')}`,
         subject,
         topic,
-        gradeLevel: '3º Ano',
+        gradeLevel: '',
         bnccSkill: bncc,
         difficulty: 'MEDIO' as const,
         type: 'MULTIPLE_CHOICE' as const,
-        stem: stemLines.join(' ') || 'Enunciado extraído do texto de prova.',
+        stem: stemLines.join(' ') || '',
         options,
         explanation,
         authorTeacher: 'Importação Prova TXT',
@@ -397,13 +389,27 @@ export const QuestionImportModal: React.FC<QuestionImportModalProps> = ({
     reader.readAsText(file);
   };
 
+  // Questão sem enunciado ou (objetiva) sem gabarito não é importada: o sistema não inventa a resposta certa.
+  const isImportable = (q: Question) =>
+    !!String(q.stem || '').trim() &&
+    (q.type !== 'MULTIPLE_CHOICE' || ((q.options || []).length >= 2 && (q.options || []).some((o) => o.isCorrect)));
+
   const handleConfirmImport = (questionsToImport: Question[]) => {
-    if (questionsToImport.length === 0) {
-      setError('Nenhuma questão válida pronta para importação.');
+    const valid = questionsToImport.filter(isImportable);
+    const skipped = questionsToImport.length - valid.length;
+    if (valid.length === 0) {
+      setError(
+        skipped > 0
+          ? `Nenhuma questão importada: ${skipped} sem enunciado, sem alternativas ou sem gabarito. Inclua "Gabarito: X" (ou a coluna de gabarito) e tente de novo.`
+          : 'Nenhuma questão válida pronta para importação.'
+      );
       return;
     }
-    onImportQuestions(questionsToImport);
-    setSuccessCount(questionsToImport.length);
+    if (skipped > 0) {
+      notify(`${skipped} questão(ões) ficaram de fora por não terem enunciado, alternativas ou gabarito. As outras ${valid.length} foram importadas.`, 'Importação parcial');
+    }
+    onImportQuestions(valid);
+    setSuccessCount(valid.length);
     setTimeout(() => {
       onClose();
     }, 1200);

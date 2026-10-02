@@ -736,10 +736,10 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                               {/* Turma / Turno */}
                               <td className="p-3">
                                 <div className="text-slate-800 font-medium">
-                                  {matchedClass?.name || std.series || 'Turma Padrão'}
+                                  {matchedClass?.name || std.series || 'Sem turma'}
                                 </div>
                                 <div className="text-[11px] text-slate-500">
-                                  Turno: {std.shift || matchedClass?.shift || 'Manhã'}
+                                  Turno: {std.shift || matchedClass?.shift || 'não informado'}
                                 </div>
                               </td>
 
@@ -754,7 +754,7 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                                   <div className="space-y-1.5">
                                     <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md font-bold text-[11px]">
                                       <AlertTriangle className="h-3 w-3 text-amber-600" />
-                                      <span>Incompleto ({std.pendingFields?.length || 1} pendências)</span>
+                                      <span>Incompleto{std.pendingFields?.length ? ` (${std.pendingFields.length} pendência${std.pendingFields.length > 1 ? 's' : ''})` : ''}</span>
                                     </div>
 
                                     {/* Badges dos campos específicos que estão faltando */}
@@ -1606,12 +1606,12 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                           <Building2 className="h-5 w-5 text-indigo-600" />
                           <div>
                             <span className="text-xs font-bold text-slate-900">
-                              {activeResult.schoolNameDetected || 'Escola / Polo Remoto'}
+                              {activeResult.schoolNameDetected || 'Escola não identificada na planilha'}
                             </span>
                             <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-2 mt-0.5">
                               <span>Turmas: <strong>{activeResult.seriesDetected || 'Geral'}</strong></span>
                               <span>•</span>
-                              <span>Data: {activeResult.dateDetected || 'Atual'}</span>
+                              <span>Data: {activeResult.dateDetected || 'não informada'}</span>
                               {activeResult.firstColumnHeaderDetected && (
                                 <>
                                   <span>•</span>

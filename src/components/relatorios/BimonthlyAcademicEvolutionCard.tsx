@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   TrendingUp,
   BarChart3,
@@ -116,6 +116,10 @@ export const BimonthlyAcademicEvolutionCard: React.FC<BimonthlyAcademicEvolution
   const [activeSubjects, setActiveSubjects] = useState<string[]>(() => {
     return allSubjectNames.slice(0, 5);
   });
+  // Dados que chegam depois (sincronização): escolhe as disciplinas quando ainda não há nenhuma.
+  useEffect(() => {
+    if (activeSubjects.length === 0 && allSubjectNames.length > 0) setActiveSubjects(allSubjectNames.slice(0, 5));
+  }, [allSubjectNames, activeSubjects.length]);
 
   const toggleSubject = (subjectName: string) => {
     setActiveSubjects((prev) =>
@@ -156,6 +160,15 @@ export const BimonthlyAcademicEvolutionCard: React.FC<BimonthlyAcademicEvolution
   // Dados formatados para Recharts comparando os 4 Bimestres
   const chartData = useMemo(() => {
     const bimesters = ['1º Bimestre', '2º Bimestre', '3º Bimestre', '4º Bimestre'];
+
+    // Aluno escolhido sem notas: gráfico vazio (não mostra a média da turma no lugar).
+    if (selectedStudentId !== 'ALL' && !(currentHistory && currentHistory.records.length > 0)) {
+      return bimesters.map((bName) => {
+        const point: Record<string, any> = { bimestre: bName, 'Média Global': null };
+        activeSubjects.forEach((subName) => (point[subName] = null));
+        return point;
+      });
+    }
 
     // Se um aluno específico está selecionado com dados cadastrados
     if (currentHistory && currentHistory.records.length > 0) {
@@ -229,13 +242,15 @@ export const BimonthlyAcademicEvolutionCard: React.FC<BimonthlyAcademicEvolution
 
       return point;
     });
-  }, [currentHistory, activeSubjects, academicHistories, selectedClassId, students]);
+  }, [currentHistory, activeSubjects, academicHistories, selectedClassId, students, selectedStudentId]);
 
   // Análise Comparativa & Insights Preditivos
   const comparativeInsights = useMemo(() => {
-    if (chartData.length < 2) return null;
-    const firstBimester = chartData[0];
-    const latestBimester = chartData[chartData.length - 1];
+    // Só com notas lançadas: compara o primeiro e o último bimestre que TÊM nota.
+    const withAvg = chartData.filter((p) => typeof p['Média Global'] === 'number');
+    if (withAvg.length < 2) return null;
+    const firstBimester = withAvg[0];
+    const latestBimester = withAvg[withAvg.length - 1];
 
     let highestGrowthSubject = '';
     let maxGrowthDiff = -Infinity;
@@ -243,31 +258,32 @@ export const BimonthlyAcademicEvolutionCard: React.FC<BimonthlyAcademicEvolution
     let minGrowthDiff = Infinity;
 
     activeSubjects.forEach((sub) => {
-      const g1 = firstBimester[sub];
-      const gLatest = latestBimester[sub];
-      if (typeof g1 === 'number' && typeof gLatest === 'number') {
-        const diff = gLatest - g1;
-        if (diff > maxGrowthDiff) {
-          maxGrowthDiff = diff;
-          highestGrowthSubject = sub;
-        }
-        if (diff < minGrowthDiff) {
-          minGrowthDiff = diff;
-          lowestGrowthSubject = sub;
-        }
+      const nums = chartData.map((p) => p[sub]).filter((v): v is number => typeof v === 'number');
+      if (nums.length < 2) return;
+      const diff = nums[nums.length - 1] - nums[0];
+      if (diff > maxGrowthDiff) {
+        maxGrowthDiff = diff;
+        highestGrowthSubject = sub;
+      }
+      if (diff < minGrowthDiff) {
+        minGrowthDiff = diff;
+        lowestGrowthSubject = sub;
       }
     });
 
-    const initialAvg = firstBimester['Média Global'] || 0;
-    const finalAvg = latestBimester['Média Global'] || 0;
+    // Com uma só disciplina comparável, ela não é ao mesmo tempo "maior evolução" e "ponto de atenção".
+    if (lowestGrowthSubject === highestGrowthSubject) lowestGrowthSubject = '';
+
+    const initialAvg = firstBimester['Média Global'] as number;
+    const finalAvg = latestBimester['Média Global'] as number;
     const globalGrowth = finalAvg - initialAvg;
     const globalPercent = initialAvg > 0 ? (globalGrowth / initialAvg) * 100 : 0;
 
     return {
       highestGrowthSubject,
-      maxGrowthDiff: Number(maxGrowthDiff.toFixed(1)),
+      maxGrowthDiff: Number.isFinite(maxGrowthDiff) ? Number(maxGrowthDiff.toFixed(1)) : 0,
       lowestGrowthSubject,
-      minGrowthDiff: Number(minGrowthDiff.toFixed(1)),
+      minGrowthDiff: Number.isFinite(minGrowthDiff) ? Number(minGrowthDiff.toFixed(1)) : 0,
       initialAvg,
       finalAvg,
       globalGrowth: Number(globalGrowth.toFixed(1)),
@@ -301,7 +317,7 @@ export const BimonthlyAcademicEvolutionCard: React.FC<BimonthlyAcademicEvolution
         b4,
         media,
         diff,
-        isAboveCut: typeof media === 'string' ? parseFloat(media) >= passingThreshold : true,
+        isAboveCut: media === '-' ? null : parseFloat(media) >= passingThreshold,
       };
     });
   }, [activeSubjects, chartData, passingThreshold]);
@@ -726,14 +742,16 @@ export const BimonthlyAcademicEvolutionCard: React.FC<BimonthlyAcademicEvolution
             </div>
             <div className="mt-1">
               <span className="text-sm font-extrabold text-emerald-900 dark:text-emerald-200">
-                {comparativeInsights.highestGrowthSubject || 'Matemática'}
+                {comparativeInsights.highestGrowthSubject || '—'}
               </span>
-              <span className="ml-2 text-xs font-bold text-emerald-600">
-                +{comparativeInsights.maxGrowthDiff} pts
-              </span>
+              {comparativeInsights.highestGrowthSubject && (
+                <span className="ml-2 text-xs font-bold text-emerald-600">
+                  {comparativeInsights.maxGrowthDiff > 0 ? `+${comparativeInsights.maxGrowthDiff}` : comparativeInsights.maxGrowthDiff} pts
+                </span>
+              )}
             </div>
             <p className="text-[10px] text-emerald-700/80 mt-0.5">
-              Crescimento contínuo e aproveitamento acima da média curricular
+              Do primeiro ao último bimestre com nota lançada
             </p>
           </div>
 
@@ -746,21 +764,23 @@ export const BimonthlyAcademicEvolutionCard: React.FC<BimonthlyAcademicEvolution
             </div>
             <div className="mt-1">
               <span className="text-sm font-extrabold text-rose-900 dark:text-rose-200">
-                {comparativeInsights.lowestGrowthSubject || 'Física'}
+                {comparativeInsights.lowestGrowthSubject || '—'}
               </span>
-              <span className="ml-2 text-xs font-bold text-rose-600">
-                {comparativeInsights.minGrowthDiff > 0 ? `+${comparativeInsights.minGrowthDiff}` : comparativeInsights.minGrowthDiff} pts
-              </span>
+              {comparativeInsights.lowestGrowthSubject && (
+                <span className="ml-2 text-xs font-bold text-rose-600">
+                  {comparativeInsights.minGrowthDiff > 0 ? `+${comparativeInsights.minGrowthDiff}` : comparativeInsights.minGrowthDiff} pts
+                </span>
+              )}
             </div>
             <p className="text-[10px] text-rose-700/80 mt-0.5">
-              Requer reforço escolar e monitoria pedagógica preventiva
+              Menor variação do primeiro ao último bimestre com nota
             </p>
           </div>
 
           <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase text-indigo-800 dark:text-indigo-300">
-                Média Geral Ponderada
+                Média Geral
               </span>
               <TrendingUp className="h-4 w-4 text-indigo-600" />
             </div>
@@ -905,12 +925,14 @@ export const BimonthlyAcademicEvolutionCard: React.FC<BimonthlyAcademicEvolution
                       <td className="px-3 py-2.5 text-center">
                         <span
                           className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
-                            row.isAboveCut
+                            row.isAboveCut === null
+                              ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                              : row.isAboveCut
                               ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200'
                               : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200'
                           }`}
                         >
-                          {row.isAboveCut ? 'Satisfatório' : 'Em Risco'}
+                          {row.isAboveCut === null ? 'Sem notas' : row.isAboveCut ? 'Satisfatório' : 'Em Risco'}
                         </span>
                       </td>
                     </tr>

@@ -111,7 +111,7 @@ export const ExamAnswerKeyModal: React.FC<ExamAnswerKeyModalProps> = ({
                 Caderno de Avaliação & Gabarito Oficial de Correção
               </h3>
               <p className="text-xs text-slate-400">
-                {exam.title} • {exam.subject} ({schoolClass?.name || 'Turma Geral'})
+                {exam.title} • {exam.subject} ({schoolClass?.name || '—'})
               </p>
             </div>
           </div>
@@ -217,7 +217,7 @@ export const ExamAnswerKeyModal: React.FC<ExamAnswerKeyModalProps> = ({
               </div>
               <div>
                 <span className="text-[10px] font-bold uppercase text-slate-400 block print:text-black">Turma:</span>
-                <span className="font-bold text-slate-900 print:text-black">{schoolClass?.name || 'Turma Geral'}</span>
+                <span className="font-bold text-slate-900 print:text-black">{schoolClass?.name || '—'}</span>
               </div>
               <div>
                 <span className="text-[10px] font-bold uppercase text-slate-400 block print:text-black">Professor(a):</span>
@@ -302,10 +302,10 @@ export const ExamAnswerKeyModal: React.FC<ExamAnswerKeyModalProps> = ({
                               {rq.points.toFixed(2)}
                             </td>
                             <td className="py-2.5 px-3 font-mono text-[11px] text-emerald-700 font-bold print:text-black">
-                              {rq.question?.bnccSkill || 'Geral'}
+                              {rq.question?.bnccSkill || '—'}
                             </td>
                             <td className="py-2.5 px-3 text-slate-700 print:text-black font-medium">
-                              {rq.question?.topic || 'Conteúdo Curricular'}
+                              {rq.question?.topic || '—'}
                             </td>
                           </tr>
                         );

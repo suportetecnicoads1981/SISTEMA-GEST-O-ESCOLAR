@@ -7,7 +7,6 @@ import {
   Search,
   Bell,
   Wifi,
-  Volume2,
   Calendar,
   Clock,
   ChevronUp,
@@ -143,7 +142,7 @@ export const WindowsTaskbar: React.FC<WindowsTaskbarProps> = ({
             <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-300 space-y-1">
               <div className="flex justify-between">
                 <span className="text-slate-400">Escola:</span>
-                <span className="font-bold truncate max-w-[150px]">{schoolName || 'Escola Ativa'}</span>
+                <span className="font-bold truncate max-w-[150px]">{schoolName || '—'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Alunos Ativos:</span>
@@ -270,9 +269,6 @@ export const WindowsTaskbar: React.FC<WindowsTaskbarProps> = ({
           <div className="flex items-center gap-1.5 px-1.5 py-1 text-slate-400">
             <div title={isOnline ? 'Este computador está com rede' : 'Este computador está sem rede'}>
               <Wifi className={`w-3.5 h-3.5 ${isOnline ? 'text-emerald-400' : 'text-red-400'}`} />
-            </div>
-            <div title="Áudio e Efeitos do Sistema Ativados">
-              <Volume2 className="w-3.5 h-3.5 text-slate-400" />
             </div>
           </div>
 
