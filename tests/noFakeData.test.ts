@@ -42,3 +42,14 @@ describe('sem dados fictícios nas telas', () => {
     expect(readFileSync('src/components/layout/Header.tsx', 'utf8')).not.toContain(": '6'}");
   });
 });
+
+describe('nomes dos módulos iguais aos do menu', () => {
+  it('Hub de TI e ajuda não usam nomes inventados', () => {
+    for (const f of ['src/components/admin/AdminTIHub.tsx', 'src/services/help/helpContent.ts', 'src/App.tsx']) {
+      const s = readFileSync(f, 'utf8');
+      for (const bad of ['Central de TI', 'CENTRAL DE TI', 'Central de Instalação', 'Controle de Acesso', 'Atualizações do Sistema']) {
+        expect(s.includes(bad), `${f}: ${bad}`).toBe(false);
+      }
+    }
+  });
+});

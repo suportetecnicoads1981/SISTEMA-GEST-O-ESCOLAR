@@ -29,6 +29,7 @@ import {
 } from '../../utils/installerGenerator';
 import { generateUpdateManualHtml } from '../../utils/updatePackageHelper';
 import { downloadBackupJsonFile, performAutoBackup } from '../../data/storage';
+import { moduleName } from '../../config/moduleNames';
 
 interface UpdateTutorialGuideProps {
   schoolName?: string;
@@ -221,7 +222,7 @@ export const UpdateTutorialGuide: React.FC<UpdateTutorialGuideProps> = ({
                 <span className="font-bold text-sm text-slate-900">Baixar e Extrair o ZIP</span>
               </div>
               <p className="text-xs text-slate-600 leading-relaxed pl-10">
-                Gere e baixe o pacote ZIP na Central de Instalação (ou copie do pen drive). Extraia todo o conteúdo para uma pasta acessível (ex: <code>Downloads</code>).
+                Gere e baixe o pacote ZIP em {moduleName('NETWORK_INSTALLER')} (ou copie do pen drive). Extraia todo o conteúdo para uma pasta acessível (ex: <code>Downloads</code>).
               </p>
             </div>
 

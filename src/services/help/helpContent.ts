@@ -1033,7 +1033,7 @@ export const HELP_MODULES: HelpModule[] = [
       },
       {
         q: 'Para onde foram o Google Drive, os pacotes .edupkg e o "Controle de Versões"?',
-        a: 'Foram retirados em 01/10/2026 porque eram simulados: mostravam "conectado", "enviado" e "atualização concluída" sem fazer nada de verdade. As funções reais são: atualização do servidor (quadro desta tela ou da Central de Instalação), cópia de segurança (botão "Fazer cópia agora", que baixa o arquivo .json) e o banco do servidor em C:\\SucessoEdu\\data.',
+        a: `Foram retirados em 01/10/2026 porque eram simulados: mostravam "conectado", "enviado" e "atualização concluída" sem fazer nada de verdade. As funções reais são: atualização do servidor (quadro desta tela ou de ${moduleName('NETWORK_INSTALLER')}), cópia de segurança (botão "Fazer cópia agora", que baixa o arquivo .json) e o banco do servidor em C:\\SucessoEdu\\data.`,
       },
     ],
   },
@@ -1072,20 +1072,20 @@ export const HELP_MODULES: HelpModule[] = [
         a: `Instalação do Servidor Sede, servidores das escolas e estações: ${moduleName('NETWORK_INSTALLER')} (Alt+I). Envio e consolidação de lotes .edusync: ${moduleName('MUNICIPAL_SYNC')}. Usuários, senhas e contas na nuvem: ${moduleName('USER_CONTROL')}. Versões publicadas: ${moduleName('SYSTEM_UPDATES')}.`,
       },
       {
-        q: 'O que a Central de TI mostra?',
+        q: `O que o ${moduleName('ADMIN_TI')} mostra?`,
         a: 'Só informações reais: se este computador está com rede e qual versão do sistema abriu; se está usando o servidor da rede local (Sede ou escola), quantas alterações aguardam envio e a última sincronização; se a nuvem responde e a situação da sincronização; e a quantidade de escolas, turmas, alunos e usuários ativos gravados neste computador, com os últimos registros de acesso. Clique em "Verificar agora" para conferir de novo. Os antigos quadros de portas, PostgreSQL, "Secret Manager" e logs de auditoria de exemplo foram retirados por não serem reais.',
       },
       {
         q: 'Onde foram parar o OmniDeploy, NexusBuild, InstalaFlow, DataSync Pro (SQL Architect) e o Diagrama?',
-        a: 'Foram desativados em 01/10/2026 para deixar o sistema mais leve. Eram painéis de demonstração: mostravam resultados simulados (por exemplo "SQL executado" ou "atualização aplicada") sem fazer nada de verdade, e o navegador precisava baixá-los mesmo sem uso. Nenhum dado foi perdido. As funções reais continuam na Central de Instalação, na Rede Municipal (.edusync), no Controle de Acesso e em Atualizações do Sistema.',
+        a: `Foram desativados em 01/10/2026 para deixar o sistema mais leve. Eram painéis de demonstração: mostravam resultados simulados (por exemplo "SQL executado" ou "atualização aplicada") sem fazer nada de verdade, e o navegador precisava baixá-los mesmo sem uso. Nenhum dado foi perdido. As funções reais continuam em ${moduleName('NETWORK_INSTALLER')}, ${moduleName('MUNICIPAL_SYNC')}, ${moduleName('USER_CONTROL')} e ${moduleName('SYSTEM_UPDATES')}.`,
       },
       {
-        q: 'Por que a Central de Instalação, Atualizações ou a Rede Municipal mostram "Carregando" na primeira vez?',
+        q: `Por que ${moduleName('NETWORK_INSTALLER')}, ${moduleName('SYSTEM_UPDATES')} ou ${moduleName('MUNICIPAL_SYNC')} mostram "Carregando" na primeira vez?`,
         a: 'Para o sistema abrir mais rápido em todos os computadores, esses módulos (os mais pesados, usados quase só pela TI e pela Sede) agora são baixados só quando você os abre. A primeira abertura leva um instante; depois fica na memória. Se o sistema foi atualizado com a janela aberta, ele recarrega a página sozinho uma vez para buscar a versão nova.',
       },
       {
         q: 'Cliquei num atalho antigo e apareceu "Painel desativado". É erro?',
-        a: 'Não. O atalho levava a um painel de demonstração que foi retirado. Use a Central de TI para chegar às ferramentas reais.',
+        a: `Não. O atalho levava a um painel de demonstração que foi retirado. Use ${moduleName('ADMIN_TI')} para chegar às ferramentas reais.`,
       },
     ],
   },

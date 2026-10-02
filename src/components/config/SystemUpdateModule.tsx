@@ -6,6 +6,7 @@ import { getLocalServerInfo } from '../../services/offline/localServerSync';
 import { ServerUpdateCard } from '../offline/ServerUpdateCard';
 import { downloadBackupJsonFile, getAutoBackupHistory, performAutoBackup } from '../../data/storage';
 import { notify } from '../../utils/dialogs';
+import { moduleName } from '../../config/moduleNames';
 
 /**
  * Atualizações do Sistema — só informações e ações reais:
@@ -85,7 +86,7 @@ export const SystemUpdateModule: React.FC<SystemUpdateModuleProps> = ({ onBack, 
             <li>
               <strong>Instalação nova:</strong> gere o pacote na{' '}
               <button onClick={() => onNavigate?.('NETWORK_INSTALLER')} className="text-indigo-700 font-bold underline cursor-pointer">
-                Central de Instalação
+                {moduleName('NETWORK_INSTALLER')}
               </button>
               .
             </li>
@@ -118,7 +119,7 @@ export const SystemUpdateModule: React.FC<SystemUpdateModuleProps> = ({ onBack, 
             <p className="text-[11px] text-slate-500">
               Para restaurar uma cópia, use a{' '}
               <button onClick={() => onNavigate?.('NETWORK_INSTALLER')} className="text-indigo-700 font-bold underline cursor-pointer">
-                Central de Instalação
+                {moduleName('NETWORK_INSTALLER')}
               </button>
               .
             </p>

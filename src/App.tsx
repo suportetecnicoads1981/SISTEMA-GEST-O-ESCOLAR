@@ -114,6 +114,7 @@ import { DropoutRiskAlertModal } from './components/common/DropoutRiskAlertModal
 import { can as canAccess, canOpenTab, deniedTabMessage, describeDenials, enforceDataPermissions } from './services/rbac/accessControl';
 import { scopeDataToSchool, userSchoolScope } from './services/rbac/schoolScope';
 import { focusSchoolIds, readStoredFocus, restoreHiddenRecords, scopeDataToFocus, storeFocus, type SchoolFocus } from './services/rbac/schoolFocus';
+import { moduleName } from './config/moduleNames';
 
 export default function App() {
   // setDataRaw: gravação sem checagem (dados vindos da nuvem, restauração, rotinas do sistema).
@@ -1697,7 +1698,7 @@ export default function App() {
     }
 
     if (!isTabAvailable(target)) {
-      notify('Este painel de demonstração foi desativado para deixar o sistema mais leve. Os recursos reais estão na Central de TI.', 'Painel desativado');
+      notify(`Este painel de demonstração foi desativado para deixar o sistema mais leve. Os recursos reais estão em ${moduleName('ADMIN_TI')}.`, 'Painel desativado');
       return;
     }
 
@@ -2196,7 +2197,7 @@ export default function App() {
 
             {/* TAB: GESTÃO MUNICIPAL & POLOS REMOTOS FORA DA REDE (.edusync) */}
             {activeTab === 'MUNICIPAL_SYNC' && (
-              <Suspense fallback={<ModuleLoadingFallback moduleName="Rede Municipal & Polos" />}>
+              <Suspense fallback={<ModuleLoadingFallback moduleName={moduleName('MUNICIPAL_SYNC')} />}>
               <MunicipalSyncModule
                 schoolUnits={data?.schoolUnits || []}
                 syncLogs={data?.syncLogs || []}
@@ -2296,7 +2297,7 @@ export default function App() {
 
             {/* TAB: ATUALIZAÇÕES WEB & HISTÓRICO DO SISTEMA */}
             {activeTab === 'SYSTEM_UPDATES' && (
-              <Suspense fallback={<ModuleLoadingFallback moduleName="Atualizações do Sistema" />}>
+              <Suspense fallback={<ModuleLoadingFallback moduleName={moduleName('SYSTEM_UPDATES')} />}>
               <SystemUpdateModule
                 onBack={handleGoBack}
                 onNavigate={handleNavigate}
@@ -2322,7 +2323,7 @@ export default function App() {
 
             {/* TAB: CENTRAL DE ADMINISTRAÇÃO & TI (PAINEL GERAL E HUB DE NAVEGAÇÃO RÁPIDA) */}
             {activeTab === 'ADMIN_TI' && (
-              <Suspense fallback={<ModuleLoadingFallback moduleName="Central de Administração & TI" />}>
+              <Suspense fallback={<ModuleLoadingFallback moduleName={moduleName('ADMIN_TI')} />}>
                 <AdminTIHub
                   schoolName={viewData.settings?.name || 'SucessoEdu Gestão Educacional'}
                   onNavigate={handleNavigate}
@@ -2341,7 +2342,7 @@ export default function App() {
 
             {/* TAB: INSTALADOR DE REDE LOCAL, NUVEM E BACKUP */}
             {activeTab === 'NETWORK_INSTALLER' && (
-              <Suspense fallback={<ModuleLoadingFallback moduleName="Central de Instalação" />}>
+              <Suspense fallback={<ModuleLoadingFallback moduleName={moduleName('NETWORK_INSTALLER')} />}>
                 <NetworkInstaller
                   onBack={handleGoBack}
                   onNavigate={handleNavigate}

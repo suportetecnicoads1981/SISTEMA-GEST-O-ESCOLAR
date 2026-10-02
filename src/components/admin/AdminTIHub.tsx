@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { SecurityAuditLog } from '../../types';
 import { isTabAvailable } from '../../config/features';
+import { moduleName, moduleGroup } from '../../config/moduleNames';
 import {
   getLocalServerInfo,
   getLocalServerStatus,
@@ -31,7 +32,7 @@ import { isCloudReachable } from '../../services/offline/connectivity';
 declare const __APP_BUILT_AT__: string;
 
 /**
- * Central de TI — mostra SOMENTE informações reais deste computador, do servidor local e da
+ * Hub de Engenharia & TI (grupo Administração & TI) — mostra SOMENTE informações reais deste computador, do servidor local e da
  * nuvem (nada simulado). As ferramentas levam aos módulos que de fato fazem o trabalho.
  */
 interface AdminTIHubProps {
@@ -102,11 +103,11 @@ const CLOUD_LABEL: Record<CloudSyncStatus['state'], { badge: string; tone: Tone 
 };
 
 const TOOLS = [
-  { id: 'NETWORK_INSTALLER', title: 'Central de Instalação', desc: 'Pacotes do Servidor Sede, servidores das escolas e estações', icon: Server, color: 'bg-blue-100/60 text-blue-700' },
-  { id: 'USER_CONTROL', title: 'Controle de Acesso', desc: 'Usuários, perfis, senhas e contas na nuvem', icon: Key, color: 'bg-purple-100/60 text-purple-700' },
-  { id: 'MUNICIPAL_SYNC', title: 'Rede Municipal (.edusync)', desc: 'Lotes das escolas e consolidação na Sede', icon: Database, color: 'bg-emerald-100/60 text-emerald-700' },
-  { id: 'SYSTEM_UPDATES', title: 'Atualizações do Sistema', desc: 'Versões publicadas e notas de atualização', icon: RefreshCw, color: 'bg-amber-100/60 text-amber-700' },
-  { id: 'ABOUT', title: 'Sobre o Sistema', desc: 'Dados do sistema e contato do suporte', icon: Info, color: 'bg-slate-100 text-slate-700' },
+  { id: 'NETWORK_INSTALLER', title: moduleName('NETWORK_INSTALLER'), desc: 'Pacotes do Servidor Sede, servidores das escolas e estações', icon: Server, color: 'bg-blue-100/60 text-blue-700' },
+  { id: 'USER_CONTROL', title: moduleName('USER_CONTROL'), desc: 'Usuários, perfis, senhas e contas na nuvem', icon: Key, color: 'bg-purple-100/60 text-purple-700' },
+  { id: 'MUNICIPAL_SYNC', title: moduleName('MUNICIPAL_SYNC'), desc: 'Lotes das escolas e consolidação na Sede', icon: Database, color: 'bg-emerald-100/60 text-emerald-700' },
+  { id: 'SYSTEM_UPDATES', title: moduleName('SYSTEM_UPDATES'), desc: 'Versões publicadas e notas de atualização', icon: RefreshCw, color: 'bg-amber-100/60 text-amber-700' },
+  { id: 'ABOUT', title: moduleName('ABOUT'), desc: 'Dados do sistema e contato do suporte', icon: Info, color: 'bg-slate-100 text-slate-700' },
 ].filter((t) => isTabAvailable(t.id));
 
 const AUDIT_TONE: Record<SecurityAuditLog['status'], string> = {
@@ -210,11 +211,11 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
               )}
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800 text-xs font-bold">
                 <Sliders className="h-3.5 w-3.5" />
-                CENTRAL DE TI
+                {moduleGroup('ADMIN_TI').toUpperCase()}
               </span>
               <span className="text-xs text-slate-400">{schoolName}</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">Administração & TI</h1>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">{moduleName('ADMIN_TI')}</h1>
             <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
               Situação real deste computador, do servidor da rede local e da nuvem, e acesso às ferramentas de TI.
             </p>
@@ -369,7 +370,7 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
             <span>Instalação do Servidor Sede, das escolas e das estações</span>
           </div>
           <p className="text-xs text-slate-600 leading-relaxed max-w-3xl">
-            Gere o pacote na <strong>Central de Instalação</strong>. Ele já configura o servidor local, a inicialização
+            Gere o pacote em <strong>{moduleName('NETWORK_INSTALLER')}</strong>. Ele já configura o servidor local, a inicialização
             automática e o atalho único oficial na Área de Trabalho.
           </p>
         </div>
@@ -377,7 +378,7 @@ export const AdminTIHub: React.FC<AdminTIHubProps> = ({
           onClick={() => onNavigate('NETWORK_INSTALLER')}
           className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs flex items-center gap-1.5 shrink-0"
         >
-          <span>Ir para a Central de Instalação</span>
+          <span>Ir para {moduleName('NETWORK_INSTALLER')}</span>
           <ArrowRight className="h-3.5 w-3.5" />
         </button>
       </div>
