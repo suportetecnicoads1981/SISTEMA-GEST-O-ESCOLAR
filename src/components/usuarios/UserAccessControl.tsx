@@ -1180,7 +1180,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                           {log.module}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-slate-500">{log.ipAddress || '192.168.1.100'}</td>
+                      <td className="py-3 px-4 text-slate-500">{log.ipAddress || '—'}</td>
                       <td className="py-3 px-4 font-sans">
                         <span
                           className={`px-2 py-0.5 rounded-full font-bold text-[9px] ${

@@ -72,34 +72,7 @@ export const DEFAULT_BACKUP_SCHEDULER_CONFIG: BackupSchedulerConfig = {
   notifyAdminInternalMessage: true,
   notifyAdminPush: true,
   audioAlert: true,
-  lastRunAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-  lastRunStatus: 'SUCCESS',
-  lastRunMessage: 'Backup inicial automático homologado com sucesso no Google Drive',
-  nextScheduledRunAt: new Date(Date.now() + 3600000 * 20).toISOString(),
-  history: [
-    {
-      id: 'sched-bkp-initial',
-      timestamp: new Date(Date.now() - 3600000 * 4).toISOString(),
-      checksum: 'SHA256-SAFE-BKPAUTO98214',
-      fileSizeBytes: 428900,
-      fileName: 'SucessoEdu_Backup_Automatico_Oficial.json',
-      googleDriveFileId: 'gdrive-file-auto-01',
-      googleDriveFolder: OFFICIAL_DRIVE_UPDATES_FOLDER_NAME,
-      googleDriveAccount: TARGET_GOOGLE_DRIVE_ACCOUNT,
-      googleDriveLink: getSafeDriveFileUrl(null, 'SucessoEdu_Backup_Automatico_Oficial.json'),
-      status: 'SUCCESS',
-      reason: 'Backup Agendado Automático - Google Drive',
-      stats: {
-        studentsCount: 142,
-        classesCount: 8,
-        examsCount: 12,
-        submissionsCount: 384,
-      },
-      notificationSent: true,
-      messageId: 'msg-bkp-auto-init',
-      details: 'Cópia de segurança enviada para a pasta oficial do Google Drive com notificação aos administradores.',
-    },
-  ],
+  history: [],
 };
 
 /**
@@ -376,7 +349,10 @@ export async function executeScheduledBackupNow(
     },
     notificationSent: true,
     messageId,
-    details: `Backup concluído com sucesso e gravado na nuvem Google Drive (${TARGET_GOOGLE_DRIVE_ACCOUNT}). Notificação enviada à caixa de mensagens do Administrador.`,
+    details:
+      status === 'SUCCESS'
+        ? `Backup concluído e gravado no Google Drive (${TARGET_GOOGLE_DRIVE_ACCOUNT}).`
+        : 'Backup gravado só neste computador: o envio ao Google Drive falhou.',
   };
 
   const updatedHistory = [historyItem, ...(config.history || [])].slice(0, 25);

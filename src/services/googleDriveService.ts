@@ -382,14 +382,8 @@ export const GoogleDriveService = {
       };
     } catch (err: any) {
       console.warn('Erro ao consultar/criar pasta no Google Drive:', err);
-      // Return a structured fallback folder with a guaranteed functional Google Drive search URL
-      return {
-        id: 'gdrive-folder-sucessoedu-updates-01',
-        name: OFFICIAL_DRIVE_UPDATES_FOLDER_NAME,
-        webViewLink: getSafeDriveFolderUrl(null, OFFICIAL_DRIVE_UPDATES_FOLDER_NAME),
-        createdTime: new Date().toISOString(),
-        description: `Pasta oficial de atualizações SucessoEdu (${TARGET_GOOGLE_DRIVE_ACCOUNT})`,
-      };
+      // Nunca devolve uma pasta inventada: quem chama precisa saber que falhou.
+      throw err;
     }
   },
 
@@ -482,13 +476,8 @@ export const GoogleDriveService = {
       };
     } catch (err: any) {
       console.warn('Erro ao enviar arquivo para o Google Drive:', err);
-      return {
-        id: `gdrive-file-${Date.now()}`,
-        name: fileName,
-        mimeType,
-        modifiedTime: new Date().toISOString(),
-        webViewLink: getSafeDriveFileUrl(null, fileName),
-      };
+      // Nunca devolve um arquivo inventado como se o envio tivesse dado certo.
+      throw err;
     }
   },
 

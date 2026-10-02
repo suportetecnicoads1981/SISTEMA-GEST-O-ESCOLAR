@@ -429,7 +429,7 @@ export function getCleanDatabase(options?: CleanInstallationOptions): AppStateDa
     whatsappConfig: DEFAULT_WHATSAPP_CONFIG,
     whatsappTemplates: DEFAULT_WHATSAPP_TEMPLATES,
     whatsappLogs: [],
-    systemUpdates: DEFAULT_SYSTEM_UPDATES,
+    systemUpdates: [],
     auditLogs: [
       {
         id: `audit-clean-${Date.now()}`,
@@ -617,7 +617,7 @@ export function getStoredData(): AppStateData {
       whatsappConfig: parsed.whatsappConfig || DEFAULT_WHATSAPP_CONFIG,
       whatsappTemplates: parsed.whatsappTemplates || DEFAULT_WHATSAPP_TEMPLATES,
       whatsappLogs: hasArr(parsed.whatsappLogs) ? parsed.whatsappLogs : [],
-      systemUpdates: parsed.systemUpdates || DEFAULT_SYSTEM_UPDATES,
+      systemUpdates: hasArr(parsed.systemUpdates) ? parsed.systemUpdates : [],
       auditLogs: hasArr(parsed.auditLogs) ? parsed.auditLogs : [],
       dropoutAlertConfig: { ...DEFAULT_DROPOUT_ALERT_CONFIG, ...(parsed.dropoutAlertConfig || {}) },
     };
@@ -765,7 +765,8 @@ export function gradeExamSubmission(
     maxScore += maxPoints;
 
     const studentAns = rawAnswers.find((a) => a.questionId === qConfig.questionId);
-    const timeSpent = studentAns?.timeSpentSeconds || 60;
+    // Tempo não registrado conta como 0 (não inventamos 60 s por questão).
+    const timeSpent = studentAns?.timeSpentSeconds || 0;
     totalTimeSpent += timeSpent;
 
     if (!q) {
@@ -1076,14 +1077,16 @@ export function restoreBackup(backup: SystemBackup, opts?: { network?: boolean }
       submissions: backup.data.submissions || [],
       academicHistories: backup.data.academicHistories || [],
       settings: backup.data.settings,
-      notifications: backup.data.notifications || DEFAULT_NOTIFICATIONS,
-      communications: backup.data.communications || DEFAULT_COMMUNICATIONS,
+      // Backup sem um campo: fica vazio (nunca entram registros de exemplo na base real).
+      notifications: backup.data.notifications || [],
+      communications: backup.data.communications || [],
       rolePreferences: (backup?.data?.rolePreferences && typeof backup.data.rolePreferences === 'object' && backup?.data?.rolePreferences?.ADMIN)
         ? { ...DEFAULT_ROLE_PREFERENCES, ...backup.data.rolePreferences }
         : DEFAULT_ROLE_PREFERENCES,
-      schoolUnits: (backup.data as any).schoolUnits || DEFAULT_SCHOOL_UNITS,
-      syncLogs: (backup.data as any).syncLogs || DEFAULT_SYNC_LOGS,
-      userAccounts: (backup.data as any).userAccounts || DEFAULT_USER_ACCOUNTS,
+      schoolUnits: (backup.data as any).schoolUnits || [],
+      syncLogs: (backup.data as any).syncLogs || [],
+      // Sem contas no backup: mantém as contas atuais (nunca as contas de exemplo).
+      userAccounts: (backup.data as any).userAccounts || getStoredData().userAccounts,
       developerContact: (backup.data as any).developerContact || DEFAULT_DEVELOPER_CONTACT,
       bnccSkills: (backup.data as any).bnccSkills || DEFAULT_BNCC_SKILLS,
       stateRegulations: (backup.data as any).stateRegulations || DEFAULT_STATE_REGULATIONS,
@@ -1095,9 +1098,9 @@ export function restoreBackup(backup: SystemBackup, opts?: { network?: boolean }
       teacherStudentNotes: (backup.data as any).teacherStudentNotes || [],
       whatsappConfig: (backup.data as any).whatsappConfig || DEFAULT_WHATSAPP_CONFIG,
       whatsappTemplates: (backup.data as any).whatsappTemplates || DEFAULT_WHATSAPP_TEMPLATES,
-      whatsappLogs: (backup.data as any).whatsappLogs || DEFAULT_WHATSAPP_LOGS,
-      systemUpdates: (backup.data as any).systemUpdates || DEFAULT_SYSTEM_UPDATES,
-      auditLogs: (backup.data as any).auditLogs || DEFAULT_AUDIT_LOGS,
+      whatsappLogs: (backup.data as any).whatsappLogs || [],
+      systemUpdates: (backup.data as any).systemUpdates || [],
+      auditLogs: (backup.data as any).auditLogs || [],
     }, { bulkReplace: true, authoritative: !!opts?.network });
   }
 }
@@ -1118,7 +1121,7 @@ export function performAutoBackup(
     customVersion ||
     localStorage.getItem('sucessoedu_active_version') ||
     (current.settings as any)?.systemVersion ||
-    'v5.4.0-ENTERPRISE';
+    '';
 
   const stats = {
     studentsCount: current.students?.length || 0,
@@ -1132,7 +1135,7 @@ export function performAutoBackup(
 
   const payloadString = JSON.stringify(current);
   const fileSizeBytes = new Blob([payloadString]).size;
-  const checksum = `SHA256-SAFE-${btoa(
+  const checksum = `CHK-${btoa(
     `${snapshotId}|${stats.studentsCount}|${stats.submissionsCount}|${timestamp}`
   ).slice(0, 24)}`;
 
@@ -1666,7 +1669,8 @@ export function logSecurityAudit(
     actionType,
     module,
     details,
-    ipAddress: '192.168.1.' + Math.floor(100 + Math.random() * 50),
+    // O navegador não conhece o próprio IP; não inventamos um.
+    ipAddress: '',
     status,
   };
 

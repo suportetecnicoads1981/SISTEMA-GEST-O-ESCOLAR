@@ -31,7 +31,6 @@ import {
   createBackup,
   getStoredData,
   resetToCleanDatabase,
-  resetToDemoDatabase,
   isDatabaseClean,
   CleanInstallationOptions,
 } from '../../data/storage';
@@ -126,18 +125,6 @@ export const UninstallationModule: React.FC<UninstallationModuleProps> = ({
     setShowCleanModal(false);
     setCleanNotification('Base de dados limpa com sucesso! O sistema está pronto para operação em produção.');
     setTimeout(() => setCleanNotification(null), 6000);
-  };
-
-  const handleRestoreDemoData = async () => {
-    if (await confirmDialog('Deseja restaurar a base demonstrativa com dados simulados de alunos, turmas e notas?')) {
-      const demoState = resetToDemoDatabase();
-      setCurrentData(demoState);
-      if (onResetToDemoDatabase) {
-        onResetToDemoDatabase();
-      }
-      setCleanNotification('Dados de demonstração restaurados com sucesso.');
-      setTimeout(() => setCleanNotification(null), 6000);
-    }
   };
 
   const handleCopyCmd = (text: string) => {
@@ -264,20 +251,9 @@ export const UninstallationModule: React.FC<UninstallationModuleProps> = ({
           </div>
         </div>
 
-        {/* CONTROLE COMPLEMENTAR: RESTAURAR DADOS DE DEMONSTRAÇÃO */}
-        <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs flex-wrap gap-2">
-          <span className="text-slate-500">
-            Deseja alternar temporariamente para os dados de teste para demonstração ou treinamento da equipe?
-          </span>
-          {isClean ? (
-            <button
-              onClick={handleRestoreDemoData}
-              className="px-3 py-1.5 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg flex items-center gap-1.5 cursor-pointer transition-all"
-            >
-              <Sparkles className="h-3.5 w-3.5 text-amber-600" />
-              <span>Carregar Dados de Demonstração</span>
-            </button>
-          ) : (
+        {/* Base de demonstração desativada: dados de exemplo nunca entram na base real. */}
+        {!isClean && (
+          <div className="flex items-center justify-end pt-2 border-t border-slate-100 text-xs flex-wrap gap-2">
             <button
               onClick={() => setShowCleanModal(true)}
               className="px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg flex items-center gap-1.5 cursor-pointer transition-all"
@@ -285,8 +261,8 @@ export const UninstallationModule: React.FC<UninstallationModuleProps> = ({
               <RotateCcw className="h-3.5 w-3.5 text-indigo-600" />
               <span>Zerar para Base Limpa</span>
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* MODAL DE EXECUÇÃO DE INSTALAÇÃO LIMPA */}
