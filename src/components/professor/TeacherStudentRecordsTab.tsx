@@ -115,7 +115,7 @@ export const TeacherStudentRecordsTab: React.FC<TeacherStudentRecordsTabProps> =
 
   // Student attendance count in active subject
   const studentAttendanceStats = useMemo(() => {
-    if (!activeStudent) return { totalLessons: 0, present: 0, absent: 0, justified: 0, rate: 100 };
+    if (!activeStudent) return { totalLessons: 0, present: 0, absent: 0, justified: 0, rate: null as number | null };
     const relevantSheets = attendanceSheets.filter(
       (s) => s.classId === activeClass?.id && s.subjectId === activeSubject?.id
     );
@@ -134,7 +134,7 @@ export const TeacherStudentRecordsTab: React.FC<TeacherStudentRecordsTabProps> =
     });
 
     const total = present + absent + justified;
-    const rate = total > 0 ? Math.round(((present + justified) / total) * 100) : 100;
+    const rate: number | null = total > 0 ? Math.round(((present + justified) / total) * 100) : null;
 
     return { totalLessons: total, present, absent, justified, rate };
   }, [attendanceSheets, activeClass?.id, activeSubject?.id, activeStudent]);
@@ -260,7 +260,7 @@ export const TeacherStudentRecordsTab: React.FC<TeacherStudentRecordsTabProps> =
                 <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-900">
                   <span className="text-[10px] text-emerald-600 font-bold uppercase block">Frequência</span>
                   <span className="text-base font-black text-emerald-700">
-                    {studentAttendanceStats.rate}%
+                    {studentAttendanceStats.rate === null ? '—' : `${studentAttendanceStats.rate}%`}
                   </span>
                 </div>
 

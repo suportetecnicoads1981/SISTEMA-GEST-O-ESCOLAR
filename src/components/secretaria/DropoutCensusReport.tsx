@@ -190,8 +190,9 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
   const dropoutRate = totalStudentsCount > 0 ? (totalDroppedOutCount / totalStudentsCount) * 100 : 0;
 
   const inActiveSearchCount = droppedOutStudents.filter(
-    (s) => !s.dropoutIntervention || s.dropoutIntervention.searchStatus === 'EM_BUSCA_ATIVA'
+    (s) => s.dropoutIntervention?.searchStatus === 'EM_BUSCA_ATIVA'
   ).length;
+  const noInterventionCount = droppedOutStudents.filter((s) => !s.dropoutIntervention).length;
 
   const rescuedCount = droppedOutStudents.filter(
     (s) => s.dropoutIntervention?.searchStatus === 'RESGATADO_REINSERIDO'
@@ -797,7 +798,7 @@ export const DropoutCensusReport: React.FC<DropoutCensusReportProps> = ({
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 border border-white/15 text-center min-w-[110px]">
               <span className="text-[10px] font-bold text-slate-300 block uppercase">Em Busca Ativa</span>
               <span className="text-2xl sm:text-3xl font-black text-amber-300">{inActiveSearchCount}</span>
-              <span className="text-[10px] text-amber-200 block mt-0.5">Equipe em campo</span>
+              <span className="text-[10px] text-amber-200 block mt-0.5">{noInterventionCount} sem intervenção registrada</span>
             </div>
 
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3.5 border border-white/15 text-center min-w-[110px]">

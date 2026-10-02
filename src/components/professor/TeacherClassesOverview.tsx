@@ -123,7 +123,7 @@ export const TeacherClassesOverview: React.FC<TeacherClassesOverviewProps> = ({
             </span>
             <span className="text-[11px] text-blue-600 font-semibold flex items-center gap-1 mt-1">
               <CheckCircle2 className="h-3 w-3" />
-              Diários homologados
+              Registros no diário
             </span>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
@@ -189,22 +189,22 @@ export const TeacherClassesOverview: React.FC<TeacherClassesOverviewProps> = ({
             const classExams = (exams || []).filter((e) => e && e.classId === cls.id);
             const classGradeSheet = (gradeSheets || []).find((g) => g && g.classId === cls.id);
 
-            // Compute average attendance rate if available
-            const classAttendances = (attendanceSheets || []).filter((a) => a && a.classId === cls.id);
-            const avgAttendance = classAttendances.length > 0
-              ? Math.round(
-                  classAttendances.reduce((acc, curr) => acc + ((curr && curr.attendanceRate) || 85), 0) /
-                  classAttendances.length
-                )
-              : 92;
+            // Frequência média real (só chamadas com taxa registrada); sem chamada: "—".
+            const classAttendances = (attendanceSheets || []).filter(
+              (a) => a && a.classId === cls.id && typeof a.attendanceRate === 'number' && Number.isFinite(a.attendanceRate)
+            );
+            const avgAttendance: string = classAttendances.length > 0
+              ? `${Math.round(classAttendances.reduce((acc, curr) => acc + curr.attendanceRate, 0) / classAttendances.length)}%`
+              : '—';
 
-            // Compute grade average if available
-            const gradeAvg = classGradeSheet?.grades && classGradeSheet.grades.length > 0
-              ? (
-                  classGradeSheet.grades.reduce((acc, g) => acc + ((g && g.termAverage) || 0), 0) /
-                  classGradeSheet.grades.length
-                ).toFixed(1)
-              : '7.8';
+            // Média real das notas lançadas da turma (todas as pautas); sem nota: "—".
+            const launched = (gradeSheets || [])
+              .filter((g) => g && g.classId === cls.id)
+              .flatMap((g) => g.grades || [])
+              .filter((g) => g && [g.assessment1, g.assessment2, g.activitiesScore, g.examScore, g.recoveryScore].some((v) => typeof v === 'number'))
+              .map((g) => Number(g.termAverage))
+              .filter((v) => Number.isFinite(v));
+            const gradeAvg = launched.length > 0 ? (launched.reduce((a, b) => a + b, 0) / launched.length).toFixed(1) : '—';
 
             return (
               <div
@@ -241,7 +241,7 @@ export const TeacherClassesOverview: React.FC<TeacherClassesOverviewProps> = ({
                     </div>
                     <div>
                       <span className="text-[10px] text-slate-400 font-bold uppercase block">Frequência</span>
-                      <span className="text-sm font-black text-emerald-600">{avgAttendance}%</span>
+                      <span className="text-sm font-black text-emerald-600">{avgAttendance}</span>
                     </div>
                     <div>
                       <span className="text-[10px] text-slate-400 font-bold uppercase block">Média</span>

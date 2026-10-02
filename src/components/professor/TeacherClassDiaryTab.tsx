@@ -208,7 +208,7 @@ export const TeacherClassDiaryTab: React.FC<TeacherClassDiaryTabProps> = ({
           </div>
           <div style="text-align: right; font-size: 8pt; color: #64748b;">
             Emitido em: ${new Date().toLocaleString('pt-BR')}<br>
-            INEP: ${settings.inepCode || '35128490'}
+            INEP: ${settings.inepCode || 'não cadastrado'}
           </div>
         </div>
 
@@ -624,10 +624,6 @@ export const TeacherClassDiaryTab: React.FC<TeacherClassDiaryTabProps> = ({
 
                     <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-200/60">
                       <span>Assinado por {lesson.teacherName}</span>
-                      <span className="text-emerald-600 font-bold flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3" />
-                        Homologado
-                      </span>
                     </div>
                   </div>
                 ))

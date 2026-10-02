@@ -777,8 +777,11 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
                   <p className="text-xl font-black text-indigo-700">{Object.keys(subjectStats).length}</p>
                 </div>
                 <div className="p-3 bg-amber-50 rounded-xl border border-amber-200">
-                  <span className="text-[10px] uppercase font-bold text-amber-700">Dificuldade Média</span>
-                  <p className="text-xl font-black text-amber-700">Equilibrada</p>
+                  <span className="text-[10px] uppercase font-bold text-amber-700">Fácil / Médio / Difícil</span>
+                  <p className="text-xl font-black text-amber-700">
+                    {questions.filter((q) => q.difficulty === 'FACIL').length} / {questions.filter((q) => q.difficulty === 'MEDIO').length} /{' '}
+                    {questions.filter((q) => q.difficulty === 'DIFICIL').length}
+                  </p>
                 </div>
               </div>
 
@@ -824,7 +827,6 @@ export const QuestionBank: React.FC<QuestionBankProps> = ({
                 </p>
                 <ul className="list-disc list-inside text-indigo-800 space-y-1 pl-1">
                   <li>Para provas bimestrais balanceadas, recomendamos proporção de 40% Fácil, 40% Médio e 20% Difícil.</li>
-                  <li>Todas as questões objetivas possuem distratores cadastrados para análise de erros comuns.</li>
                   <li>Aproveite o botão "Elaborar Avaliação" com itens selecionados para gerar testes instantâneos.</li>
                 </ul>
               </div>

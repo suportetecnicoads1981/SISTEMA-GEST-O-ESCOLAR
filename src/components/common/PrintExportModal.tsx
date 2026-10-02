@@ -614,7 +614,7 @@ export function PrintExportModal<T>({
                           {settings?.tradeName || 'Secretaria Municipal de Educação & Gestão Escolar'}
                         </p>
                         <p className="text-[10px] text-slate-500">
-                          {settings?.address} • {settings?.city} - {settings?.state} • Tel: {settings?.phone} • Cód. INEP: {settings?.inepCode || '35128490'}
+                          {settings?.address} • {settings?.city} - {settings?.state} • Tel: {settings?.phone} • Cód. INEP: {settings?.inepCode || 'não cadastrado'}
                         </p>
                       </div>
                     </div>

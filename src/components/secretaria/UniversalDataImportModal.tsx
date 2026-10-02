@@ -42,8 +42,6 @@ import {
   ImportFilterOptions,
   FileImportResult,
   ParsedImportStudent,
-  loadSampleRuthPereiraBarbaresco,
-  loadSampleErminioBrito8Col,
   downloadSpreadsheetTemplate,
   downloadWordTemplate,
   downloadWriterTemplate,
@@ -157,93 +155,6 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
     }
 
     setFileResults((prev) => [...prev, ...results]);
-    setIsProcessing(false);
-  };
-
-  // Carregar dados de exemplo diretos da planilha da Escola Maria da Praia
-  const handleLoadSampleMariaDaPraia = () => {
-    setIsProcessing(true);
-    setImportSuccess(false);
-
-    const sampleRows = [
-      { name: 'THAYLA VITORIA FERNANDES MARTINS', birth: '2021-08-25', formatted: '25/08/2021', gender: 'F', race: 'PARDO', addr: 'VILA: BRILHANTE', pcd: '', laudo: '' },
-      { name: 'KAUÊ DE AQUINO GUEDES', birth: '2021-06-01', formatted: '01/06/2021', gender: 'M', race: 'PARDO', addr: 'VILA: BRILHANTE', pcd: '', laudo: '' },
-      { name: 'REBECA SANTOS RODRIGUES', birth: '2020-04-15', formatted: '15/04/2020', gender: 'F', race: 'PARDO', addr: 'VILA: BRILHANTE', pcd: '', laudo: '' },
-      { name: 'SAMUEL SILVA SANTOS', birth: '2021-05-01', formatted: '01/05/2021', gender: 'M', race: 'PARDO', addr: 'VILA: BRILHANTE', pcd: '', laudo: '' },
-      { name: 'THAYLLA EMANUELLY ALMEDIA DE SOUSA', birth: '2022-03-23', formatted: '23/03/2022', gender: 'F', race: 'PARDO', addr: 'VILA: BRILHANTE', pcd: '', laudo: '' },
-      { name: 'LARISSA MANOELA SOUSA LOBATO', birth: '2021-11-10', formatted: '10/11/2021', gender: 'F', race: 'PARDO', addr: 'VILA: BRILHANTE', pcd: '', laudo: '' },
-      { name: 'YASMIM ALVES REIS', birth: '2022-01-03', formatted: '03/01/2022', gender: 'F', race: 'PARDO', addr: 'VILA: BRILHANTE', pcd: '', laudo: '' },
-      { name: 'MARIA CECILIA MARTINS MORAIS', birth: '2021-07-12', formatted: '12/07/2021', gender: 'F', race: 'PARDO', addr: 'VILA: BRILHANTE', pcd: '', laudo: '' },
-      { name: 'ANA LARA BARROS ARAÚJO', birth: '2021-02-26', formatted: '26/02/2021', gender: 'F', race: 'PARDO', addr: 'VILA: BRILHANTE', pcd: '', laudo: '' },
-      { name: 'VALENTINA SANTOS DA SILVA', birth: '2021-03-19', formatted: '19/03/2021', gender: 'F', race: 'PARDO', addr: 'VILA: BRILHANTE', pcd: '', laudo: '' },
-      { name: 'MARIA JULIA PESSOA LOPES', birth: '2020-08-03', formatted: '03/08/2020', gender: 'F', race: 'PARDO', addr: 'VILA: BRILHANTE', pcd: '', laudo: '' },
-      { name: 'THALISSON DE SOUSA SILVA', birth: '2020-12-16', formatted: '16/12/2020', gender: 'M', race: 'PARDO', addr: 'VILA: BRILHANTE', pcd: '', laudo: '' },
-      { name: 'ENZO SAMUEL BATISTA OLIVEIRA', birth: '2022-05-12', formatted: '12/05/2022', gender: 'M', race: 'PARDO', addr: 'VILA: BRILHANTE', pcd: '', laudo: '' },
-      { name: 'ÂNGELO MIGUEL ALVES LIMA', birth: '2022-04-22', formatted: '22/04/2022', gender: 'M', race: 'PARDO', addr: 'VILA: BRILHANTE', pcd: '', laudo: '' },
-      { name: 'HELOISA BARROS DA SILVA', birth: '2020-06-05', formatted: '05/06/2020', gender: 'F', race: 'BRANCO', addr: 'VILA: BRILHNATE', pcd: '', laudo: '' },
-    ];
-
-    const currentSeries = filters.overrideSeriesWithDefault && filters.defaultSeries ? filters.defaultSeries : 'PRÉ II';
-
-    const sampleStudents: ParsedImportStudent[] = sampleRows.map((r, idx) => ({
-      tempId: `sample-${idx}`,
-      sequenceNumber: String(idx + 1),
-      name: r.name,
-      birthDate: r.birth,
-      formattedBirthDate: r.formatted,
-      gender: r.gender as any,
-      raceColor: (r.race === 'BRANCO' ? 'BRANCA' : 'PARDA') as any,
-      address: r.addr,
-      shift: filters.defaultShift || 'MANHÃ',
-      series: currentSeries,
-      seriesFromFirstCol: 'PRÉ II',
-      medicalClassification: 'A Avaliar / PCD Não especificado',
-      hasMedicalReport: false,
-      medicalReportText: 'PENDENTE',
-      schoolName: 'ESCOLA: MARIA DA PRAIA',
-      cadastralStatus: 'INCOMPLETE',
-      pendingFields: ['Avaliação de Laudo (SIM/NÃO)', 'CPF / Certidão de Nascimento'],
-      sourceFileName: 'Exemplo_Escola_Maria_da_Praia.xlsx',
-      rawRow: r,
-    }));
-
-    const sampleResult: FileImportResult = {
-      fileName: 'Exemplo_Escola_Maria_da_Praia.xlsx',
-      fileSize: 24500,
-      schoolNameDetected: 'ESCOLA: MARIA DA PRAIA',
-      seriesDetected: 'PRÉ II',
-      firstColumnHeaderDetected: 'PRÉ II\nNº',
-      seriesFromFirstColumn: 'PRÉ II',
-      dateDetected: '01/09/2026',
-      totalRows: sampleStudents.length,
-      students: sampleStudents,
-      completeCount: 0,
-      incompleteCount: sampleStudents.length,
-      errors: [],
-    };
-
-    setFileResults([sampleResult]);
-    setActiveFileIndex(0);
-    setIsProcessing(false);
-  };
-
-  // Carregar dados oficiais de exemplo da EMEI Professora Ruth Pereira Barbaresco (Pré-Escola I A)
-  const handleLoadSampleRuthPereira = () => {
-    setIsProcessing(true);
-    setImportSuccess(false);
-    const sampleRuth = loadSampleRuthPereiraBarbaresco(filters, classes, schoolUnits);
-    setFileResults([sampleRuth]);
-    setActiveFileIndex(0);
-    setIsProcessing(false);
-  };
-
-  // Carregar dados de 8 colunas da EMIEIF Ermínio Brito (Pré II – 1º ao 5º - 6º ao 9º Anos)
-  const handleLoadSampleErminioBrito = () => {
-    setIsProcessing(true);
-    setImportSuccess(false);
-    const sampleErminio = loadSampleErminioBrito8Col(filters, classes, schoolUnits);
-    setFileResults([sampleErminio]);
-    setActiveFileIndex(0);
     setIsProcessing(false);
   };
 
@@ -1019,48 +930,14 @@ export const UniversalDataImportModal: React.FC<UniversalDataImportModalProps> =
                   <div>
                     <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                       <Sparkles className="h-4 w-4 text-amber-500" />
-                      Exemplos Prontos & Modelos para Download
+                      Modelos para Download
                     </span>
                     <p className="text-[11px] text-slate-500 mt-1">
-                      Carregue dados de teste com alunos PCD / TEA ou baixe os modelos padrão editáveis.
+                      Baixe os modelos de planilha editáveis.
                     </p>
                   </div>
 
                   <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={handleLoadSampleErminioBrito}
-                      className="w-full py-2 px-3 bg-gradient-to-r from-emerald-50 via-teal-50 to-indigo-50 hover:from-emerald-100 hover:to-indigo-100 border border-emerald-300 text-emerald-950 font-bold text-xs rounded-xl transition-all flex items-center justify-between gap-2 cursor-pointer shadow-2xs text-left"
-                      title="Exemplo com cabeçalho oficial de 8 colunas do município: Série, Nome, Nasc, Sexo, Raça, Endereço, PCD, Laudo"
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <Sparkles className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                        <span className="truncate">Exemplo 8 Colunas: EMIEIF Ermínio Brito</span>
-                      </div>
-                      <span className="text-[10px] font-extrabold px-1.5 py-0.5 bg-emerald-200/80 text-emerald-900 rounded shrink-0">
-                        8 Colunas
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleLoadSampleRuthPereira}
-                      className="w-full py-2 px-3 bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 border border-indigo-200 text-indigo-900 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs text-left"
-                      title="Exemplo com cabeçalho oficial do município, alunos PCD, TEA e laudo"
-                    >
-                      <Sparkles className="h-3.5 w-3.5 text-purple-600 shrink-0" />
-                      <span className="truncate">Exemplo Municipal: EMEI Ruth Pereira (Pré I A)</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleLoadSampleMariaDaPraia}
-                      className="w-full py-1.5 px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <Layers className="h-3.5 w-3.5 text-slate-500" />
-                      <span>Exemplo Escola Maria da Praia</span>
-                    </button>
-
                     <div className="pt-1">
                       <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                         Baixar Modelos Prontos:

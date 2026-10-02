@@ -46,7 +46,7 @@ export const TeacherHeaderBar: React.FC<TeacherHeaderBarProps> = ({
   onBack,
   backButtonLabel,
 }) => {
-  const totalWorkload = (teacherSubjects || []).reduce((acc, s) => acc + ((s && s.workloadHours) || 80), 0);
+  const totalWorkload = (teacherSubjects || []).reduce((acc, s) => acc + ((s && Number(s.workloadHours)) || 0), 0);
 
   return (
     <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-indigo-900/40 space-y-5">
@@ -132,7 +132,7 @@ export const TeacherHeaderBar: React.FC<TeacherHeaderBarProps> = ({
             </div>
             <div className="bg-indigo-900/40 px-3 py-1.5 rounded-xl border border-indigo-700/30 text-center hidden md:block">
               <span className="block text-[10px] text-indigo-300 font-bold uppercase">Carga Horária</span>
-              <span className="text-sm font-black text-white">{totalWorkload}h</span>
+              <span className="text-sm font-black text-white">{totalWorkload ? `${totalWorkload}h` : "—"}</span>
             </div>
           </div>
         </div>
@@ -192,17 +192,13 @@ export const TeacherHeaderBar: React.FC<TeacherHeaderBarProps> = ({
             >
               <option value="1º Bimestre" className="bg-slate-900 text-white">1º Bimestre</option>
               <option value="2º Bimestre" className="bg-slate-900 text-white">2º Bimestre</option>
-              <option value="3º Bimestre" className="bg-slate-900 text-white">3º Bimestre (Atual)</option>
+              <option value="3º Bimestre" className="bg-slate-900 text-white">3º Bimestre</option>
               <option value="4º Bimestre" className="bg-slate-900 text-white">4º Bimestre</option>
               <option value="Recuperação Final" className="bg-slate-900 text-white">Recuperação Final</option>
             </select>
           </div>
         </div>
 
-        <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
-          <Clock className="h-3.5 w-3.5 text-emerald-400" />
-          <span>Sessão ativa e sincronizada</span>
-        </div>
       </div>
     </div>
   );

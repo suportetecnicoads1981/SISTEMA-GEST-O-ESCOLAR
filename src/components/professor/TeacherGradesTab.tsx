@@ -314,7 +314,7 @@ export const TeacherGradesTab: React.FC<TeacherGradesTabProps> = ({
           </div>
           <div style="text-align: right; font-size: 8pt; color: #64748b;">
             Emitido em: ${new Date().toLocaleString('pt-BR')}<br>
-            INEP: ${settings.inepCode || '35128490'}
+            INEP: ${settings.inepCode || 'não cadastrado'}
           </div>
         </div>
 

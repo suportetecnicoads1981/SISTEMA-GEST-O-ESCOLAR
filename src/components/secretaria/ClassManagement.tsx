@@ -53,6 +53,8 @@ interface ClassManagementProps {
   onNavigate?: (tab: string, payload?: any) => void;
 }
 
+const capOf = (c: any): number => Number(c?.maxCapacity || c?.capacity) || 0;
+
 export const ClassManagement: React.FC<ClassManagementProps> = ({
   classes,
   courses,
@@ -191,20 +193,22 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
 
   const printClassSummaryMetrics: SummaryMetricItem[] = useMemo(() => {
     const totalEnrolled = sortedClasses.reduce((acc, c) => acc + students.filter((s) => s.classId === c.id).length, 0);
-    const totalCapacity = sortedClasses.reduce((acc, c) => acc + (c.maxCapacity || c.capacity || 35), 0);
+    // Turma sem capacidade cadastrada fica fora da soma (não assumimos 35 vagas).
+    const totalCapacity = sortedClasses.reduce((acc, c) => acc + capOf(c), 0);
+    const enrolledWithCap = sortedClasses.reduce((acc, c) => acc + (capOf(c) ? students.filter((s) => s.classId === c.id).length : 0), 0);
     return [
       { label: 'Total de Turmas', value: sortedClasses.length, color: 'text-slate-900' },
       { label: 'Estudantes Enturmados', value: totalEnrolled, color: 'text-indigo-600' },
       { label: 'Capacidade Total das Salas', value: totalCapacity, color: 'text-emerald-600' },
-      { label: 'Vagas Remanescentes', value: Math.max(0, totalCapacity - totalEnrolled), color: 'text-amber-600' },
+      { label: 'Vagas Remanescentes', value: Math.max(0, totalCapacity - enrolledWithCap), color: 'text-amber-600' },
     ];
   }, [sortedClasses, students]);
 
   const renderPrintClassCell = (c: SchoolClass, colId: string, idx: number) => {
     const unit = schoolUnits.find((u) => u.id === c.schoolUnitId);
     const enrolled = students.filter((s) => s.classId === c.id).length;
-    const capacity = c.maxCapacity || 35;
-    const vacancies = Math.max(0, capacity - enrolled);
+    const capacity = capOf(c);
+    const vacancies = capacity ? Math.max(0, capacity - enrolled) : null;
 
     switch (colId) {
       case 'index':
@@ -224,9 +228,9 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
       case 'enrolledCount':
         return String(enrolled);
       case 'maxCapacity':
-        return String(capacity);
+        return capacity ? String(capacity) : 'Não informada';
       case 'vacancies':
-        return String(vacancies);
+        return vacancies === null ? '—' : String(vacancies);
       case 'schoolYear':
         return String(c.schoolYear || 2026);
       case 'signature':
@@ -299,7 +303,7 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
         `"${c.shift}"`,
         `"${unit?.name || 'Sede'}"`,
         `"${c.roomNumber || ''}"`,
-        c.maxCapacity || (c as any).capacity || 35,
+        capOf(c) || '',
         inClass,
         `"${c.classTeacher || ''}"`,
       ];
@@ -370,7 +374,7 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
   };
 
   const totalCapacity = useMemo(
-    () => classes.reduce((sum, c) => sum + (c.maxCapacity || (c as any).capacity || 35), 0),
+    () => classes.reduce((sum, c) => sum + capOf(c), 0),
     [classes]
   );
 
@@ -590,7 +594,7 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {sortedClasses.map((cls) => {
           const enrolledCount = students.filter((s) => s.classId === cls.id).length;
-          const capacityPercent = Math.min(100, Math.round((enrolledCount / cls.maxCapacity) * 100));
+          const capacityPercent = capOf(cls) ? Math.min(100, Math.round((enrolledCount / capOf(cls)) * 100)) : 0;
           const unit = schoolUnits.find((u) => u.id === cls.schoolUnitId);
 
           return (
@@ -666,7 +670,7 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
                       Ocupação
                     </span>
                     <span className="font-bold text-slate-800">
-                      {enrolledCount} / {cls.maxCapacity} ({capacityPercent}%)
+                      {capOf(cls) ? `${enrolledCount} / ${capOf(cls)} (${capacityPercent}%)` : `${enrolledCount} alunos (capacidade não informada)`}
                     </span>
                   </div>
                   <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
@@ -723,12 +727,12 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
                 </div>
                 <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200">
                   <span className="text-[10px] uppercase font-bold text-emerald-700">Vagas Ofertadas</span>
-                  <p className="text-2xl font-black text-emerald-700">{totalCapacity}</p>
+                  <p className="text-2xl font-black text-emerald-700">{totalCapacity || '—'}</p>
                 </div>
                 <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-200">
                   <span className="text-[10px] uppercase font-bold text-indigo-700">Taxa Geral de Ocupação</span>
                   <p className="text-2xl font-black text-indigo-700">
-                    {Math.round((students.length / (totalCapacity || 1)) * 100)}%
+                    {totalCapacity ? `${Math.round((students.filter((st) => classes.some((c) => c.id === st.classId && capOf(c))).length / totalCapacity) * 100)}%` : '—'}
                   </p>
                 </div>
               </div>
@@ -757,7 +761,7 @@ export const ClassManagement: React.FC<ClassManagementProps> = ({
                           <td className="p-2.5 text-center font-bold">
                             {students.filter((s) => s.classId === cls.id).length}
                           </td>
-                          <td className="p-2.5 text-center text-slate-500">{cls.maxCapacity || cls.capacity || 35}</td>
+                          <td className="p-2.5 text-center text-slate-500">{capOf(cls) || 'Não informada'}</td>
                         </tr>
                       ))}
                     </tbody>

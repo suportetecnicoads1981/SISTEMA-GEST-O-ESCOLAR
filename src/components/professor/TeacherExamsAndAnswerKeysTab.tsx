@@ -112,7 +112,7 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
   // Questão Inédita Rápida (Criada na hora pelo professor)
   const [showNewQuestionForm, setShowNewQuestionForm] = useState<boolean>(false);
   const [customQuestionStem, setCustomQuestionStem] = useState<string>('');
-  const [customQuestionSkill, setCustomQuestionSkill] = useState<string>('EM13MAT101');
+  const [customQuestionSkill, setCustomQuestionSkill] = useState<string>('');
   const [customOptions, setCustomOptions] = useState<Array<{ text: string; isCorrect: boolean }>>([
     { text: '', isCorrect: true },
     { text: '', isCorrect: false },
@@ -248,7 +248,7 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
         subjectId: activeSubject.id,
         topic: 'Conteúdo do Docente',
         gradeLevel: activeClass.gradeLevel || '1º Ano',
-        bnccSkill: customQuestionSkill.trim() || 'EM13MAT101',
+        bnccSkill: customQuestionSkill.trim() || undefined,
         difficulty: 'MEDIO',
         type: 'MULTIPLE_CHOICE',
         options: customOptions.map((opt, idx) => ({
@@ -439,7 +439,7 @@ export const TeacherExamsAndAnswerKeysTab: React.FC<TeacherExamsAndAnswerKeysTab
                     {activeExam.title}
                   </h4>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {activeExam.description || 'Avaliação oficial bimestral com modelos múltiplos e alinhamento à BNCC'}
+                    {activeExam.description || ''}
                   </p>
                 </div>
 

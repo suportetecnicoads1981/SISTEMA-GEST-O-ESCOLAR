@@ -397,7 +397,7 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
           <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total de Provas</p>
           <p className="text-2xl font-black text-slate-900 mt-1">{exams.length}</p>
-          <p className="text-[10px] text-indigo-600 font-semibold mt-0.5">Com gabaritos integrados</p>
+          <p className="text-[10px] text-indigo-600 font-semibold mt-0.5">Cadastradas</p>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
           <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Submissões Corrigidas</p>
@@ -406,13 +406,18 @@ export const ExamManager: React.FC<ExamManagerProps> = ({
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
           <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Tempo Médio Configurado</p>
-          <p className="text-2xl font-black text-indigo-600 mt-1">45 min</p>
-          <p className="text-[10px] text-slate-500 mt-0.5">Cronômetro ativo</p>
+          <p className="text-2xl font-black text-indigo-600 mt-1">
+            {(() => {
+              const t = exams.map((e) => Number(e?.timeLimitMinutes) || 0).filter((m) => m > 0);
+              return t.length ? `${Math.round(t.reduce((a, b) => a + b, 0) / t.length)} min` : '—';
+            })()}
+          </p>
+          <p className="text-[10px] text-slate-500 mt-0.5">Média das provas com tempo limite</p>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Diagnóstico de Erros</p>
-          <p className="text-2xl font-black text-slate-900 mt-1">100%</p>
-          <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">Detecção de distratores</p>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Questões nas Provas</p>
+          <p className="text-2xl font-black text-slate-900 mt-1">{exams.reduce((acc, e) => acc + (e?.questions?.length || 0), 0)}</p>
+          <p className="text-[10px] text-slate-500 mt-0.5">Somando todas as provas</p>
         </div>
       </div>
 

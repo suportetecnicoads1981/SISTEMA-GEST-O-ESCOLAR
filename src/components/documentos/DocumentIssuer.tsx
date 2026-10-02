@@ -424,7 +424,6 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
                 </div>
 
                 <div className="flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-200 pt-3">
-                  <span>Autenticidade: Chave SHA256-{Math.random().toString(36).substring(2, 10).toUpperCase()}</span>
                   <span>SucessoEdu • Gestão Educacional</span>
                 </div>
               </div>
@@ -587,12 +586,14 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
                 </div>
 
                 <p>
-                  encontra-se regularmente matriculado(a) e com frequência ativa no ano letivo de <strong>{selectedClass?.schoolYear || 2026}</strong>, cursando a turma <strong>{selectedClass?.name}</strong> no turno <strong>{selectedClass?.shift}</strong>.
+                  encontra-se regularmente matriculado(a) no ano letivo de <strong>{selectedClass?.schoolYear || 2026}</strong>, cursando a turma <strong>{selectedClass?.name}</strong> no turno <strong>{selectedClass?.shift}</strong>.
                 </p>
 
-                <p>
-                  Declaramos ainda que o(a) aluno(a) possui conduta disciplinar regular e frequência escolar compatível com as exigências da legislação educacional vigente.
-                </p>
+                {attendancePct !== null && (
+                  <p>
+                    Frequência registrada nas aulas lançadas no sistema: <strong>{String(attendancePct).replace('.', ',')}%</strong>.
+                  </p>
+                )}
 
                 {customObservation && (
                   <p className="italic text-xs bg-indigo-50/50 p-2 rounded-lg border border-indigo-100">

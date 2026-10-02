@@ -12,8 +12,6 @@ import {
 import {
   parseDocxFile,
   parseOdtFile,
-  OFFICIAL_MUNICIPAL_SAMPLE_DATA,
-  OFFICIAL_ERMINIO_BRITO_8COL_DATA,
   downloadSpreadsheetTemplate,
   downloadWordTemplate,
   downloadWriterTemplate,
@@ -2271,42 +2269,6 @@ export function convertImportedStudentsToOfficial(
 
     return officialStudent;
   });
-}
-
-// Carrega amostra oficial municipal: EMEI RUTH PEREIRA BARBARESCO (Pré-Escola I A)
-export function loadSampleRuthPereiraBarbaresco(
-  filters: ImportFilterOptions,
-  classes: SchoolClass[],
-  schoolUnits: SchoolUnit[]
-): FileImportResult {
-  const res = processSheetWithHeaders(
-    OFFICIAL_MUNICIPAL_SAMPLE_DATA,
-    'Levantamento_EMEI_Ruth_Pereira_Barbaresco.xlsx',
-    34816,
-    filters,
-    classes,
-    schoolUnits
-  );
-  res.documentType = 'EXCEL';
-  return res;
-}
-
-// Carrega amostra municipal de 8 colunas: EMIEIF ERMINIO BRITO (Pré II, 1º ao 5º, 6º ao 9º Anos)
-export function loadSampleErminioBrito8Col(
-  filters: ImportFilterOptions,
-  classes: SchoolClass[],
-  schoolUnits: SchoolUnit[]
-): FileImportResult {
-  const res = processSheetWithHeaders(
-    OFFICIAL_ERMINIO_BRITO_8COL_DATA,
-    'Levantamento_EMIEIF_Erminio_Brito_8Colunas.xlsx',
-    38912,
-    filters,
-    classes,
-    schoolUnits
-  );
-  res.documentType = 'EXCEL';
-  return res;
 }
 
 // Gera o modelo Excel fiel ao print anexo pelo usuário ("ESCOLA: MARIA DA PRAIA")

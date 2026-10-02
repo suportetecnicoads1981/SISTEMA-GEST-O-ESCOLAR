@@ -284,7 +284,7 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
           if (idx === 0 && line.toLowerCase().includes('título')) return;
           const parts = line.includes(';') ? line.split(';') : line.split(',');
           const msgTitle = parts[0]?.replace(/"/g, '').trim() || `Comunicado ${idx + 1}`;
-          const msgContent = parts[1]?.replace(/"/g, '').trim() || 'Aviso oficial da equipe pedagógica.';
+          const msgContent = parts[1]?.replace(/"/g, '').trim() || '';
           const msgCategory = (parts[2]?.replace(/"/g, '').trim() as any) || 'GERAL';
 
           imported.push({
@@ -297,7 +297,7 @@ export const CommunicationModule: React.FC<CommunicationModuleProps> = ({
             senderName: currentUserName,
             recipientType: 'ALL',
             targetRoles: ['STUDENT', 'TEACHER', 'PARENT', 'ADMIN'],
-            sendPushNotification: true,
+            sendPushNotification: false, // importação não dispara aviso
             status: 'ENVIADO',
             attachments: [],
             requireReadConfirmation: true,

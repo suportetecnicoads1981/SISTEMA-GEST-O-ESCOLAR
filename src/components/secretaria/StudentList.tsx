@@ -486,7 +486,7 @@ export const StudentList: React.FC<StudentListProps> = ({
       if (!shiftOk(c.shift)) return;
       const list = byClass.get(cls.id) || [];
       const st = stats(list);
-      const capacity = Number(c.capacity || c.maxCapacity) || 35;
+      const capacity = Number(c.capacity || c.maxCapacity) || 0; // 0 = não informada
       const series = String(c.gradeLevel || '').trim();
       const className = classMap.get(cls.id) || cls.name;
       rows.push({
@@ -496,9 +496,9 @@ export const StudentList: React.FC<StudentListProps> = ({
         series,
         className,
         shift: c.shift || '',
-        capacity,
-        vacancies: Math.max(capacity - st.active, 0),
-        occupancy: Math.round((st.active / capacity) * 100),
+        capacity: capacity || '',
+        vacancies: capacity ? Math.max(capacity - st.active, 0) : '',
+        occupancy: capacity ? Math.round((st.active / capacity) * 100) : '',
         room: c.roomNumber || '',
         teacher: c.classTeacher || '',
       });
@@ -1158,33 +1158,37 @@ export const StudentList: React.FC<StudentListProps> = ({
         imported = Array.isArray(parsed) ? parsed : [parsed];
       } else {
         const lines = trimmed.split('\n').filter((l) => l.trim().length > 0);
-        const defaultClassId = classes[0]?.id || 'TURMA-3A';
-
+        // Só o que veio na lista é gravado; o resto fica em branco e marcado como pendência
+        // (nada de CPF, telefone, endereço ou turma inventados).
         lines.forEach((line, idx) => {
           if (idx === 0 && line.toLowerCase().includes('nome')) return;
           const parts = line.includes(';') ? line.split(';') : line.split(',');
-          const name = parts[0]?.replace(/"/g, '').trim() || `Aluno Importado ${idx + 1}`;
-          const cpf = parts[1]?.replace(/"/g, '').trim() || `000.000.${idx}00-00`;
-          const email = parts[2]?.replace(/"/g, '').trim() || `aluno${Date.now().toString().slice(-4)}${idx}@escola.edu.br`;
+          const name = parts[0]?.replace(/"/g, '').trim();
+          if (!name) return;
+          const cpf = parts[1]?.replace(/"/g, '').trim() || '';
+          const email = parts[2]?.replace(/"/g, '').trim() || '';
+          const id = `std-imp-${Date.now()}-${idx}`;
 
           imported.push({
-            id: `std-imp-${Date.now()}-${idx}`,
-            enrollmentNumber: provisionalRaFor(`std-imp-${Date.now()}-${idx}`),
+            id,
+            enrollmentNumber: provisionalRaFor(id),
             name,
             cpf,
-            birthDate: '2008-05-15',
+            birthDate: '',
             gender: 'OTHER',
             email,
-            phone: '(11) 98765-4321',
-            address: 'Endereço cadastrado via importação',
-            city: 'São Paulo',
-            state: 'SP',
-            zipCode: '01000-000',
-            guardianName: 'Responsável Legal',
-            guardianPhone: '(11) 91234-5678',
-            courseId: 'course-1',
-            classId: defaultClassId,
+            phone: '',
+            address: '',
+            city: '',
+            state: '',
+            zipCode: '',
+            guardianName: '',
+            guardianPhone: '',
+            courseId: '',
+            classId: '',
             status: 'ACTIVE',
+            cadastralStatus: 'INCOMPLETE',
+            pendingFields: ['Data de nascimento', 'Responsável', 'Endereço', 'Turma', ...(cpf ? [] : ['CPF'])],
             entryDate: new Date().toISOString().split('T')[0],
           });
         });
@@ -1422,7 +1426,7 @@ export const StudentList: React.FC<StudentListProps> = ({
           <span className="text-xs font-bold text-slate-400 uppercase mb-1">Total de Alunos</span>
           <div className="flex items-baseline gap-2">
             <span className="text-2xl font-bold text-slate-800">{students.length}</span>
-            <span className="text-emerald-500 text-xs font-medium">100% Censo Escolar</span>
+            <span className="text-emerald-500 text-xs font-medium">cadastrados</span>
           </div>
         </div>
 
@@ -1432,7 +1436,7 @@ export const StudentList: React.FC<StudentListProps> = ({
             <span className="text-2xl font-bold text-indigo-600">
               {students.filter((s) => s.status === 'ACTIVE').length}
             </span>
-            <span className="text-slate-500 text-xs font-medium">Em frequência</span>
+            <span className="text-slate-500 text-xs font-medium">situação Ativo</span>
           </div>
         </div>
 

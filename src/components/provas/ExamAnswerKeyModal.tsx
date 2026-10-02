@@ -189,10 +189,10 @@ export const ExamAnswerKeyModal: React.FC<ExamAnswerKeyModalProps> = ({
                 </div>
                 <div>
                   <h1 className="text-base font-bold text-slate-900 uppercase tracking-tight print:text-black">
-                    {settings.name || 'COLÉGIO INTEGRADO EDUGESTÃO'}
+                    {settings.name || ''}
                   </h1>
                   <p className="text-xs text-slate-500 print:text-slate-700">
-                    {settings.city}/{settings.state} • Portaria de Autorização CEE/MEC • CNPJ {settings.cnpj || '00.000.000/0001-00'}
+                    {[settings.city && settings.state ? `${settings.city}/${settings.state}` : settings.city, (settings as any).accreditationDecree, settings.cnpj ? `CNPJ ${settings.cnpj}` : ''].filter(Boolean).join(' • ')}
                   </p>
                 </div>
               </div>

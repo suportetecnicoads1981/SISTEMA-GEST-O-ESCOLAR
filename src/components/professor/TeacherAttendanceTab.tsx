@@ -137,7 +137,7 @@ export const TeacherAttendanceTab: React.FC<TeacherAttendanceTabProps> = ({
     (s) => localEntries[s.id]?.status === 'FALTA'
   ).length;
 
-  const attendanceRate = total > 0 ? Math.round(((presentCount + justifiedCount) / total) * 100) : 100;
+  const attendanceRate: number | null = total > 0 ? Math.round(((presentCount + justifiedCount) / total) * 100) : null;
 
   // Actions
   const handleSetStatus = (studentId: string, status: AttendanceStatus) => {
@@ -202,7 +202,7 @@ export const TeacherAttendanceTab: React.FC<TeacherAttendanceTabProps> = ({
       totalPresent: presentCount,
       totalAbsent: absentCount,
       totalJustified: justifiedCount,
-      attendanceRate,
+      attendanceRate: attendanceRate ?? 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -272,7 +272,7 @@ export const TeacherAttendanceTab: React.FC<TeacherAttendanceTabProps> = ({
           </div>
           <div style="text-align: right; font-size: 8pt; color: #64748b;">
             Emitido em: ${new Date().toLocaleString('pt-BR')}<br>
-            INEP: ${settings.inepCode || '35128490'}
+            INEP: ${settings.inepCode || 'não cadastrado'}
           </div>
         </div>
 
@@ -328,7 +328,7 @@ export const TeacherAttendanceTab: React.FC<TeacherAttendanceTabProps> = ({
           <div style="color: #059669;">Presentes: ${presentCount}</div>
           <div style="color: #dc2626;">Faltas: ${absentCount}</div>
           <div style="color: #d97706;">Justificadas: ${justifiedCount}</div>
-          <div>Índice de Presença: ${attendanceRate}%</div>
+          <div>Índice de Presença: ${attendanceRate === null ? '—' : attendanceRate + '%'}</div>
         </div>
 
         <div class="signatures">
@@ -490,7 +490,7 @@ export const TeacherAttendanceTab: React.FC<TeacherAttendanceTabProps> = ({
 
           <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-900 col-span-2 sm:col-span-1">
             <span className="block text-[10px] text-indigo-600 font-bold uppercase">Frequência</span>
-            <span className="text-base font-black text-indigo-700">{attendanceRate}%</span>
+            <span className="text-base font-black text-indigo-700">{attendanceRate === null ? '—' : `${attendanceRate}%`}</span>
           </div>
         </div>
       </div>

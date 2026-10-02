@@ -372,7 +372,7 @@ export function ClassDiaryModule({
   // Stats calculation for active class
   const classAttendanceStats = useMemo(() => {
     const relevantSheets = attendanceSheets.filter((s) => s.classId === selectedClassId);
-    if (relevantSheets.length === 0) return { avgRate: 100, totalLessons: 0, atRiskCount: 0 };
+    if (relevantSheets.length === 0) return { avgRate: null as number | null, totalLessons: 0, atRiskCount: 0 };
 
     let totalPresences = 0;
     let totalAbsences = 0;
@@ -392,7 +392,7 @@ export function ClassDiaryModule({
       });
     });
 
-    const avgRate = totalPossibilities > 0 ? Math.round((totalPresences / totalPossibilities) * 100) : 100;
+    const avgRate: number | null = totalPossibilities > 0 ? Math.round((totalPresences / totalPossibilities) * 100) : null;
     const atRiskCount = Object.values(studentAbsenceCount).filter(
       (abs) => abs >= (activeRegulation?.consecutiveAbsencesAlert || 5)
     ).length;
@@ -407,7 +407,6 @@ export function ClassDiaryModule({
   // Quadro de frequência por aluno (mesmo cálculo da tela), para o relatório padrão.
   const frequencyReportRows = useMemo(() => {
     const sheets = attendanceSheets.filter((sh) => sh.classId === selectedClassId);
-    const total = sheets.length || 1;
     const minPct = activeRegulation?.minAttendancePercentage ?? 75;
     return classStudents.map((st) => {
       let p = 0;
@@ -419,7 +418,9 @@ export function ClassDiaryModule({
         else if (e?.status === 'FALTA') f++;
         else if (e?.status === 'FALTA_JUSTIFICADA') j++;
       });
-      const rate = Math.round(((p + j) / total) * 100);
+      // Base: chamadas em que o aluno foi registrado. Sem registro: "—" (não é 0% nem 100%).
+      const recorded = p + f + j;
+      const rate = recorded > 0 ? Math.round(((p + j) / recorded) * 100) : null;
       return {
         name: st.name,
         ra: st.enrollmentNumber || '',
@@ -427,8 +428,8 @@ export function ClassDiaryModule({
         present: p,
         absent: f,
         justified: j,
-        rate: `${rate}%`,
-        status: rate < minPct ? `Abaixo de ${minPct}%` : 'Regular',
+        rate: rate === null ? '—' : `${rate}%`,
+        status: rate === null ? 'Sem registros' : rate < minPct ? `Abaixo de ${minPct}%` : 'Regular',
       };
     });
   }, [attendanceSheets, selectedClassId, classStudents, activeRegulation]);
@@ -689,7 +690,7 @@ export function ClassDiaryModule({
                 Presença Média Acumulada
               </span>
               <span className="text-2xl font-black text-emerald-600 mt-1 block">
-                {classAttendanceStats.avgRate}%
+                {classAttendanceStats.avgRate === null ? '—' : `${classAttendanceStats.avgRate}%`}
               </span>
               <span className="text-xs text-slate-500 mt-0.5 block">
                 Mínimo Legal ({activeRegulation?.stateCode || 'NACIONAL'}): {activeRegulation?.minAttendancePercentage ?? 75}%
@@ -1301,11 +1302,11 @@ export function ClassDiaryModule({
                       }
                     });
 
-                    const totalLessonsGiven = relevantSheets.length || 1;
+                    const totalLessonsGiven = presentCount + absentCount + justifiedCount;
                     const effectivePresences = presentCount + justifiedCount;
-                    const rate = Math.round((effectivePresences / totalLessonsGiven) * 100);
+                    const rate: number | null = totalLessonsGiven > 0 ? Math.round((effectivePresences / totalLessonsGiven) * 100) : null;
                     const minPct = activeRegulation?.minAttendancePercentage ?? 75;
-                    const isBelowMin = rate < minPct;
+                    const isBelowMin = rate !== null && rate < minPct;
 
                     return (
                       <tr key={st.id} className="hover:bg-slate-50">
@@ -1325,7 +1326,7 @@ export function ClassDiaryModule({
                                 : 'bg-emerald-100 text-emerald-800'
                             }`}
                           >
-                            {rate}%
+                            {rate === null ? '—' : `${rate}%`}
                           </span>
                         </td>
                         <td className="p-2.5 text-center">
@@ -1627,7 +1628,7 @@ export function ClassDiaryModule({
           ]}
           summaryMetrics={[
             { label: 'Total de Alunos', value: classStudents.length },
-            { label: 'Freq. Média Turma', value: `${classAttendanceStats.avgRate}%`, colorClass: 'text-emerald-700' },
+            { label: 'Freq. Média Turma', value: classAttendanceStats.avgRate === null ? '—' : `${classAttendanceStats.avgRate}%`, colorClass: 'text-emerald-700' },
             { label: 'Mínimo Legal', value: `${activeRegulation?.minAttendancePercentage ?? 75}%` },
             { label: 'Aulas Ministradas', value: classAttendanceStats.totalLessons },
           ]}

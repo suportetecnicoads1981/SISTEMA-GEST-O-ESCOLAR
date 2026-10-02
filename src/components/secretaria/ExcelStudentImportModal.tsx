@@ -134,7 +134,7 @@ export const ExcelStudentImportModal: React.FC<ExcelStudentImportModalProps> = (
             row['Matrícula/RA'] || row['Matricula'] || row['RA'] || ''
           ).trim();
           const cpf = String(row['CPF do Aluno'] || row['CPF'] || '').trim();
-          const birthDate = String(row['Data de Nascimento'] || row['Nascimento'] || '2012-01-01').trim();
+          const birthDate = String(row['Data de Nascimento'] || row['Nascimento'] || '').trim();
           const gradeLevel = String(row['Turma/Série'] || row['Turma'] || row['Serie'] || '').trim();
           const guardianName = String(row['Nome do Responsável'] || row['Responsável'] || '').trim();
           const guardianPhone = String(row['WhatsApp/Telefone'] || row['Telefone'] || '').trim();
@@ -143,14 +143,12 @@ export const ExcelStudentImportModal: React.FC<ExcelStudentImportModalProps> = (
           const email = String(row['E-mail'] || row['Email'] || '').trim();
 
           // Match or assign class
-          let matchedClass = classes.find(
+          const matchedClass = classes.find(
             (c) =>
-              c.name.toLowerCase() === gradeLevel.toLowerCase() ||
-              c.code.toLowerCase() === gradeLevel.toLowerCase()
+              (c.name || '').toLowerCase() === gradeLevel.toLowerCase() ||
+              (c.code || '').toLowerCase() === gradeLevel.toLowerCase()
           );
-          if (!matchedClass && classes.length > 0) {
-            matchedClass = classes[0];
-          }
+          // Sem turma correspondente: o aluno fica sem enturmação (nunca na primeira turma da lista).
 
           let isValid = true;
           let validationError = '';
@@ -164,9 +162,9 @@ export const ExcelStudentImportModal: React.FC<ExcelStudentImportModalProps> = (
             enrollmentNumber: ra,
             cpf: cpf || '000.000.000-00',
             birthDate,
-            gradeLevel: gradeLevel || matchedClass?.gradeLevel || 'Ensino Fundamental',
-            classId: matchedClass?.id || classes[0]?.id || 'cls-default',
-            className: matchedClass?.name || gradeLevel || 'Turma A',
+            gradeLevel: gradeLevel || matchedClass?.gradeLevel || '',
+            classId: matchedClass?.id || '',
+            className: matchedClass?.name || (gradeLevel ? `${gradeLevel} (sem turma correspondente)` : 'Sem enturmação'),
             guardianName,
             guardianPhone,
             address,
@@ -206,16 +204,16 @@ export const ExcelStudentImportModal: React.FC<ExcelStudentImportModalProps> = (
       // Sem RA na planilha: provisório, trocado pelo número da nuvem assim que houver conexão.
       enrollmentNumber: r.enrollmentNumber || provisionalRaFor(`std-imp-${stamp}-${i}`),
       cpf: r.cpf || '',
-      birthDate: r.birthDate || '2015-01-01',
-      gender: 'M',
+      birthDate: r.birthDate || '',
+      gender: 'OTHER',
       phone: r.guardianPhone || '',
       email: r.email || '',
-      guardianName: r.guardianName || 'Responsável Legal',
+      guardianName: r.guardianName || '',
       guardianPhone: r.guardianPhone || '',
-      address: r.address || 'Endereço não informado',
-      city: 'Sede Municipal',
-      state: 'UF',
-      zipCode: '00000-000',
+      address: r.address || '',
+      city: '',
+      state: '',
+      zipCode: '',
       courseId: 'crs-ef',
       classId: r.classId,
       status: 'ACTIVE',
