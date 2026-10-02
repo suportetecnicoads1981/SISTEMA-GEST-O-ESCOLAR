@@ -1,3 +1,4 @@
+import { appVersionLabel } from '../../config/appVersion';
 import React, { useState, useEffect } from 'react';
 import {
   Server,
@@ -97,8 +98,6 @@ import {
   generateDirectoryVerificationBat,
   InstallationStructureAuditReport,
 } from '../../utils/installationStructureVerifier';
-import { GoogleDriveConnectivityTester } from './GoogleDriveConnectivityTester';
-import { AppIntegrityChecker } from './AppIntegrityChecker';
 import { UninstallationModule } from './UninstallationModule';
 import { generateUpdateManualHtml } from '../../utils/updatePackageHelper';
 import { confirmDialog, notify } from '../../utils/dialogs';
@@ -141,7 +140,7 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
   // Network State
   const [serverHost, setServerHost] = useState('192.168.1.150');
   const [serverPort, setServerPort] = useState(3000);
-  const [schoolName, setSchoolName] = useState('Escola Municipal São Paulo');
+  const [schoolName, setSchoolName] = useState(() => getStoredData()?.settings?.name || '');
   const [stationName, setStationName] = useState('Estação-Laboratório-01');
   const [stationType, setStationType] = useState<'ADMIN' | 'TEACHER' | 'STUDENT_LAB' | 'KIOSK_EXAM'>('STUDENT_LAB');
   const [kioskMode, setKioskMode] = useState(true);
@@ -203,42 +202,39 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
         }
         setPingStatus({
           status: 'success',
-          message: `Servidor Local Ativo no IP ${data.ipList?.[0] || '127.0.0.1'}:${data.port || 3000}`,
-          latency: 2,
+          message: `Servidor local respondeu: ${data.ipList?.[0] || serverHost}${data.port ? ':' + data.port : ''}`,
         });
       }
     } catch {
-      setPingStatus({
-        status: 'success',
-        message: 'Servidor Local Ativo e Respondendo (Porta 3000)',
-        latency: 1,
-      });
+      setPingStatus({ status: 'error', message: 'Servidor local não respondeu a partir deste computador.' });
     }
   };
 
-  const handleScanNetwork = () => {
+  // Procura o servidor SucessoEdu que atende este computador (o navegador não consegue varrer a rede inteira).
+  const handleScanNetwork = async () => {
     setIsScanning(true);
     setDiscoveredServers([]);
-
-    setTimeout(() => {
-      setDiscoveredServers([
-        {
-          name: `${schoolName} - Servidor Master (Secretaria)`,
-          ip: serverHost || '192.168.1.150',
-          port: serverPort || 3000,
-          latency: 2,
-          role: 'Servidor Central / Banco de Dados Local',
-        },
-        {
-          name: `${schoolName} - Réplica Laboratório 01`,
-          ip: '192.168.1.180',
-          port: 3000,
-          latency: 4,
-          role: 'Terminal Secundário',
-        },
-      ]);
+    try {
+      const start = performance.now();
+      const res = await fetch('/api/local/health', { cache: 'no-store' });
+      const latency = Math.round(performance.now() - start);
+      if (res.ok) {
+        const info = await res.json().catch(() => ({} as any));
+        setDiscoveredServers([
+          {
+            name: info?.serverName || 'Servidor SucessoEdu',
+            ip: window.location.hostname,
+            port: Number(window.location.port) || 80,
+            latency,
+            role: info?.role === 'SEDE' ? 'Servidor Sede' : info?.role === 'REMOTO' ? 'Servidor da escola' : 'Servidor local',
+          },
+        ]);
+      }
+    } catch {
+      /* nenhum servidor local respondeu */
+    } finally {
       setIsScanning(false);
-    }, 1200);
+    }
   };
 
   const handleTestConnection = async () => {
@@ -250,8 +246,8 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
       if (res.ok) {
         setPingStatus({
           status: 'success',
-          message: `Conexão local ativa com sucesso! Latência interna: ${latency || 2}ms`,
-          latency: latency || 2,
+          message: `Servidor respondeu em ${latency} ms.`,
+          latency,
         });
       } else {
         setPingStatus({
@@ -260,12 +256,7 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
         });
       }
     } catch {
-      const latency = Math.round(performance.now() - startTime);
-      setPingStatus({
-        status: 'success',
-        message: `Servidor local respondendo em ${serverHost}:${serverPort} (${latency || 3}ms)`,
-        latency: latency || 3,
-      });
+      setPingStatus({ status: 'error', message: 'Sem resposta do servidor a partir deste computador.' });
     }
   };
 
@@ -590,49 +581,8 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
           <span>Diagnóstico de Rede & Backup</span>
         </button>
 
-        <button
-          id="tab-btn-structure-verifier"
-          onClick={() => setActiveTab('STRUCTURE_VERIFIER')}
-          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer ${
-            activeTab === 'STRUCTURE_VERIFIER'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <FolderCheck className="h-4 w-4 text-emerald-400" />
-          <span>📁 Estrutura &amp; Layout</span>
-          {structureAudit?.hasPreviousInstall && (
-            <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-600 font-bold text-[10px]">
-              Protegido
-            </span>
-          )}
-        </button>
 
-        <button
-          id="tab-btn-integrity-checker"
-          onClick={() => setActiveTab('INTEGRITY_CHECKER')}
-          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer ${
-            activeTab === 'INTEGRITY_CHECKER'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <ShieldCheck className="h-4 w-4 text-emerald-400" />
-          <span>🛡️ Integridade &amp; Auto-Reparo SHA-256</span>
-        </button>
 
-        <button
-          id="tab-btn-google-drive-test"
-          onClick={() => setActiveTab('GOOGLE_DRIVE_TEST')}
-          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer ${
-            activeTab === 'GOOGLE_DRIVE_TEST'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <UploadCloud className="h-4 w-4 text-emerald-400" />
-          <span>☁️ Teste Google Drive &amp; Nuvem</span>
-        </button>
 
         <button
           onClick={() => setActiveTab('UPDATE_TUTORIAL')}
@@ -727,113 +677,6 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
               </button>
             </div>
           )}
-
-          {/* ROTINA DE VERIFICAÇÃO DE ESTRUTURA DE DIRETÓRIOS & PROTEÇÃO DE LAYOUT */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className={`p-2.5 rounded-xl ${structureAudit?.hasPreviousInstall ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-blue-50 text-blue-600 border border-blue-200'}`}>
-                  <FolderCheck className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h4 className="text-sm font-black text-slate-800">
-                      Verificação de Estrutura de Diretórios &amp; Proteção de Layout
-                    </h4>
-                    {structureAudit?.hasPreviousInstall ? (
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                        Instalação Prévia Detectada (C:\SucessoEdu)
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-black uppercase tracking-wider">
-                        Nova Implantação
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {structureAudit?.hasPreviousInstall
-                      ? 'Estrutura canônica de diretórios preservada. Redefinição de layout bloqueada para proteger o tema e as configurações visuais da escola.'
-                      : 'Estrutura canônica de 6 diretórios validada e pronta para implantação limpa.'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => handleRunStructureAudit(true)}
-                  disabled={isAuditingStructure}
-                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-60"
-                  title="Executar verificação da estrutura agora"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${isAuditingStructure ? 'animate-spin text-indigo-600' : ''}`} />
-                  <span>{isAuditingStructure ? 'Auditando...' : 'Re-verificar'}</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab('STRUCTURE_VERIFIER')}
-                  className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <Layers className="h-3.5 w-3.5" />
-                  <span>Ver Detalhes &amp; Pastas</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Status Pills Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
-              {structureAudit?.directories.map((dir) => (
-                <div
-                  key={dir.id}
-                  className="p-2.5 rounded-xl border border-slate-100 bg-slate-50 flex items-center justify-between"
-                >
-                  <div className="truncate mr-2">
-                    <span className="font-mono font-bold text-slate-700 text-[11px] block truncate">{dir.name}</span>
-                    <span className="text-[10px] text-slate-400 block truncate">{dir.isCritical ? 'Crítico' : 'Opcional'}</span>
-                  </div>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-emerald-100 text-emerald-700 shrink-0">
-                    {dir.status === 'PRESERVED' ? 'Preservado' : 'Validado'}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Layout Guard Active Banner */}
-            {structureAudit?.hasPreviousInstall && (
-              <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-3 text-xs flex items-start gap-2.5 text-emerald-900">
-                <Lock className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                <div className="leading-relaxed">
-                  <span className="font-bold">Proteção de Layout Ativa:</span> Como uma instalação prévia foi identificada no sistema, a rotina de verificação no fluxo do NetworkInstaller impede ativamente que o layout e as preferências pedagógicas sejam redefinidos para o padrão. Todos os atalhos, blocos do painel e dados continuam preservados.
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* QUICK INTEGRITY AUDIT BANNER */}
-          <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-indigo-950 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
-            <div className="flex items-center gap-3.5">
-              <div className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
-                <ShieldCheck className="h-5 w-5" />
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                  Auditoria Criptográfica de Arquivos &amp; Auto-Reparo SHA-256
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold uppercase tracking-wider">
-                    v5.4.0
-                  </span>
-                </h4>
-                <p className="text-xs text-slate-300 mt-0.5">
-                  Verifique se todos os 17 arquivos críticos em <code className="text-emerald-300 font-mono">C:\SucessoEdu</code> estão autênticos e corrija arquivos corrompidos ou ausentes em 1 clique.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setActiveTab('INTEGRITY_CHECKER')}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 shrink-0 cursor-pointer"
-            >
-              <span>Abrir Auditor &amp; Auto-Reparo</span>
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
 
           {/* UNIFIED UNIVERSAL INSTALLER CARD (NOVO) */}
           <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-7 text-white shadow-xl border border-indigo-500/30 relative overflow-hidden">
@@ -975,7 +818,7 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
                     Pacote ZIP do Sistema Completo Unificado
                   </h4>
                   <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-black border border-emerald-500/30">
-                    v5.4.1
+                    {appVersionLabel()}
                   </span>
                 </div>
                 <p className="text-xs text-slate-300 mt-0.5">
@@ -1577,14 +1420,6 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  onClick={() => setActiveTab('GOOGLE_DRIVE_TEST')}
-                  className="px-4 py-2.5 bg-indigo-500/30 hover:bg-indigo-500/50 text-white border border-indigo-300/40 font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer"
-                  title="Abrir utilitário de teste de conectividade e escrita no Google Drive"
-                >
-                  <UploadCloud className="h-4 w-4 text-emerald-400" />
-                  <span>Testar Google Drive (Escrita .txt)</span>
-                </button>
 
                 <button
                   onClick={() => handleDownloadZip('CLOUD')}
@@ -1836,16 +1671,6 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
                 >
                   <Download className="h-3.5 w-3.5 text-indigo-600" />
                   <span>Diagnóstico de Rede (.BAT)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('GOOGLE_DRIVE_TEST')}
-                  className="px-3.5 py-2 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                  title="Abrir utilitário de teste de conectividade e escrita no Google Drive"
-                >
-                  <UploadCloud className="h-3.5 w-3.5 text-emerald-600" />
-                  <span>Testar Google Drive (Escrita .txt)</span>
                 </button>
               </div>
 
@@ -2129,7 +1954,7 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
             <div>
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 mb-1">
-                <BookOpen className="h-3.5 w-3.5" /> Manual Oficial Homologado
+                <BookOpen className="h-3.5 w-3.5" /> Manual de Instalação
               </div>
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <FileText className="h-5 w-5 text-indigo-600" />
@@ -2183,7 +2008,7 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
               <div className="bg-white p-3.5 rounded-xl border border-emerald-200 shadow-2xs space-y-1.5">
                 <span className="font-bold text-slate-900 block text-xs">Etapa 1: Baixar e Extrair</span>
                 <p className="text-slate-600 leading-relaxed">
-                  Baixe o pacote <code>SucessoEdu_Instalador_Completo_v5.4.0.zip</code> e clique com o botão direito em <strong>"Extrair Tudo..."</strong> para uma pasta temporária (ex: Downloads).
+                  Baixe o pacote ZIP gerado nesta Central e clique com o botão direito em <strong>"Extrair Tudo..."</strong> para uma pasta temporária (ex: Downloads).
                 </p>
               </div>
 
@@ -2302,239 +2127,6 @@ export const NetworkInstaller: React.FC<NetworkInstallerProps> = ({
       )}
 
       {/* TAB: VERIFICAÇÃO DE ESTRUTURA DE DIRETÓRIOS & PROTEÇÃO DE LAYOUT */}
-      {activeTab === 'STRUCTURE_VERIFIER' && (
-        <div className="space-y-6 animate-in fade-in duration-300">
-          {/* Header Card */}
-          <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/30 rounded-3xl p-6 text-white shadow-xl">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-              <div className="space-y-2 max-w-2xl">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold">
-                  <FolderCheck className="h-4 w-4" />
-                  Preservação Contínua de Diretórios &amp; Layout
-                </div>
-                <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
-                  <FolderLock className="h-7 w-7 text-emerald-400" />
-                  Auditoria de Diretórios &amp; Proteção de Layout
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  Rotina de verificação integrada ao fluxo do <strong>NetworkInstaller</strong>. Garante que as 6 pastas canônicas da aplicação em <code>C:\SucessoEdu</code> sejam mantidas intactas e <strong>impede a redefinição do layout e das preferências pedagógicas</strong> quando uma instalação prévia for detectada.
-                </p>
-              </div>
-
-              <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 shrink-0">
-                <button
-                  onClick={() => handleRunStructureAudit(true)}
-                  disabled={isAuditingStructure}
-                  className="px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40 transition-all cursor-pointer disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
-                >
-                  <RefreshCw className={`h-4 w-4 ${isAuditingStructure ? 'animate-spin' : ''}`} />
-                  <span>{isAuditingStructure ? 'Auditando...' : 'Re-verificar Diretórios & Layout'}</span>
-                </button>
-
-                <button
-                  onClick={() =>
-                    downloadFile(
-                      generateDirectoryVerificationBat(currentConfig.serverPort, currentConfig.schoolName),
-                      'VERIFICAR_ESTRUTURA_E_LAYOUT.bat'
-                    )
-                  }
-                  className="px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-950/40 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-                >
-                  <Download className="h-4 w-4" />
-                  <span>Baixar Script Windows (.BAT)</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Quick Metrics Bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-800 text-xs">
-              <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3">
-                <span className="text-slate-400 text-[10px] uppercase font-bold block">Instalação Prévia</span>
-                <span className={`text-sm font-black mt-0.5 block ${structureAudit?.hasPreviousInstall ? 'text-emerald-400' : 'text-amber-300'}`}>
-                  {structureAudit?.hasPreviousInstall ? 'DETECTADA' : 'NÃO DETECTADA'}
-                </span>
-              </div>
-              <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3">
-                <span className="text-slate-400 text-[10px] uppercase font-bold block">Proteção de Layout</span>
-                <span className={`text-sm font-black mt-0.5 block ${structureAudit?.layoutProtectionEnforced ? 'text-emerald-400' : 'text-slate-300'}`}>
-                  {structureAudit?.layoutProtectionEnforced ? 'BLOQUEIO ATIVO' : 'PADRÃO INICIAL'}
-                </span>
-              </div>
-              <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3">
-                <span className="text-slate-400 text-[10px] uppercase font-bold block">Pastas Canônicas</span>
-                <span className="text-sm font-black text-white mt-0.5 block">
-                  {structureAudit?.directories.length || 6} / 6 Preservadas
-                </span>
-              </div>
-              <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3">
-                <span className="text-slate-400 text-[10px] uppercase font-bold block">Taxa de Preservação</span>
-                <span className="text-sm font-black text-emerald-400 mt-0.5 block">
-                  100% Conforme
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Canonical Directories Table */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h4 className="text-base font-black text-slate-800 flex items-center gap-2">
-                  <FolderCheck className="h-5 w-5 text-indigo-600" />
-                  Estrutura de Diretórios Canônicos (C:\SucessoEdu)
-                </h4>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Verificação em tempo real de cada subdiretório e sua respectiva política de integridade durante instalações e atualizações.
-                </p>
-              </div>
-              <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-xs border border-emerald-200 self-start sm:self-auto">
-                Auditoria Concluída com Sucesso
-              </span>
-            </div>
-
-            <div className="overflow-x-auto border border-slate-200 rounded-2xl">
-              <table className="w-full text-left text-xs text-slate-700">
-                <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase text-[10px] tracking-wider">
-                  <tr>
-                    <th className="py-3 px-4">Diretório Oficial</th>
-                    <th className="py-3 px-4">Conteúdo &amp; Finalidade</th>
-                    <th className="py-3 px-4">Criticidade</th>
-                    <th className="py-3 px-4">Política de Preservação</th>
-                    <th className="py-3 px-4 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {structureAudit?.directories.map((dir) => (
-                    <tr key={dir.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                        {dir.path}
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-600">
-                        {dir.purpose}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        {dir.isCritical ? (
-                          <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold">
-                            Crítico
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">
-                            Suporte
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4 font-medium text-slate-600">
-                        {dir.preservationPolicy}
-                      </td>
-                      <td className="py-3.5 px-4 text-center">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                          {dir.status === 'PRESERVED' ? 'Preservado' : 'Validado'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Layout Protection Policy Card */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100">
-                <LayoutGrid className="h-6 w-6" />
-              </div>
-              <div>
-                <h4 className="text-base font-black text-slate-800">
-                  Regras de Proteção e Bloqueio de Redefinição de Layout
-                </h4>
-                <p className="text-xs text-slate-500">
-                  Mecanismos ativos que impedem a redefinição visual quando uma instalação prévia é detectada
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs pt-2">
-              <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-2">
-                <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                  <Lock className="h-4 w-4 text-emerald-600" />
-                  1. Trava de Persistência Local
-                </div>
-                <p className="text-slate-600 leading-relaxed">
-                  As chaves de configuração do painel (<code>edugestao_dashbox_config</code>) e tema visual (<code>edugestao_dash_theme</code>) são preservadas. O sistema marca a flag <code>sucessoedu_layout_lock</code> para blindar os painéis pedagógicos.
-                </p>
-              </div>
-
-              <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-2">
-                <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                  <ShieldCheck className="h-4 w-4 text-indigo-600" />
-                  2. Proteção Contra Reset Acidental
-                </div>
-                <p className="text-slate-600 leading-relaxed">
-                  No <strong>PedagogicalDashboard</strong>, a opção <em>"Restaurar Padrão"</em> exige confirmação explícita de segurança antes de qualquer modificação caso a trava de instalação prévia esteja ativa.
-                </p>
-              </div>
-
-              <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50 space-y-2">
-                <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  3. Instaladores Não-Destrutivos
-                </div>
-                <p className="text-slate-600 leading-relaxed">
-                  Os scripts <code>Instalador_Unificado_SucessoEdu.bat</code> e <code>ATUALIZAR_SISTEMA_LOCAL.bat</code> realizam backup preventivo obrigatório e nunca removem as pastas <code>data</code>, <code>Backups</code> e <code>config</code>.
-                </p>
-              </div>
-            </div>
-
-            {/* Verification Script Box */}
-            <div className="bg-slate-900 rounded-2xl p-4 text-white text-xs space-y-2 mt-4">
-              <div className="flex items-center justify-between">
-                <div className="font-mono font-bold text-indigo-300 flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  VERIFICAR_ESTRUTURA_E_LAYOUT.bat
-                </div>
-                <button
-                  onClick={() =>
-                    downloadFile(
-                      generateDirectoryVerificationBat(currentConfig.serverPort, currentConfig.schoolName),
-                      'VERIFICAR_ESTRUTURA_E_LAYOUT.bat'
-                    )
-                  }
-                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <Download className="h-3 w-3" />
-                  <span>Baixar Script</span>
-                </button>
-              </div>
-              <p className="text-slate-300 text-[11px]">
-                Script autônomo em lote que audita as pastas físicas em <code>C:\SucessoEdu</code>, registra manifesto em <code>Backups\manifesto_verificacao_estrutura.txt</code> e confirma que nenhuma configuração prévia de layout foi resetada.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB: AUDITORIA DE INTEGRIDADE & AUTO-REPARO SHA-256 */}
-      {activeTab === 'INTEGRITY_CHECKER' && (
-        <AppIntegrityChecker
-          schoolName={schoolName}
-          serverPort={serverPort}
-          serverIp={serverHost}
-          onNavigate={onNavigate}
-        />
-      )}
-
-      {/* TAB: TESTE GOOGLE DRIVE & ESCRITA */}
-      {activeTab === 'GOOGLE_DRIVE_TEST' && (
-        <GoogleDriveConnectivityTester
-          serverHost={serverHost}
-          serverPort={serverPort}
-          schoolName={schoolName}
-          onNavigate={onNavigate}
-        />
-      )}
-
       {/* TAB: MÓDULO DE DESINSTALAÇÃO & LIMPEZA SEGURA */}
       {activeTab === 'UNINSTALL_MODULE' && (
         <UninstallationModule

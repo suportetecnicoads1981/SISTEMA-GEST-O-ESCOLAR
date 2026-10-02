@@ -39,7 +39,7 @@ interface UpdateTutorialGuideProps {
 export const UpdateTutorialGuide: React.FC<UpdateTutorialGuideProps> = ({
   schoolName = 'SucessoEdu Gestão Educacional',
   serverPort = 3000,
-  currentVersion = 'v5.4.0-ENTERPRISE',
+  currentVersion = '',
 }) => {
   const [activeTutorialMethod, setActiveTutorialMethod] = useState<
     'FRESH_INSTALL' | 'EXISTING_UPDATE' | 'CLOUD_OTA' | 'OFFLINE_USB' | 'CLIENT_STATION' | 'UNINSTALL_CLEANUP'
@@ -165,27 +165,7 @@ export const UpdateTutorialGuide: React.FC<UpdateTutorialGuideProps> = ({
           <HardDrive className="w-4 h-4" /> 2. Atualizar Sistema Existente (C:\SucessoEdu)
         </button>
 
-        <button
-          onClick={() => setActiveTutorialMethod('CLOUD_OTA')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-            activeTutorialMethod === 'CLOUD_OTA'
-              ? 'bg-white text-indigo-700 shadow-xs border border-slate-200'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-          }`}
-        >
-          <Cloud className="w-4 h-4" /> 3. Nuvem (Google Drive)
-        </button>
 
-        <button
-          onClick={() => setActiveTutorialMethod('OFFLINE_USB')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-            activeTutorialMethod === 'OFFLINE_USB'
-              ? 'bg-white text-indigo-700 shadow-xs border border-slate-200'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
-          }`}
-        >
-          <Zap className="w-4 h-4" /> 4. Pen Drive (.edupkg)
-        </button>
 
         <button
           onClick={() => setActiveTutorialMethod('CLIENT_STATION')}
@@ -195,7 +175,7 @@ export const UpdateTutorialGuide: React.FC<UpdateTutorialGuideProps> = ({
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
           }`}
         >
-          <Laptop className="w-4 h-4" /> 5. Estações de Trabalho (F5)
+          <Laptop className="w-4 h-4" /> 3. Estações de Trabalho (F5)
         </button>
 
         <button
@@ -206,7 +186,7 @@ export const UpdateTutorialGuide: React.FC<UpdateTutorialGuideProps> = ({
               : 'text-rose-700 hover:bg-rose-100/70'
           }`}
         >
-          <Trash2 className="w-4 h-4" /> 6. Desinstalação &amp; Limpeza Segura
+          <Trash2 className="w-4 h-4" /> 4. Desinstalação &amp; Limpeza Segura
         </button>
       </div>
 
@@ -241,7 +221,7 @@ export const UpdateTutorialGuide: React.FC<UpdateTutorialGuideProps> = ({
                 <span className="font-bold text-sm text-slate-900">Baixar e Extrair o ZIP</span>
               </div>
               <p className="text-xs text-slate-600 leading-relaxed pl-10">
-                Baixe o pacote oficial <code>SucessoEdu_Instalador_Completo_v5.4.0.zip</code> do Google Drive oficial ou pen drive. Extraia todo o conteúdo para uma pasta acessível (ex: <code>Downloads</code>).
+                Gere e baixe o pacote ZIP na Central de Instalação (ou copie do pen drive). Extraia todo o conteúdo para uma pasta acessível (ex: <code>Downloads</code>).
               </p>
             </div>
 
@@ -385,86 +365,6 @@ export const UpdateTutorialGuide: React.FC<UpdateTutorialGuideProps> = ({
       )}
 
       {/* METHOD 2: CLOUD OTA */}
-      {activeTutorialMethod === 'CLOUD_OTA' && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-6">
-          <div className="border-b border-slate-200 pb-4">
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Cloud className="w-5 h-5 text-indigo-600" />
-              Passo a Passo: Atualização Direta via Nuvem (Google Drive Oficial)
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Conectado ao repositório homologado <code>suportetecnicoads@gmail.com</code> na pasta <em>Atualizações e melhorias</em>.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center mt-0.5 flex-shrink-0">1</div>
-              <div>
-                <strong className="text-xs text-slate-900 block font-bold">Acessar a Central de Atualizações</strong>
-                <p className="text-xs text-slate-600 mt-0.5">No menu lateral esquerdo do SucessoEdu, clique em <strong>⚙️ Atualizações &amp; Nuvem</strong>.</p>
-              </div>
-            </div>
-
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center mt-0.5 flex-shrink-0">2</div>
-              <div>
-                <strong className="text-xs text-slate-900 block font-bold">Verificar Novos Pacotes</strong>
-                <p className="text-xs text-slate-600 mt-0.5">Clique no botão <strong>"☁️ Verificar Atualizações no Google Drive"</strong> para consultar a versão ativa.</p>
-              </div>
-            </div>
-
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center mt-0.5 flex-shrink-0">3</div>
-              <div>
-                <strong className="text-xs text-slate-900 block font-bold">Instalar com 1 Clique (OTA)</strong>
-                <p className="text-xs text-slate-600 mt-0.5">Clique no botão verde <strong>"⚡ Sincronizar Nuvem (OTA 1-Clique)"</strong>. O sistema executará o backup preventivo e aplicará o pacote.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* METHOD 3: OFFLINE USB */}
-      {activeTutorialMethod === 'OFFLINE_USB' && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-6">
-          <div className="border-b border-slate-200 pb-4">
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Zap className="w-5 h-5 text-indigo-600" />
-              Passo a Passo: Atualização Offline via Pen Drive (.edupkg)
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Ideal para escolas em áreas rurais ou unidades que operam sem conexão contínua à internet.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center mt-0.5 flex-shrink-0">1</div>
-              <div>
-                <strong className="text-xs text-slate-900 block font-bold">Baixar o Pacote .edupkg na Nuvem</strong>
-                <p className="text-xs text-slate-600 mt-0.5">Em qualquer computador com internet, baixe o arquivo <code>SucessoEdu_Update_v5.4.0.edupkg</code> da pasta oficial no Google Drive.</p>
-              </div>
-            </div>
-
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center mt-0.5 flex-shrink-0">2</div>
-              <div>
-                <strong className="text-xs text-slate-900 block font-bold">Copiar para o Pen Drive</strong>
-                <p className="text-xs text-slate-600 mt-0.5">Salve o arquivo na raiz do seu pen drive ou disco removível e leve até a escola.</p>
-              </div>
-            </div>
-
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center mt-0.5 flex-shrink-0">3</div>
-              <div>
-                <strong className="text-xs text-slate-900 block font-bold">Carregar no SucessoEdu</strong>
-                <p className="text-xs text-slate-600 mt-0.5">Na aba <em>Atualizações &amp; Nuvem</em>, clique em <strong>"📂 Selecionar Pacote (.edupkg)"</strong>, selecione o arquivo do pen drive e confirme a instalação.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* METHOD 5: CLIENT STATION */}
       {activeTutorialMethod === 'CLIENT_STATION' && (

@@ -115,66 +115,9 @@ interface CustomizableChartModalProps {
   documentCategory?: string;
 }
 
+// Sem dados recebidos: gráfico vazio (nunca números de exemplo).
 const DEFAULT_FALLBACK_DATASETS: ChartDatasetOption[] = [
-  {
-    id: 'dropout_reasons',
-    title: 'Motivos de Evasão Escolar (Padrão MEC / INEP)',
-    subtitle: 'Distribuição nominal e percentual de estudantes evadidos por fator determinante',
-    unit: 'alunos',
-    valueLabel: 'Qtd. Alunos',
-    defaultChartType: 'BAR_HORIZONTAL',
-    benchmarkValue: 5,
-    benchmarkLabel: 'Alerta Municipal (5 alunos)',
-    data: [
-      { name: 'Mudança de Endereço / Município', value: 14, category: 'Territorial' },
-      { name: 'Dificuldade de Transporte Escolar', value: 8, category: 'Acesso' },
-      { name: 'Trabalho Infantil / Apoio Familiar', value: 6, category: 'Socioeconômico' },
-      { name: 'Desinteresse / Desmotivação', value: 5, category: 'Pedagógico' },
-      { name: 'Gravidez na Adolescência', value: 3, category: 'Saúde/Social' },
-      { name: 'Doença / Problemas de Saúde', value: 2, category: 'Saúde' },
-      { name: 'Vulnerabilidade Social / CRAS', value: 4, category: 'Proteção' },
-    ],
-  },
-  {
-    id: 'class_performance',
-    title: 'Rendimento Médio por Turma',
-    subtitle: 'Média de aproveitamento e proficiência geral das turmas ativas',
-    unit: 'pts',
-    valueLabel: 'Média de Notas',
-    defaultChartType: 'BAR_VERTICAL',
-    benchmarkValue: 7.0,
-    benchmarkLabel: 'Meta Pedagógica (7.0 pts)',
-    data: [
-      { name: '1º Ano A', value: 8.2, secondaryValue: 7.0 },
-      { name: '1º Ano B', value: 7.8, secondaryValue: 7.0 },
-      { name: '2º Ano A', value: 8.5, secondaryValue: 7.0 },
-      { name: '2º Ano B', value: 6.9, secondaryValue: 7.0 },
-      { name: '3º Ano A', value: 7.4, secondaryValue: 7.0 },
-      { name: '4º Ano A', value: 8.0, secondaryValue: 7.0 },
-      { name: '5º Ano A', value: 8.7, secondaryValue: 7.0 },
-    ],
-  },
-  {
-    id: 'attendance_rate',
-    title: 'Taxa de Presença e Frequência Escolar',
-    subtitle: 'Percentual de presença apurado no diário eletrônico por ano/série',
-    unit: '%',
-    valueLabel: 'Taxa de Frequência',
-    defaultChartType: 'AREA',
-    benchmarkValue: 75,
-    benchmarkLabel: 'Mínimo LDB (75%)',
-    data: [
-      { name: '1º Ano', value: 94.2 },
-      { name: '2º Ano', value: 92.5 },
-      { name: '3º Ano', value: 89.8 },
-      { name: '4º Ano', value: 91.0 },
-      { name: '5º Ano', value: 87.5 },
-      { name: '6º Ano', value: 84.2 },
-      { name: '7º Ano', value: 86.0 },
-      { name: '8º Ano', value: 82.5 },
-      { name: '9º Ano', value: 85.3 },
-    ],
-  },
+  { id: 'sem-dados', title: 'Sem dados para exibir', subtitle: 'Ainda não há registros lançados para este gráfico.', data: [] },
 ];
 
 const COLOR_PALETTES: Record<ColorPaletteKey, { name: string; colors: string[]; bgBadge: string }> = {

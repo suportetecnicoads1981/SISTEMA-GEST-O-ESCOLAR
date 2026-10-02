@@ -399,7 +399,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
       state: activeSecretary.state || u.state || 'PA',
       zipCode: activeSecretary.zipCode || u.zipCode || '68.398-000',
       linkageCode: u.linkageCode || `VINC-SEMED-PA-${Math.floor(100 + Math.random() * 900)}`,
-      linkageDecree: u.linkageDecree || 'Portaria de Homologação SEMED/PMCN',
+      linkageDecree: u.linkageDecree || '',
       linkageDate: u.linkageDate || new Date().toISOString(),
     }));
     onUpdateSchoolUnits(updated);
@@ -1253,9 +1253,9 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
                   <span className="flex items-center gap-1">
                     {unit.hasInternet ? (
-                      <span className="text-emerald-600 font-medium">● Conectada</span>
+                      <span className="text-emerald-600 font-medium" title="Informado no cadastro da escola">● Com internet (cadastro)</span>
                     ) : (
-                      <span className="text-amber-600 font-medium">○ Polo Offline</span>
+                      <span className="text-amber-600 font-medium" title="Informado no cadastro da escola">○ Sem internet (cadastro)</span>
                     )}
                   </span>
                   <span className="font-mono text-slate-600 font-semibold">
@@ -1534,7 +1534,7 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                     <th className="p-3">Código INEP</th>
                     <th className="p-3">Tipologia / Zona</th>
                     <th className="p-3">Diretor(a)</th>
-                    <th className="p-3">Código de Homologação</th>
+                    <th className="p-3">Código de Vínculo</th>
                     <th className="p-3 text-center">Status do Vínculo</th>
                     <th className="p-3 text-right">Ação</th>
                   </tr>

@@ -77,7 +77,6 @@ import { FeedbackSuggestionsModal } from './components/common/FeedbackSuggestion
 import { DevBacklogModule, isDevBacklogOwner } from './components/admin/DevBacklogModule';
 import { AboutSystem } from './components/sobre/AboutSystem';
 import { LoginScreen } from './components/auth/LoginScreen';
-import { TopOverviewBanner } from './components/layout/TopOverviewBanner';
 import { UniversalDataImportModal } from './components/secretaria/UniversalDataImportModal';
 import { WorkspaceTabsBar } from './components/layout/WorkspaceTabsBar';
 import { WindowsTitleBar } from './components/layout/WindowsTitleBar';
@@ -2436,7 +2435,7 @@ export default function App() {
           onTriggerTestPush={() => {
             triggerPushNotification(
               '🔔 Teste de Notificação Push',
-              'O canal de notificações está 100% operacional no SucessoEdu.'
+              'Notificação de teste: se você está vendo esta mensagem, as notificações funcionam neste computador.'
             );
           }}
         />
