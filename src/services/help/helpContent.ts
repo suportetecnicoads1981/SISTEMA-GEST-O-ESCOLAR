@@ -768,8 +768,16 @@ export const HELP_MODULES: HelpModule[] = [
     summary: 'Escolas da rede, envio de lotes das escolas para a Sede e consolidação na Secretaria.',
     faq: [
       {
+        q: 'Toda escola fica vinculada à SEMED?',
+        a: 'Sim. O sistema controla toda a rede municipal de educação, então toda escola cadastrada (inclusive anexas e as criadas pela importação de planilhas) fica vinculada à SEMED por padrão. Só deixa de constar como vinculada se alguém desmarcar o vínculo no cadastro da escola.',
+      },
+      {
+        q: 'Por que o número de docentes de uma escola está 0?',
+        a: 'Porque ainda não há professor cadastrado para ela. O número vem dos cadastros: cadastre o professor em Usuários (papel Professor, lotado na escola) ou informe o professor nas disciplinas/turmas da escola. Não é mais um número digitado à mão no cadastro da escola.',
+      },
+      {
         q: 'De onde vêm os números do Censo e do Quadro de Desempenho?',
-        a: 'Somente dos dados lançados no sistema; nada é estimado. Matrículas e turmas: alunos ativos e turmas cadastradas em cada escola. Educação Especial: alunos com AEE, condição especial, necessidade ou CID marcados no cadastro. Docentes: o número informado no cadastro da escola ("—" quando não informado). A coluna Cadastro mostra "INEP PENDENTE" quando a escola não tem código INEP de 8 dígitos e quantos alunos têm pendências no cadastro. No Quadro de Desempenho, as médias (geral, Língua Portuguesa e Matemática) são calculadas só com as notas já lançadas nos diários; enquanto não houver notas, aparece "Ainda não há notas lançadas na rede". IDEB, taxa de aprovação, transporte e alimentação escolar foram retirados porque não há esses dados no sistema (o IDEB é divulgado pelo INEP/MEC).',
+        a: 'Somente dos dados lançados no sistema; nada é estimado. Matrículas e turmas: alunos ativos e turmas cadastradas em cada escola. Educação Especial: alunos com AEE, condição especial, necessidade ou CID marcados no cadastro. Docentes: contados automaticamente pelos professores cadastrados — contas de usuário com papel de professor lotadas na escola, professores das disciplinas das turmas da escola e o professor regente de cada turma (cada pessoa conta uma vez). A coluna Cadastro mostra "INEP PENDENTE" quando a escola não tem código INEP de 8 dígitos e quantos alunos têm pendências no cadastro. No Quadro de Desempenho, as médias (geral, Língua Portuguesa e Matemática) são calculadas só com as notas já lançadas nos diários; enquanto não houver notas, aparece "Ainda não há notas lançadas na rede". IDEB, taxa de aprovação, transporte e alimentação escolar foram retirados porque não há esses dados no sistema (o IDEB é divulgado pelo INEP/MEC).',
       },
       {
         q: 'Como tiro a relação das escolas da rede?',

@@ -2206,6 +2206,8 @@ export default function App() {
                 submissions={data?.submissions || []}
                 academicHistories={data?.academicHistories || []}
                 classGradeSheets={data?.classGradeSheets || []}
+                subjects={data?.subjects || []}
+                userAccounts={data?.userAccounts || []}
                 settings={data?.settings || DEFAULT_SCHOOL_SETTINGS}
                 municipalSecretary={{
                   ...(data?.municipalSecretary || DEFAULT_MUNICIPAL_SECRETARY),

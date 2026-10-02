@@ -766,13 +766,9 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
               </div>
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Corpo Docente</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={formData.totalTeachers || 0}
-                  onChange={(e) => setFormData({ ...formData, totalTeachers: Number(e.target.value) })}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold text-center"
-                />
+                <p className="w-full px-3 py-2 rounded-xl border border-dashed border-slate-200 bg-slate-50 text-[11px] text-slate-500 leading-snug">
+                  Contado automaticamente pelos professores cadastrados (usuários lotados, disciplinas e regentes das turmas).
+                </p>
               </div>
             </div>
           </div>

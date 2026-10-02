@@ -88,3 +88,35 @@ export function schoolPerformance(unitId: string, classes: AnyClass[], sheets: A
   const avg = (a: number[]) => (a.length ? Math.round((a.reduce((x, y) => x + y, 0) / a.length) * 10) / 10 : null);
   return { overall: avg(all), portuguese: avg(lp), math: avg(mat), gradesCount: all.length };
 }
+
+type AnySubject = { classId?: string; teacherName?: string };
+type AnyUser = { name?: string; role?: string; sector?: string; schoolUnitId?: string; active?: boolean };
+
+const personKey = (name?: string) =>
+  String(name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+/**
+ * Professores da escola, contados pelos cadastros reais (sem número digitado à mão):
+ * contas de usuário com papel de professor lotadas na escola, professores das disciplinas
+ * das turmas da escola e o professor regente de cada turma. Cada pessoa conta uma vez.
+ */
+export function teachersOfUnit(unitId: string, classes: Array<AnyClass & { classTeacher?: string }>, subjects: AnySubject[], users: AnyUser[]): string[] {
+  const classIds = new Set(classes.filter((c) => c?.schoolUnitId === unitId).map((c) => c.id));
+  const names = new Map<string, string>();
+  const add = (n?: string) => {
+    const k = personKey(n);
+    if (k && !names.has(k)) names.set(k, String(n).trim());
+  };
+  for (const u of users || []) {
+    const isTeacher = String(u?.role || '').toUpperCase() === 'TEACHER' || String(u?.sector || '').toUpperCase() === 'PROFESSOR';
+    if (isTeacher && u?.active !== false && u?.schoolUnitId === unitId) add(u.name);
+  }
+  for (const s of subjects || []) if (s?.classId && classIds.has(s.classId)) add(s.teacherName);
+  for (const c of classes || []) if (c?.schoolUnitId === unitId) add((c as any).classTeacher);
+  return Array.from(names.values());
+}

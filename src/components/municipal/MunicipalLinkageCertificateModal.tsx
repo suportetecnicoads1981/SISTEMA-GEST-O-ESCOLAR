@@ -290,7 +290,7 @@ export const MunicipalLinkageCertificateModal: React.FC<
             </div>
             <div>
               <span className="block text-[10px] font-bold text-slate-500 uppercase">
-                Docentes (informados)
+                Docentes Cadastrados
               </span>
               <span className="cert-num text-base font-black text-slate-900">{totalTeachers}</span>
             </div>

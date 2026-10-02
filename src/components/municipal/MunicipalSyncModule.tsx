@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { z } from 'zod';
 import { annexesOf, parentOf } from '../../utils/schoolAnnexes';
-import { activeStudentsOfUnit, hasCadastralPending, isSpecialEducationStudent, isValidInep, schoolPerformance } from '../../utils/networkIndicators';
+import { activeStudentsOfUnit, hasCadastralPending, isSpecialEducationStudent, isValidInep, schoolPerformance, teachersOfUnit } from '../../utils/networkIndicators';
 import {
   Building2,
   Upload,
@@ -54,6 +54,8 @@ import {
   ExamSubmission,
   AcademicHistory,
   ClassGradeSheet,
+  Subject,
+  UserAccount,
   SchoolSettings,
   MunicipalSecretaryInfo,
 } from '../../types';
@@ -85,6 +87,9 @@ interface MunicipalSyncModuleProps {
   academicHistories?: AcademicHistory[];
   /** Notas lançadas nos diários (para o quadro de desempenho real). */
   classGradeSheets?: ClassGradeSheet[];
+  /** Professores: disciplinas das turmas e contas de usuário (para contar docentes reais). */
+  subjects?: Subject[];
+  userAccounts?: UserAccount[];
   settings?: SchoolSettings;
   municipalSecretary?: MunicipalSecretaryInfo;
   onUpdateSchoolUnits?: (units: SchoolUnit[]) => void;
@@ -188,7 +193,8 @@ const useDataValidation = (props?: MunicipalSyncModuleProps) => {
         ...u,
         totalStudents: linkedStudents > 0 ? linkedStudents : Number(u?.totalStudents ?? 0),
         totalClasses: linkedClasses > 0 ? linkedClasses : Number(u?.totalClasses ?? 0),
-        totalTeachers: Number(u?.totalTeachers ?? 0),
+        // Docentes = professores cadastrados (contas lotadas, disciplinas e regentes das turmas).
+        totalTeachers: teachersOfUnit(u.id, classes as any[], props?.subjects || [], props?.userAccounts || []).length,
         name: u?.name ?? 'Escola Municipal',
         inepCode: u?.inepCode ?? '',
         district: u?.district ?? '',
@@ -198,7 +204,7 @@ const useDataValidation = (props?: MunicipalSyncModuleProps) => {
         directorName: u?.directorName ?? '',
         };
       });
-  }, [rawSchoolUnits, students, classes]);
+  }, [rawSchoolUnits, students, classes, props?.subjects, props?.userAccounts]);
 
   const isLoading = !props || props.students === undefined || props.classes === undefined || props.exams === undefined;
 
@@ -2009,8 +2015,8 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                     <td className="p-3 text-slate-500">{u.district}</td>
                     <td className="p-3 text-center font-bold text-slate-900">{u.totalStudents}</td>
                     <td className="p-3 text-center text-slate-700">{u.totalClasses}</td>
-                    <td className="p-3 text-center text-slate-700" title={u.totalTeachers ? '' : 'Não informado no cadastro da escola'}>
-                      {u.totalTeachers || '—'}
+                    <td className="p-3 text-center text-slate-700" title="Professores cadastrados: contas lotadas na escola, professores das disciplinas e regentes das turmas">
+                      {u.totalTeachers}
                     </td>
                     <td className="p-3 text-center text-indigo-700 font-semibold">{specialEducation}</td>
                     <td className="p-3 text-center">

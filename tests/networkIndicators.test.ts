@@ -35,3 +35,27 @@ describe('indicadores reais da rede', () => {
     expect(schoolPerformance('u1', classes, sheets)).toEqual({ overall: 6.3, portuguese: 7, math: 5, gradesCount: 3 });
   });
 });
+
+import { teachersOfUnit } from '../src/utils/networkIndicators';
+
+describe('docentes pelos professores cadastrados', () => {
+  it('une contas lotadas, disciplinas e regentes sem repetir a pessoa', () => {
+    const classes = [
+      { id: 'c1', schoolUnitId: 'u1', classTeacher: 'Maria Souza' },
+      { id: 'c2', schoolUnitId: 'u2', classTeacher: 'Outra Pessoa' },
+    ];
+    const subjects = [
+      { classId: 'c1', teacherName: 'MARIA SOUZA' },
+      { classId: 'c1', teacherName: 'João Lima' },
+      { classId: 'c2', teacherName: 'Pedro' },
+    ];
+    const users = [
+      { name: 'Ana Prof', role: 'TEACHER', schoolUnitId: 'u1', active: true },
+      { name: 'Inativo', role: 'TEACHER', schoolUnitId: 'u1', active: false },
+      { name: 'Secretária', role: 'ADMIN', sector: 'SECRETARIA', schoolUnitId: 'u1' },
+      { name: 'João Lima', sector: 'PROFESSOR', schoolUnitId: 'u1' },
+    ];
+    expect(teachersOfUnit('u1', classes, subjects, users).map((n) => n.toLowerCase()).sort()).toEqual(['ana prof', 'joão lima', 'maria souza']);
+    expect(teachersOfUnit('u3', classes, subjects, users)).toEqual([]);
+  });
+});
