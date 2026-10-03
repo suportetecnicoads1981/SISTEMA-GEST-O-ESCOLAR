@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { readLogoFile } from '../../services/documentBranding';
+import { readLogoFile, splitPersonNames, joinPersonNames } from '../../services/documentBranding';
 import {
   X,
   Save,
@@ -19,6 +19,7 @@ import {
   Upload,
   Image as ImageIcon,
   Trash2,
+  Plus,
 } from 'lucide-react';
 import { SchoolUnit, LocationZone, SchoolUnitType } from '../../types';
 import { notify } from '../../utils/dialogs';
@@ -80,6 +81,9 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
   });
 
   const [error, setError] = useState<string>('');
+  // Coordenadores(as): um campo para cada nome (escolas com mais de um coordenador).
+  // Gravados juntos no cadastro ("A e B"); nos documentos, cada um ganha a sua linha de assinatura.
+  const [coordinators, setCoordinators] = useState<string[]>(['']);
 
   const handleFileUpload = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -119,7 +123,10 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
         municipalSecretaryName: unitToEdit.municipalSecretaryName || 'Secretaria Municipal de Educação – SEMED',
         municipalSecretaryCnpj: unitToEdit.municipalSecretaryCnpj || '30.676.114/0001-17',
       });
+      const names = splitPersonNames(unitToEdit.coordinatorName);
+      setCoordinators(names.length ? names : ['']);
     } else {
+      setCoordinators(['']);
       const linkNum = Math.floor(100 + Math.random() * 900);
       setFormData({
         name: '',
@@ -204,8 +211,15 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
       city: formData.city?.trim() || '',
       state: formData.state?.trim() || '',
       directorName: formData.directorName.trim(),
-      coordinatorName: formData.coordinatorName?.trim() || undefined,
+      coordinatorName: joinPersonNames(coordinators) || undefined,
       secretaryName: formData.secretaryName?.trim() || undefined,
+      // Logos enviadas no cadastro (antes ficavam de fora ao salvar e se perdiam).
+      logoUrl: formData.logoUrl?.trim() || undefined,
+      // Logo da Gestão: só grava se for própria da escola (a da Secretaria vem do cadastro da SEMED).
+      managementLogoUrl:
+        formData.managementLogoUrl?.trim() && formData.managementLogoUrl.trim() !== (defaultManagementLogo || '').trim()
+          ? formData.managementLogoUrl.trim()
+          : undefined,
       phone: formData.phone?.trim() || '',
       email: formData.email?.trim() || '',
       totalClassrooms: Number(formData.totalClassrooms) || 0,
@@ -689,7 +703,7 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
               <span>Corpo Diretivo & Gestão Pedagógica</span>
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Nome do(a) Diretor(a) *</label>
                 <input
@@ -703,17 +717,6 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Coordenador(a) Pedagógico(a)</label>
-                <input
-                  type="text"
-                  value={formData.coordinatorName || ''}
-                  onChange={(e) => setFormData({ ...formData, coordinatorName: e.target.value })}
-                  placeholder="Ex: Profa. Adriana Silva"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200"
-                />
-              </div>
-
-              <div>
                 <label className="block font-semibold text-slate-700 mb-1">Secretário(a) Escolar</label>
                 <input
                   type="text"
@@ -723,6 +726,53 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
                   className="w-full px-3 py-2 rounded-xl border border-slate-200"
                 />
               </div>
+            </div>
+
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-1">
+                <label className="block font-semibold text-slate-700">
+                  Coordenador(a) Pedagógico(a){coordinators.length > 1 ? ` (${coordinators.length})` : ''}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setCoordinators((prev) => [...prev, ''])}
+                  className="px-2 py-1 rounded-lg text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 flex items-center gap-1 cursor-pointer"
+                  title="Escola com mais de um(a) coordenador(a): acrescente um campo para cada nome"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Adicionar coordenador(a)
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {coordinators.map((name, i) => (
+                  <div key={i} className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setCoordinators((prev) => prev.map((n, j) => (j === i ? v : n)));
+                      }}
+                      placeholder={i === 0 ? 'Ex: Profa. Adriana Silva' : 'Nome do(a) outro(a) coordenador(a)'}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                      aria-label={`Coordenador(a) Pedagógico(a) ${i + 1}`}
+                    />
+                    {coordinators.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setCoordinators((prev) => prev.filter((_, j) => j !== i))}
+                        className="p-2 rounded-lg text-rose-600 hover:bg-rose-50 border border-slate-200 cursor-pointer shrink-0"
+                        title="Remover este nome"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">
+                Nos relatórios pedagógicos da escola, cada coordenador(a) sai com a sua própria linha de assinatura.
+              </p>
             </div>
           </div>
 

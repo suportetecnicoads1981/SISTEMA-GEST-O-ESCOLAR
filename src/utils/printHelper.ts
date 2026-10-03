@@ -1,5 +1,5 @@
 import { sanitizeHtmlFragment } from './safeHtml';
-import { withLetterhead } from '../services/documentBranding';
+import { withLetterhead, type SignerRole } from '../services/documentBranding';
 import { printFileName } from './printIsolated';
 /**
  * Utilitário centralizado e robusto para Impressão e Pré-visualização Oficial no SucessoEdu.
@@ -19,6 +19,8 @@ export interface PrintOptions {
   classId?: string;
   /** true: não acrescenta o timbre padrão (documento já tem o seu). */
   noLetterhead?: boolean;
+  /** Quem assina pela escola (sem isso, vale o módulo aberto). */
+  signers?: SignerRole[];
 }
 
 /**
@@ -29,7 +31,7 @@ export function buildPrintHtml(contentHtml: string, options?: PrintOptions): str
   const orientation = options?.orientation || 'portrait';
   const bodyHtml = options?.noLetterhead
     ? contentHtml
-    : withLetterhead(contentHtml, { schoolUnitId: options?.schoolUnitId, classId: options?.classId, schoolName: options?.schoolName });
+    : withLetterhead(contentHtml, { schoolUnitId: options?.schoolUnitId, classId: options?.classId, schoolName: options?.schoolName, signers: options?.signers });
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -309,7 +311,7 @@ function showInAppPrintModal(contentHtml: string, options?: PrintOptions) {
       <!-- Folha A4 de Pré-Visualização -->
       <div style="background: #e2e8f0; padding: 24px 16px; min-height: 500px; display: flex; justify-content: center;">
         <div id="sucessoedu_a4_sheet" style="width: 100%; max-width: 800px; background: white; padding: 32px 36px; border-radius: 4px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); color: #0f172a; font-family: 'Plus Jakarta Sans', sans-serif;">
-          ${options?.noLetterhead ? contentHtml : withLetterhead(contentHtml, { schoolUnitId: options?.schoolUnitId, classId: options?.classId, schoolName: options?.schoolName })}
+          ${options?.noLetterhead ? contentHtml : withLetterhead(contentHtml, { schoolUnitId: options?.schoolUnitId, classId: options?.classId, schoolName: options?.schoolName, signers: options?.signers })}
         </div>
       </div>
     </div>

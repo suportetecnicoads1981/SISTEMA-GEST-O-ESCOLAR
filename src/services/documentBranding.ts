@@ -26,7 +26,17 @@ export interface BrandingSchool {
   name: string;
   inepCode?: string;
   logoUrl?: string;
+  /** Corpo diretivo do cadastro da escola (assinaturas dos relatórios da escola). */
+  directorName?: string;
+  coordinatorName?: string;
+  secretaryName?: string;
 }
+
+/**
+ * Quem assina pela escola: Direção, Coordenação Pedagógica ou Secretaria Escolar
+ * (nomes do cadastro da escola em Rede Municipal & Polos > Escolas).
+ */
+export type SignerRole = 'DIRECAO' | 'COORDENACAO' | 'SECRETARIA_ESCOLAR';
 
 export interface DocumentBrandingState {
   managementLogoUrl: string;
@@ -50,6 +60,8 @@ export interface LetterheadTarget {
   schoolUnitId?: string;
   classId?: string;
   schoolName?: string;
+  /** Quem assina pela escola. Sem isso, vale o módulo aberto (ver setDocumentSignContext). */
+  signers?: SignerRole[];
 }
 
 let state: DocumentBrandingState = {
@@ -81,7 +93,15 @@ export function setDocumentBranding(input: {
   const schools = new Map<string, BrandingSchool>();
   for (const u of input.schoolUnits || []) {
     if (!u?.id) continue;
-    schools.set(String(u.id), { id: String(u.id), name: u.name || '', inepCode: u.inepCode, logoUrl: cleanUrl(u.logoUrl) });
+    schools.set(String(u.id), {
+      id: String(u.id),
+      name: u.name || '',
+      inepCode: u.inepCode,
+      logoUrl: cleanUrl(u.logoUrl),
+      directorName: u.directorName || '',
+      coordinatorName: u.coordinatorName || '',
+      secretaryName: u.secretaryName || '',
+    });
   }
   const classSchool = new Map<string, string>();
   for (const c of input.classes || []) {
@@ -119,6 +139,122 @@ export function formatPersonName(raw?: string): string {
     .split(' ')
     .map((w, i) => (i > 0 && small.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)))
     .join(' ');
+}
+
+/**
+ * Separa vários nomes gravados no mesmo campo (ex.: duas coordenadoras):
+ * "Simone Menezes e Wandicleia Mota de Medeiros" → ["Simone Menezes", "Wandicleia Mota de Medeiros"].
+ * Também aceita vírgula, ponto e vírgula, barra e quebra de linha. O " e " só separa quando
+ * os dois lados têm nome e sobrenome (não quebra nomes como "Maria e Silva" sem sobrenome).
+ */
+export function splitPersonNames(raw?: string): string[] {
+  const text = String(raw || '').trim();
+  if (!text) return [];
+  const out: string[] = [];
+  for (const chunk of text.split(/\s*(?:[;,\/\n]|\s&\s)\s*/)) {
+    const part = chunk.trim();
+    if (!part) continue;
+    const pieces = part.split(/\s+e\s+/i);
+    if (pieces.length > 1 && pieces.every((p) => p.trim().split(/\s+/).length >= 2)) {
+      pieces.forEach((p) => out.push(p.trim()));
+    } else {
+      out.push(part);
+    }
+  }
+  return out.filter(Boolean);
+}
+
+/** Junta nomes para gravar num campo só: "A e B", "A, B e C". */
+export function joinPersonNames(names: string[]): string {
+  const list = names.map((n) => String(n || '').trim().replace(/\s+/g, ' ')).filter(Boolean);
+  if (list.length <= 1) return list[0] || '';
+  return `${list.slice(0, -1).join(', ')} e ${list[list.length - 1]}`;
+}
+
+/* ---------- Assinaturas da escola ---------- */
+
+/** Quem assina pela escola no módulo aberto (o App atualiza ao trocar de módulo). */
+let signContext: SignerRole[] | null = null;
+export function setDocumentSignContext(roles: SignerRole[] | null): void {
+  signContext = roles && roles.length ? roles : null;
+}
+
+/** Quem assina em cada módulo: pedagógico = Coordenação; Secretaria = Secretário(a) e Direção. */
+export function signersForModule(tabId: string): SignerRole[] | null {
+  const COORD = new Set([
+    'TEACHER_PORTAL', 'PROFESSOR', 'PROFESSOR_DASHBOARD', 'CLASS_DIARY', 'PEDAGOGICAL_DASHBOARD',
+    'BNCC_SKILLS', 'ASSESSMENT_REPORT', 'EXAMS', 'QUESTION_BANK', 'QUESTIONS', 'STUDENT_ROOM',
+  ]);
+  const SECRETARIA = new Set(['MAIN_DASHBOARD', 'STUDENTS', 'CLASSES', 'DOCUMENTS', 'DROPOUT_CENSUS', 'CENSUS']);
+  const DIRECAO = new Set(['COMMUNICATION', 'WHATSAPP', 'NOTIFICATIONS']);
+  if (COORD.has(tabId)) return ['COORDENACAO'];
+  if (SECRETARIA.has(tabId)) return ['SECRETARIA_ESCOLAR', 'DIRECAO'];
+  if (DIRECAO.has(tabId)) return ['DIRECAO'];
+  return null;
+}
+
+export interface Signer {
+  name: string;
+  role: string;
+}
+
+const ROLE_LABEL: Record<SignerRole, string> = {
+  DIRECAO: 'Diretor(a) Escolar',
+  COORDENACAO: 'Coordenador(a) Pedagógico(a)',
+  SECRETARIA_ESCOLAR: 'Secretário(a) Escolar',
+};
+
+/**
+ * Assinaturas da escola do documento. Campo vazio no cadastro: assina a Direção.
+ * Sem escola (relatório da rede) ou sem nomes cadastrados: lista vazia (assina a Secretaria de Educação).
+ */
+export function schoolSigners(target?: LetterheadTarget): Signer[] {
+  const roles = target?.signers || signContext;
+  if (!roles) return [];
+  const school = resolveLetterheadSchool(target);
+  if (!school) return [];
+  const field = (r: SignerRole) =>
+    r === 'DIRECAO' ? school.directorName : r === 'COORDENACAO' ? school.coordinatorName : school.secretaryName;
+  const out: Signer[] = [];
+  const seen = new Set<string>();
+  const add = (r: SignerRole) => {
+    for (const n of splitPersonNames(field(r))) {
+      const name = formatPersonName(n);
+      const key = name.toLowerCase();
+      if (!name || seen.has(key)) continue;
+      seen.add(key);
+      out.push({ name, role: ROLE_LABEL[r] });
+    }
+  };
+  roles.forEach(add);
+  if (!out.length) add('DIRECAO');
+  return out;
+}
+
+/** Linhas de assinatura lado a lado (até 3 por linha). Tabela: funciona na impressão e no Word. */
+export function signatureBlocksHtml(signers: Signer[]): string {
+  if (!signers.length) return '';
+  const rows: Signer[][] = [];
+  for (let i = 0; i < signers.length; i += 3) rows.push(signers.slice(i, i + 3));
+  const tr = (row: Signer[]) => {
+    const w = Math.floor(100 / row.length);
+    return `<tr>${row
+      .map(
+        (sg) => `<td width="${w}%" style="width:${w}%;padding:34px 14px 0;text-align:center;vertical-align:top;border:none;font-size:11px;line-height:1.3">
+    <div style="border-top:1px solid #0f172a;padding-top:4px;font-weight:700">${escapeHtml(sg.name)}</div>
+    <div>${escapeHtml(sg.role)}</div>
+  </td>`
+      )
+      .join('')}</tr>`;
+  };
+  return `<table data-sucessoedu-signers="1" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;border:none;margin-top:8px;page-break-inside:avoid;font-family:Arial,Helvetica,sans-serif;color:#0f172a">${rows
+    .map(tr)
+    .join('')}</table>`;
+}
+
+/** Bloco de assinaturas da escola do documento ('' quando não há escola ou nomes cadastrados). */
+export function schoolSignatureHtml(target?: LetterheadTarget): string {
+  return signatureBlocksHtml(schoolSigners(target));
 }
 
 /** "Augusta (Secretária Municipal de Educação)" → nome e cargo separados. */
@@ -162,12 +298,17 @@ function hasOwnSignature(html: string): boolean {
   return /assinatura|_{8,}|border-top:\s*1px solid[^"]*"[^>]*>\s*[^<]{3,}<\/div>\s*<div[^>]*>\s*(diretor|secret|coorden)/i.test(html);
 }
 
-export function issuerFooterHtml(includeSignature = true): string {
+export function issuerFooterHtml(includeSignature = true, target?: LetterheadTarget): string {
   const now = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   const issuer = state.issuerName
     ? `Emitido por <strong>${escapeHtml(state.issuerName)}</strong>${state.issuerRole ? ` (${escapeHtml(state.issuerRole)})` : ''} em ${escapeHtml(now)}`
     : `Emitido em ${escapeHtml(now)}`;
-  const sign = includeSignature && state.secretaryName
+  // Documento de uma escola: assina quem responde por ela (Coordenação, Secretaria Escolar ou
+  // Direção, conforme o módulo). Relatório da rede: assina o(a) titular da Secretaria de Educação.
+  const schoolSign = includeSignature ? schoolSignatureHtml(target) : '';
+  const sign = schoolSign
+    ? schoolSign
+    : includeSignature && state.secretaryName
     ? `<div style="margin:36px auto 0;width:300px;text-align:center;font-size:11px;line-height:1.3">
     <div style="border-top:1px solid #0f172a;padding-top:4px;font-weight:700">${escapeHtml(state.secretaryName)}</div>
     <div>${escapeHtml(state.secretaryRole)}</div>
@@ -391,7 +532,7 @@ export function letterheadHtml(target?: LetterheadTarget, opts?: { word?: boolea
 export function withLetterhead(contentHtml: string, target?: LetterheadTarget, opts?: { word?: boolean }): string {
   if (!contentHtml) return contentHtml;
   let out = contentHtml.includes(LETTERHEAD_MARK) ? contentHtml : letterheadHtml(target, opts) + contentHtml;
-  if (!out.includes(ISSUER_MARK)) out += issuerFooterHtml(!hasOwnSignature(contentHtml));
+  if (!out.includes(ISSUER_MARK)) out += issuerFooterHtml(!hasOwnSignature(contentHtml), target);
   return out;
 }
 
@@ -408,7 +549,7 @@ export function withLetterheadInDocument(html: string, target?: LetterheadTarget
   }
   if (!out.includes(ISSUER_MARK)) {
     const end = out.search(/<\/body>/i);
-    if (end >= 0) out = out.slice(0, end) + issuerFooterHtml(!hasOwnSignature(html)) + out.slice(end);
+    if (end >= 0) out = out.slice(0, end) + issuerFooterHtml(!hasOwnSignature(html), target) + out.slice(end);
   }
   return out;
 }
