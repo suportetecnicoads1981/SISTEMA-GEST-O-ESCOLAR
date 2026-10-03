@@ -733,6 +733,32 @@ export const HELP_MODULES: HelpModule[] = [
         a: 'Na situação "Pronto para entrega", se o telefone do solicitante estiver preenchido, aparece "Avisar pelo WhatsApp": abre o WhatsApp com a mensagem pronta para você conferir e enviar.',
       },
       {
+        q: 'Como corrijo (edito) um protocolo registrado errado?',
+        steps: [
+          'Na lista, clique no lápis da linha do protocolo (ou abra o protocolo e clique em "Editar").',
+          'Corrija o que estiver errado: aluno, documento, detalhes, solicitante, telefone, como chegou, previsão de entrega (e "Entregue a", se já foi entregue).',
+          'Escreva o motivo da correção (obrigatório quando o protocolo já foi entregue ou cancelado) e clique em "Salvar alterações".',
+        ],
+        a: 'O número do protocolo não muda. No histórico do protocolo fica "Dados corrigidos", com cada campo alterado (valor antigo riscado → valor novo), quem alterou e quando.',
+      },
+      {
+        q: 'Como excluo um protocolo? Ele some de vez?',
+        steps: [
+          'Na lista, clique na lixeira da linha do protocolo (ou abra o protocolo e clique em "Excluir").',
+          'Escreva o motivo (ex.: registrado em duplicidade) e confirme.',
+        ],
+        a: 'Não some: o protocolo sai da lista e dos contadores, mas fica guardado com quem excluiu, quando e o motivo. Para ver os excluídos, escolha "Excluídos" no filtro de situação; lá aparece o botão "Restaurar", que traz o protocolo de volta (e também fica registrado quem restaurou).',
+      },
+      {
+        q: 'Onde vejo quem fez cada movimentação, edição ou exclusão?',
+        steps: [
+          'No alto do módulo, clique em "Histórico de movimentações".',
+          'Filtre por tipo (abertura, movimentação, observação, edição, exclusão, restauração), por usuário, por período ou pela busca (nº do protocolo, aluno).',
+          'Clique numa linha para abrir o protocolo, ou em "Imprimir" para tirar o relatório (PDF, Word, Excel ou CSV).',
+        ],
+        a: 'O histórico do módulo junta tudo o que foi feito em todos os protocolos, com data e hora, quem fez e o que mudou. Ele não pode ser editado nem apagado. Cada protocolo também mostra o próprio histórico ao ser aberto.',
+      },
+      {
         q: 'Como encontro um protocolo pelo número?',
         a: 'Digite o número na busca, com ou sem traços (ex.: 2026-1003-4F7K ou 202610034F7K). A busca também acha pelo nome do aluno, RA, nome do responsável ou documento.',
       },
@@ -746,8 +772,8 @@ export const HELP_MODULES: HelpModule[] = [
         a: 'O relatório sai com os filtros aplicados, separado por escola, com o timbre e a assinatura de quem responde pela escola.',
       },
       {
-        q: 'Quem pode registrar e movimentar protocolos?',
-        a: 'Quem tem acesso a Documentos & Certificados ou a Secretaria & Alunos no cadastro de usuários (Usuários & Permissões). Para registrar é preciso o privilégio "Criar"; para movimentar, "Editar". Usuário lotado numa escola vê e registra só os protocolos da escola dele; a Sede vê a rede inteira.',
+        q: 'Quem pode registrar, movimentar, editar e excluir protocolos?',
+        a: 'Quem tem acesso a Documentos & Certificados ou a Secretaria & Alunos no cadastro de usuários (Usuários & Permissões). Para registrar é preciso o privilégio "Criar"; para movimentar e editar, "Editar"; para excluir e restaurar, "Excluir". Usuário lotado numa escola vê e registra só os protocolos da escola dele; a Sede vê a rede inteira.',
         tip: 'Também dá para abrir o módulo pelo botão "Protocolos & Solicitações" no alto de Documentos & Certificados.',
       },
     ],
