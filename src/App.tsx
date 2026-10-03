@@ -1038,6 +1038,17 @@ export default function App() {
     );
   };
 
+  /** Planilha de complementação: grava de uma vez os alunos completados pela escola. */
+  const handleBulkUpdateStudents = (updated: Student[]) => {
+    if (!updated.length) return;
+    const byId = new Map(updated.map((s) => [s.id, s]));
+    setData((prev) => ({
+      ...prev,
+      students: prev.students.map((s) => byId.get(s.id) || s),
+    }));
+    triggerPushNotification('📋 Cadastro completado', `${updated.length} aluno(s) atualizado(s) pela planilha de complementação.`);
+  };
+
   const handleDeleteStudent = (id: string) => {
     setData((prev) => ({
       ...prev,
@@ -2195,6 +2206,7 @@ export default function App() {
                 onSaveStudent={handleSaveStudent}
                 onDeleteStudent={canAccess(accessActor, 'secretaria', 'canDelete') ? handleDeleteStudent : undefined}
                 onBatchImportStudents={handleBatchImportStudents}
+                onBulkUpdateStudents={handleBulkUpdateStudents}
                 onIssueDocument={handleIssueDocument}
                 onBack={handleGoBack}
                 onNavigate={handleNavigate}

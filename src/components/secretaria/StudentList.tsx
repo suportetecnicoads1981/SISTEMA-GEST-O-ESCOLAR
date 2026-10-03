@@ -87,6 +87,7 @@ import {
   movementUsesOriginSchool,
   originText,
 } from '../../services/students/transfers';
+const ComplementSheetModal = React.lazy(() => import('./ComplementSheetModal'));
 interface StudentListProps {
   students: Student[];
   classes: SchoolClass[];
@@ -118,6 +119,8 @@ interface StudentListProps {
   currentUserName?: string;
   /** Alunos da rede inteira (para o filtro "enviados" achar quem saiu da escola). */
   allStudents?: Student[];
+  /** Grava vários alunos de uma vez (planilha de complementação). */
+  onBulkUpdateStudents?: (students: Student[]) => void;
 }
 
 export const StudentList: React.FC<StudentListProps> = ({
@@ -144,6 +147,7 @@ export const StudentList: React.FC<StudentListProps> = ({
   transferDestinationIds = null,
   currentUserName,
   allStudents,
+  onBulkUpdateStudents,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUnitFilter, setSelectedUnitFilter] = useState('ALL');
@@ -170,6 +174,7 @@ export const StudentList: React.FC<StudentListProps> = ({
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExcelImportModalOpen, setIsExcelImportModalOpen] = useState(false);
   const [isUniversalImportModalOpen, setIsUniversalImportModalOpen] = useState(false);
+  const [isComplementModalOpen, setIsComplementModalOpen] = useState(false);
   const [showPendingCensusDashbox, setShowPendingCensusDashbox] = useState(false);
   const [importText, setImportText] = useState('');
   const [importFeedback, setImportFeedback] = useState<string | null>(null);
@@ -1399,6 +1404,15 @@ export const StudentList: React.FC<StudentListProps> = ({
           >
             <FileSpreadsheet className="h-3.5 w-3.5 text-indigo-600" />
             <span>Importar Planilhas / Polos</span>
+          </button>
+          <button
+            id="btn-students-complement-sheet"
+            onClick={() => setIsComplementModalOpen(true)}
+            className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            title="Gerar a planilha para a escola completar (CPF, nascimento, endereço, responsável, laudo...) e importar de volta só o que foi preenchido"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+            <span>Planilha de complementação</span>
           </button>
           <button
             onClick={() => setShowPendingCensusDashbox((prev) => !prev)}
@@ -2975,6 +2989,25 @@ export const StudentList: React.FC<StudentListProps> = ({
           }
         }}
       />
+
+      {/* Planilha de complementação: gerar para a escola completar e importar de volta */}
+      {isComplementModalOpen && (
+        <React.Suspense fallback={null}>
+          <ComplementSheetModal
+            isOpen
+            onClose={() => setIsComplementModalOpen(false)}
+            students={students}
+            classes={classes}
+            schoolUnits={schoolUnits}
+            allStudents={allStudents && allStudents.length ? allStudents : students}
+            defaultSchoolId={selectedUnitFilter}
+            onApply={(updated) => {
+              if (onBulkUpdateStudents) onBulkUpdateStudents(updated);
+              else updated.forEach((st) => onSaveStudent(st));
+            }}
+          />
+        </React.Suspense>
+      )}
 
       {/* Universal Multi-Format Data Import Modal (Polos Remotos, .xlsx, .csv, .json, .xml, .ods) */}
       <UniversalDataImportModal

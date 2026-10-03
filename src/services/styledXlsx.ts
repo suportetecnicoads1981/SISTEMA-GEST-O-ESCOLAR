@@ -37,6 +37,11 @@ export interface StyledXlsxSection {
   columns?: StyledXlsxColumn[];
   /** Última linha em negrito (linha do total geral). */
   boldLastRow?: boolean;
+  /**
+   * Colunas para preencher (índices): células em formato texto (o Excel não troca CPF por número)
+   * e, quando vazias, pintadas de amarelo para a escola ver o que falta.
+   */
+  inputCols?: number[];
 }
 
 export interface StyledXlsxOptions {
@@ -88,6 +93,8 @@ const S = {
   note: 11,
   rule: 12,
   cellR: 13,
+  input: 14,
+  inputEmpty: 15,
 };
 
 const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -102,11 +109,12 @@ const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <font><i/><sz val="9"/><color rgb="FF475569"/><name val="Arial"/></font>
 <font><b/><sz val="12"/><name val="Arial"/></font>
 </fonts>
-<fills count="4">
+<fills count="5">
 <fill><patternFill patternType="none"/></fill>
 <fill><patternFill patternType="gray125"/></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FFE2E8F0"/><bgColor indexed="64"/></patternFill></fill>
 <fill><patternFill patternType="solid"><fgColor rgb="FF1E293B"/><bgColor indexed="64"/></patternFill></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FFFEF08A"/><bgColor indexed="64"/></patternFill></fill>
 </fills>
 <borders count="3">
 <border><left/><right/><top/><bottom/><diagonal/></border>
@@ -114,7 +122,7 @@ const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <border><left/><right/><top/><bottom style="medium"><color rgb="FF0F172A"/></bottom><diagonal/></border>
 </borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="14">
+<cellXfs count="16">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
 <xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
 <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
@@ -129,6 +137,8 @@ const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
 <xf numFmtId="0" fontId="0" fillId="0" borderId="2" xfId="0" applyBorder="1"/>
 <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="49" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="49" fontId="0" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>
 </cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;
@@ -218,6 +228,10 @@ function renderSheet(opts: StyledXlsxOptions): { sheet: string; images: SheetIma
       add(
         cols.map((c, i) => {
           const raw = r[i] ?? '';
+          if (sec.inputCols?.includes(i)) {
+            // Campo para preencher: sempre texto (CPF e telefone não viram número).
+            return { v: String(raw), s: String(raw).trim() ? S.input : S.inputEmpty };
+          }
           const s = bold ? S.total : c.align === 'center' ? S.cellC : c.align === 'right' ? S.cellR : S.cellL;
           return { v: isNum(raw) ? Number(raw) : String(raw), s };
         })
