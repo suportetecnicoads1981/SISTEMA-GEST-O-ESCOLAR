@@ -286,7 +286,7 @@ export const HELP_GENERAL: HelpModule = {
       steps: [
         'Para bloquear: clique no seu nome no alto da tela e em "Bloquear tela", ou use "Bloquear Tela" no menu lateral, ou aperte Ctrl+Shift+L.',
         'Para voltar: digite a sua senha e clique em Entrar. Abas e formulários abertos continuam como estavam.',
-        'Para trocar de usuário: clique no seu nome e em "Trocar usuário" (ou, com a tela bloqueada, apague o login e digite o do outro usuário). Ele entra com o login e a senha dele; as telas do usuário anterior são fechadas.',
+        'Para trocar de usuário: clique no seu nome e em "Trocar usuário", ou clique direto no nome do outro usuário na lista desse menu (ou, com a tela bloqueada, digite o login do outro usuário). Ele entra com a senha dele; as telas do usuário anterior são fechadas.',
         'Em "Bloquear sem uso após" (no mesmo menu do seu nome) escolha o tempo: 5, 10, 15, 30 minutos, 1 hora ou Nunca. O padrão é 15 minutos e vale para este computador.',
       ],
       a: 'Sem mexer no mouse ou no teclado pelo tempo escolhido, a tela é bloqueada sozinha e pede o login de novo. Recarregar a página (F5) não libera a tela bloqueada. O botão "Sair do Sistema" da tela bloqueada encerra a sessão. Bloqueios, desbloqueios e trocas de usuário ficam registrados na auditoria.',
@@ -981,7 +981,7 @@ export const HELP_MODULES: HelpModule[] = [
           'Desbloquear: o login já vem preenchido; digite a senha. O trabalho continua de onde parou.',
           'Trocar de usuário: "Trocar usuário" no menu do seu nome (ou, na tela bloqueada, digite outro login). O novo usuário entra com a senha dele e as telas do anterior são fechadas.',
         ],
-        a: 'A tela bloqueada cobre todo o sistema e confere a senha do mesmo jeito que a tela de login (nuvem, servidor da escola ou senha guardada neste computador). Cada bloqueio, desbloqueio e troca de usuário fica registrado em "Auditoria & Logs".',
+        a: 'A tela bloqueada cobre todo o sistema e confere a senha do mesmo jeito que a tela de login (nuvem, servidor da escola ou senha guardada neste computador). Toda troca de usuário pede a senha do usuário escolhido, inclusive pela lista do menu do nome e pelo botão "Simular" desta tela (desde 03/10/2026 nem o Master troca sem a senha). Cada bloqueio, desbloqueio e troca de usuário fica registrado em "Auditoria & Logs".',
         tip: 'Na troca de usuário, se o novo usuário entrar sem internet, a conexão da nuvem do usuário anterior é desconectada (a menos que o computador esteja marcado para "Manter conectado à nuvem").',
       },
       { q: 'Como mudo o que cada perfil pode ver?', a: 'Use "Gestão de Permissões (RBAC)" / "Matriz de Níveis de Acesso" e marque os módulos permitidos para cada perfil.' },
