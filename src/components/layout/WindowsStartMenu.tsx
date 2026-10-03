@@ -39,6 +39,7 @@ import {
   FileSpreadsheet,
   DownloadCloud,
   FileText,
+  FileClock,
 } from 'lucide-react';
 import { UserAccount } from '../../types';
 
@@ -126,6 +127,7 @@ export const WindowsStartMenu: React.FC<WindowsStartMenuProps> = ({
     { id: 'BNCC_SKILLS', name: moduleName('BNCC_SKILLS'), desc: 'Lançamento, Relatórios e Gráficos', icon: HelpCircle, color: 'bg-indigo-600', group: 'Pedagógico' },
     { id: 'QUESTION_BANK', name: moduleName('QUESTION_BANK'), desc: 'Habilidades e Itens Avaliativos', icon: HelpCircle, color: 'bg-teal-600', group: 'Pedagógico' },
     { id: 'DOCUMENTS', name: moduleName('DOCUMENTS'), desc: 'Históricos, Declarações e Diplomas', icon: Award, color: 'bg-rose-600', group: 'Secretaria' },
+    { id: 'PROTOCOLS', name: moduleName('PROTOCOLS'), desc: 'Pedidos de documentos com número de protocolo', icon: FileClock, color: 'bg-teal-600', group: 'Secretaria' },
     { id: 'DROPOUT_CENSUS', name: moduleName('DROPOUT_CENSUS'), desc: 'Busca Ativa e Infrequência', icon: UserX, color: 'bg-orange-600', group: 'Gestão' },
     { id: 'PEDAGOGICAL_DASHBOARD', name: moduleName('PEDAGOGICAL_DASHBOARD'), desc: 'Diagnósticos e Rendimento', icon: TrendingUp, color: 'bg-cyan-600', group: 'Gestão' },
     { id: 'MUNICIPAL_SYNC', name: moduleName('MUNICIPAL_SYNC'), desc: 'Sincronização e Censo Municipal', icon: Building2, color: 'bg-violet-600', group: 'Rede' },

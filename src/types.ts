@@ -2069,3 +2069,53 @@ export interface NexusInstallErrorLogRecord {
   firestoreSynced: boolean;
   details?: string;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Protocolos & Solicitações (pedidos de documentos com número de acompanhamento)
+// ---------------------------------------------------------------------------------------------
+
+/** Situação do protocolo. */
+export type ProtocolStatus = 'ABERTO' | 'EM_ANDAMENTO' | 'PRONTO' | 'ENTREGUE' | 'CANCELADO';
+
+/** Quem pediu o documento. */
+export type ProtocolRequesterRelation = 'RESPONSAVEL' | 'ALUNO' | 'PROFESSOR' | 'SERVIDOR' | 'OUTRO';
+
+/** Por onde o pedido chegou. */
+export type ProtocolChannel = 'BALCAO' | 'TELEFONE' | 'WHATSAPP' | 'EMAIL' | 'OUTRO';
+
+/** Cada movimentação do protocolo (abertura, mudança de situação ou observação). */
+export interface ProtocolHistoryEntry {
+  at: string;
+  status: ProtocolStatus;
+  userId: string;
+  userName: string;
+  note?: string;
+}
+
+/** Solicitação protocolada (ex.: declaração, histórico, boletim). */
+export interface ProtocolRequest {
+  id: string;
+  /** Número de acompanhamento informado ao solicitante (ex.: 2026-1003-4F7K). */
+  number: string;
+  schoolUnitId?: string;
+  studentId?: string;
+  studentName: string;
+  enrollmentNumber?: string;
+  className?: string;
+  requesterName: string;
+  requesterRelation: ProtocolRequesterRelation;
+  requesterPhone?: string;
+  documentType: string;
+  description?: string;
+  channel?: ProtocolChannel;
+  /** Data prevista para entrega (AAAA-MM-DD). */
+  dueDate?: string;
+  status: ProtocolStatus;
+  createdAt: string;
+  updatedAt: string;
+  createdByUserId: string;
+  createdByName: string;
+  deliveredTo?: string;
+  deliveredAt?: string;
+  history: ProtocolHistoryEntry[];
+}

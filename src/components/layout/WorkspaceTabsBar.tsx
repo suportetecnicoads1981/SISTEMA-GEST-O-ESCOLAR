@@ -31,6 +31,7 @@ import {
   GitBranch,
   Bell,
   Search,
+  FileClock,
 } from 'lucide-react';
 
 import { moduleName } from '../../config/moduleNames';
@@ -64,6 +65,7 @@ export const TAB_METADATA: Record<
   CLASSES: { label: moduleName('CLASSES'), shortLabel: moduleName('CLASSES'), icon: Layers, group: 'Secretaria' },
   DROPOUT_CENSUS: { label: moduleName('DROPOUT_CENSUS'), shortLabel: moduleName('DROPOUT_CENSUS'), icon: UserX, group: 'Secretaria' },
   DOCUMENTS: { label: moduleName('DOCUMENTS'), shortLabel: moduleName('DOCUMENTS'), icon: Award, group: 'Secretaria' },
+  PROTOCOLS: { label: moduleName('PROTOCOLS'), shortLabel: moduleName('PROTOCOLS'), icon: FileClock, group: 'Secretaria' },
   PEDAGOGICAL_DASHBOARD: { label: moduleName('PEDAGOGICAL_DASHBOARD'), shortLabel: moduleName('PEDAGOGICAL_DASHBOARD'), icon: TrendingUp, group: 'Pedagógico' },
   ASSESSMENT_REPORT: { label: moduleName('ASSESSMENT_REPORT'), shortLabel: moduleName('ASSESSMENT_REPORT'), icon: Award, group: 'Pedagógico' },
   BNCC_SKILLS: { label: moduleName('BNCC_SKILLS'), shortLabel: moduleName('BNCC_SKILLS'), icon: BookOpen, group: 'Pedagógico' },

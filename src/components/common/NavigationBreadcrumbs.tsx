@@ -41,6 +41,7 @@ const TAB_LABELS: Record<string, { label: string; group: string }> = {
   CLASSES: { label: moduleName('CLASSES'), group: moduleGroup('CLASSES') },
   DROPOUT_CENSUS: { label: moduleName('DROPOUT_CENSUS'), group: moduleGroup('DROPOUT_CENSUS') },
   DOCUMENTS: { label: moduleName('DOCUMENTS'), group: moduleGroup('DOCUMENTS') },
+  PROTOCOLS: { label: moduleName('PROTOCOLS'), group: moduleGroup('PROTOCOLS') },
   PEDAGOGICAL_DASHBOARD: { label: moduleName('PEDAGOGICAL_DASHBOARD'), group: moduleGroup('PEDAGOGICAL_DASHBOARD') },
   ASSESSMENT_REPORT: { label: moduleName('ASSESSMENT_REPORT'), group: moduleGroup('ASSESSMENT_REPORT') },
   BNCC_SKILLS: { label: moduleName('BNCC_SKILLS'), group: moduleGroup('BNCC_SKILLS') },

@@ -53,6 +53,7 @@ import {
   Pin,
   PinOff,
   BookOpenCheck,
+  FileClock,
 } from 'lucide-react';
 
 import { moduleName } from '../../config/moduleNames';
@@ -73,6 +74,8 @@ interface SidebarProps {
     unreadMessages?: number;
     schoolUnits?: number;
     userAccounts?: number;
+    /** Protocolos ainda não entregues nem cancelados. */
+    openProtocols?: number;
   };
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
@@ -295,6 +298,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'CLASSES', label: moduleName('CLASSES'), icon: Layers, shortcut: 'Alt+T' },
         { id: 'DROPOUT_CENSUS', label: moduleName('DROPOUT_CENSUS'), icon: UserX, badge: 'Censo', shortcut: 'Alt+C' },
         { id: 'DOCUMENTS', label: moduleName('DOCUMENTS'), icon: Award, badge: 'Oficial', shortcut: 'Alt+O' },
+        { id: 'PROTOCOLS', label: moduleName('PROTOCOLS'), icon: FileClock, count: counts?.openProtocols, shortcut: 'Alt+L' },
       ],
     },
     {

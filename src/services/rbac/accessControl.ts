@@ -77,6 +77,7 @@ const TAB_MODULE: Record<string, SystemModuleKey | 'MASTER' | null> = {
   DROPOUT_CENSUS: 'secretaria',
   CLASSES: 'turmas',
   DOCUMENTS: 'documentos',
+  PROTOCOLS: 'documentos',
   PEDAGOGICAL_DASHBOARD: 'relatorios',
   ASSESSMENT_REPORT: 'relatorios',
   BNCC_SKILLS: 'relatorios',
@@ -142,6 +143,7 @@ export const ACCESS_RULES: Record<string, Rule> = {
   classGradeSheets: { keys: ['diarioClasse', 'portalProfessor'], label: 'notas' },
   teacherLessonPlans: { keys: ['portalProfessor', 'diarioClasse'], label: 'planos de aula' },
   teacherStudentNotes: { keys: ['portalProfessor', 'diarioClasse'], label: 'anotações do professor' },
+  protocols: { keys: ['documentos', 'secretaria'], label: 'protocolos de solicitação' },
   communications: {
     keys: ['comunicacao'],
     label: 'comunicados',

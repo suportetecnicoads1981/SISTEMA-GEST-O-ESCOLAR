@@ -680,6 +680,66 @@ export const HELP_MODULES: HelpModule[] = [
     ],
   },
   {
+    id: 'PROTOCOLS',
+    title: moduleName('PROTOCOLS'),
+    where: `Menu > ${moduleGroup('PROTOCOLS')} > ${moduleName('PROTOCOLS')} (Alt+L)`,
+    summary: 'Pedidos de documentos (declaração, histórico, boletim...) registrados com número de protocolo, situação, prazo e histórico de movimentação.',
+    faq: [
+      {
+        q: 'Como registro um pedido de documento?',
+        steps: [
+          'Clique em "Novo Protocolo".',
+          'Digite o nome ou o RA do aluno e escolha na lista (a escola e a turma vêm do cadastro).',
+          'Escolha o documento solicitado e, se precisar, descreva o pedido em "Detalhes".',
+          'Em "Quem está pedindo", escolha Pai, mãe ou responsável (o nome e o telefone do responsável vêm do cadastro do aluno), O próprio aluno, Professor(a), Servidor(a) ou Outro.',
+          'Confira a previsão de entrega (padrão: 5 dias) e clique em "Registrar e gerar protocolo".',
+          'Informe o número ao solicitante e, se quiser, clique em "Imprimir comprovante".',
+        ],
+        tip: 'O número tem a data do pedido e um código (ex.: 2026-1003-4F7K). Não usa letras que se confundem (O, I, L) nem os números 0 e 1, para facilitar ditar por telefone.',
+      },
+      {
+        q: 'Quais são as situações do protocolo?',
+        steps: [
+          'Aberto: pedido registrado.',
+          'Em andamento: a secretaria está preparando o documento.',
+          'Pronto para entrega: o documento está pronto; dá para avisar o responsável pelo WhatsApp.',
+          'Entregue: informe a quem foi entregue. Encerra o protocolo.',
+          'Cancelado: informe o motivo. Encerra o protocolo.',
+        ],
+        a: 'Cada mudança fica no histórico do protocolo, com data, hora e o usuário que mudou. Depois de Entregue ou Cancelado, só é possível acrescentar observações.',
+        tip: 'Protocolo que passou da previsão de entrega sem ser entregue aparece como "Atrasado".',
+      },
+      {
+        q: 'Como movimento um protocolo?',
+        steps: [
+          'Clique no protocolo na lista (ou em "Movimentar").',
+          'Em "Movimentar protocolo", escolha a nova situação.',
+          'Escreva uma observação se quiser (no cancelamento o motivo é obrigatório; na entrega, o nome de quem retirou).',
+          'Clique em "Salvar movimentação".',
+        ],
+        a: 'Na situação "Pronto para entrega", se o telefone do solicitante estiver preenchido, aparece "Avisar pelo WhatsApp": abre o WhatsApp com a mensagem pronta para você conferir e enviar.',
+      },
+      {
+        q: 'Como encontro um protocolo pelo número?',
+        a: 'Digite o número na busca, com ou sem traços (ex.: 2026-1003-4F7K ou 202610034F7K). A busca também acha pelo nome do aluno, RA, nome do responsável ou documento.',
+      },
+      {
+        q: 'Como tiro o relatório dos protocolos?',
+        steps: [
+          'Use os filtros: situação (ou clique num dos cartões do alto), escola, documento, usuário que registrou, período e a busca (aluno ou responsável).',
+          'Clique em "Relatório".',
+          'Escolha as colunas e imprima, salve em PDF ou exporte para Excel, Word ou CSV.',
+        ],
+        a: 'O relatório sai com os filtros aplicados, separado por escola, com o timbre e a assinatura de quem responde pela escola.',
+      },
+      {
+        q: 'Quem pode registrar e movimentar protocolos?',
+        a: 'Quem tem acesso a Documentos & Certificados ou a Secretaria & Alunos no cadastro de usuários (Usuários & Permissões). Para registrar é preciso o privilégio "Criar"; para movimentar, "Editar". Usuário lotado numa escola vê e registra só os protocolos da escola dele; a Sede vê a rede inteira.',
+        tip: 'Também dá para abrir o módulo pelo botão "Protocolos & Solicitações" no alto de Documentos & Certificados.',
+      },
+    ],
+  },
+  {
     id: 'PEDAGOGICAL_DASHBOARD',
     title: moduleName('PEDAGOGICAL_DASHBOARD'),
     where: `Menu > ${moduleGroup('PEDAGOGICAL_DASHBOARD')} > ${moduleName('PEDAGOGICAL_DASHBOARD')} (Alt+R)`,
@@ -860,7 +920,7 @@ export const HELP_MODULES: HelpModule[] = [
         q: 'Quem assina os relatórios da escola?',
         steps: [
           'Módulos pedagógicos (Portal do Professor, Diário & Frequência, Evolução Pedagógica, Habilidades BNCC, Resultados Nível & Escola, Elaboração de Provas e Banco de Questões BNCC): o(a) Coordenador(a) Pedagógico(a). Com dois coordenadores, sai uma linha para cada um.',
-          'Secretaria (Visão Geral / Dashbox, Secretaria & Alunos, Turmas & Matrizes, Censo de Evasão & Busca Ativa e Documentos & Certificados): o(a) Secretário(a) Escolar e o(a) Diretor(a).',
+          'Secretaria (Visão Geral / Dashbox, Secretaria & Alunos, Turmas & Matrizes, Censo de Evasão & Busca Ativa, Documentos & Certificados e Protocolos & Solicitações): o(a) Secretário(a) Escolar e o(a) Diretor(a).',
           'Comunicação (comunicados e WhatsApp): o(a) Diretor(a).',
           'Relatório da rede inteira (sem uma escola escolhida): o(a) titular da Secretaria de Educação, como antes.',
         ],

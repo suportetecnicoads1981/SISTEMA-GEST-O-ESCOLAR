@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Users,
   Layers,
+  FileClock,
 } from 'lucide-react';
 import {
   Student,
@@ -212,6 +213,14 @@ export const DocumentIssuer: React.FC<DocumentIssuerProps> = ({
           >
             <Users className="h-3.5 w-3.5 text-slate-500" />
             <span>Voltar para Alunos</span>
+          </button>
+          <button
+            onClick={() => onNavigate?.('PROTOCOLS')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-bold transition-all cursor-pointer"
+            title="Registrar ou acompanhar pedidos de documentos com número de protocolo"
+          >
+            <FileClock className="h-3.5 w-3.5" />
+            <span>{moduleName('PROTOCOLS')}</span>
           </button>
           <div className="hidden md:flex items-center gap-1 text-xs text-slate-400 ml-2">
             <span>Início</span>

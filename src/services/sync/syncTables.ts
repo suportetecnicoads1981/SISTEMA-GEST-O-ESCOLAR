@@ -357,7 +357,7 @@ export const SYNC_TABLES: SyncTable[] = [
     }),
   },
   // Coleções sem tabela própria (app_records).
-  ...(['teacherLessonPlans', 'teacherStudentNotes', 'stateRegulations', 'whatsappTemplates'] as const).map(
+  ...(['teacherLessonPlans', 'teacherStudentNotes', 'stateRegulations', 'whatsappTemplates', 'protocols'] as const).map(
     (key): SyncTable => ({ stream: `${APP_TABLE}:${key}`, table: APP_TABLE, key, kind: 'appList' })
   ),
   ...(['municipalSecretary', 'whatsappConfig', 'rolePreferences', 'activeStateRegulationCode', 'developerContact', 'dropoutAlertConfig'] as const).map(

@@ -24,6 +24,7 @@ export const SCHOOL_SCOPED_COLLECTIONS = [
   'bnccAssessments',
   'teacherLessonPlans',
   'teacherStudentNotes',
+  'protocols',
 ] as const;
 
 export type ScopedCollection = (typeof SCHOOL_SCOPED_COLLECTIONS)[number];

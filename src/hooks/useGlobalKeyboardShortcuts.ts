@@ -90,6 +90,15 @@ const ALL_SYSTEM_SHORTCUTS: ShortcutDefinition[] = [
     description: 'Emissão de declarações, certidões e históricos escolares.',
   },
   {
+    id: 'protocolos',
+    key: 'l',
+    displayKey: 'Alt + L',
+    label: moduleName('PROTOCOLS'),
+    tabId: 'PROTOCOLS',
+    category: 'PEDAGOGICO',
+    description: 'Pedidos de documentos com número de protocolo e acompanhamento.',
+  },
+  {
     id: 'sala_aluno',
     key: 'f',
     displayKey: 'Alt + F',
