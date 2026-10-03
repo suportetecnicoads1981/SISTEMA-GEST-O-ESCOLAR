@@ -251,7 +251,7 @@ describe('Sincronização v2 (motor único com trava de versão)', () => {
     computers.A.state.students = [];
     const st = await run('A');
     expect(tbl('students').size).toBe(30);
-    expect(st.message || '').toMatch(/apagamento em massa/);
+    expect(st.message || '').toMatch(/apagamento acidental/);
   });
 
   it('senha e marca de Master continuam só no computador', async () => {
@@ -302,5 +302,28 @@ describe('Sincronização v2 (motor único com trava de versão)', () => {
     expect(st.message || '').toMatch(/reiniciou a base/);
     await run('A');
     expect(backups).toBe(1); // marco aplicado uma vez só
+  });
+});
+
+import { deletionBlockReason } from '../src/services/sync/cloudSync';
+
+describe('proteção contra exclusão acidental (incidente de 02/10: 16 escolas apagadas pela Sede)', () => {
+  it('bloqueia as 16 escolas apagadas de uma vez (antes passava por serem menos de 20)', () => {
+    expect(deletionBlockReason('school_units', 16, 16)).not.toBeNull();
+  });
+  it('bloqueia qualquer exclusão logo após receber a base da nuvem', () => {
+    expect(deletionBlockReason('students', 1, 2659, true)).not.toBeNull();
+  });
+  it('bloqueia todos os registros de uma tabela, mesmo poucos', () => {
+    expect(deletionBlockReason('school_classes', 3, 3)).not.toBeNull();
+  });
+  it('bloqueia mais de uma escola ou usuário por rodada', () => {
+    expect(deletionBlockReason('school_units', 2, 16)).not.toBeNull();
+    expect(deletionBlockReason('user_accounts', 2, 10)).not.toBeNull();
+  });
+  it('permite a exclusão normal do dia a dia', () => {
+    expect(deletionBlockReason('school_units', 1, 16)).toBeNull();
+    expect(deletionBlockReason('students', 5, 2659)).toBeNull();
+    expect(deletionBlockReason('students', 0, 2659)).toBeNull();
   });
 });

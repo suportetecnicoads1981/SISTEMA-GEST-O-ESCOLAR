@@ -57,6 +57,16 @@ export const HELP_GENERAL: HelpModule = {
         tip: 'Um registro recusado nunca chega à nuvem nem apaga nada lá: fica só neste computador até ser corrigido ou excluído.',
       },
       {
+      q: 'Apareceu "exclusão(ões) não foram enviadas à nuvem (proteção contra apagamento acidental)". O que significa?',
+        a: 'Este computador tentou apagar na nuvem registros que sumiram só nele, e o sistema barrou. Isso acontece quando a cópia deste computador está incompleta (por exemplo, logo depois de receber a base da nuvem ou com o armazenamento do navegador cheio). A proteção barra: qualquer exclusão logo após receber a base; todos os registros de uma tabela de uma vez; muitos registros de uma vez; e mais de uma escola ou de um usuário na mesma rodada. Os registros continuam na nuvem e voltam a este computador na próxima sincronização.',
+        steps: [
+          'Não faça nada às pressas: os dados estão seguros na nuvem.',
+          'Aguarde 1 minuto (ou clique em "Sincronizar agora") e confira se os registros voltaram.',
+          'Se a exclusão foi intencional (por exemplo, apagar duas escolas), apague uma por vez ou peça ao suporte.',
+        ],
+        tip: 'Esta proteção foi criada depois de 02/10/2026, quando um computador com a cópia incompleta apagou as 16 escolas da nuvem (todas foram recuperadas). A própria nuvem também recusa apagar mais de uma escola por vez.',
+      },
+      {
       q: 'O que é o botão "Nuvem" no alto da tela?',
         a: 'Mostra a situação da sincronização: verde = em dia; azul girando = sincronizando; âmbar = há alterações aguardando envio ou avisos; vermelho = erro (tenta de novo sozinho). Clique para ver a hora da última sincronização, quantos registros aguardam envio, os recusados e os avisos recentes, e para "Sincronizar agora".',
         tip: 'O administrador também vê "Conferência completa": compara todos os registros deste computador com a nuvem. Onde houver diferença, fica a da nuvem; o que só existe aqui é enviado. Use só se o suporte pedir.',

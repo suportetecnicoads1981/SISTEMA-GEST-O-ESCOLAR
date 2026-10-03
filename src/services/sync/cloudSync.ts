@@ -55,6 +55,25 @@ const CHUNK = 100;
 const TICK_MS = 60_000;
 const MASS_DELETE_MIN = 20;
 const MASS_DELETE_RATIO = 0.5;
+/** Tabelas em que nunca se apaga mais de um registro por rodada (cadastros-base da rede). */
+const GUARDED_TABLES = new Set(['school_units', 'user_accounts']);
+
+/**
+ * Proteção contra exclusão acidental (pura, testável). Devolve o motivo do bloqueio ou null.
+ * - Rodada logo após reinício ou primeira sincronização: nada foi excluído pelo usuário,
+ *   então um registro "sumido" aqui é falha local (cópia incompleta, armazenamento cheio).
+ * - Todos os registros conhecidos de uma tabela sumiram (a partir de 2).
+ * - Muitos de uma vez (a partir de MASS_DELETE_MIN e metade da tabela).
+ * - Escolas e usuários: mais de um por rodada.
+ */
+export function deletionBlockReason(table: string, removed: number, known: number, justReset = false): string | null {
+  if (removed <= 0) return null;
+  if (justReset) return 'logo após receber a base da nuvem';
+  if (known >= 2 && removed >= known) return 'todos os registros de uma vez';
+  if (removed >= MASS_DELETE_MIN && removed / Math.max(1, known) >= MASS_DELETE_RATIO) return 'muitos registros de uma vez';
+  if (GUARDED_TABLES.has(table) && removed > 1) return 'mais de um cadastro-base de uma vez';
+  return null;
+}
 
 export interface SyncNotice {
   at: string;
@@ -288,6 +307,8 @@ interface RunContext {
   pushed: number;
   pulled: number;
   warnings: string[];
+  /** Rodada de reinício/primeira sincronização: exclusões não são enviadas. */
+  noDeletes?: boolean;
 }
 
 const labelOf = (rec: any, id: string) =>
@@ -354,10 +375,15 @@ async function pushStream(ctx: RunContext, t: SyncTable) {
   const removed = Object.keys(sm.rows).filter((id) => !local.has(id));
   if (removed.length) {
     const known = Object.keys(sm.rows).length;
-    if (removed.length >= MASS_DELETE_MIN && removed.length / Math.max(1, known) >= MASS_DELETE_RATIO) {
+    const blocked = deletionBlockReason(t.table, removed.length, known, !!ctx.noDeletes);
+    if (blocked) {
+      console.warn(`[Sincronização] ${removed.length} exclusão(ões) em ${t.table} não enviada(s): ${blocked}.`);
       ctx.warnings.push(
-        `${removed.length} exclusões em ${TABLE_LABEL[t.table] || t.table} não foram enviadas (proteção contra apagamento em massa). Use "Conferência completa" para recuperar os registros ou peça ao suporte a limpeza.`
+        `${removed.length} exclusão(ões) em ${TABLE_LABEL[t.table] || t.table} não foram enviadas à nuvem (proteção contra apagamento acidental: ${blocked}). Os registros continuam na nuvem e voltam a este computador na próxima sincronização. Se a exclusão foi intencional, peça ao suporte.`
       );
+      // Esquece as versões desses registros aqui: a próxima rodada os recebe de volta da nuvem.
+      removed.forEach((id) => delete sm.rows[id]);
+      sm.cursor = undefined;
     } else if (!ctx.isAdmin) {
       ctx.warnings.push(`${removed.length} exclusão(ões) aguardando uma conta de administrador para ir à nuvem.`);
     } else {
@@ -652,6 +678,8 @@ async function runOnce(): Promise<CloudSyncStatus> {
     // 1) Envia o que mudou aqui. 2) Recebe o que mudou na nuvem. 3) Exclusões.
     // Na primeira vez o envio é pulado; o que só existe aqui sobe logo depois do recebimento.
     const firstTime = SYNC_TABLES.some((t) => !ctx.meta.streams[t.stream]?.pulled);
+    // Reinício da base ou primeira sincronização: nenhuma exclusão sai deste computador nesta rodada.
+    ctx.noDeletes = firstTime || !!epoch.reset;
     for (const t of SYNC_TABLES) await pushStream(ctx, t);
     for (const t of SYNC_TABLES) await pullStream(ctx, t);
     await pullDeletions(ctx);
