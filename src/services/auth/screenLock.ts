@@ -45,6 +45,9 @@ export interface LockState {
   at: string;
   /** Motivo do bloqueio. */
   reason: 'inatividade' | 'botao' | 'troca';
+  /** Troca para um usuário escolhido na lista: login dele já preenchido (a senha é sempre pedida). */
+  targetLogin?: string;
+  targetName?: string;
 }
 
 export function readLockState(): LockState | null {

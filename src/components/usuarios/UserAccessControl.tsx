@@ -1026,7 +1026,7 @@ export const UserAccessControl: React.FC<UserAccessControlProps> = ({
                               {canManageUsers && (<>
                               <button
                                 onClick={() => onSwitchCurrentUser(user)}
-                                title="Alternar sessão para este usuário"
+                                title="Entrar como este usuário (pede a senha dele)"
                                 className="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 transition-colors cursor-pointer text-xs font-bold inline-flex items-center gap-1 shadow-2xs"
                               >
                                 <RefreshCw className="h-3.5 w-3.5" />

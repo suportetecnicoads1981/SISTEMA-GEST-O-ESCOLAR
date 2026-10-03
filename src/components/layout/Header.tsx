@@ -375,7 +375,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-50 animate-in fade-in zoom-in-95">
               <div className="p-2 border-b border-slate-100 text-xs">
                 <span className="font-bold text-slate-900 block">Operador Atual</span>
-                <span className="text-[10px] text-slate-400">Selecione para alternar permissões</span>
+                <span className="text-[10px] text-slate-400">Clique em outro usuário para trocar (pede a senha dele)</span>
               </div>
               <div className="max-h-60 overflow-y-auto space-y-1 py-1">
                 {userAccounts.map((u) => (

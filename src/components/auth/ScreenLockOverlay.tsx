@@ -60,7 +60,12 @@ export const ScreenLockOverlay: React.FC<ScreenLockOverlayProps> = ({
         <span>{isSwitch ? 'Troca de usuário' : 'Tela bloqueada'}</span>
         {at && <span className="ml-auto font-mono text-[10px] text-amber-300/80">{at}</span>}
       </div>
-      {isSwitch ? (
+      {isSwitch && lock.targetName ? (
+        <p className="text-amber-100/90 leading-relaxed">
+          Para entrar como <strong>{formatPersonName(lock.targetName) || lock.targetName}</strong>, digite a senha desse usuário.
+          {name ? <> As telas abertas por <strong>{name}</strong> serão fechadas.</> : null}
+        </p>
+      ) : isSwitch ? (
         <p className="text-amber-100/90 leading-relaxed">
           Entre com o login e a senha do usuário que vai usar o sistema agora.
           {name ? <> As telas abertas por <strong>{name}</strong> serão fechadas.</> : null}
@@ -97,7 +102,7 @@ export const ScreenLockOverlay: React.FC<ScreenLockOverlayProps> = ({
         companyLogoUrl={companyLogoUrl}
         onPasswordUpdate={onPasswordUpdate}
         onLoginSuccess={onUnlock}
-        initialUsername={isSwitch ? '' : lockedUser?.login || lockedUser?.email || ''}
+        initialUsername={isSwitch ? lock.targetLogin || '' : lockedUser?.login || lockedUser?.email || ''}
         topNotice={notice}
         onExit={onLogout}
         exitLabel="Sair do Sistema"

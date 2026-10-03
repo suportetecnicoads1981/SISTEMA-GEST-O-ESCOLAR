@@ -415,18 +415,16 @@ export default function App() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [riskNotifKey, isAuthenticated]);
-  // Somente o Administrador Master autenticado pode operar como outro usuário.
-  const canSwitchOperator = Boolean(authenticatedAccount?.isMaster);
-
+  // Troca de usuário (lista do menu do nome, "Simular" em Usuários & Permissões, troca de perfil):
+  // sempre pela tela bloqueada, com a SENHA do usuário escolhido. Antes, o Master trocava sem senha.
   const switchOperatorIfAllowed = (target: UserAccount): boolean => {
-    if (target.id === authenticatedUserId || canSwitchOperator) {
-      setCurrentUser(target);
-      return true;
+    if (!target) return false;
+    if (target.id === currentUser?.id) return true;
+    if (target.active === false) {
+      triggerPushNotification('🔒 Usuário inativo', `${target.name} está inativo no cadastro de usuários.`);
+      return false;
     }
-    triggerPushNotification(
-      '🔒 Troca de operador bloqueada',
-      'Somente o Administrador Master pode operar como outro usuário. Encerre a sessão e entre com a conta desejada.'
-    );
+    lockScreen('troca', target);
     return false;
   };
 
@@ -848,10 +846,15 @@ export default function App() {
 
   // ---- Bloqueio de tela ----
   const lockScreen = useCallback(
-    (reason: LockState['reason']) => {
+    (reason: LockState['reason'], target?: UserAccount) => {
       if (!isAuthenticated) return;
       const userId = String(currentUser?.id || authenticatedUserId || '');
-      const state: LockState = { userId, at: new Date().toISOString(), reason };
+      const state: LockState = {
+        userId,
+        at: new Date().toISOString(),
+        reason,
+        ...(target ? { targetLogin: target.login || target.email || '', targetName: target.name || '' } : {}),
+      };
       storeLockState(state);
       setScreenLock(state);
       setIsStartMenuOpen(false);
@@ -865,7 +868,7 @@ export default function App() {
           reason === 'inatividade'
             ? 'Tela bloqueada automaticamente por falta de uso.'
             : reason === 'troca'
-              ? 'Tela bloqueada para troca de usuário.'
+              ? `Tela bloqueada para troca de usuário${target ? ` (para: ${target.name})` : ''}.`
               : 'Tela bloqueada pelo usuário.'
         );
       } catch {
