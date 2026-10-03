@@ -702,13 +702,19 @@ export const HELP_MODULES: HelpModule[] = [
         q: 'Como registro um pedido de documento?',
         steps: [
           'Clique em "Novo Protocolo".',
-          'Digite o nome ou o RA do aluno e escolha na lista (a escola e a turma vêm do cadastro).',
+          'Em "Escola para onde o protocolo vai", escolha a escola que vai preparar o documento (usuário lotado numa escola já vem com a dele).',
+          'Digite o nome ou o RA do aluno e escolha na lista (a busca mostra os alunos da escola escolhida; a turma vem do cadastro).',
           'Escolha o documento solicitado e, se precisar, descreva o pedido em "Detalhes".',
           'Em "Quem está pedindo", escolha Pai, mãe ou responsável (o nome e o telefone do responsável vêm do cadastro do aluno), O próprio aluno, Professor(a), Servidor(a) ou Outro.',
           'Confira a previsão de entrega (padrão: 5 dias) e clique em "Registrar e gerar protocolo".',
           'Informe o número ao solicitante e, se quiser, clique em "Imprimir comprovante".',
         ],
         tip: 'O número tem a data do pedido e um código (ex.: 2026-1003-4F7K). Não usa letras que se confundem (O, I, L) nem os números 0 e 1, para facilitar ditar por telefone.',
+      },
+      {
+        q: 'Posso direcionar o protocolo para uma escola diferente da escola do aluno?',
+        a: 'Sim. A escola escolhida em "Escola para onde o protocolo vai" é a que recebe o pedido: o protocolo aparece na lista dela, sai no comprovante e no relatório dela. Exemplo: aluno transferido que pede o histórico da escola antiga. Para achar esse aluno, marque "Procurar o aluno em todas as escolas"; o sistema avisa quando a escola do aluno é diferente da escola do protocolo.',
+        tip: 'Se escolher o aluno antes da escola, o protocolo vai para a escola do aluno. Para trocar depois, use "Editar": a troca de escola fica no histórico, com o nome da escola antiga e da nova e quem trocou.',
       },
       {
         q: 'Quais são as situações do protocolo?',

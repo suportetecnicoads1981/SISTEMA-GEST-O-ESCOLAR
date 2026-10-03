@@ -135,6 +135,7 @@ export interface NewProtocolInput {
 
 /** Problema no preenchimento ('' quando está tudo certo). */
 export function protocolInputProblem(input: Partial<NewProtocolInput>): string {
+  if (!String(input.schoolUnitId || '').trim()) return 'Escolha a escola para onde o protocolo será direcionado.';
   if (!String(input.studentName || '').trim()) return 'Escolha o aluno a que o documento se refere.';
   if (!String(input.requesterName || '').trim()) return 'Informe o nome de quem está pedindo o documento.';
   if (!String(input.documentType || '').trim()) return 'Escolha o documento solicitado.';
@@ -260,6 +261,7 @@ export interface ProtocolEditInput {
 }
 
 const EDIT_FIELDS: { field: keyof ProtocolEditInput; label: string; show?: (v: any) => string }[] = [
+  { field: 'schoolUnitId', label: 'Escola' },
   { field: 'studentName', label: 'Aluno(a)' },
   { field: 'enrollmentNumber', label: 'RA' },
   { field: 'className', label: 'Turma' },
@@ -276,14 +278,14 @@ const EDIT_FIELDS: { field: keyof ProtocolEditInput; label: string; show?: (v: a
 const clean = (v: unknown) => String(v ?? '').trim();
 
 /** O que muda entre o protocolo e a edição (lista vazia = nada mudou). */
-export function protocolChanges(p: ProtocolRequest, input: ProtocolEditInput): ProtocolFieldChange[] {
+export function protocolChanges(p: ProtocolRequest, input: ProtocolEditInput, schoolName?: (id: string) => string): ProtocolFieldChange[] {
   const out: ProtocolFieldChange[] = [];
   for (const f of EDIT_FIELDS) {
     if (f.field === 'deliveredTo' && p.status !== 'ENTREGUE') continue;
     const before = clean((p as any)[f.field]);
     const after = clean(input[f.field]);
     if (before === after) continue;
-    const show = f.show || ((v: any) => clean(v));
+    const show = f.field === 'schoolUnitId' ? (v: any) => (v ? (schoolName && schoolName(v)) || v : '') : f.show || ((v: any) => clean(v));
     out.push({ field: String(f.field), label: f.label, from: show(before), to: show(after) });
   }
   return out;
@@ -302,10 +304,17 @@ export function editProblem(p: ProtocolRequest, input: ProtocolEditInput, reason
 }
 
 /** Grava a edição e registra no histórico cada campo alterado (antes → depois) e quem alterou. */
-export function editProtocol(p: ProtocolRequest, input: ProtocolEditInput, actor: ProtocolActor, reason?: string, now = new Date()): ProtocolRequest {
+export function editProtocol(
+  p: ProtocolRequest,
+  input: ProtocolEditInput,
+  actor: ProtocolActor,
+  reason?: string,
+  now = new Date(),
+  schoolName?: (id: string) => string
+): ProtocolRequest {
   const problem = editProblem(p, input, reason);
   if (problem) throw new Error(problem);
-  const changes = protocolChanges(p, input);
+  const changes = protocolChanges(p, input, schoolName);
   const at = now.toISOString();
   const opt = (v?: string) => clean(v) || undefined;
   return {
