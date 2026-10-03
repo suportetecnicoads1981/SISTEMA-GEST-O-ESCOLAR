@@ -21,7 +21,7 @@ import {
   FileDown,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { letterheadHtml, issuerFooterHtml, preloadLogos, dedupeImagesForPrint, schoolSignatureHtml } from '../../services/documentBranding';
+import { letterheadHtml, issuerFooterHtml, preloadLogos, dedupeImagesForPrint, schoolSignatureHtml, schoolSigners } from '../../services/documentBranding';
 import { downloadStyledXlsx } from '../../services/styledXlsx';
 import { printFileName, setPrintTitle } from '../../utils/printIsolated';
 import { SchoolSettings } from '../../types';
@@ -268,8 +268,10 @@ ${filtersLine ? `<p class="meta">Filtros aplicados: ${filtersLine}</p>` : ''}
 ${groupSummary ? `<p class="meta"><b>${h(groupSummary(g.rows))}</b></p>` : ''}
 <p class="meta"><b>${h(countLabel)}:</b> ${g.rows.length} • Emitido em ${h(now)}</p>
 ${
-  // Escola do grupo com corpo diretivo cadastrado: assinatura de quem responde por ela.
-  schoolSignatureHtml({ schoolUnitId: g.schoolUnitId, classId: g.classId }) ||
+  !showSignatures
+    ? ''
+    : // Escola do grupo com corpo diretivo cadastrado: assinatura de quem responde por ela.
+      schoolSignatureHtml({ schoolUnitId: g.schoolUnitId, classId: g.classId }) ||
   '<table class="conf"><tr><td>Conferido por: ________________________________________</td><td>Data: ____/____/________</td><td>Assinatura: ______________________________</td></tr></table>'
 }
 </${word ? 'div' : 'section'}>`;
@@ -408,6 +410,25 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
   const exportRows = () => data.map((item, idx) => activeColumns.map((c) => cellText(item, c.id, idx)));
 
   const [exporting, setExporting] = useState<'' | 'xlsx' | 'word'>('');
+
+  /**
+   * Timbre da pré-visualização: relatório de uma escola só (ex.: filtro "Escola") mostra o
+   * nome e a logo dela, como na impressão. Antes a prévia saía sempre só com Gestão e SEMED.
+   */
+  const previewLetterhead = useMemo(() => {
+    if (!groupBy || !data.length) return {};
+    const ids = new Set<string>();
+    let classId: string | undefined;
+    for (const it of data) {
+      const g = groupBy(it) as any;
+      ids.add(String(g?.schoolUnitId || ''));
+      if (!classId && g?.classId) classId = g.classId;
+      if (ids.size > 1) return {};
+    }
+    const only = Array.from(ids)[0];
+    return only ? { schoolUnitId: only, classId } : classId ? { classId } : {};
+  }, [groupBy, data]);
+  const previewSigners = useMemo(() => schoolSigners(previewLetterhead), [previewLetterhead]);
 
   /** Excel formatado: timbre com as logos, título, identificação de cada escola/turma, bordas e totais. */
   const handleExportExcel = async () => {
@@ -879,7 +900,7 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
                 {/* Cabeçalho Institucional Oficial (logos da Gestão, SEMED e escola dos cadastros) */}
                 {showHeader && (
                   <div>
-                    <DocumentLetterhead />
+                    <DocumentLetterhead {...previewLetterhead} />
                     <div className="flex items-center justify-between gap-4 -mt-1 text-[9px] text-slate-500">
                       <div>
                         {showSchoolDetails &&
@@ -1072,27 +1093,25 @@ h1{font-size:12pt;text-align:center;margin:6px 0 2px;text-transform:uppercase}
 
               {/* Rodapé e Assinaturas */}
               <div className="mt-8 pt-4 space-y-6">
-                {showSignatures && (
-                  <div className="grid grid-cols-2 gap-8 pt-6">
-                    <div className="text-center">
-                      <div className="border-t border-slate-400 pt-1.5 w-3/4 mx-auto font-bold text-[10px]">
-                        {schoolSettings?.principalName || 'Direção Geral da Unidade Escolar'}
-                      </div>
-                      <div className="text-[9px] text-slate-500">
-                        {schoolSettings?.principalTitle || 'Diretora Pedagógica Geral'}
-                      </div>
+                {showSignatures &&
+                  (previewSigners.length ? (
+                    // Quem responde pela escola (cadastro da escola), conforme o módulo
+                    <div className={`grid gap-8 pt-6 ${previewSigners.length >= 3 ? 'grid-cols-3' : previewSigners.length === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                      {previewSigners.map((sg) => (
+                        <div key={sg.name} className="text-center">
+                          <div className="border-t border-slate-400 pt-1.5 w-3/4 mx-auto font-bold text-[10px]">{sg.name}</div>
+                          <div className="text-[9px] text-slate-500">{sg.role}</div>
+                        </div>
+                      ))}
                     </div>
-
-                    <div className="text-center">
-                      <div className="border-t border-slate-400 pt-1.5 w-3/4 mx-auto font-bold text-[10px]">
-                        {schoolSettings?.secretaryName || 'Secretaria Escolar Autorizada'}
-                      </div>
-                      <div className="text-[9px] text-slate-500">
-                        {schoolSettings?.secretaryRegistration || 'Secretário(a) de Registro Acadêmico'}
-                      </div>
+                  ) : (
+                    // Várias escolas no relatório: cada escola sai com a sua assinatura na impressão
+                    <div className="grid grid-cols-3 gap-4 pt-6 text-[10px] text-slate-700">
+                      <div>Conferido por: ____________________________</div>
+                      <div>Data: ____/____/________</div>
+                      <div>Assinatura: ______________________</div>
                     </div>
-                  </div>
-                )}
+                  ))}
 
                 {showTimestamp && (
                   <div className="border-t border-slate-200 pt-2 flex flex-wrap items-center justify-between text-[9px] text-slate-400">

@@ -353,6 +353,52 @@ export function resolveLetterheadSchool(target?: LetterheadTarget): BrandingScho
 /** Marca usada para não repetir o timbre quando o documento já o tem. */
 export const LETTERHEAD_MARK = 'data-sucessoedu-letterhead';
 
+/**
+ * Área útil da imagem: tira a margem transparente ou branca em volta do desenho.
+ * Muitas logos vêm com bastante sobra; no timbre (altura fixa) o desenho ficava pequeno.
+ */
+export function contentBounds(img: CanvasImageSource, w: number, h: number): { x: number; y: number; w: number; h: number } {
+  const full = { x: 0, y: 0, w, h };
+  try {
+    const k = Math.min(1, 400 / Math.max(w, h));
+    const cw = Math.max(1, Math.round(w * k));
+    const ch = Math.max(1, Math.round(h * k));
+    const c = document.createElement('canvas');
+    c.width = cw;
+    c.height = ch;
+    const ctx = c.getContext('2d');
+    if (!ctx) return full;
+    ctx.drawImage(img, 0, 0, cw, ch);
+    const px = ctx.getImageData(0, 0, cw, ch).data;
+    let minX = cw, minY = ch, maxX = -1, maxY = -1;
+    for (let y = 0; y < ch; y++) {
+      for (let x = 0; x < cw; x++) {
+        const i = (y * cw + x) * 4;
+        const a = px[i + 3];
+        const nearWhite = px[i] > 244 && px[i + 1] > 244 && px[i + 2] > 244;
+        if (a > 16 && !nearWhite) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < 0) return full;
+    const pad = Math.round(Math.max(maxX - minX, maxY - minY) * 0.03);
+    const bx = Math.max(0, minX - pad);
+    const by = Math.max(0, minY - pad);
+    const bw = Math.min(cw, maxX + pad + 1) - bx;
+    const bh = Math.min(ch, maxY + pad + 1) - by;
+    // Quase sem sobra: mantém a imagem como está.
+    if (bw * bh > cw * ch * 0.92) return full;
+    return { x: Math.round(bx / k), y: Math.round(by / k), w: Math.max(1, Math.round(bw / k)), h: Math.max(1, Math.round(bh / k)) };
+  } catch {
+    // Imagem de outro site sem permissão de leitura: usa inteira.
+    return full;
+  }
+}
+
 /* ---------- Logos: tamanho real (Word/Excel precisam de largura e altura fixas) ---------- */
 export interface LogoImage {
   w: number;
@@ -387,37 +433,44 @@ function loadLogo(src: string): Promise<LogoImage | null> {
     };
     img.onload = () => {
       clearTimeout(timer);
-      const w = img.naturalWidth || img.width || 0;
-      const h = img.naturalHeight || img.height || 0;
-      if (!w || !h) return done(null);
+      const fullW = img.naturalWidth || img.width || 0;
+      const fullH = img.naturalHeight || img.height || 0;
+      if (!fullW || !fullH) return done(null);
+      // Sem a margem vazia em volta, o desenho ocupa toda a altura do timbre.
+      const crop = contentBounds(img, fullW, fullH);
+      const cropped = crop.w !== fullW || crop.h !== fullH;
+      const w = crop.w;
+      const h = crop.h;
       let png: Uint8Array | undefined;
       let small: string | undefined;
       let smallPng: string | undefined;
       try {
-        // Timbre: 64 px de altura na folha; 3x isso mantém a nitidez na impressão.
-        const k = Math.min(1, 200 / h, 360 / w);
-        if (k < 1 || src.length > 60_000) {
+        // Timbre: até 80 px de altura na folha; 4x isso mantém a nitidez na impressão.
+        const k = Math.min(1, 320 / h, 560 / w);
+        if (k < 1 || cropped || src.length > 60_000) {
           const c2 = document.createElement('canvas');
           c2.width = Math.max(1, Math.round(w * k));
           c2.height = Math.max(1, Math.round(h * k));
-          c2.getContext('2d')!.drawImage(img, 0, 0, c2.width, c2.height);
+          const g2 = c2.getContext('2d')!;
+          g2.imageSmoothingQuality = 'high';
+          g2.drawImage(img, crop.x, crop.y, crop.w, crop.h, 0, 0, c2.width, c2.height);
           const outPng = c2.toDataURL('image/png');
-          if (outPng.length < src.length) smallPng = outPng;
+          if (cropped || outPng.length < src.length) smallPng = outPng;
           // WebP com transparência é bem menor que PNG; o Chrome/Edge imprimem normalmente.
-          const outWebp = c2.toDataURL('image/webp', 0.92);
+          const outWebp = c2.toDataURL('image/webp', 0.95);
           const best = outWebp.startsWith('data:image/webp') && outWebp.length < outPng.length ? outWebp : outPng;
-          if (best.length < src.length) small = best;
+          if (cropped || best.length < src.length) small = best;
         }
       } catch {
         small = undefined;
         smallPng = undefined;
       }
       try {
-        const scale = Math.min(1, 360 / Math.max(w, h));
+        const scale = Math.min(1, 480 / Math.max(w, h));
         const canvas = document.createElement('canvas');
         canvas.width = Math.max(1, Math.round(w * scale));
         canvas.height = Math.max(1, Math.round(h * scale));
-        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.getContext('2d')!.drawImage(img, crop.x, crop.y, crop.w, crop.h, 0, 0, canvas.width, canvas.height);
         const b64 = canvas.toDataURL('image/png').split(',')[1] || '';
         const bin = atob(b64);
         png = new Uint8Array(bin.length);
@@ -491,9 +544,9 @@ function letterheadWordHtml(target?: LetterheadTarget): string {
   const p = letterheadParts(target);
   const img = (src: string, _i: number, list: string[]) => {
     const info = getLoadedLogo(src);
-    const maxW = list.length > 1 ? 80 : 110;
-    const box = info ? fitBox(info.w, info.h, maxW, 60) : { w: 0, h: 60 };
-    const size = box.w ? `width="${box.w}" height="${box.h}" style="width:${box.w}px;height:${box.h}px"` : `height="60" style="height:60px"`;
+    const maxW = list.length > 1 ? 100 : 140;
+    const box = info ? fitBox(info.w, info.h, maxW, 72) : { w: 0, h: 72 };
+    const size = box.w ? `width="${box.w}" height="${box.h}" style="width:${box.w}px;height:${box.h}px"` : `height="72" style="height:72px"`;
     return `<img src="${escapeHtml(printLogoSrc(src, true))}" ${size} alt="" />`;
   };
   const cell = (list: string[], align: string) =>
@@ -512,7 +565,7 @@ export function letterheadHtml(target?: LetterheadTarget, opts?: { word?: boolea
   if (opts?.word) return letterheadWordHtml(target);
   const school = resolveLetterheadSchool(target);
   const img = (src: string, alt: string) =>
-    `<img src="${escapeHtml(printLogoSrc(src))}" alt="${escapeHtml(alt)}" style="max-height:64px;max-width:120px;object-fit:contain;display:block" />`;
+    `<img src="${escapeHtml(printLogoSrc(src))}" alt="${escapeHtml(alt)}" style="max-height:80px;max-width:150px;object-fit:contain;display:block" />`;
   const left = state.managementLogoUrl ? img(state.managementLogoUrl, 'Gestão Municipal') : '';
   const rightParts: string[] = [];
   if (state.semedLogoUrl) rightParts.push(img(state.semedLogoUrl, 'SEMED'));
@@ -562,7 +615,7 @@ export function withLetterheadInDocument(html: string, target?: LetterheadTarget
  * Reduz a imagem enviada como logo (até 480 px, mantendo transparência) para não
  * pesar no banco nem na sincronização. SVG é mantido como está.
  */
-export function readLogoFile(file: File, maxSize = 480): Promise<string> {
+export function readLogoFile(file: File, maxSize = 1000): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('Não foi possível ler a imagem.'));
@@ -572,17 +625,20 @@ export function readLogoFile(file: File, maxSize = 480): Promise<string> {
       const img = new Image();
       img.onerror = () => resolve(dataUrl);
       img.onload = () => {
-        const scale = Math.min(1, maxSize / Math.max(img.width || 1, img.height || 1));
-        if (scale >= 1 && dataUrl.length < 400_000) return resolve(dataUrl);
-        const w = Math.max(1, Math.round(img.width * scale));
-        const h = Math.max(1, Math.round(img.height * scale));
+        // Tira a margem vazia em volta do desenho e guarda com até 1000 px (boa nitidez na impressão).
+        const crop = contentBounds(img, img.width || 1, img.height || 1);
+        const cropped = crop.w !== img.width || crop.h !== img.height;
+        const scale = Math.min(1, maxSize / Math.max(crop.w, crop.h));
+        if (!cropped && scale >= 1 && dataUrl.length < 600_000) return resolve(dataUrl);
+        const w = Math.max(1, Math.round(crop.w * scale));
+        const h = Math.max(1, Math.round(crop.h * scale));
         const canvas = document.createElement('canvas');
         canvas.width = w;
         canvas.height = h;
         const ctx = canvas.getContext('2d');
         if (!ctx) return resolve(dataUrl);
         ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(img, 0, 0, w, h);
+        ctx.drawImage(img, crop.x, crop.y, crop.w, crop.h, 0, 0, w, h);
         resolve(canvas.toDataURL('image/png'));
       };
       img.src = dataUrl;
