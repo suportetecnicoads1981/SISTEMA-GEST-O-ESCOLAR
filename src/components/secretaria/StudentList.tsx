@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { formatAge } from '../../utils/studentDocuments';
+import { formatAge, hasCadastralPending } from '../../utils/studentDocuments';
 import { displayClassName } from '../../utils/schoolDataNormalizer';
 import { provisionalRaFor } from '../../services/raService';
 import {
@@ -155,6 +155,8 @@ export const StudentList: React.FC<StudentListProps> = ({
   const [selectedShiftFilter, setSelectedShiftFilter] = useState('ALL');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('ALL');
   const [selectedCadastralFilter, setSelectedCadastralFilter] = useState('ALL');
+  // Alunos com pendência cadastral: a mesma conta no botão, no atalho e no cartão "Situação Cadastral".
+  const pendingCensusCount = useMemo(() => students.filter((s) => hasCadastralPending(s)).length, [students]);
   const [selectedSpecialFilter, setSelectedSpecialFilter] = useState('ALL');
   const [selectedZoneFilter, setSelectedZoneFilter] = useState('ALL');
   const [selectedGenderFilter, setSelectedGenderFilter] = useState('ALL');
@@ -843,9 +845,16 @@ export const StudentList: React.FC<StudentListProps> = ({
 
       // 7. Filtro por Situação Cadastral (Censo)
       if (selectedCadastralFilter !== 'ALL') {
-        const studentCadastral = student.cadastralStatus || 'OK';
-        if (studentCadastral !== selectedCadastralFilter) {
-          return false;
+        // Mesma regra dos contadores: "com pendência" = situação diferente de OK ou campo pendente.
+        if (selectedCadastralFilter === 'ANY_PENDING') {
+          if (!hasCadastralPending(student)) return false;
+        } else if (selectedCadastralFilter === 'OK') {
+          if (hasCadastralPending(student)) return false;
+        } else {
+          const studentCadastral = student.cadastralStatus || 'OK';
+          if (studentCadastral !== selectedCadastralFilter) {
+            return false;
+          }
         }
       }
 
@@ -997,6 +1006,8 @@ export const StudentList: React.FC<StudentListProps> = ({
           ? 'Cadastro Incompleto'
           : selectedCadastralFilter === 'PENDING_DOCS'
           ? 'Pendência de Documentos'
+          : selectedCadastralFilter === 'ANY_PENDING'
+          ? 'Com pendência (Censo)'
           : selectedCadastralFilter;
       list.push({ label: 'Situação Cadastral', value: cadLabel });
     }
@@ -1399,7 +1410,7 @@ export const StudentList: React.FC<StudentListProps> = ({
             title="Exibir ou ocultar Dashbox de Pendências de Dados Cadastrais dos Polos Remotos & Censo"
           >
             <AlertCircle className="h-3.5 w-3.5" />
-            <span>Pendências Censo ({students.filter((s) => s.cadastralStatus !== 'OK').length})</span>
+            <span>Pendências Censo ({pendingCensusCount})</span>
           </button>
           <button
             onClick={() => setIsPredictiveAlertsModalOpen(true)}
@@ -1507,10 +1518,17 @@ export const StudentList: React.FC<StudentListProps> = ({
           <span className="text-xs font-bold text-slate-400 uppercase mb-1">Situação Cadastral</span>
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-            <span className="text-xs font-bold text-slate-700">
-              {students.filter((s) => !s.cadastralStatus || s.cadastralStatus === 'OK').length} Cadastros OK
-            </span>
+            <span className="text-xs font-bold text-slate-700">{students.length - pendingCensusCount} Cadastros OK</span>
           </div>
+          <button
+            type="button"
+            onClick={() => setSelectedCadastralFilter('ANY_PENDING')}
+            className="flex items-center gap-2 mt-1 text-left cursor-pointer hover:underline"
+            title="Mostrar os alunos com pendência cadastral"
+          >
+            <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+            <span className="text-xs font-bold text-amber-700">{pendingCensusCount} com pendência</span>
+          </button>
         </div>
       </div>
 
@@ -1715,6 +1733,7 @@ export const StudentList: React.FC<StudentListProps> = ({
               >
                 <option value="ALL">Todas as Situações</option>
                 <option value="OK">Cadastro OK / Regular</option>
+                <option value="ANY_PENDING">Com qualquer pendência (Censo)</option>
                 <option value="PENDING_DOCS">Pendência de Documentos</option>
                 <option value="INCOMPLETE">Cadastro Incompleto</option>
                 <option value="NEEDS_UPDATE">Necessita Atualização</option>
@@ -1886,16 +1905,17 @@ export const StudentList: React.FC<StudentListProps> = ({
           <button
             type="button"
             onClick={() => {
-              setSelectedCadastralFilter(selectedCadastralFilter === 'PENDING_DOCS' ? 'ALL' : 'PENDING_DOCS');
+              setSelectedCadastralFilter(selectedCadastralFilter === 'ANY_PENDING' ? 'ALL' : 'ANY_PENDING');
             }}
+            title="Mostrar só os alunos com alguma pendência cadastral (CPF, nascimento, endereço, laudo...)"
             className={`px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0 transition-colors cursor-pointer flex items-center gap-1 ${
-              selectedCadastralFilter === 'PENDING_DOCS'
+              selectedCadastralFilter === 'ANY_PENDING'
                 ? 'bg-amber-600 text-white shadow-2xs'
                 : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
             }`}
           >
             <ShieldAlert className="h-3 w-3" />
-            <span>Pendências Censo ({students.filter((s) => s.cadastralStatus === 'PENDING_DOCS').length})</span>
+            <span>Pendências Censo ({pendingCensusCount})</span>
           </button>
 
           {/* Atalho Com Laudo / PCD */}

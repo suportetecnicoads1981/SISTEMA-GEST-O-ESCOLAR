@@ -553,7 +553,12 @@ export const HELP_MODULES: HelpModule[] = [
         a: 'Sim. Uma linha "ESCOLA ANEXO: nome" ou só "ANEXO nome" antes das tabelas abre a escola anexa. Ela vira uma escola própria, ligada à escola principal, com as turmas e os alunos dela. Na planilha padrão, cada anexa vem em arquivo próprio, com a escola sede informada na aba DADOS DA ESCOLA.',
       },
       { q: 'Como edito ou corrijo o cadastro de um aluno?', a: 'Na lista, clique no lápis (Editar) na linha do aluno, altere e salve.' },
-      { q: 'Como encontro alunos com pendências no Censo?', a: 'Use o atalho "Pendências Censo" acima da lista, ou "Mais Filtros" > Situação Cadastral. Clique em "Completar" para corrigir o que falta.' },
+      { q: 'Como encontro alunos com pendências no Censo?', a: 'Use o atalho "Pendências Censo" acima da lista, ou "Mais Filtros" > Situação Cadastral > "Com qualquer pendência (Censo)". Clique em "Completar" para corrigir o que falta.' },
+      {
+        q: 'Por que os números de "Pendências Censo" eram diferentes em cada lugar?',
+        a: 'Cada contador usava uma regra: o botão do alto contava todo cadastro que não estava "OK", e o atalho acima da lista contava só a situação "Pendência de Documentos" (por isso mostrava 0). Desde 03/10/2026 todos usam a mesma regra, inclusive o cartão "Situação Cadastral" e o quadro de pendências da Visão Geral / Dashbox: o aluno tem pendência quando a situação não é "OK", quando há algum campo pendente, quando está sem CPF (ou com CPF inválido) ou quando é PCD sem laudo entregue.',
+        tip: 'As planilhas importadas vieram sem CPF, então todos os alunos importados aparecem com a pendência "CPF / Certidão de Nascimento" até o CPF ser cadastrado. Ao informar um CPF válido e salvar, essa pendência sai sozinha.',
+      },
       { q: 'Como imprimo ou exporto a lista?', a: 'Filtre a lista como quiser e clique em "Imprimir lista filtrada" ou "Exportar CSV".' },
       {
         q: 'Como gero o Relatório de Matrículas e Enturmação só com o que preciso?',
