@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, Loader2, Upload, X } from 'lucide-react';
 import type { SchoolClass, SchoolUnit, Student } from '../../types';
 import {
@@ -40,13 +40,26 @@ export const ComplementSheetModal: React.FC<ComplementSheetModalProps> = ({
   onApply,
 }) => {
   const [tab, setTab] = useState<Tab>('GERAR');
-  const units = useMemo(
-    () => [...schoolUnits].filter(Boolean).sort((a, b) => String(a.name).localeCompare(String(b.name), 'pt-BR')),
-    [schoolUnits]
-  );
+  // Escola de cada aluno (cadastro ou turma).
+  const classSchool = useMemo(() => new Map(classes.map((c) => [c.id, c.schoolUnitId || ''])), [classes]);
+  const schoolOfStudent = (s: Student) => s.schoolUnitId || classSchool.get(s.classId) || '';
+  // Só as escolas que têm alunos nesta tela (com a escola em foco no alto, é só ela).
+  const units = useMemo(() => {
+    const withStudents = new Set(students.map(schoolOfStudent).filter(Boolean));
+    return [...schoolUnits]
+      .filter((u) => u && withStudents.has(u.id))
+      .sort((a, b) => String(a.name).localeCompare(String(b.name), 'pt-BR'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schoolUnits, students, classSchool]);
   const [schoolId, setSchoolId] = useState<string>(() =>
     defaultSchoolId && defaultSchoolId !== 'ALL' && units.some((u) => u.id === defaultSchoolId) ? defaultSchoolId : units.length === 1 ? units[0].id : ''
   );
+  // Escola fora da lista (ou nenhuma, havendo uma só): acerta a escolha.
+  useEffect(() => {
+    if (schoolId && units.some((u) => u.id === schoolId)) return;
+    setSchoolId(units.length === 1 ? units[0].id : '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [units]);
   const [onlyPending, setOnlyPending] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -59,8 +72,9 @@ export const ComplementSheetModal: React.FC<ComplementSheetModalProps> = ({
 
   const unit = units.find((u) => u.id === schoolId);
   const schoolStudents = useMemo(
-    () => (schoolId ? students.filter((s) => s.schoolUnitId === schoolId && s.status !== 'TRANSFERRED') : []),
-    [students, schoolId]
+    () => (schoolId ? students.filter((s) => schoolOfStudent(s) === schoolId && s.status !== 'TRANSFERRED') : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [students, schoolId, classSchool]
   );
   const rows = useMemo(() => buildComplementRows(schoolStudents, classes, onlyPending), [schoolStudents, classes, onlyPending]);
   const totalRows = useMemo(() => buildComplementRows(schoolStudents, classes, false).length, [schoolStudents, classes]);
@@ -249,6 +263,19 @@ export const ComplementSheetModal: React.FC<ComplementSheetModalProps> = ({
               )}
 
               {message && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">{message}</div>}
+
+              {!busy && (!unit || rows.length === 0) && (
+                <div data-testid="complement-disabled-reason" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 flex gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  {units.length === 0
+                    ? 'Nenhum aluno nesta tela. Confira a escola escolhida no alto da tela ou os filtros.'
+                    : !unit
+                      ? 'Escolha a escola acima para liberar o botão "Baixar planilha".'
+                      : onlyPending
+                        ? 'Nenhum aluno desta escola tem algo faltando. Desmarque "Só alunos com algo faltando" para gerar com todos.'
+                        : 'Esta escola não tem alunos ativos.'}
+                </div>
+              )}
 
               <div className="flex justify-end">
                 <button
