@@ -34,6 +34,7 @@ import {
   ClassGradeSheet,
   TeacherLessonPlan,
   TeacherStudentPedagogicalNote,
+  ProtocolRequest,
   WhatsAppConfig,
   WhatsAppMessageLog,
   WhatsAppTemplate,
@@ -319,6 +320,8 @@ export interface AppStateData {
   classGradeSheets: ClassGradeSheet[];
   teacherLessonPlans: TeacherLessonPlan[];
   teacherStudentNotes: TeacherStudentPedagogicalNote[];
+  /** Protocolos & Solicitações (pedidos de documentos com número de acompanhamento). */
+  protocols: ProtocolRequest[];
   whatsappConfig: WhatsAppConfig;
   whatsappTemplates: WhatsAppTemplate[];
   whatsappLogs: WhatsAppMessageLog[];
@@ -426,6 +429,7 @@ export function getCleanDatabase(options?: CleanInstallationOptions): AppStateDa
     classGradeSheets: [],
     teacherLessonPlans: [],
     teacherStudentNotes: [],
+    protocols: [],
     whatsappConfig: DEFAULT_WHATSAPP_CONFIG,
     whatsappTemplates: DEFAULT_WHATSAPP_TEMPLATES,
     whatsappLogs: [],
@@ -498,6 +502,7 @@ export function resetToDemoDatabase(): AppStateData {
     classGradeSheets: DEFAULT_CLASS_GRADE_SHEETS,
     teacherLessonPlans: DEFAULT_TEACHER_LESSON_PLANS,
     teacherStudentNotes: DEFAULT_TEACHER_STUDENT_NOTES,
+    protocols: [],
     whatsappConfig: DEFAULT_WHATSAPP_CONFIG,
     whatsappTemplates: DEFAULT_WHATSAPP_TEMPLATES,
     whatsappLogs: DEFAULT_WHATSAPP_LOGS,
@@ -614,6 +619,7 @@ export function getStoredData(): AppStateData {
       classGradeSheets: hasArr(parsed.classGradeSheets) ? parsed.classGradeSheets : [],
       teacherLessonPlans: hasArr(parsed.teacherLessonPlans) ? parsed.teacherLessonPlans : [],
       teacherStudentNotes: hasArr(parsed.teacherStudentNotes) ? parsed.teacherStudentNotes : [],
+      protocols: hasArr(parsed.protocols) ? parsed.protocols : [],
       whatsappConfig: parsed.whatsappConfig || DEFAULT_WHATSAPP_CONFIG,
       whatsappTemplates: parsed.whatsappTemplates || DEFAULT_WHATSAPP_TEMPLATES,
       whatsappLogs: hasArr(parsed.whatsappLogs) ? parsed.whatsappLogs : [],
@@ -1096,6 +1102,7 @@ export function restoreBackup(backup: SystemBackup, opts?: { network?: boolean }
       classGradeSheets: (backup.data as any).classGradeSheets || [],
       teacherLessonPlans: (backup.data as any).teacherLessonPlans || [],
       teacherStudentNotes: (backup.data as any).teacherStudentNotes || [],
+      protocols: (backup.data as any).protocols || [],
       whatsappConfig: (backup.data as any).whatsappConfig || DEFAULT_WHATSAPP_CONFIG,
       whatsappTemplates: (backup.data as any).whatsappTemplates || DEFAULT_WHATSAPP_TEMPLATES,
       whatsappLogs: (backup.data as any).whatsappLogs || [],

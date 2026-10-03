@@ -26,6 +26,7 @@ import {
   Wrench,
   ShieldCheck,
   Database,
+  FileClock,
 } from 'lucide-react';
 import { SYSTEM_SHORTCUTS, ShortcutDefinition } from '../../hooks/useGlobalKeyboardShortcuts';
 
@@ -80,6 +81,7 @@ const TAB_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   QUESTION_BANK: HelpCircle,
   PEDAGOGICAL_DASHBOARD: TrendingUp,
   DOCUMENTS: Award,
+  PROTOCOLS: FileClock,
   STUDENT_ROOM: CheckCircle2,
   DROPOUT_CENSUS: UserX,
   MUNICIPAL_SYNC: Building2,

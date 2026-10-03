@@ -30,6 +30,7 @@ import {
   WhatsAppMessageLog,
   WhatsAppTemplate,
   SystemUpdatePackage,
+  ProtocolRequest,
 } from './types';
 import {
   getStoredData,
@@ -108,6 +109,7 @@ import { appVersionLabel } from './config/appVersion';
 // Módulos de TI pesados (geradores de instaladores e do app offline) só carregam quando abertos.
 const NetworkInstaller = lazyModule(() => import('./components/config/NetworkInstaller').then((m) => ({ default: m.NetworkInstaller })));
 const SystemUpdateModule = lazyModule(() => import('./components/config/SystemUpdateModule').then((m) => ({ default: m.SystemUpdateModule })));
+const ProtocolModule = lazyModule(() => import('./components/protocolos/ProtocolModule').then((m) => ({ default: m.ProtocolModule })));
 const MunicipalSyncModule = lazyModule(() => import('./components/municipal/MunicipalSyncModule').then((m) => ({ default: m.MunicipalSyncModule })));
 const AdminTIHub = lazyModule(() => import('./components/admin/AdminTIHub').then((m) => ({ default: m.AdminTIHub })));
 import { isTabAvailable } from './config/features';
@@ -990,6 +992,15 @@ export default function App() {
       }).`
     );
     triggerPushNotification('👤 Usuário trocado', `Bem-vindo(a) ${user.name} (${user.sectorTitle || user.sector})`);
+  };
+
+  // Protocolos & Solicitações: inclui ou atualiza o protocolo (abertura, movimentação, observação).
+  const handleSaveProtocol = (p: ProtocolRequest) => {
+    setData((prev) => {
+      const list = (prev as any).protocols || [];
+      const exists = list.some((x: ProtocolRequest) => x.id === p.id);
+      return { ...prev, protocols: exists ? list.map((x: ProtocolRequest) => (x.id === p.id ? p : x)) : [p, ...list] } as any;
+    });
   };
 
   // Students handlers with auto-notification
@@ -2093,6 +2104,7 @@ export default function App() {
             userAccounts: data?.userAccounts?.length || 0,
             unreadNotifications: unreadNotificationCount,
             unreadMessages: (data?.communications || []).length,
+            openProtocols: ((viewData as any).protocols || []).filter((p: ProtocolRequest) => p.status !== 'ENTREGUE' && p.status !== 'CANCELADO').length,
           }}
         />
 
@@ -2258,6 +2270,22 @@ export default function App() {
             )}
 
             {/* TAB: EMISSÃO DE DOCUMENTOS E CERTIFICADOS */}
+            {activeTab === 'PROTOCOLS' && (
+              <Suspense fallback={<ModuleLoadingFallback moduleName={moduleName('PROTOCOLS')} />}>
+                <ProtocolModule
+                  protocols={(viewData as any).protocols || []}
+                  students={viewData.students || []}
+                  classes={viewData.classes || []}
+                  schoolUnits={viewData.schoolUnits || []}
+                  currentUser={accessActor as any}
+                  scopeUnitId={schoolScope}
+                  canCreate={canAccess(accessActor as any, 'documentos', 'canCreate') || canAccess(accessActor as any, 'secretaria', 'canCreate')}
+                  canEdit={canAccess(accessActor as any, 'documentos', 'canEdit') || canAccess(accessActor as any, 'secretaria', 'canEdit')}
+                  onSave={handleSaveProtocol}
+                />
+              </Suspense>
+            )}
+
             {activeTab === 'DOCUMENTS' && (
               <DocumentIssuer
                 students={data?.students || []}

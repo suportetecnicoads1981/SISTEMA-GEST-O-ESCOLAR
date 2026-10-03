@@ -27,6 +27,7 @@ import {
   Info,
   Bell,
   CornerDownLeft,
+  FileClock,
 } from 'lucide-react';
 
 import { moduleName } from '../../config/moduleNames';
@@ -132,6 +133,16 @@ const ALL_NAV_DESTINATIONS: NavDestination[] = [
     icon: Award,
     shortcut: 'Alt + O',
     description: 'Emissão oficial de históricos, declarações e certificados com QR Code.',
+  },
+  {
+    id: 'PROTOCOLS',
+    title: moduleName('PROTOCOLS'),
+    category: 'Secretaria',
+    categoryColor: 'bg-blue-50 text-blue-700',
+    keywords: ['protocolo', 'solicitacao', 'pedido', 'requerimento', 'declaracao', 'historico', 'boletim', 'acompanhamento'],
+    icon: FileClock,
+    shortcut: 'Alt + L',
+    description: 'Pedidos de documentos com número de protocolo, situação e histórico.',
   },
 
   // Pedagógico
