@@ -29,6 +29,7 @@ import {
   Megaphone,
   RefreshCw,
   LogOut,
+  Lock,
   Keyboard,
   Server,
   Cpu,
@@ -79,6 +80,8 @@ interface SidebarProps {
   showDevBacklog?: boolean;
   /** Privilégios do operador: módulos sem permissão de leitura não aparecem no menu. */
   canOpenTab?: (tabId: string) => boolean;
+  /** Bloqueia a tela (pede login de novo). */
+  onLockScreen?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -94,6 +97,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   showDevBacklog = false,
   canOpenTab,
+  onLockScreen,
 }) => {
   const current = activeTab || currentTab || 'MAIN_DASHBOARD';
   const [isAdminTIExpanded, setIsAdminTIExpanded] = useState(true);
@@ -783,6 +787,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className="w-9 h-9 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
               >
                 <Keyboard className="h-4.5 w-4.5" />
+              </button>
+            </div>
+          )
+        )}
+
+        {onLockScreen && (
+          isExpanded ? (
+            <button
+              id="sidebar-btn-lock"
+              onClick={onLockScreen}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-amber-300 hover:bg-amber-950/40 hover:text-amber-200 border border-amber-900/30 transition-all cursor-pointer group shadow-2xs"
+              title="Bloquear a tela: para voltar, digite a senha (ou entre com outro usuário)"
+            >
+              <div className="flex items-center gap-2.5">
+                <Lock className="h-4 w-4 text-amber-300" />
+                <span>Bloquear Tela</span>
+              </div>
+              <kbd className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-bold">
+                Ctrl+Shift+L
+              </kbd>
+            </button>
+          ) : (
+            <div
+              className="relative group flex justify-center py-0.5"
+              onMouseEnter={(e) => showTip(e, { id: '__bloquear', label: 'Bloquear Tela', shortcut: 'Ctrl+Shift+L' })}
+              onMouseLeave={() => hideTip('__bloquear')}
+            >
+              <button
+                onClick={onLockScreen}
+                className="w-9 h-9 rounded-xl bg-amber-950/30 hover:bg-amber-900/50 text-amber-300 hover:text-amber-100 flex items-center justify-center border border-amber-900/30 transition-colors cursor-pointer"
+              >
+                <Lock className="h-4.5 w-4.5" />
               </button>
             </div>
           )

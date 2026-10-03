@@ -77,6 +77,15 @@ import { FeedbackSuggestionsModal } from './components/common/FeedbackSuggestion
 import { DevBacklogModule, isDevBacklogOwner } from './components/admin/DevBacklogModule';
 import { AboutSystem } from './components/sobre/AboutSystem';
 import { LoginScreen } from './components/auth/LoginScreen';
+import { ScreenLockOverlay } from './components/auth/ScreenLockOverlay';
+import {
+  ACTIVITY_EVENTS,
+  LockState,
+  readLockIdleMinutes,
+  readLockState,
+  storeLockIdleMinutes,
+  storeLockState,
+} from './services/auth/screenLock';
 import { UniversalDataImportModal } from './components/secretaria/UniversalDataImportModal';
 import { WorkspaceTabsBar } from './components/layout/WorkspaceTabsBar';
 import { WindowsTitleBar } from './components/layout/WindowsTitleBar';
@@ -171,6 +180,9 @@ export default function App() {
       return null;
     }
   });
+  // ---- Bloqueio de tela (inatividade ou botão) e troca de usuário pela mesma tela ----
+  const [screenLock, setScreenLock] = useState<LockState | null>(() => readLockState());
+  const [lockIdleMinutes, setLockIdleMinutes] = useState<number>(() => readLockIdleMinutes());
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
   const [isUniversalImportModalOpen, setIsUniversalImportModalOpen] = useState(false);
   const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
@@ -243,7 +255,7 @@ export default function App() {
     activeShortcutToast,
   } = useGlobalKeyboardShortcuts({
     onNavigate: (tabId) => handleNavigate(tabId),
-    isEnabled: isAuthenticated,
+    isEnabled: isAuthenticated && !screenLock,
   });
 
   // User Accounts & Active Session State
@@ -832,6 +844,142 @@ export default function App() {
       '🔒 Sessão Encerrada com Cópia de Segurança',
       `Backup automático gerado com sucesso (${autoBackup.stats.studentsCount} alunos e ${autoBackup.stats.examsCount} avaliações salvos no snapshot).`
     );
+  };
+
+  // ---- Bloqueio de tela ----
+  const lockScreen = useCallback(
+    (reason: LockState['reason']) => {
+      if (!isAuthenticated) return;
+      const userId = String(currentUser?.id || authenticatedUserId || '');
+      const state: LockState = { userId, at: new Date().toISOString(), reason };
+      storeLockState(state);
+      setScreenLock(state);
+      setIsStartMenuOpen(false);
+      try {
+        logSecurityAudit(
+          'BLOQUEIO_TELA',
+          userId || 'desconhecido',
+          currentUser?.name || 'Usuário',
+          currentUser?.role || 'ADMIN',
+          currentUser?.sector || 'SECRETARIA',
+          reason === 'inatividade'
+            ? 'Tela bloqueada automaticamente por falta de uso.'
+            : reason === 'troca'
+              ? 'Tela bloqueada para troca de usuário.'
+              : 'Tela bloqueada pelo usuário.'
+        );
+      } catch {
+        /* auditoria é complementar */
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isAuthenticated, currentUser?.id, currentUser?.name, currentUser?.role, currentUser?.sector, authenticatedUserId]
+  );
+
+  const handleChangeLockIdleMinutes = useCallback((minutes: number) => {
+    storeLockIdleMinutes(minutes);
+    setLockIdleMinutes(minutes);
+  }, []);
+
+  // Sem sessão não há o que bloquear (o bloqueio guardado de uma sessão encerrada é descartado).
+  useEffect(() => {
+    if (!isAuthenticated && screenLock) {
+      storeLockState(null);
+      setScreenLock(null);
+    }
+  }, [isAuthenticated, screenLock]);
+
+  // Contagem de inatividade: qualquer movimento do mouse, tecla, rolagem ou toque reinicia.
+  useEffect(() => {
+    if (!isAuthenticated || screenLock || !lockIdleMinutes) return;
+    const limitMs = lockIdleMinutes * 60 * 1000;
+    let last = Date.now();
+    const onActivity = () => {
+      last = Date.now();
+    };
+    ACTIVITY_EVENTS.forEach((ev) => window.addEventListener(ev, onActivity, { passive: true, capture: true }));
+    // Conferência a cada 15 s (também pega o computador que voltou da suspensão).
+    const timer = window.setInterval(() => {
+      if (Date.now() - last >= limitMs) lockScreen('inatividade');
+    }, 15000);
+    return () => {
+      ACTIVITY_EVENTS.forEach((ev) => window.removeEventListener(ev, onActivity, { capture: true } as any));
+      window.clearInterval(timer);
+    };
+  }, [isAuthenticated, screenLock, lockIdleMinutes, lockScreen]);
+
+  // Ctrl+Shift+L bloqueia a tela. Outra janela do sistema bloqueada/desbloqueada acompanha.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && (e.key === 'L' || e.key === 'l')) {
+        e.preventDefault();
+        lockScreen('botao');
+      }
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'sucessoedu_tela_bloqueada') setScreenLock(readLockState());
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [lockScreen]);
+
+  /** Login conferido na tela bloqueada: mesmo usuário desbloqueia; outro usuário assume o sistema. */
+  const handleUnlock = (user: UserAccount) => {
+    const previousId = screenLock?.userId || authenticatedUserId || '';
+    const sameUser = !!previousId && user.id === previousId;
+    storeLockState(null);
+    setScreenLock(null);
+    if (sameUser) {
+      // Mantém as abas e formulários abertos; só atualiza o cadastro (senha/papel vindos do login).
+      setCurrentUser((prev) => (prev && prev.id === user.id ? { ...prev, ...user } : user));
+      logSecurityAudit(
+        'DESBLOQUEIO_TELA',
+        user.id,
+        user.name,
+        user.role,
+        user.sector,
+        'Tela desbloqueada com a senha do próprio usuário.'
+      );
+      return;
+    }
+    // Troca de usuário: as telas do anterior são fechadas e a sessão passa a ser do novo usuário.
+    setCurrentUser(user);
+    setAuthenticatedUserId(user.id);
+    setOpenTabs(['MAIN_DASHBOARD']);
+    setActiveTab('MAIN_DASHBOARD');
+    setNavigationHistory([]);
+    try {
+      localStorage.setItem('sucessoedu_auth_session', 'true');
+      localStorage.setItem('sucessoedu_logged_user_id', user.id);
+    } catch {}
+    // Sem login na nuvem do novo usuário (ex.: sem internet), a nuvem não pode continuar
+    // conectada com a conta do usuário anterior.
+    const client = getSupabaseClient();
+    client.auth
+      .getSession()
+      .then(({ data: sess }) => {
+        const cloudEmail = String(sess?.session?.user?.email || '').toLowerCase();
+        const newEmail = String(user.email || '').toLowerCase();
+        if (cloudEmail && cloudEmail !== newEmail && !shouldKeepCloudSession()) {
+          client.auth.signOut({ scope: 'local' }).catch(() => {});
+        }
+      })
+      .catch(() => {});
+    logSecurityAudit(
+      'TROCA_USUARIO',
+      user.id,
+      user.name,
+      user.role,
+      user.sector,
+      `Troca de usuário pela tela bloqueada (usuário anterior: ${
+        (data.userAccounts || []).find((u) => u.id === previousId)?.name || previousId || 'desconhecido'
+      }).`
+    );
+    triggerPushNotification('👤 Usuário trocado', `Bem-vindo(a) ${user.name} (${user.sectorTitle || user.sector})`);
   };
 
   // Students handlers with auto-notification
@@ -1824,6 +1972,20 @@ export default function App() {
 
   return (
     <div className="h-screen max-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans antialiased relative overflow-hidden">
+      {/* Tela bloqueada (inatividade, botão ou troca de usuário): pede login de novo */}
+      {screenLock && (
+        <ScreenLockOverlay
+          lock={screenLock}
+          lockedUser={(data.userAccounts || []).find((u) => u.id === screenLock.userId) || currentUser}
+          userAccounts={data.userAccounts || []}
+          schoolUnits={data.schoolUnits || []}
+          systemVersion={appVersionLabel()}
+          companyLogoUrl={data.developerContact?.companyLogoUrl}
+          onPasswordUpdate={handlePasswordUpdate}
+          onUnlock={handleUnlock}
+          onLogout={handleLogout}
+        />
+      )}
       {/* Toast Notification Banner */}
       {toastNotification && (
         <div className="fixed top-4 right-4 z-50 max-w-sm w-full bg-slate-900 text-white rounded-2xl shadow-2xl p-4 border border-slate-700 flex items-start gap-3 animate-in slide-in-from-top-4 duration-200">
@@ -1891,6 +2053,10 @@ export default function App() {
         schoolUnits={data.schoolUnits || []}
         schoolFocus={focusIds.length ? schoolFocus : null}
         onChangeSchoolFocus={canChooseSchoolFocus ? handleChangeSchoolFocus : undefined}
+        onLockScreen={() => lockScreen('botao')}
+        onSwitchUser={() => lockScreen('troca')}
+        lockIdleMinutes={lockIdleMinutes}
+        onChangeLockIdleMinutes={handleChangeLockIdleMinutes}
       />
 
       {/* Main Layout Shell */}
@@ -1907,6 +2073,7 @@ export default function App() {
           onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
           showDevBacklog={isDevBacklogOwner(currentUser?.email)}
           canOpenTab={(tab) => canOpenTab(accessActor, tab)}
+          onLockScreen={() => lockScreen('botao')}
           counts={{
             students: viewData?.students?.length || 0,
             exams: viewData?.exams?.length || 0,

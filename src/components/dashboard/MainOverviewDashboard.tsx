@@ -47,6 +47,7 @@ import {
   NotificationItem,
 } from '../../types';
 import { CadastralPendingCensusDashbox } from './CadastralPendingCensusDashbox';
+import { userSchoolScope } from '../../services/rbac/schoolScope';
 
 import { moduleName } from '../../config/moduleNames';
 import { DropoutRiskResult, describeDropoutCriterion } from '../../utils/dropoutRiskEngine';
@@ -458,6 +459,7 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
         onEditStudent={onEditStudent}
         onOpenImportModal={onOpenImportModal}
         onNavigateToSecretaria={() => onNavigate('STUDENTS')}
+        scopeUnitId={userSchoolScope(currentUser as any)}
       />
 
       {/* ========================================================= */}

@@ -277,6 +277,22 @@ export const HELP_GENERAL: HelpModule = {
       tip: 'O selo aparece nos dois modos. Se abrir pelo atalho do servidor e ele mostrar "Acesso pelo link", o servidor demorou a responder na abertura: aguarde o aviso "Recarregar agora" no alto da tela, ou aperte F5.',
     },
     {
+      q: 'Onde fica o selo do rodapé? Ele cobria o botão Iniciar e a Pesquisa.',
+      a: 'Desde 03/10/2026 o selo fica dentro da Barra de Tarefas, no canto de baixo à esquerda, antes dos botões "Iniciar" e "Pesquisar", sem cobrir nada. Clique nele para abrir os detalhes (a janela abre para cima). Na tela de login, onde não há Barra de Tarefas, ele continua no canto da tela.',
+      tip: 'Se a Barra de Tarefas estiver no modo "ocultar automaticamente", passe o mouse no rodapé para ver o selo.',
+    },
+    {
+      q: 'Como bloqueio a tela quando saio do computador? E como outra pessoa entra sem fechar o sistema?',
+      steps: [
+        'Para bloquear: clique no seu nome no alto da tela e em "Bloquear tela", ou use "Bloquear Tela" no menu lateral, ou aperte Ctrl+Shift+L.',
+        'Para voltar: digite a sua senha e clique em Entrar. Abas e formulários abertos continuam como estavam.',
+        'Para trocar de usuário: clique no seu nome e em "Trocar usuário" (ou, com a tela bloqueada, apague o login e digite o do outro usuário). Ele entra com o login e a senha dele; as telas do usuário anterior são fechadas.',
+        'Em "Bloquear sem uso após" (no mesmo menu do seu nome) escolha o tempo: 5, 10, 15, 30 minutos, 1 hora ou Nunca. O padrão é 15 minutos e vale para este computador.',
+      ],
+      a: 'Sem mexer no mouse ou no teclado pelo tempo escolhido, a tela é bloqueada sozinha e pede o login de novo. Recarregar a página (F5) não libera a tela bloqueada. O botão "Sair do Sistema" da tela bloqueada encerra a sessão. Bloqueios, desbloqueios e trocas de usuário ficam registrados na auditoria.',
+      tip: 'A sincronização continua funcionando com a tela bloqueada.',
+    },
+    {
       q: 'Quem gera o número de matrícula (RA)? Por que aparece "Aguardando número da nuvem"?',
       a: 'O RA agora é gerado pela nuvem, e não mais por cada computador. Todo aluno novo (cadastro, importação ou planilha) nasce com um RA provisório, que começa com "RA-PROV-". Assim que o computador estiver conectado à nuvem, ele recebe o número definitivo (ex.: RA-2026-2196), em até 1 minuto. A nuvem guarda qual número cada aluno recebeu: se dois computadores pedirem para o mesmo aluno, os dois recebem o mesmo número. Por isso os RAs não mudam mais sozinhos nem se repetem. Nos documentos, enquanto o número não chega, aparece "Aguardando número da nuvem".',
       steps: [
@@ -332,6 +348,17 @@ export const HELP_MODULES: HelpModule[] = [
       { q: 'Para que serve esta tela?', a: 'Mostra um resumo (alunos, turmas, avaliações, avisos) e botões de acesso rápido aos módulos. Clique em um cartão para abrir o módulo correspondente.' },
       { q: 'O que é o cartão "Risco de evasão por faltas"?', a: 'Mostra quantos alunos atingiram o limite de faltas sem justificativa (vermelho) e quantos estão perto dele (amarelo), com o critério em uso. Clique no cartão para abrir o painel de risco no Censo de Evasão & Busca Ativa.' },
       { q: 'Os números estão desatualizados.', steps: ['Clique em "Sincronizar agora" no selo do rodapé.', 'Aperte F5 para recarregar a tela.'] },
+      {
+        q: 'Como imprimo as pendências cadastrais de uma escola só?',
+        steps: [
+          'No quadro "Dashbox de Pendências de Dados Cadastrais", na barra de filtros, escolha a escola (o número entre parênteses é a quantidade de alunos com pendência).',
+          'Se a escola for sede de anexas, use "+ Anexas" para juntar as anexas que quiser.',
+          'Se quiser, escolha também o tipo de pendência (CPF, nascimento, endereço, laudo) ou busque um aluno.',
+          'Clique em "Imprimir Guia de Cobrança" (sai com o timbre da escola) ou em "Exportar CSV".',
+        ],
+        a: 'Os indicadores do quadro, a impressão e o CSV seguem a escola escolhida. Com mais de uma escola (por exemplo, sede + anexas ou "Todas as escolas"), cada escola sai em bloco próprio, com os alunos em ordem alfabética, e no final vem o quadro totalizador com o total de cada escola e o total geral.',
+        tip: 'Usuário lotado numa escola vê só a escola dele (e as anexas, se for a sede): as outras escolas da rede não aparecem. A Sede e o Master escolhem qualquer escola da rede.',
+      },
     ],
   },
   {
@@ -654,6 +681,10 @@ export const HELP_MODULES: HelpModule[] = [
     summary: 'Painel com médias, aprovação, acertos por questão e evolução dos alunos e turmas.',
     faq: [
       {
+        q: 'Onde foi parar o quadro "Sobre a Engenharia do Sistema & Dash Boxes"?',
+        a: 'Foi retirado em 03/10/2026: era um cartão de apresentação técnica, sem informação para o trabalho pedagógico. Ele também saiu da lista de quadros do botão de personalizar o painel. Nenhum dado foi alterado.',
+      },
+      {
         q: 'De onde vêm as notas dos gráficos da Evolução Pedagógica?',
         a: 'Das notas que os professores lançam no Diário de Notas (Portal do Professor > Notas), por turma, disciplina e bimestre, somadas às do histórico escolar quando houver. Onde não há nota lançada, aparece "—" ou "Sem notas lançadas": o sistema não mostra mais números de exemplo. A média mínima usada é 6,0.',
         tip: 'Se um aluno ou turma aparece sem notas, confira se o professor salvou a folha de notas do bimestre.',
@@ -942,6 +973,17 @@ export const HELP_MODULES: HelpModule[] = [
       },
       { q: 'Como crio o acesso de um professor ou funcionário?', steps: ['Clique em "Novo Usuário".', 'Informe nome, login, e-mail e perfil.', 'Escolha a escola.', 'Defina uma senha (ou gere uma) e salve.', 'Entregue o login e a senha à pessoa.'] },
       { q: 'Como tiro o acesso de alguém?', a: 'Edite o usuário e desative, ou exclua. Prefira desativar: o histórico continua ligado ao nome.' },
+      {
+        q: 'Como funciona o bloqueio de tela e a troca de usuário?',
+        steps: [
+          'Bloquear agora: clique no seu nome no alto da tela > "Bloquear tela", ou "Bloquear Tela" no menu lateral, ou Ctrl+Shift+L.',
+          'Bloqueio por falta de uso: no mesmo menu, em "Bloquear sem uso após", escolha 5, 10, 15, 30 minutos, 1 hora ou Nunca (padrão: 15 minutos, vale para este computador).',
+          'Desbloquear: o login já vem preenchido; digite a senha. O trabalho continua de onde parou.',
+          'Trocar de usuário: "Trocar usuário" no menu do seu nome (ou, na tela bloqueada, digite outro login). O novo usuário entra com a senha dele e as telas do anterior são fechadas.',
+        ],
+        a: 'A tela bloqueada cobre todo o sistema e confere a senha do mesmo jeito que a tela de login (nuvem, servidor da escola ou senha guardada neste computador). Cada bloqueio, desbloqueio e troca de usuário fica registrado em "Auditoria & Logs".',
+        tip: 'Na troca de usuário, se o novo usuário entrar sem internet, a conexão da nuvem do usuário anterior é desconectada (a menos que o computador esteja marcado para "Manter conectado à nuvem").',
+      },
       { q: 'Como mudo o que cada perfil pode ver?', a: 'Use "Gestão de Permissões (RBAC)" / "Matriz de Níveis de Acesso" e marque os módulos permitidos para cada perfil.' },
       {
         q: 'O que cada permissão libera?',

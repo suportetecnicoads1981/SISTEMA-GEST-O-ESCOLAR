@@ -55,6 +55,14 @@ interface LoginScreenProps {
   onPasswordUpdate?: (user: UserAccount, passwordHash: string) => void;
   systemVersion?: string;
   companyLogoUrl?: string;
+  /** Tela bloqueada: login já preenchido com o usuário que estava usando o sistema. */
+  initialUsername?: string;
+  /** Aviso mostrado no alto do cartão de login (ex.: "Tela bloqueada"). */
+  topNotice?: React.ReactNode;
+  /** Botão Fechar/Sair: ação própria (na tela bloqueada, encerra a sessão em vez de fechar a janela). */
+  onExit?: () => void;
+  /** Texto do botão Fechar/Sair. */
+  exitLabel?: string;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
@@ -64,8 +72,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   onPasswordUpdate,
   systemVersion = '',
   companyLogoUrl,
+  initialUsername = '',
+  topNotice,
+  onExit,
+  exitLabel = 'Fechar',
 }) => {
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(initialUsername);
   // Tela simples (login e senha) para todos. A tela completa — lista de usuários, IP da rede,
   // backup — só abre para o Master, depois de confirmar login e senha em "Acesso do administrador".
   // Base sem nenhuma conta (primeira instalação) abre direto a completa.
@@ -201,6 +213,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setConfirmNewPassword('');
     setErrorMsg('');
     setActiveTabMode('SEARCH_USERS');
+    if (onExit) {
+      onExit();
+      return;
+    }
     try {
       // O navegador só deixa o script fechar a janela em alguns casos (ex.: atalho recém-aberto).
       window.close();
@@ -576,10 +592,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           title="Sair / Fechar"
         >
           <X className="h-4 w-4" />
-          <span className="hidden sm:inline">Fechar</span>
+          <span className="hidden sm:inline">{exitLabel}</span>
         </button>
 
         <div className="w-full max-w-md rounded-3xl bg-slate-900/90 border border-slate-800 shadow-2xl backdrop-blur-2xl p-6 sm:p-8 z-10">
+          {topNotice}
           {/* Cabeçalho com as logos da Gestão e da SEMED */}
           <div className="flex items-center justify-between gap-3 mb-2">
             <div className="h-14 w-14 shrink-0 flex items-center justify-center">
@@ -800,7 +817,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         title="Sair / Fechar"
       >
         <X className="h-4 w-4" />
-        <span className="hidden sm:inline">Fechar</span>
+        <span className="hidden sm:inline">{exitLabel}</span>
       </button>
 
       {userAccounts.length > 0 && (
