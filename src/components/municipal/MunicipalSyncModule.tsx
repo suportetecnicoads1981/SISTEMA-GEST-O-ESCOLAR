@@ -308,6 +308,16 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
     setIsSchoolUnitModalOpen(true);
   };
 
+  // Logo da escola. Imagem enviada no antigo campo "Logo da Gestão" do cadastro da escola
+  // (diferente da logo da Gestão da Secretaria) também vale como logo da escola.
+  const schoolLogoOf = (unit: SchoolUnit): string => {
+    const own = String(unit.logoUrl || '').trim();
+    if (own) return own;
+    const mgmt = String((unit as any).managementLogoUrl || '').trim();
+    const network = String(activeSecretary?.managementLogoUrl || '').trim();
+    return mgmt && mgmt !== network ? mgmt : '';
+  };
+
   const handleOpenEditSchoolUnit = (unit: SchoolUnit) => {
     setSchoolUnitToEdit(unit);
     setIsSchoolUnitModalOpen(true);
@@ -1193,10 +1203,10 @@ export const MunicipalSyncModule: React.FC<MunicipalSyncModuleProps> = (props) =
                   </div>
 
                   <div className="flex items-start gap-3">
-                    {unit.logoUrl ? (
+                    {schoolLogoOf(unit) ? (
                       <div className="h-11 w-11 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center p-1 shrink-0 shadow-2xs">
                         <img
-                          src={unit.logoUrl}
+                          src={schoolLogoOf(unit)}
                           alt={unit.name}
                           className="h-full w-full object-contain"
                           referrerPolicy="no-referrer"

@@ -71,3 +71,21 @@ describe('assinatura da escola nos documentos', () => {
     expect(issuerFooterHtml(true, { schoolUnitId: 'u1' })).not.toContain('Augusta');
   });
 });
+
+describe('logo da escola', () => {
+  it('imagem enviada no antigo campo "Logo da Gestão" da escola vale como logo da escola', async () => {
+    const { getDocumentBranding } = await import('../src/services/documentBranding');
+    setDocumentBranding({
+      secretary: { managementLogoUrl: 'data:image/png;base64,REDE' } as any,
+      schoolUnits: [
+        { id: 'a', name: 'A', managementLogoUrl: 'data:image/png;base64,ESCOLA' } as any,
+        { id: 'b', name: 'B', managementLogoUrl: 'data:image/png;base64,REDE' } as any,
+        { id: 'c', name: 'C', logoUrl: 'data:image/png;base64,PROPRIA', managementLogoUrl: 'data:image/png;base64,OUTRA' } as any,
+      ],
+    });
+    const sc = getDocumentBranding().schools;
+    expect(sc.get('a')?.logoUrl).toBe('data:image/png;base64,ESCOLA');
+    expect(sc.get('b')?.logoUrl).toBe('');
+    expect(sc.get('c')?.logoUrl).toBe('data:image/png;base64,PROPRIA');
+  });
+});

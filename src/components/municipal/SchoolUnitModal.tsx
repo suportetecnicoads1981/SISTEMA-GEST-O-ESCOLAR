@@ -45,7 +45,6 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
   allUnits = [],
 }) => {
   const schoolLogoInputRef = useRef<HTMLInputElement>(null);
-  const managementLogoInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<Partial<SchoolUnit>>({
     name: '',
@@ -116,8 +115,14 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
 
   useEffect(() => {
     if (unitToEdit) {
+      // Antes havia um segundo campo ("Logo da Gestão / Mantenedora") no cadastro da escola, que
+      // não saía no timbre. Imagem enviada só nele passa a ser a logo da escola.
+      const ownMgmt = String(unitToEdit.managementLogoUrl || '').trim();
+      const movedLogo =
+        !String(unitToEdit.logoUrl || '').trim() && ownMgmt && ownMgmt !== String(defaultManagementLogo || '').trim() ? ownMgmt : '';
       setFormData({
         ...unitToEdit,
+        ...(movedLogo ? { logoUrl: movedLogo } : {}),
         isLinkedToSecretary: unitToEdit.isLinkedToSecretary !== false,
         municipalSecretaryId: unitToEdit.municipalSecretaryId || 'semed-cumaru-do-norte',
         municipalSecretaryName: unitToEdit.municipalSecretaryName || 'Secretaria Municipal de Educação – SEMED',
@@ -215,11 +220,8 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
       secretaryName: formData.secretaryName?.trim() || undefined,
       // Logos enviadas no cadastro (antes ficavam de fora ao salvar e se perdiam).
       logoUrl: formData.logoUrl?.trim() || undefined,
-      // Logo da Gestão: só grava se for própria da escola (a da Secretaria vem do cadastro da SEMED).
-      managementLogoUrl:
-        formData.managementLogoUrl?.trim() && formData.managementLogoUrl.trim() !== (defaultManagementLogo || '').trim()
-          ? formData.managementLogoUrl.trim()
-          : undefined,
+      // O campo "Logo da Gestão" saiu do cadastro da escola: a da Gestão vem do cadastro da Secretaria.
+      managementLogoUrl: undefined,
       phone: formData.phone?.trim() || '',
       email: formData.email?.trim() || '',
       totalClassrooms: Number(formData.totalClassrooms) || 0,
@@ -326,19 +328,19 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
             <h3 className="font-bold text-slate-900 text-xs flex items-center justify-between pb-1 border-b border-slate-200">
               <span className="flex items-center gap-1.5">
                 <ImageIcon className="h-4 w-4 text-emerald-600" />
-                <span>Identidade Visual da Escola e da Gestão</span>
+                <span>Logo da Escola (timbre dos documentos)</span>
               </span>
               <span className="text-[10px] text-slate-500 font-normal">
                 Suporta PNG, JPG, SVG ou WebP (Máx 3MB)
               </span>
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+            <div className="grid grid-cols-1 gap-4 pt-1">
               {/* Logo Oficial da Unidade Escolar (Brasão/Marca da Escola) */}
               <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="font-bold text-slate-800 text-xs flex items-center gap-1">
-                    <span>1. Logo / Brasão da Escola</span>
+                    <span>Logo / Brasão da Escola</span>
                   </label>
                   {formData.logoUrl && (
                     <button
@@ -393,65 +395,11 @@ export const SchoolUnitModal: React.FC<SchoolUnitModalProps> = ({
                 </div>
               </div>
 
-              {/* Logo da Gestão / Mantenedora Vinculada */}
-              <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="font-bold text-slate-800 text-xs flex items-center gap-1">
-                    <span>2. Logo da Gestão / Mantenedora</span>
-                  </label>
-                  {formData.managementLogoUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setFormData((prev) => ({ ...prev, managementLogoUrl: '' }))}
-                      className="text-[10px] text-rose-600 hover:text-rose-700 flex items-center gap-0.5 font-bold cursor-pointer"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      <span>Remover</span>
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="h-16 w-16 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 flex items-center justify-center shrink-0 overflow-hidden relative group">
-                    {formData.managementLogoUrl ? (
-                      <img
-                        src={formData.managementLogoUrl}
-                        alt="Logo Gestão"
-                        className="h-full w-full object-contain p-1"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <Building2 className="h-6 w-6 text-slate-400" />
-                    )}
-                  </div>
-
-                  <div className="flex-1 space-y-1.5">
-                    <input
-                      type="file"
-                      ref={managementLogoInputRef}
-                      onChange={(e) => handleFileUpload(e, 'managementLogoUrl')}
-                      accept="image/*"
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => managementLogoInputRef.current?.click()}
-                      className="w-full px-3 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Upload className="h-3.5 w-3.5" />
-                      <span>{formData.managementLogoUrl ? 'Trocar Logo Gestão' : 'Enviar Logo Gestão'}</span>
-                    </button>
-                    <input
-                      type="text"
-                      placeholder="Ou cole a URL do logo da gestão..."
-                      value={formData.managementLogoUrl?.startsWith('data:') ? 'Imagem carregada localmente' : (formData.managementLogoUrl || '')}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, managementLogoUrl: e.target.value }))}
-                      className="w-full px-2.5 py-1 text-[11px] rounded-lg border border-slate-200 text-slate-700 font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
             </div>
+            <p className="text-[11px] text-slate-500">
+              A logo da escola sai no timbre de todos os documentos e relatórios dela, à direita, junto da logo da SEMED.
+              A logo da Gestão Municipal (lado esquerdo do timbre) é a do cadastro da Secretaria, em Rede Municipal &amp; Polos.
+            </p>
           </div>
 
           {/* DADOS BÁSICOS */}
