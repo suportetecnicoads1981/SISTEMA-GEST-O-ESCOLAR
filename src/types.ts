@@ -2085,12 +2085,26 @@ export type ProtocolRequesterRelation = 'RESPONSAVEL' | 'ALUNO' | 'PROFESSOR' | 
 export type ProtocolChannel = 'BALCAO' | 'TELEFONE' | 'WHATSAPP' | 'EMAIL' | 'OUTRO';
 
 /** Cada movimentação do protocolo (abertura, mudança de situação ou observação). */
+export type ProtocolHistoryAction = 'ABERTURA' | 'MOVIMENTACAO' | 'OBSERVACAO' | 'EDICAO' | 'EXCLUSAO' | 'RESTAURACAO';
+
+/** Campo alterado numa edição do protocolo (valor antes e depois). */
+export interface ProtocolFieldChange {
+  field: string;
+  label: string;
+  from: string;
+  to: string;
+}
+
 export interface ProtocolHistoryEntry {
   at: string;
   status: ProtocolStatus;
   userId: string;
   userName: string;
   note?: string;
+  /** Tipo do registro (registros antigos não têm: abertura, movimentação ou observação). */
+  action?: ProtocolHistoryAction;
+  /** Edição: o que mudou. */
+  changes?: ProtocolFieldChange[];
 }
 
 /** Solicitação protocolada (ex.: declaração, histórico, boletim). */
@@ -2118,5 +2132,10 @@ export interface ProtocolRequest {
   createdByName: string;
   deliveredTo?: string;
   deliveredAt?: string;
+  /** Exclusão: o protocolo sai da lista, mas fica guardado (com quem excluiu e o motivo). */
+  deletedAt?: string;
+  deletedByUserId?: string;
+  deletedByName?: string;
+  deletedReason?: string;
   history: ProtocolHistoryEntry[];
 }

@@ -2115,7 +2115,7 @@ export default function App() {
             userAccounts: data?.userAccounts?.length || 0,
             unreadNotifications: unreadNotificationCount,
             unreadMessages: (data?.communications || []).length,
-            openProtocols: ((viewData as any).protocols || []).filter((p: ProtocolRequest) => p.status !== 'ENTREGUE' && p.status !== 'CANCELADO').length,
+            openProtocols: ((viewData as any).protocols || []).filter((p: ProtocolRequest) => !p.deletedAt && p.status !== 'ENTREGUE' && p.status !== 'CANCELADO').length,
           }}
         />
 
@@ -2293,6 +2293,7 @@ export default function App() {
                   scopeUnitId={schoolScope}
                   canCreate={canAccess(accessActor as any, 'documentos', 'canCreate') || canAccess(accessActor as any, 'secretaria', 'canCreate')}
                   canEdit={canAccess(accessActor as any, 'documentos', 'canEdit') || canAccess(accessActor as any, 'secretaria', 'canEdit')}
+                  canDelete={canAccess(accessActor as any, 'documentos', 'canDelete') || canAccess(accessActor as any, 'secretaria', 'canDelete')}
                   onSave={handleSaveProtocol}
                 />
               </Suspense>

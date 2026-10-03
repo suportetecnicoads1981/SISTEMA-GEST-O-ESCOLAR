@@ -9,6 +9,12 @@ import {
   moveProtocol,
   nextStatuses,
   protocolInputProblem,
+  editProtocol,
+  editProblem,
+  deleteProtocol,
+  restoreProtocol,
+  protocolAuditTrail,
+  historyAction,
 } from '../src/services/protocols/protocolService';
 
 const actor = { id: 'u1', name: 'Ana Secretária' };
@@ -107,5 +113,71 @@ describe('prazo e filtros', () => {
     expect(filterProtocols(list, { search: 'carla' })).toEqual([b]);
     expect(filterProtocols(list, { search: a.number.replace(/-/g, '').toLowerCase() })).toEqual([a]);
     expect(filterProtocols(list, { status: 'OVERDUE' }, '2026-10-30')).toEqual([a]);
+  });
+});
+
+describe('edição, exclusão e histórico do módulo', () => {
+  const base = createProtocol(input, actor, [], new Date(2026, 9, 3, 9, 0, 0));
+  const editor = { id: 'u9', name: 'Carlos Coordenador' };
+  const editInput = {
+    studentId: base.studentId,
+    studentName: base.studentName,
+    enrollmentNumber: base.enrollmentNumber,
+    schoolUnitId: base.schoolUnitId,
+    requesterName: 'Maria da Silva Souza',
+    requesterRelation: base.requesterRelation,
+    requesterPhone: '(94) 99999-0000',
+    documentType: 'Boletim Escolar',
+    description: base.description,
+    channel: base.channel,
+    dueDate: base.dueDate,
+  };
+
+  it('edição registra cada campo alterado (antes e depois) e quem alterou', () => {
+    const e = editProtocol(base, editInput, editor, '', new Date(2026, 9, 3, 10));
+    expect(e.documentType).toBe('Boletim Escolar');
+    expect(e.requesterName).toBe('Maria da Silva Souza');
+    const h = e.history[e.history.length - 1];
+    expect(h.action).toBe('EDICAO');
+    expect(h.userName).toBe('Carlos Coordenador');
+    expect(h.changes?.map((c) => c.label)).toEqual(['Documento', 'Solicitante', 'Telefone']);
+    expect(h.changes?.[0]).toMatchObject({ from: 'Histórico Escolar', to: 'Boletim Escolar' });
+    expect(base.documentType).toBe('Histórico Escolar'); // o original não muda
+  });
+
+  it('sem mudança não grava; encerrado exige motivo', () => {
+    expect(editProblem(base, { ...editInput, requesterName: base.requesterName, requesterPhone: '', documentType: base.documentType })).toMatch(/Nada/);
+    const done = moveProtocol(moveProtocol(base, 'PRONTO', actor), 'ENTREGUE', actor, { deliveredTo: 'Maria' });
+    expect(editProblem(done, { ...editInput, deliveredTo: 'Maria' })).toMatch(/motivo/);
+    const fixed = editProtocol(done, { ...editInput, deliveredTo: 'Maria da Silva' }, editor, 'Nome digitado errado');
+    expect(fixed.deliveredTo).toBe('Maria da Silva');
+    expect(fixed.history.at(-1)?.note).toMatch(/Motivo: Nome digitado errado/);
+  });
+
+  it('exclusão não apaga: guarda quem, quando e motivo; some da lista e pode ser restaurado', () => {
+    expect(() => deleteProtocol(base, editor, '')).toThrow(/motivo/);
+    const d = deleteProtocol(base, editor, 'Registrado em duplicidade', new Date(2026, 9, 3, 11));
+    expect(d.deletedByName).toBe('Carlos Coordenador');
+    expect(d.deletedReason).toBe('Registrado em duplicidade');
+    expect(filterProtocols([d], { status: 'ALL' })).toEqual([]);
+    expect(filterProtocols([d], { status: 'DELETED' })).toEqual([d]);
+    expect(isOverdue(d, '2030-01-01')).toBe(false);
+    expect(moveProblem(d, 'EM_ANDAMENTO')).toMatch(/excluído/);
+    const r = restoreProtocol(d, actor);
+    expect(r.deletedAt).toBeUndefined();
+    expect(r.history.at(-1)?.action).toBe('RESTAURACAO');
+    expect(filterProtocols([r], { status: 'ALL' })).toEqual([r]);
+  });
+
+  it('histórico do módulo junta tudo, mais recente primeiro, com tipo e usuário', () => {
+    const p1 = moveProtocol(base, 'EM_ANDAMENTO', actor, {}, new Date(2026, 9, 3, 9, 30));
+    const p2 = deleteProtocol(editProtocol(p1, editInput, editor, '', new Date(2026, 9, 3, 10)), editor, 'Duplicado', new Date(2026, 9, 3, 11));
+    // registro antigo, sem "action"
+    const legacy = { ...base, id: 'old', number: 'X', history: [{ at: '2026-01-01T10:00:00.000Z', status: 'ABERTO' as const, userId: 'u1', userName: 'Ana' }, { at: '2026-01-02T10:00:00.000Z', status: 'PRONTO' as const, userId: 'u1', userName: 'Ana' }] };
+    const rows = protocolAuditTrail([p2, legacy]);
+    expect(rows.map((r) => r.action).slice(0, 4)).toEqual(['EXCLUSAO', 'EDICAO', 'MOVIMENTACAO', 'ABERTURA']);
+    expect(rows[0].userName).toBe('Carlos Coordenador');
+    expect(rows.slice(-2).map((r) => r.action)).toEqual(['MOVIMENTACAO', 'ABERTURA']);
+    expect(historyAction(legacy.history[1], 1, legacy.history[0])).toBe('MOVIMENTACAO');
   });
 });

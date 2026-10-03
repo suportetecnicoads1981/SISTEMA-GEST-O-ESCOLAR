@@ -22,6 +22,10 @@ import {
   PackageCheck,
   Hourglass,
   Inbox,
+  Pencil,
+  Trash2,
+  Undo2,
+  ListChecks,
 } from 'lucide-react';
 import type {
   ProtocolChannel,
@@ -55,6 +59,16 @@ import {
   protocolInputProblem,
   sortProtocols,
   DEFAULT_DUE_DAYS,
+  HISTORY_ACTION_LABEL,
+  deleteProtocol,
+  editProblem,
+  editProtocol,
+  historyAction,
+  historyTitle,
+  protocolAuditTrail,
+  restoreProtocol,
+  type ProtocolAuditRow,
+  type ProtocolEditInput,
   type ProtocolFilters,
 } from '../../services/protocols/protocolService';
 import { triggerPrint } from '../../utils/printHelper';
@@ -72,6 +86,8 @@ interface ProtocolModuleProps {
   scopeUnitId?: string | null;
   canCreate: boolean;
   canEdit: boolean;
+  /** Excluir e restaurar protocolos. */
+  canDelete?: boolean;
   /** Inclui ou atualiza o protocolo. */
   onSave: (p: ProtocolRequest) => void;
 }
@@ -133,6 +149,7 @@ export const ProtocolModule: React.FC<ProtocolModuleProps> = ({
   scopeUnitId,
   canCreate,
   canEdit,
+  canDelete = false,
   onSave,
 }) => {
   const actor = { id: String(currentUser?.id || 'desconhecido'), name: formatPersonName(currentUser?.name) || 'Usuário' };
@@ -157,8 +174,12 @@ export const ProtocolModule: React.FC<ProtocolModuleProps> = ({
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE));
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = { ABERTO: 0, EM_ANDAMENTO: 0, PRONTO: 0, ENTREGUE: 0, CANCELADO: 0, OVERDUE: 0 };
+    const c: Record<string, number> = { ABERTO: 0, EM_ANDAMENTO: 0, PRONTO: 0, ENTREGUE: 0, CANCELADO: 0, OVERDUE: 0, DELETED: 0 };
     for (const p of all) {
+      if (p.deletedAt) {
+        c.DELETED++;
+        continue;
+      }
       c[p.status] = (c[p.status] || 0) + 1;
       if (isOverdue(p, today)) c.OVERDUE++;
     }
@@ -191,6 +212,15 @@ export const ProtocolModule: React.FC<ProtocolModuleProps> = ({
   // ---------------- Detalhe / movimentação ----------------
   const [openId, setOpenId] = useState<string | null>(null);
   const opened = openId ? all.find((p) => p.id === openId) || null : null;
+
+  // ---------------- Editar / excluir ----------------
+  const [editId, setEditId] = useState<string | null>(null);
+  const editing = editId ? all.find((p) => p.id === editId) || null : null;
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const deleting = deleteId ? all.find((p) => p.id === deleteId) || null : null;
+
+  // ---------------- Visão: lista ou histórico do módulo ----------------
+  const [view, setView] = useState<'LIST' | 'AUDIT'>('LIST');
 
   // ---------------- Relatório ----------------
   const [reportOpen, setReportOpen] = useState(false);
@@ -247,6 +277,7 @@ export const ProtocolModule: React.FC<ProtocolModuleProps> = ({
     { id: 'createdByName', label: 'Registrado por', defaultVisible: true },
     { id: 'deliveredAt', label: 'Entregue em', defaultVisible: false },
     { id: 'deliveredTo', label: 'Entregue a', defaultVisible: false },
+    { id: 'deleted', label: 'Exclusão (quem, quando, motivo)', defaultVisible: false },
   ];
   const reportCell = (p: ProtocolRequest, col: string): string => {
     switch (col) {
@@ -255,20 +286,32 @@ export const ProtocolModule: React.FC<ProtocolModuleProps> = ({
       case 'createdAt':
         return formatDateBr(p.createdAt);
       case 'status':
-        return `${PROTOCOL_STATUS_LABEL[p.status]}${isOverdue(p, today) ? ' (atrasado)' : ''}`;
+        return `${PROTOCOL_STATUS_LABEL[p.status]}${isOverdue(p, today) ? ' (atrasado)' : ''}${p.deletedAt ? ' (excluído)' : ''}`;
       case 'dueDate':
         return formatDateBr(p.dueDate);
       case 'deliveredAt':
         return formatDateBr(p.deliveredAt);
       case 'requesterRelation':
         return PROTOCOL_RELATION_LABEL[p.requesterRelation] || '';
+      case 'deleted':
+        return p.deletedAt ? `${p.deletedByName || ''} em ${formatDateTimeBr(p.deletedAt)} — ${p.deletedReason || ''}` : '';
       default:
         return String((p as any)[col] ?? '');
     }
   };
   const reportFilters = [
     filters.status && filters.status !== 'ALL'
-      ? { label: 'Situação', value: filters.status === 'OVERDUE' ? 'Atrasados' : filters.status === 'OPEN_ANY' ? 'Em aberto' : PROTOCOL_STATUS_LABEL[filters.status as ProtocolStatus] }
+      ? {
+          label: 'Situação',
+          value:
+            filters.status === 'OVERDUE'
+              ? 'Atrasados'
+              : filters.status === 'OPEN_ANY'
+                ? 'Em aberto'
+                : filters.status === 'DELETED'
+                  ? 'Excluídos'
+                  : PROTOCOL_STATUS_LABEL[filters.status as ProtocolStatus],
+        }
       : null,
     filters.schoolUnitId && filters.schoolUnitId !== 'ALL' ? { label: 'Escola', value: unitName(filters.schoolUnitId) } : null,
     filters.documentType && filters.documentType !== 'ALL' ? { label: 'Documento', value: filters.documentType } : null,
@@ -339,6 +382,32 @@ export const ProtocolModule: React.FC<ProtocolModuleProps> = ({
         </div>
       </div>
 
+      {/* Lista de protocolos ou histórico de movimentações do módulo */}
+      <div className="flex items-center gap-1 bg-white rounded-xl border border-slate-200 p-1 w-fit">
+        <button
+          type="button"
+          onClick={() => setView('LIST')}
+          className={`px-3 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1.5 cursor-pointer ${view === 'LIST' ? 'bg-teal-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+        >
+          <FileClock className="h-4 w-4" />
+          Protocolos
+        </button>
+        <button
+          type="button"
+          data-testid="protocol-audit-tab"
+          onClick={() => setView('AUDIT')}
+          className={`px-3 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1.5 cursor-pointer ${view === 'AUDIT' ? 'bg-teal-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+          title="Todas as movimentações, edições e exclusões, com quem fez e quando"
+        >
+          <ListChecks className="h-4 w-4" />
+          Histórico de movimentações
+        </button>
+      </div>
+
+      {view === 'AUDIT' && <ProtocolAuditView protocols={all} unitName={unitName} onOpen={(id) => setOpenId(id)} />}
+
+      {view === 'LIST' && (
+      <>
       {/* Indicadores (clique para filtrar) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {KPI.map((k) => {
@@ -383,6 +452,7 @@ export const ProtocolModule: React.FC<ProtocolModuleProps> = ({
               </option>
             ))}
             <option value="OVERDUE">Atrasados</option>
+            <option value="DELETED">Excluídos ({counts.DELETED})</option>
           </select>
           {!scopeUnitId && schoolOptions.length > 1 && (
             <select value={String(filters.schoolUnitId)} onChange={(e) => setFilter({ schoolUnitId: e.target.value })} className={`${inputCls} lg:w-56`} title="Escola">
@@ -479,19 +549,63 @@ export const ProtocolModule: React.FC<ProtocolModuleProps> = ({
                     </td>
                     <td className="p-3">
                       <StatusBadge p={p} />
+                      {p.deletedAt && (
+                        <div className="mt-1 text-[10px] text-rose-700 font-semibold">
+                          Excluído por {p.deletedByName} em {formatDateTimeBr(p.deletedAt)}
+                        </div>
+                      )}
                     </td>
                     <td className="p-3 text-slate-700">{formatDateBr(p.dueDate)}</td>
                     <td className="p-3 text-right">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenId(p.id);
-                        }}
-                        className="px-2.5 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold text-[11px] rounded-lg cursor-pointer"
-                      >
-                        {canEdit && !isFinalStatus(p.status) ? 'Movimentar' : 'Ver'}
-                      </button>
+                      <div className="inline-flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        {p.deletedAt ? (
+                          canDelete && (
+                            <button
+                              type="button"
+                              onClick={() => onSave(restoreProtocol(p, actor))}
+                              className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-[11px] rounded-lg cursor-pointer flex items-center gap-1"
+                              title="Desfazer a exclusão (fica registrado quem restaurou)"
+                            >
+                              <Undo2 className="h-3.5 w-3.5" />
+                              Restaurar
+                            </button>
+                          )
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setOpenId(p.id)}
+                              className="px-2.5 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold text-[11px] rounded-lg cursor-pointer"
+                            >
+                              {canEdit && !isFinalStatus(p.status) ? 'Movimentar' : 'Ver'}
+                            </button>
+                            {canEdit && (
+                              <button
+                                type="button"
+                                data-testid="protocol-edit"
+                                onClick={() => setEditId(p.id)}
+                                className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+                                title="Editar (corrigir dados do pedido)"
+                                aria-label="Editar"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button
+                                type="button"
+                                data-testid="protocol-delete"
+                                onClick={() => setDeleteId(p.id)}
+                                className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
+                                title="Excluir (fica guardado com quem excluiu e o motivo)"
+                                aria-label="Excluir"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -518,6 +632,9 @@ export const ProtocolModule: React.FC<ProtocolModuleProps> = ({
           </div>
         )}
       </div>
+
+      </>
+      )}
 
       {newOpen && (
         <NewProtocolModal
@@ -546,10 +663,41 @@ export const ProtocolModule: React.FC<ProtocolModuleProps> = ({
           p={opened}
           schoolName={unitName(opened.schoolUnitId)}
           canEdit={canEdit}
+          canDelete={canDelete}
+          onEdit={() => setEditId(opened.id)}
+          onDelete={() => setDeleteId(opened.id)}
+          onRestore={() => onSave(restoreProtocol(opened, actor))}
           onClose={() => setOpenId(null)}
           onMove={(to, note, deliveredTo) => onSave(moveProtocol(opened, to, actor, { note, deliveredTo }))}
           onNote={(note) => onSave(addProtocolNote(opened, note, actor))}
           onPrint={() => printReceipt(opened)}
+        />
+      )}
+
+      {editing && (
+        <EditProtocolModal
+          key={editing.id}
+          p={editing}
+          students={students}
+          classes={classes}
+          schoolUnits={schoolUnits}
+          onClose={() => setEditId(null)}
+          onSave={(input, reason) => {
+            onSave(editProtocol(editing, input, actor, reason));
+            setEditId(null);
+          }}
+        />
+      )}
+
+      {deleting && (
+        <DeleteProtocolModal
+          p={deleting}
+          onClose={() => setDeleteId(null)}
+          onConfirm={(reason) => {
+            onSave(deleteProtocol(deleting, actor, reason));
+            setDeleteId(null);
+            if (openId === deleting.id) setOpenId(null);
+          }}
         />
       )}
 
@@ -867,12 +1015,18 @@ const ProtocolDetailModal: React.FC<{
   p: ProtocolRequest;
   schoolName: string;
   canEdit: boolean;
+  canDelete: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+  onRestore: () => void;
   onClose: () => void;
   onMove: (to: ProtocolStatus, note?: string, deliveredTo?: string) => void;
   onNote: (note: string) => void;
   onPrint: () => void;
-}> = ({ p, schoolName, canEdit, onClose, onMove, onNote, onPrint }) => {
-  const options = nextStatuses(p.status);
+}> = ({ p, schoolName, canEdit: canEditProp, canDelete, onEdit, onDelete, onRestore, onClose, onMove, onNote, onPrint }) => {
+  const deleted = !!p.deletedAt;
+  const canEdit = canEditProp && !deleted;
+  const options = deleted ? [] : nextStatuses(p.status);
   const [to, setTo] = useState<ProtocolStatus | ''>(options[0] || '');
   const [note, setNote] = useState('');
   const [deliveredTo, setDeliveredTo] = useState(p.requesterName || '');
@@ -931,6 +1085,23 @@ const ProtocolDetailModal: React.FC<{
         <div className="p-5 grid grid-cols-1 lg:grid-cols-5 gap-5 text-xs max-h-[75vh] overflow-y-auto">
           {/* Dados */}
           <div className="lg:col-span-3 space-y-4">
+            {deleted && (
+              <div data-testid="protocol-deleted-banner" className="p-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-800 space-y-1">
+                <div className="font-bold flex items-center gap-1.5">
+                  <Trash2 className="h-4 w-4" />
+                  Protocolo excluído
+                </div>
+                <div>
+                  Por <strong>{p.deletedByName}</strong> em {formatDateTimeBr(p.deletedAt)}. Motivo: {p.deletedReason}
+                </div>
+                {canDelete && (
+                  <button type="button" onClick={onRestore} className="mt-1 px-3 py-1.5 bg-white border border-rose-200 hover:bg-rose-100 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer">
+                    <Undo2 className="h-3.5 w-3.5" />
+                    Restaurar protocolo
+                  </button>
+                )}
+              </div>
+            )}
             <div className="rounded-xl border border-slate-200 divide-y divide-slate-100">
               {info
                 .filter(([, v]) => v)
@@ -947,7 +1118,19 @@ const ProtocolDetailModal: React.FC<{
                 <Printer className="h-4 w-4" />
                 Imprimir comprovante
               </button>
-              {phone && p.status === 'PRONTO' && (
+              {canEdit && (
+                <button type="button" onClick={onEdit} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl flex items-center gap-1.5 cursor-pointer">
+                  <Pencil className="h-4 w-4" />
+                  Editar
+                </button>
+              )}
+              {canDelete && !deleted && (
+                <button type="button" onClick={onDelete} className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl flex items-center gap-1.5 cursor-pointer">
+                  <Trash2 className="h-4 w-4" />
+                  Excluir
+                </button>
+              )}
+              {!deleted && phone && p.status === 'PRONTO' && (
                 <a
                   href={`https://wa.me/${phone}?text=${waText}`}
                   target="_blank"
@@ -1027,19 +1210,507 @@ const ProtocolDetailModal: React.FC<{
               Histórico
             </div>
             <ol className="relative border-l-2 border-slate-200 ml-2 space-y-3">
-              {[...(p.history || [])].reverse().map((h, i) => (
-                <li key={`${h.at}-${i}`} className="ml-3">
-                  <span className="absolute -left-[7px] mt-1 h-3 w-3 rounded-full bg-teal-500 border-2 border-white" />
-                  <div className="text-[11px] text-slate-500">{formatDateTimeBr(h.at)}</div>
-                  <div className="font-bold text-slate-900">{PROTOCOL_STATUS_LABEL[h.status]}</div>
-                  <div className="text-[11px] text-slate-600">por {h.userName}</div>
-                  {h.note && <div className="mt-0.5 text-slate-700 flex items-start gap-1"><FileText className="h-3 w-3 mt-0.5 shrink-0" />{h.note}</div>}
-                </li>
-              ))}
+              {(p.history || [])
+                .map((h, i, arr) => ({ h, i, action: historyAction(h, i, arr[i - 1]) }))
+                .reverse()
+                .map(({ h, i, action }) => (
+                  <li key={`${h.at}-${i}`} className="ml-3" data-testid="protocol-history-item">
+                    <span
+                      className={`absolute -left-[7px] mt-1 h-3 w-3 rounded-full border-2 border-white ${
+                        action === 'EXCLUSAO' ? 'bg-rose-500' : action === 'EDICAO' ? 'bg-amber-500' : action === 'RESTAURACAO' ? 'bg-sky-500' : 'bg-teal-500'
+                      }`}
+                    />
+                    <div className="text-[11px] text-slate-500">{formatDateTimeBr(h.at)}</div>
+                    <div className="font-bold text-slate-900">{historyTitle(h, action)}</div>
+                    <div className="text-[11px] text-slate-600">por {h.userName}</div>
+                    {h.changes && h.changes.length > 0 ? (
+                      <ul className="mt-0.5 space-y-0.5 text-slate-700">
+                        {h.changes.map((c) => (
+                          <li key={c.field}>
+                            <span className="font-semibold">{c.label}:</span> <span className="line-through text-slate-400">{c.from || '(vazio)'}</span> →{' '}
+                            <span className="text-emerald-700">{c.to || '(vazio)'}</span>
+                          </li>
+                        ))}
+                        {/^Motivo: /.test(h.note || '') && <li className="italic">{String(h.note).split(' • ')[0]}</li>}
+                      </ul>
+                    ) : (
+                      h.note && (
+                        <div className="mt-0.5 text-slate-700 flex items-start gap-1">
+                          <FileText className="h-3 w-3 mt-0.5 shrink-0" />
+                          {h.note}
+                        </div>
+                      )
+                    )}
+                  </li>
+                ))}
             </ol>
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+/* ------------------------------------------------------------------------------------------ */
+/* Editar                                                                                      */
+/* ------------------------------------------------------------------------------------------ */
+
+const EditProtocolModal: React.FC<{
+  p: ProtocolRequest;
+  students: Student[];
+  classes: SchoolClass[];
+  schoolUnits: SchoolUnit[];
+  onClose: () => void;
+  onSave: (input: ProtocolEditInput, reason?: string) => void;
+}> = ({ p, students, classes, schoolUnits, onClose, onSave }) => {
+  const [studentSearch, setStudentSearch] = useState('');
+  const [student, setStudent] = useState<Pick<ProtocolEditInput, 'studentId' | 'studentName' | 'enrollmentNumber' | 'className' | 'schoolUnitId'>>({
+    studentId: p.studentId,
+    studentName: p.studentName,
+    enrollmentNumber: p.enrollmentNumber,
+    className: p.className,
+    schoolUnitId: p.schoolUnitId,
+  });
+  const [relation, setRelation] = useState<ProtocolRequesterRelation>(p.requesterRelation);
+  const [requesterName, setRequesterName] = useState(p.requesterName || '');
+  const [requesterPhone, setRequesterPhone] = useState(p.requesterPhone || '');
+  const [documentType, setDocumentType] = useState(p.documentType);
+  const [description, setDescription] = useState(p.description || '');
+  const [channel, setChannel] = useState<ProtocolChannel | undefined>(p.channel);
+  const [dueDate, setDueDate] = useState(p.dueDate || '');
+  const [deliveredTo, setDeliveredTo] = useState(p.deliveredTo || '');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+
+  const classOf = (s: Student) => classes.find((c) => c.id === s.classId);
+  const matches = useMemo(() => {
+    const t = fold(studentSearch).trim();
+    if (t.length < 2) return [];
+    return students.filter((s) => fold(s.name).includes(t) || fold(s.enrollmentNumber).includes(t)).slice(0, 8);
+  }, [students, studentSearch]);
+
+  const input: ProtocolEditInput = {
+    ...student,
+    studentName: student.studentName || '',
+    requesterName,
+    requesterRelation: relation,
+    requesterPhone,
+    documentType,
+    description,
+    channel,
+    dueDate,
+    deliveredTo,
+  };
+  const docOptions = (PROTOCOL_DOCUMENT_TYPES as readonly string[]).includes(p.documentType)
+    ? (PROTOCOL_DOCUMENT_TYPES as readonly string[])
+    : [p.documentType, ...PROTOCOL_DOCUMENT_TYPES];
+  const closed = isFinalStatus(p.status);
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const problem = editProblem(p, input, reason);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    onSave(input, reason);
+  };
+
+  const inputCls = 'w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500';
+  const labelCls = 'block text-[11px] font-bold text-slate-700 mb-1';
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto" role="dialog" aria-modal="true">
+      <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden my-6" data-testid="protocol-edit-modal">
+        <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="h-9 w-9 rounded-xl bg-amber-500 flex items-center justify-center text-white">
+              <Pencil className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Editar protocolo {p.number}</h2>
+              <p className="text-xs text-slate-500">Cada campo alterado fica no histórico, com o valor anterior e quem alterou</p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 cursor-pointer" aria-label="Fechar">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <form onSubmit={submit} className="p-5 space-y-4 text-xs max-h-[75vh] overflow-y-auto">
+          {error && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-semibold flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              {error}
+            </div>
+          )}
+          <div>
+            <label className={labelCls}>Aluno(a) *</label>
+            <div className="p-3 rounded-xl border border-teal-200 bg-teal-50/60 space-y-2">
+              <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                <User className="h-3.5 w-3.5 text-teal-700" />
+                {student.studentName}
+                <span className="text-[11px] font-normal text-slate-600">{[student.enrollmentNumber, student.className].filter(Boolean).join(' • ')}</span>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input value={studentSearch} onChange={(e) => setStudentSearch(e.target.value)} placeholder="Trocar aluno: digite o nome ou o RA..." className={`${inputCls} pl-9`} />
+                {matches.length > 0 && (
+                  <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-64 overflow-y-auto">
+                    {matches.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => {
+                          const cls = classOf(s);
+                          setStudent({ studentId: s.id, studentName: s.name, enrollmentNumber: s.enrollmentNumber, className: cls?.name, schoolUnitId: s.schoolUnitId || cls?.schoolUnitId || p.schoolUnitId });
+                          setStudentSearch('');
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-teal-50 border-b border-slate-100 last:border-0 cursor-pointer"
+                      >
+                        <div className="font-bold text-slate-900">{s.name}</div>
+                        <div className="text-[11px] text-slate-500">
+                          {[s.enrollmentNumber, classOf(s)?.name, schoolUnits.find((u) => u.id === s.schoolUnitId)?.name].filter(Boolean).join(' • ')}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Documento solicitado *</label>
+              <select value={documentType} onChange={(e) => setDocumentType(e.target.value)} className={inputCls}>
+                {docOptions.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Previsão de entrega</label>
+              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputCls} />
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>Detalhes do pedido {documentType === 'Outro documento' ? '*' : '(opcional)'}</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={inputCls} />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Quem está pedindo *</label>
+              <select value={relation} onChange={(e) => setRelation(e.target.value as ProtocolRequesterRelation)} className={inputCls}>
+                {(Object.keys(PROTOCOL_RELATION_LABEL) as ProtocolRequesterRelation[]).map((r) => (
+                  <option key={r} value={r}>
+                    {PROTOCOL_RELATION_LABEL[r]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Como o pedido chegou</label>
+              <select value={channel || ''} onChange={(e) => setChannel((e.target.value || undefined) as ProtocolChannel | undefined)} className={inputCls}>
+                <option value="">—</option>
+                {(Object.keys(PROTOCOL_CHANNEL_LABEL) as ProtocolChannel[]).map((c) => (
+                  <option key={c} value={c}>
+                    {PROTOCOL_CHANNEL_LABEL[c]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Nome do solicitante *</label>
+              <input data-testid="protocol-edit-requester" value={requesterName} onChange={(e) => setRequesterName(e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Telefone / WhatsApp</label>
+              <input value={requesterPhone} onChange={(e) => setRequesterPhone(e.target.value)} className={inputCls} />
+            </div>
+            {p.status === 'ENTREGUE' && (
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Entregue a *</label>
+                <input value={deliveredTo} onChange={(e) => setDeliveredTo(e.target.value)} className={inputCls} />
+              </div>
+            )}
+          </div>
+          <div>
+            <label className={labelCls}>Motivo da correção {closed ? '*' : '(opcional)'}</label>
+            <input
+              data-testid="protocol-edit-reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className={inputCls}
+              placeholder={closed ? 'Protocolo encerrado: explique por que está corrigindo' : 'Ex.: nome do responsável digitado errado'}
+            />
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-600 hover:bg-slate-100 font-bold rounded-xl cursor-pointer">
+              Cancelar
+            </button>
+            <button type="submit" data-testid="protocol-edit-save" className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer">
+              <CheckCircle2 className="h-4 w-4" />
+              Salvar alterações
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+/* ------------------------------------------------------------------------------------------ */
+/* Excluir                                                                                     */
+/* ------------------------------------------------------------------------------------------ */
+
+const DeleteProtocolModal: React.FC<{ p: ProtocolRequest; onClose: () => void; onConfirm: (reason: string) => void }> = ({ p, onClose, onConfirm }) => {
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  return (
+    <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden text-xs" data-testid="protocol-delete-modal">
+        <div className="px-5 py-4 bg-rose-50 border-b border-rose-100 flex items-center gap-2.5">
+          <div className="h-9 w-9 rounded-xl bg-rose-600 flex items-center justify-center text-white">
+            <Trash2 className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Excluir protocolo {p.number}</h2>
+            <p className="text-slate-600">
+              {p.documentType} • {p.studentName}
+            </p>
+          </div>
+        </div>
+        <div className="p-5 space-y-3">
+          <p className="text-slate-700">
+            O protocolo sai da lista, mas <strong>não é apagado</strong>: fica guardado em "Excluídos", com o seu nome, a data e o motivo, e pode ser restaurado.
+          </p>
+          {error && <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 font-semibold">{error}</div>}
+          <label className="block text-[11px] font-bold text-slate-700">Motivo da exclusão *</label>
+          <textarea
+            data-testid="protocol-delete-reason"
+            autoFocus
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+            className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+            placeholder="Ex.: registrado em duplicidade; aberto no aluno errado"
+          />
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-600 hover:bg-slate-100 font-bold rounded-xl cursor-pointer">
+              Cancelar
+            </button>
+            <button
+              type="button"
+              data-testid="protocol-delete-confirm"
+              onClick={() => (reason.trim() ? onConfirm(reason) : setError('Informe o motivo da exclusão.'))}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl flex items-center gap-1.5 cursor-pointer"
+            >
+              <Trash2 className="h-4 w-4" />
+              Excluir
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ------------------------------------------------------------------------------------------ */
+/* Histórico de movimentações do módulo                                                        */
+/* ------------------------------------------------------------------------------------------ */
+
+const AUDIT_PAGE = 100;
+
+const ProtocolAuditView: React.FC<{ protocols: ProtocolRequest[]; unitName: (id?: string) => string; onOpen: (id: string) => void }> = ({ protocols, unitName, onOpen }) => {
+  const rows = useMemo(() => protocolAuditTrail(protocols), [protocols]);
+  const [search, setSearch] = useState('');
+  const [user, setUser] = useState('ALL');
+  const [action, setAction] = useState('ALL');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [page, setPage] = useState(0);
+  const [printOpen, setPrintOpen] = useState(false);
+
+  const users = useMemo(() => {
+    const m = new Map<string, string>();
+    rows.forEach((r) => m.set(r.userId, r.userName));
+    return Array.from(m.entries()).sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
+  }, [rows]);
+
+  const filtered = useMemo(() => {
+    const t = fold(search).trim();
+    return rows.filter((r) => {
+      if (user !== 'ALL' && r.userId !== user) return false;
+      if (action !== 'ALL' && r.action !== action) return false;
+      const day = localIsoDate(new Date(r.at));
+      if (from && day < from) return false;
+      if (to && day > to) return false;
+      if (t && !(fold(r.number).includes(t) || fold(r.studentName).includes(t) || fold(r.note).includes(t) || fold(r.userName).includes(t))) return false;
+      return true;
+    });
+  }, [rows, search, user, action, from, to]);
+  const pageRows = filtered.slice(page * AUDIT_PAGE, (page + 1) * AUDIT_PAGE);
+  const pages = Math.max(1, Math.ceil(filtered.length / AUDIT_PAGE));
+
+  const inputCls = 'w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500';
+  const tone: Record<string, string> = {
+    ABERTURA: 'bg-sky-50 text-sky-800 border-sky-200',
+    MOVIMENTACAO: 'bg-teal-50 text-teal-800 border-teal-200',
+    OBSERVACAO: 'bg-slate-50 text-slate-700 border-slate-200',
+    EDICAO: 'bg-amber-50 text-amber-800 border-amber-200',
+    EXCLUSAO: 'bg-rose-50 text-rose-800 border-rose-200',
+    RESTAURACAO: 'bg-violet-50 text-violet-800 border-violet-200',
+  };
+  const detail = (r: ProtocolAuditRow) => {
+    if (!r.changes || !r.changes.length) return r.note;
+    const why = /^Motivo: /.test(r.note) ? r.note.split(' • ')[0] : '';
+    return [r.changes.map((c) => `${c.label}: ${c.from || '(vazio)'} → ${c.to || '(vazio)'}`).join('; '), why].filter(Boolean).join(' • ');
+  };
+  const reset = (fn: () => void) => {
+    fn();
+    setPage(0);
+  };
+
+  return (
+    <div className="space-y-3" data-testid="protocol-audit">
+      <div className="bg-white rounded-2xl border border-slate-200 p-3 space-y-2">
+        <p className="text-[11px] text-slate-600">
+          Tudo o que foi feito nos protocolos — abertura, mudança de situação, observação, edição, exclusão e restauração — com quem fez, quando e o que mudou. Nada aqui pode ser apagado.
+        </p>
+        <div className="flex flex-col lg:flex-row gap-2 lg:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input value={search} onChange={(e) => reset(() => setSearch(e.target.value))} placeholder="Buscar por nº do protocolo, aluno, usuário ou texto..." className={`${inputCls} pl-9`} />
+          </div>
+          <select value={action} onChange={(e) => reset(() => setAction(e.target.value))} className={`${inputCls} lg:w-44`} title="Tipo">
+            <option value="ALL">Todos os tipos</option>
+            {(Object.keys(HISTORY_ACTION_LABEL) as (keyof typeof HISTORY_ACTION_LABEL)[]).map((a) => (
+              <option key={a} value={a}>
+                {HISTORY_ACTION_LABEL[a]}
+              </option>
+            ))}
+          </select>
+          <select value={user} onChange={(e) => reset(() => setUser(e.target.value))} className={`${inputCls} lg:w-52`} title="Usuário">
+            <option value="ALL">Feito por: todos</option>
+            {users.map(([id, name]) => (
+              <option key={id} value={id}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <label className="flex items-center gap-1.5 text-[11px] text-slate-600">
+            De
+            <input type="date" value={from} onChange={(e) => reset(() => setFrom(e.target.value))} className={`${inputCls} w-36`} />
+          </label>
+          <label className="flex items-center gap-1.5 text-[11px] text-slate-600">
+            até
+            <input type="date" value={to} onChange={(e) => reset(() => setTo(e.target.value))} className={`${inputCls} w-36`} />
+          </label>
+          <button
+            type="button"
+            onClick={() => setPrintOpen(true)}
+            disabled={!filtered.length}
+            className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-40 shrink-0"
+          >
+            <Printer className="h-4 w-4" />
+            Imprimir ({filtered.length})
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        {filtered.length === 0 ? (
+          <div className="text-center py-10 text-xs text-slate-500">Nenhuma movimentação com estes filtros.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+                  <th className="p-3">Data e hora</th>
+                  <th className="p-3">Protocolo / Aluno</th>
+                  <th className="p-3">O que foi feito</th>
+                  <th className="p-3">Detalhes</th>
+                  <th className="p-3">Feito por</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {pageRows.map((r, i) => (
+                  <tr key={`${r.protocolId}-${r.at}-${i}`} className="hover:bg-teal-50/40 cursor-pointer align-top" onClick={() => onOpen(r.protocolId)}>
+                    <td className="p-3 whitespace-nowrap text-slate-700">{formatDateTimeBr(r.at)}</td>
+                    <td className="p-3">
+                      <div className="font-mono font-bold text-slate-900">{r.number}</div>
+                      <div className="text-[11px] text-slate-500">{[r.studentName, unitName(r.schoolUnitId)].filter(Boolean).join(' • ')}</div>
+                    </td>
+                    <td className="p-3">
+                      <span className={`inline-block px-2 py-0.5 rounded-md border text-[11px] font-bold ${tone[r.action]}`}>{HISTORY_ACTION_LABEL[r.action]}</span>
+                      <div className="text-[11px] text-slate-600 mt-0.5">{r.title}</div>
+                    </td>
+                    <td className="p-3 text-slate-700 max-w-md">{detail(r)}</td>
+                    <td className="p-3 font-semibold text-slate-800 whitespace-nowrap">{r.userName}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {filtered.length > AUDIT_PAGE && (
+          <div className="flex items-center justify-between p-3 border-t border-slate-100 text-xs text-slate-600">
+            <span>
+              Exibindo {page * AUDIT_PAGE + 1} a {Math.min(filtered.length, (page + 1) * AUDIT_PAGE)} de {filtered.length}
+            </span>
+            <div className="flex items-center gap-1">
+              <button type="button" disabled={page === 0} onClick={() => setPage((v) => v - 1)} className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-40 cursor-pointer">
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="font-bold">
+                {page + 1} / {pages}
+              </span>
+              <button type="button" disabled={page >= pages - 1} onClick={() => setPage((v) => v + 1)} className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-40 cursor-pointer">
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <ConfigurablePrintModal
+        isOpen={printOpen}
+        onClose={() => setPrintOpen(false)}
+        title="Histórico de Movimentações dos Protocolos"
+        subtitle="Quem fez, quando e o que mudou"
+        columns={[
+          { id: 'index', label: 'Nº', defaultVisible: true, align: 'center' },
+          { id: 'at', label: 'Data e hora', defaultVisible: true },
+          { id: 'number', label: 'Protocolo', defaultVisible: true },
+          { id: 'studentName', label: 'Aluno(a)', defaultVisible: true },
+          { id: 'action', label: 'Tipo', defaultVisible: true },
+          { id: 'detail', label: 'Detalhes', defaultVisible: true },
+          { id: 'userName', label: 'Feito por', defaultVisible: true },
+        ]}
+        data={filtered}
+        appliedFilters={[
+          action !== 'ALL' ? { label: 'Tipo', value: HISTORY_ACTION_LABEL[action as keyof typeof HISTORY_ACTION_LABEL] } : null,
+          user !== 'ALL' ? { label: 'Feito por', value: users.find(([id]) => id === user)?.[1] || '' } : null,
+          search ? { label: 'Busca', value: search } : null,
+          from || to ? { label: 'Período', value: `${formatDateBr(from) || '...'} a ${formatDateBr(to) || '...'}` } : null,
+        ].filter(Boolean) as { label: string; value: string }[]}
+        summaryMetrics={[{ label: 'Registros', value: filtered.length }]}
+        defaultOrientation="landscape"
+        renderCell={(r: ProtocolAuditRow, col: string, rowIndex: number) =>
+          col === 'index'
+            ? String(rowIndex + 1)
+            : col === 'at'
+              ? formatDateTimeBr(r.at)
+              : col === 'action'
+                ? `${HISTORY_ACTION_LABEL[r.action]} — ${r.title}`
+                : col === 'detail'
+                  ? detail(r)
+                  : String((r as any)[col] ?? '')
+        }
+        fileName="Historico_Protocolos"
+        countLabel="Total de registros"
+      />
     </div>
   );
 };

@@ -7,9 +7,15 @@
  *
  * Situações: Aberto → Em andamento → Pronto para entrega → Entregue (ou Cancelado).
  * Entregue e Cancelado encerram o protocolo: depois disso só se acrescentam observações.
+ *
+ * Edição e exclusão também ficam no histórico: a edição guarda cada campo alterado (antes e
+ * depois) e quem alterou; a exclusão não apaga o protocolo — ele sai da lista, mas continua
+ * guardado com quem excluiu, quando e o motivo, e pode ser restaurado.
  */
 import type {
   ProtocolChannel,
+  ProtocolFieldChange,
+  ProtocolHistoryAction,
   ProtocolHistoryEntry,
   ProtocolRequest,
   ProtocolRequesterRelation,
@@ -168,7 +174,7 @@ export function createProtocol(
     updatedAt: at,
     createdByUserId: actor.id,
     createdByName: actor.name,
-    history: [{ at, status: 'ABERTO', userId: actor.id, userName: actor.name, note: 'Solicitação registrada.' }],
+    history: [{ at, status: 'ABERTO', userId: actor.id, userName: actor.name, note: 'Solicitação registrada.', action: 'ABERTURA' }],
   };
 }
 
@@ -185,6 +191,7 @@ export function nextStatuses(current: ProtocolStatus): ProtocolStatus[] {
 
 /** Problema na movimentação ('' quando pode). */
 export function moveProblem(p: ProtocolRequest, to: ProtocolStatus, note?: string, deliveredTo?: string): string {
+  if (p.deletedAt) return 'Protocolo excluído: restaure antes de movimentar.';
   if (isFinalStatus(p.status)) return `O protocolo já está "${PROTOCOL_STATUS_LABEL[p.status]}". Só é possível acrescentar observações.`;
   if (to === p.status) return 'O protocolo já está nessa situação.';
   if (to === 'CANCELADO' && !String(note || '').trim()) return 'Informe o motivo do cancelamento.';
@@ -210,6 +217,7 @@ export function moveProtocol(
     userId: actor.id,
     userName: actor.name,
     note: [String(opts.note || '').trim(), to === 'ENTREGUE' ? `Entregue a: ${deliveredTo}` : ''].filter(Boolean).join(' • ') || undefined,
+    action: 'MOVIMENTACAO',
   };
   return {
     ...p,
@@ -228,13 +236,207 @@ export function addProtocolNote(p: ProtocolRequest, note: string, actor: Protoco
   return {
     ...p,
     updatedAt: at,
-    history: [...(p.history || []), { at, status: p.status, userId: actor.id, userName: actor.name, note: text }],
+    history: [...(p.history || []), { at, status: p.status, userId: actor.id, userName: actor.name, note: text, action: 'OBSERVACAO' }],
   };
+}
+
+// ===================== Edição, exclusão e restauração =====================
+
+/** Campos que podem ser corrigidos depois do registro. */
+export interface ProtocolEditInput {
+  schoolUnitId?: string;
+  studentId?: string;
+  studentName: string;
+  enrollmentNumber?: string;
+  className?: string;
+  requesterName: string;
+  requesterRelation: ProtocolRequesterRelation;
+  requesterPhone?: string;
+  documentType: string;
+  description?: string;
+  channel?: ProtocolChannel;
+  dueDate?: string;
+  deliveredTo?: string;
+}
+
+const EDIT_FIELDS: { field: keyof ProtocolEditInput; label: string; show?: (v: any) => string }[] = [
+  { field: 'studentName', label: 'Aluno(a)' },
+  { field: 'enrollmentNumber', label: 'RA' },
+  { field: 'className', label: 'Turma' },
+  { field: 'documentType', label: 'Documento' },
+  { field: 'description', label: 'Detalhes' },
+  { field: 'requesterName', label: 'Solicitante' },
+  { field: 'requesterRelation', label: 'Quem pediu', show: (v) => PROTOCOL_RELATION_LABEL[v as ProtocolRequesterRelation] || String(v || '') },
+  { field: 'requesterPhone', label: 'Telefone' },
+  { field: 'channel', label: 'Como chegou', show: (v) => (v ? PROTOCOL_CHANNEL_LABEL[v as ProtocolChannel] || String(v) : '') },
+  { field: 'dueDate', label: 'Previsão de entrega', show: (v) => formatDateBr(v) },
+  { field: 'deliveredTo', label: 'Entregue a' },
+];
+
+const clean = (v: unknown) => String(v ?? '').trim();
+
+/** O que muda entre o protocolo e a edição (lista vazia = nada mudou). */
+export function protocolChanges(p: ProtocolRequest, input: ProtocolEditInput): ProtocolFieldChange[] {
+  const out: ProtocolFieldChange[] = [];
+  for (const f of EDIT_FIELDS) {
+    if (f.field === 'deliveredTo' && p.status !== 'ENTREGUE') continue;
+    const before = clean((p as any)[f.field]);
+    const after = clean(input[f.field]);
+    if (before === after) continue;
+    const show = f.show || ((v: any) => clean(v));
+    out.push({ field: String(f.field), label: f.label, from: show(before), to: show(after) });
+  }
+  return out;
+}
+
+/** Problema na edição ('' quando pode). */
+export function editProblem(p: ProtocolRequest, input: ProtocolEditInput, reason?: string): string {
+  if (p.deletedAt) return 'Protocolo excluído: restaure antes de editar.';
+  const base = protocolInputProblem(input);
+  if (base) return base;
+  if (p.status === 'ENTREGUE' && !clean(input.deliveredTo)) return 'Informe a quem o documento foi entregue.';
+  if (protocolChanges(p, input).length === 0) return 'Nada foi alterado.';
+  // Protocolo encerrado (entregue ou cancelado): a correção precisa de justificativa.
+  if (isFinalStatus(p.status) && !clean(reason)) return 'Protocolo encerrado: informe o motivo da correção.';
+  return '';
+}
+
+/** Grava a edição e registra no histórico cada campo alterado (antes → depois) e quem alterou. */
+export function editProtocol(p: ProtocolRequest, input: ProtocolEditInput, actor: ProtocolActor, reason?: string, now = new Date()): ProtocolRequest {
+  const problem = editProblem(p, input, reason);
+  if (problem) throw new Error(problem);
+  const changes = protocolChanges(p, input);
+  const at = now.toISOString();
+  const opt = (v?: string) => clean(v) || undefined;
+  return {
+    ...p,
+    schoolUnitId: opt(input.schoolUnitId) ?? p.schoolUnitId,
+    studentId: opt(input.studentId),
+    studentName: clean(input.studentName),
+    enrollmentNumber: opt(input.enrollmentNumber),
+    className: opt(input.className),
+    requesterName: clean(input.requesterName),
+    requesterRelation: input.requesterRelation,
+    requesterPhone: opt(input.requesterPhone),
+    documentType: clean(input.documentType),
+    description: opt(input.description),
+    channel: input.channel,
+    dueDate: opt(input.dueDate) ?? p.dueDate,
+    ...(p.status === 'ENTREGUE' ? { deliveredTo: clean(input.deliveredTo) } : {}),
+    updatedAt: at,
+    history: [
+      ...(p.history || []),
+      {
+        at,
+        status: p.status,
+        userId: actor.id,
+        userName: actor.name,
+        action: 'EDICAO',
+        changes,
+        note: [clean(reason) ? `Motivo: ${clean(reason)}` : '', changes.map((c) => `${c.label}: ${c.from || '(vazio)'} → ${c.to || '(vazio)'}`).join('; ')]
+          .filter(Boolean)
+          .join(' • '),
+      },
+    ],
+  };
+}
+
+/** Exclui (sem apagar): sai da lista, fica guardado com quem excluiu, quando e o motivo. */
+export function deleteProtocol(p: ProtocolRequest, actor: ProtocolActor, reason: string, now = new Date()): ProtocolRequest {
+  if (p.deletedAt) throw new Error('O protocolo já está excluído.');
+  const why = clean(reason);
+  if (!why) throw new Error('Informe o motivo da exclusão.');
+  const at = now.toISOString();
+  return {
+    ...p,
+    deletedAt: at,
+    deletedByUserId: actor.id,
+    deletedByName: actor.name,
+    deletedReason: why,
+    updatedAt: at,
+    history: [...(p.history || []), { at, status: p.status, userId: actor.id, userName: actor.name, action: 'EXCLUSAO', note: `Excluído. Motivo: ${why}` }],
+  };
+}
+
+/** Desfaz a exclusão (o histórico registra quem restaurou). */
+export function restoreProtocol(p: ProtocolRequest, actor: ProtocolActor, now = new Date()): ProtocolRequest {
+  if (!p.deletedAt) return p;
+  const at = now.toISOString();
+  const { deletedAt: _a, deletedByUserId: _b, deletedByName: _c, deletedReason: _d, ...rest } = p;
+  return {
+    ...rest,
+    updatedAt: at,
+    history: [...(p.history || []), { at, status: p.status, userId: actor.id, userName: actor.name, action: 'RESTAURACAO', note: 'Protocolo restaurado.' }],
+  };
+}
+
+export const HISTORY_ACTION_LABEL: Record<ProtocolHistoryAction, string> = {
+  ABERTURA: 'Abertura',
+  MOVIMENTACAO: 'Movimentação',
+  OBSERVACAO: 'Observação',
+  EDICAO: 'Edição',
+  EXCLUSAO: 'Exclusão',
+  RESTAURACAO: 'Restauração',
+};
+
+/** Tipo do registro (os antigos, sem `action`, são deduzidos). */
+export function historyAction(h: ProtocolHistoryEntry, index: number, prev?: ProtocolHistoryEntry): ProtocolHistoryAction {
+  if (h.action) return h.action;
+  if (index === 0) return 'ABERTURA';
+  return prev && prev.status !== h.status ? 'MOVIMENTACAO' : 'OBSERVACAO';
+}
+
+/** Título do registro no histórico. */
+export function historyTitle(h: ProtocolHistoryEntry, action: ProtocolHistoryAction): string {
+  if (action === 'MOVIMENTACAO') return `Situação: ${PROTOCOL_STATUS_LABEL[h.status]}`;
+  if (action === 'ABERTURA') return 'Aberto';
+  if (action === 'EDICAO') return 'Dados corrigidos';
+  if (action === 'EXCLUSAO') return 'Excluído';
+  if (action === 'RESTAURACAO') return 'Restaurado';
+  return 'Observação';
+}
+
+export interface ProtocolAuditRow {
+  at: string;
+  protocolId: string;
+  number: string;
+  studentName: string;
+  schoolUnitId?: string;
+  action: ProtocolHistoryAction;
+  title: string;
+  userId: string;
+  userName: string;
+  note: string;
+  changes?: ProtocolFieldChange[];
+}
+
+/** Histórico do módulo: todas as movimentações de todos os protocolos (mais recentes primeiro). */
+export function protocolAuditTrail(list: ProtocolRequest[]): ProtocolAuditRow[] {
+  const rows: ProtocolAuditRow[] = [];
+  for (const p of list) {
+    (p.history || []).forEach((h, i, arr) => {
+      const action = historyAction(h, i, arr[i - 1]);
+      rows.push({
+        at: h.at,
+        protocolId: p.id,
+        number: p.number,
+        studentName: p.studentName,
+        schoolUnitId: p.schoolUnitId,
+        action,
+        title: historyTitle(h, action),
+        userId: h.userId,
+        userName: h.userName,
+        note: h.note || '',
+        changes: h.changes,
+      });
+    });
+  }
+  return rows.sort((a, b) => String(b.at).localeCompare(String(a.at)));
 }
 
 /** Passou do prazo e ainda não foi entregue nem cancelado. */
 export function isOverdue(p: ProtocolRequest, today = localIsoDate(new Date())): boolean {
-  return !isFinalStatus(p.status) && !!p.dueDate && p.dueDate < today;
+  return !p.deletedAt && !isFinalStatus(p.status) && !!p.dueDate && p.dueDate < today;
 }
 
 /** "03/10/2026" a partir de AAAA-MM-DD ou de data ISO. */
@@ -257,7 +459,8 @@ export function formatDateTimeBr(value?: string): string {
 
 export interface ProtocolFilters {
   search?: string;
-  status?: ProtocolStatus | 'ALL' | 'OVERDUE' | 'OPEN_ANY';
+  /** DELETED = só os excluídos (nas demais opções os excluídos não aparecem). */
+  status?: ProtocolStatus | 'ALL' | 'OVERDUE' | 'OPEN_ANY' | 'DELETED';
   schoolUnitId?: string | 'ALL';
   documentType?: string | 'ALL';
   createdBy?: string | 'ALL';
@@ -276,7 +479,10 @@ export function filterProtocols(list: ProtocolRequest[], f: ProtocolFilters, tod
   const term = fold(f.search).trim();
   const termNum = normalizeProtocolNumber(f.search || '');
   return list.filter((p) => {
-    if (f.status && f.status !== 'ALL') {
+    if (f.status === 'DELETED') {
+      if (!p.deletedAt) return false;
+    } else if (p.deletedAt) return false;
+    if (f.status && f.status !== 'ALL' && f.status !== 'DELETED') {
       if (f.status === 'OVERDUE') {
         if (!isOverdue(p, today)) return false;
       } else if (f.status === 'OPEN_ANY') {
