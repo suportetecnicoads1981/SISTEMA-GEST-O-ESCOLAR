@@ -26,7 +26,10 @@ import {
   History,
   LifeBuoy,
   RefreshCw,
+  Lock,
+  UserRound,
 } from 'lucide-react';
+import { LOCK_IDLE_OPTIONS, lockIdleLabel } from '../../services/auth/screenLock';
 import { getLocalServerInfo, flushLocalChanges } from '../../services/offline/localServerSync';
 import { supabaseBatchQueue } from '../../services/supabaseBatchQueue';
 import { CloudSyncIndicator } from '../offline/CloudSyncIndicator';
@@ -67,6 +70,13 @@ interface HeaderProps {
   schoolUnits?: SchoolUnit[];
   schoolFocus?: SchoolFocus | null;
   onChangeSchoolFocus?: (focus: SchoolFocus | null) => void;
+  /** Bloqueia a tela (pede login de novo). */
+  onLockScreen?: () => void;
+  /** Bloqueia a tela para outro usuário entrar (troca de usuário). */
+  onSwitchUser?: () => void;
+  /** Minutos sem uso até bloquear a tela (0 = nunca). */
+  lockIdleMinutes?: number;
+  onChangeLockIdleMinutes?: (minutes: number) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -97,6 +107,10 @@ export const Header: React.FC<HeaderProps> = ({
   schoolUnits = [],
   schoolFocus = null,
   onChangeSchoolFocus,
+  onLockScreen,
+  onSwitchUser,
+  lockIdleMinutes,
+  onChangeLockIdleMinutes,
 }) => {
   // Opções da escola em foco: cada escola e, para a escola sede, "sede + anexas"
   const focusOptions = [...schoolUnits]
@@ -390,6 +404,58 @@ export const Header: React.FC<HeaderProps> = ({
                   </button>
                 ))}
               </div>
+              {(onLockScreen || onSwitchUser) && (
+                <div className="pt-2 pb-1 border-t border-slate-100 space-y-1.5">
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {onLockScreen && (
+                      <button
+                        id="btn-header-lock-screen"
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          onLockScreen();
+                        }}
+                        className="py-1.5 px-2 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                        title="Bloquear a tela agora (Ctrl+Shift+L). Para voltar, digite a senha."
+                      >
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>Bloquear tela</span>
+                      </button>
+                    )}
+                    {onSwitchUser && (
+                      <button
+                        id="btn-header-switch-user"
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          onSwitchUser();
+                        }}
+                        className="py-1.5 px-2 text-xs font-bold text-indigo-800 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                        title="Outro usuário entra com o login e a senha dele, sem fechar o sistema"
+                      >
+                        <UserRound className="w-3.5 h-3.5" />
+                        <span>Trocar usuário</span>
+                      </button>
+                    )}
+                  </div>
+                  {onChangeLockIdleMinutes && (
+                    <label className="flex items-center justify-between gap-2 px-1 text-[11px] text-slate-600">
+                      <span title="Sem mexer no mouse ou no teclado por este tempo, a tela é bloqueada (vale para este computador)">
+                        Bloquear sem uso após
+                      </span>
+                      <select
+                        value={lockIdleMinutes ?? 15}
+                        onChange={(e) => onChangeLockIdleMinutes(Number(e.target.value))}
+                        className="text-[11px] py-1 px-1.5 border border-slate-200 rounded-md bg-white text-slate-700 font-semibold cursor-pointer"
+                      >
+                        {LOCK_IDLE_OPTIONS.map((m) => (
+                          <option key={m} value={m}>
+                            {lockIdleLabel(m)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </div>
+              )}
               <div className="pt-2 border-t border-slate-100 space-y-1">
                 <button
                   onClick={() => {

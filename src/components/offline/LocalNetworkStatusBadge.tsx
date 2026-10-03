@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   getLocalServerInfo,
   subscribeLocalServerStatus,
@@ -22,6 +23,93 @@ export function appBuildLabel(): string {
   } catch {
     return '';
   }
+}
+
+/** Espaço reservado na Barra de Tarefas (canto inferior esquerdo) para o selo de status. */
+export const TASKBAR_STATUS_SLOT_ID = 'taskbar-status-slot';
+
+/** Acompanha o espaço do selo na Barra de Tarefas (aparece depois do login, some na tela de login). */
+function useTaskbarSlot(): HTMLElement | null {
+  const [slot, setSlot] = useState<HTMLElement | null>(() =>
+    typeof document !== 'undefined' ? document.getElementById(TASKBAR_STATUS_SLOT_ID) : null
+  );
+  useEffect(() => {
+    if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return;
+    const find = () => {
+      const el = document.getElementById(TASKBAR_STATUS_SLOT_ID);
+      setSlot((prev) => (prev === el ? prev : el));
+    };
+    find();
+    const mo = new MutationObserver(find);
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => mo.disconnect();
+  }, []);
+  return slot;
+}
+
+/**
+ * Lugar do selo: dentro da Barra de Tarefas (sem cobrir o Iniciar e a Pesquisa) quando ela existe;
+ * fora dela (tela de login), fica flutuando no canto inferior esquerdo.
+ */
+const BadgeDock: React.FC<{ testId: string; children: (docked: boolean) => React.ReactNode }> = ({ testId, children }) => {
+  const slot = useTaskbarSlot();
+  if (slot) {
+    return createPortal(
+      <div data-testid={testId} data-docked="taskbar" style={{ position: 'relative', fontFamily: 'Inter, system-ui, sans-serif' }}>
+        {children(true)}
+      </div>,
+      slot
+    );
+  }
+  return (
+    <div
+      data-testid={testId}
+      style={{ position: 'fixed', left: 12, bottom: 12, zIndex: 2147482000, fontFamily: 'Inter, system-ui, sans-serif' }}
+    >
+      {children(false)}
+    </div>
+  );
+};
+
+/** Janela de detalhes do selo: abre para cima, a partir do selo. */
+const popoverStyle: React.CSSProperties = {
+  position: 'absolute',
+  left: 0,
+  bottom: 'calc(100% + 10px)',
+  width: 300,
+  maxHeight: '70vh',
+  overflowY: 'auto',
+  background: '#fff',
+  color: '#0f172a',
+  border: '1px solid #e2e8f0',
+  borderRadius: 14,
+  boxShadow: '0 12px 30px rgba(0,0,0,0.18)',
+  padding: 14,
+  fontSize: 12,
+  lineHeight: 1.45,
+  zIndex: 60,
+};
+
+/** Selo (pílula): mais compacto dentro da Barra de Tarefas. */
+function pillStyle(docked: boolean): React.CSSProperties {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    background: docked ? '#1e293b' : '#0f172a',
+    color: '#fff',
+    border: docked ? '1px solid #334155' : 0,
+    borderRadius: 999,
+    padding: docked ? '4px 10px' : '6px 12px',
+    fontSize: 11,
+    fontWeight: 700,
+    cursor: 'pointer',
+    boxShadow: docked ? 'none' : '0 6px 16px rgba(0,0,0,0.25)',
+    maxWidth: docked ? 280 : undefined,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  };
 }
 
 /**
@@ -236,25 +324,11 @@ export const LocalNetworkStatusBadge: React.FC = () => {
         </button>
       </div>
     )}
-    <div
-      data-testid="local-network-status"
-      style={{ position: 'fixed', left: 12, bottom: 12, zIndex: 2147482000, fontFamily: 'Inter, system-ui, sans-serif' }}
-    >
+    <BadgeDock testId="local-network-status">
+      {(docked) => (
+      <>
       {open && (
-        <div
-          style={{
-            marginBottom: 8,
-            width: 300,
-            background: '#fff',
-            color: '#0f172a',
-            border: '1px solid #e2e8f0',
-            borderRadius: 14,
-            boxShadow: '0 12px 30px rgba(0,0,0,0.18)',
-            padding: 14,
-            fontSize: 12,
-            lineHeight: 1.45,
-          }}
-        >
+        <div style={popoverStyle}>
           <strong style={{ fontSize: 13 }}>{local.serverName || roleLabel}</strong>
           {appBuildLabel() && <p style={{ margin: '2px 0 6px', color: '#64748b' }}>Versão do sistema publicada em {appBuildLabel()}</p>}
           <p style={{ margin: '6px 0' }}>{label}</p>
@@ -304,25 +378,14 @@ export const LocalNetworkStatusBadge: React.FC = () => {
         onClick={() => setOpen((v) => !v)}
         aria-label={label}
         title={label}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          background: '#0f172a',
-          color: '#fff',
-          border: 0,
-          borderRadius: 999,
-          padding: '6px 12px',
-          fontSize: 11,
-          fontWeight: 700,
-          cursor: 'pointer',
-          boxShadow: '0 6px 16px rgba(0,0,0,0.25)',
-        }}
+        style={pillStyle(docked)}
       >
-        <span style={{ width: 9, height: 9, borderRadius: 999, background: dot, display: 'inline-block' }} />
-        {label}
+        <span style={{ width: 9, height: 9, borderRadius: 999, background: dot, display: 'inline-block', flexShrink: 0 }} />
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
       </button>
-    </div>
+      </>
+      )}
+    </BadgeDock>
     </>
   );
 };
@@ -436,25 +499,11 @@ const WebCloudBadge: React.FC<WebCloudBadgeProps> = ({
           </button>
         </div>
       )}
-      <div
-        data-testid="cloud-status-web"
-        style={{ position: 'fixed', left: 12, bottom: 12, zIndex: 2147482000, fontFamily: 'Inter, system-ui, sans-serif' }}
-      >
+      <BadgeDock testId="cloud-status-web">
+        {(docked) => (
+        <>
         {open && (
-          <div
-            style={{
-              marginBottom: 8,
-              width: 300,
-              background: '#fff',
-              color: '#0f172a',
-              border: '1px solid #e2e8f0',
-              borderRadius: 14,
-              boxShadow: '0 12px 30px rgba(0,0,0,0.18)',
-              padding: 14,
-              fontSize: 12,
-              lineHeight: 1.45,
-            }}
-          >
+          <div style={popoverStyle}>
             <strong style={{ fontSize: 13 }}>Acesso pelo link (nuvem)</strong>
             {appBuildLabel() && <p style={{ margin: '2px 0 6px', color: '#64748b' }}>Versão do sistema publicada em {appBuildLabel()}</p>}
             <p style={{ margin: '6px 0' }}>{label}</p>
@@ -491,25 +540,14 @@ const WebCloudBadge: React.FC<WebCloudBadgeProps> = ({
           onClick={() => setOpen((v) => !v)}
           aria-label={label}
           title={label}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            background: '#0f172a',
-            color: '#fff',
-            border: 0,
-            borderRadius: 999,
-            padding: '6px 12px',
-            fontSize: 11,
-            fontWeight: 700,
-            cursor: 'pointer',
-            boxShadow: '0 6px 16px rgba(0,0,0,0.25)',
-          }}
+          style={pillStyle(docked)}
         >
-          <span style={{ width: 9, height: 9, borderRadius: 999, background: dot, display: 'inline-block' }} />
-          {label}
+          <span style={{ width: 9, height: 9, borderRadius: 999, background: dot, display: 'inline-block', flexShrink: 0 }} />
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
         </button>
-      </div>
+        </>
+        )}
+      </BadgeDock>
     </>
   );
 };

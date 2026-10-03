@@ -1,4 +1,3 @@
-import { appVersionText } from '../../config/appVersion';
 import React, { useState, useMemo, useEffect } from 'react';
 import { FlexChart } from '../common/FlexChart';
 import {
@@ -112,7 +111,6 @@ interface DashBoxConfig {
   tileDistribution: boolean;
   tileAccuracy: boolean;
   tileAiDiagnosis: boolean;
-  tileDevCard: boolean;
   tileCommonMistakes: boolean;
   tileStudentTable: boolean;
 }
@@ -127,7 +125,6 @@ const DEFAULT_DASHBOX_CONFIG: DashBoxConfig = {
   tileDistribution: true,
   tileAccuracy: true,
   tileAiDiagnosis: true,
-  tileDevCard: true,
   tileCommonMistakes: true,
   tileStudentTable: true,
 };
@@ -213,7 +210,6 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
         tileDistribution: true,
         tileAccuracy: false,
         tileAiDiagnosis: true,
-        tileDevCard: false,
         tileCommonMistakes: false,
         tileStudentTable: true,
       });
@@ -228,7 +224,6 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
         tileDistribution: true,
         tileAccuracy: true,
         tileAiDiagnosis: true,
-        tileDevCard: false,
         tileCommonMistakes: true,
         tileStudentTable: true,
       });
@@ -1103,33 +1098,6 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
           </div>
         )}
 
-        {/* Bento Tile 6: Dark Card Sobre o Desenvolvedor (6 cols) */}
-        {dashBoxes.tileDevCard && (
-          <div
-            id="bento-tile-dev-card"
-            className="col-span-12 lg:col-span-12 bg-slate-900 rounded-2xl p-5 shadow-xs text-white flex flex-col justify-between"
-          >
-            <div>
-              <h3 className="font-bold mb-1 text-sm flex items-center gap-2">
-                <span>👨‍💻</span> Sobre a Engenharia do Sistema & Dash Boxes
-              </h3>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                Plataforma com suporte híbrido para operação local (offline/LAN) e hospedagem em nuvem
-                (Cloud Run, VPS, Vercel, Docker). Painel configurável em tempo real.
-              </p>
-            </div>
-
-            <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-800">
-              <div>
-                <p className="text-xs font-bold text-white">SucessoEdu Gestão Educacional</p>
-                <p className="text-[10px] text-slate-400 font-mono">
-                  suportetecnicoads@gmail.com | {appVersionText()}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Bento Tile 7: Common Mistakes & Pedagogical Interventions (12 cols) */}
         {dashBoxes.tileCommonMistakes && report && report.commonErrors.length > 0 && (
           <div
@@ -1369,7 +1337,6 @@ export const PedagogicalDashboard: React.FC<PedagogicalDashboardProps> = ({
                     { key: 'tileDistribution', label: 'Gráfico: Distribuição por Faixa de Desempenho' },
                     { key: 'tileCommonMistakes', label: 'Painel: Mapeamento de Distratores & Intervenções' },
                     { key: 'tileStudentTable', label: 'Tabela: Desempenho Individual dos Alunos' },
-                    { key: 'tileDevCard', label: 'Card: Engenharia e Contato' },
                   ].map((box) => {
                     const isVisible = dashBoxes[box.key as keyof DashBoxConfig];
                     return (

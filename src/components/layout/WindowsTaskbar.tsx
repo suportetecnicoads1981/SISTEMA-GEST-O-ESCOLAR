@@ -184,6 +184,9 @@ export const WindowsTaskbar: React.FC<WindowsTaskbarProps> = ({
             : 'translate-y-0 opacity-100'
         }`}
       >
+        {/* Selo de status do servidor/nuvem: fica aqui dentro (antes cobria o Iniciar e a Pesquisa) */}
+        <div id="taskbar-status-slot" className="shrink-0 flex items-center empty:hidden mr-1.5" />
+
         {/* LADO ESQUERDO / CENTRO: Botão Iniciar + Busca + Módulos Abertos */}
         <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-x-auto scrollbar-none py-1">
           {/* Botão INICIAR Estilo Windows (4 Quadrantes Modernos) */}

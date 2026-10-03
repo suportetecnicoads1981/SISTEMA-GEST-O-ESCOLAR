@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { isCpfPending } from '../../utils/studentDocuments';
 import {
   AlertTriangle,
@@ -21,6 +21,18 @@ import {
 } from 'lucide-react';
 import { Student, SchoolUnit, SchoolClass } from '../../types';
 import { triggerPrint } from '../../utils/printHelper';
+import { annexesOf, chosenAnnexIds } from '../../utils/schoolAnnexes';
+import { AnnexPicker } from '../secretaria/AnnexPicker';
+
+/** Valor do filtro para alunos ainda sem escola definida no cadastro. */
+const NO_SCHOOL = '__SEM_ESCOLA__';
+
+const esc = (v: unknown) =>
+  String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 
 interface CadastralPendingCensusDashboxProps {
   students: Student[];
@@ -29,6 +41,11 @@ interface CadastralPendingCensusDashboxProps {
   onEditStudent?: (student: Student) => void;
   onOpenImportModal?: () => void;
   onNavigateToSecretaria?: () => void;
+  /**
+   * Escola de lotação do usuário. Lotado numa escola: o quadro fica preso à escola dele
+   * (e às anexas, se for a sede). Sem lotação (Sede/rede): o usuário escolhe a escola.
+   */
+  scopeUnitId?: string | null;
 }
 
 export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashboxProps> = ({
@@ -38,8 +55,15 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
   onEditStudent,
   onOpenImportModal,
   onNavigateToSecretaria,
+  scopeUnitId = null,
 }) => {
-  const [selectedSchool, setSelectedSchool] = useState<string>('ALL');
+  // Lotado: começa (e fica) na escola dele. Rede: começa em "Todas as escolas".
+  const [selectedSchool, setSelectedSchool] = useState<string>(scopeUnitId || 'ALL');
+  const [annexChoice, setAnnexChoice] = useState<string[]>([]);
+  useEffect(() => {
+    setSelectedSchool(scopeUnitId || 'ALL');
+    setAnnexChoice([]);
+  }, [scopeUnitId]);
   const [selectedPendingType, setSelectedPendingType] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
@@ -65,9 +89,12 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
     });
   }, [students]);
 
+  // Escola do aluno: a do cadastro; sem ela, a da turma.
+  const unitIdOf = (s: Student): string =>
+    String(s.schoolUnitId || classes.find((c) => c.id === s.classId)?.schoolUnitId || '').trim();
+  const unitById = (id: string) => schoolUnits.find((u) => u.id === id);
   // Dados reais de cada aluno (sem valores de exemplo quando faltam).
-  const schoolOf = (s: Student) =>
-    s.schoolOriginName || schoolUnits.find((u) => u.id === s.schoolUnitId)?.name || '—';
+  const schoolOf = (s: Student) => unitById(unitIdOf(s))?.name || s.schoolOriginName || '—';
   const seriesOf = (s: Student) => s.series || classes.find((c) => c.id === s.classId)?.gradeLevel || '—';
   const shiftOf = (s: Student) => s.shift || classes.find((c) => c.id === s.classId)?.shift || '—';
   const pendingsOf = (s: Student): string[] => {
@@ -81,27 +108,73 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
     return out.length ? out : ['Cadastro a revisar'];
   };
 
-  // Lista única de escolas/polos encontrados nos cadastros com pendência
-  const schoolOptions = useMemo(() => {
-    const set = new Set<string>();
+  // Pendências por escola (para o número ao lado de cada escola no filtro)
+  const pendingByUnit = useMemo(() => {
+    const m = new Map<string, number>();
     incompleteStudents.forEach((s) => {
-      if (s.schoolOriginName) set.add(s.schoolOriginName);
-      else if (s.schoolUnitId) {
-        const u = schoolUnits.find((unit) => unit.id === s.schoolUnitId);
-        if (u) set.add(u.name);
-      }
+      const id = unitIdOf(s) || NO_SCHOOL;
+      m.set(id, (m.get(id) || 0) + 1);
     });
-    return Array.from(set);
-  }, [incompleteStudents, schoolUnits]);
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incompleteStudents, classes]);
+
+  // Escolas que o usuário pode escolher:
+  // - lotado: a escola dele e as anexas dela (nunca as outras escolas da rede);
+  // - rede/Sede: todas as escolas com pendência.
+  const schoolOptions = useMemo(() => {
+    if (scopeUnitId) {
+      const own = schoolUnits.find((u) => u.id === scopeUnitId);
+      const list = [own, ...annexesOf(scopeUnitId, schoolUnits)].filter(Boolean) as SchoolUnit[];
+      return list.map((u) => ({ id: u.id, name: u.parentUnitId ? `${u.name} (anexa)` : u.name, count: pendingByUnit.get(u.id) || 0 }));
+    }
+    // Anexa logo abaixo da escola sede dela
+    const groupKey = (u: SchoolUnit) => {
+      const parent = u.parentUnitId ? schoolUnits.find((x) => x.id === u.parentUnitId) : undefined;
+      return parent ? `${parent.name}\u0001${u.name}` : `${u.name}\u0000`;
+    };
+    return schoolUnits
+      .filter((u) => (pendingByUnit.get(u.id) || 0) > 0)
+      .sort((a, b) => groupKey(a).localeCompare(groupKey(b), 'pt-BR'))
+      .map((u) => ({ id: u.id, name: u.parentUnitId ? `${u.name} (anexa)` : u.name, count: pendingByUnit.get(u.id) || 0 }));
+  }, [schoolUnits, pendingByUnit, scopeUnitId]);
+  const noSchoolCount = pendingByUnit.get(NO_SCHOOL) || 0;
+
+  // Escola sede escolhida: as anexas podem entrar junto (relatório conjunto)
+  const selectedAnnexes = useMemo(
+    () => (selectedSchool !== 'ALL' && selectedSchool !== NO_SCHOOL ? annexesOf(selectedSchool, schoolUnits) : []),
+    [selectedSchool, schoolUnits]
+  );
+  const selectedIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (selectedSchool === 'ALL' || selectedSchool === NO_SCHOOL) return ids;
+    ids.add(selectedSchool);
+    chosenAnnexIds(selectedSchool, schoolUnits, annexChoice).forEach((id) => ids.add(id));
+    return ids;
+  }, [selectedSchool, schoolUnits, annexChoice]);
+
+  // Lotado numa escola sem anexas: não há o que escolher, o quadro mostra só a escola dele.
+  const lockedToOwnSchool = !!scopeUnitId && schoolOptions.length <= 1;
+  const selectedSchoolLabel =
+    selectedSchool === 'ALL'
+      ? 'Todas as escolas da rede'
+      : selectedSchool === NO_SCHOOL
+        ? 'Alunos sem escola definida'
+        : [unitById(selectedSchool)?.name || '—', ...chosenAnnexIds(selectedSchool, schoolUnits, annexChoice).map((id) => unitById(id)?.name || '')]
+            .filter(Boolean)
+            .join(' + ');
+
+  // Filtro da escola (vale para a tela, os indicadores, a impressão e o CSV)
+  const schoolFiltered = useMemo(() => {
+    if (selectedSchool === 'ALL') return incompleteStudents;
+    if (selectedSchool === NO_SCHOOL) return incompleteStudents.filter((s) => !unitIdOf(s));
+    return incompleteStudents.filter((s) => selectedIds.has(unitIdOf(s)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incompleteStudents, selectedSchool, selectedIds, classes]);
 
   // Filtros aplicados
   const filteredList = useMemo(() => {
-    return incompleteStudents.filter((s) => {
-      // Filtro de Polo / Escola
-      if (selectedSchool !== 'ALL') {
-        const studentSchool = s.schoolOriginName || schoolUnits.find((u) => u.id === s.schoolUnitId)?.name;
-        if (studentSchool !== selectedSchool) return false;
-      }
+    return schoolFiltered.filter((s) => {
 
       // Filtro de Tipo de Pendência
       if (selectedPendingType === 'LAUDO') {
@@ -137,29 +210,29 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
 
       return true;
     });
-  }, [incompleteStudents, selectedSchool, selectedPendingType, searchTerm, schoolUnits]);
+  }, [schoolFiltered, selectedPendingType, searchTerm]);
 
   // Métricas agregadas
   const stats = useMemo(() => {
-    const totalIncomplete = incompleteStudents.length;
-    const missingLaudoCount = incompleteStudents.filter(
+    const totalIncomplete = schoolFiltered.length;
+    const missingLaudoCount = schoolFiltered.filter(
       (s) =>
         (s.medicalClassification && s.medicalClassification !== 'Não declarada' && !s.hasMedicalReport) ||
         s.pendingFields?.some((f) => f.toLowerCase().includes('laudo'))
     ).length;
-    const missingBirthCount = incompleteStudents.filter(
+    const missingBirthCount = schoolFiltered.filter(
       (s) =>
         !s.birthDate ||
         s.birthDate === '2020-01-01' ||
         s.pendingFields?.some((f) => f.toLowerCase().includes('nascimento'))
     ).length;
-    const missingAddressCount = incompleteStudents.filter(
+    const missingAddressCount = schoolFiltered.filter(
       (s) =>
         !s.address ||
         s.address.toLowerCase().includes('pendente') ||
         s.pendingFields?.some((f) => f.toLowerCase().includes('endereço') || f.toLowerCase().includes('endereco'))
     ).length;
-    const totalPolos = schoolOptions.length;
+    const totalPolos = new Set(schoolFiltered.map((s) => unitIdOf(s) || NO_SCHOOL)).size;
 
     return {
       totalIncomplete,
@@ -168,58 +241,120 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
       missingAddressCount,
       totalPolos,
     };
-  }, [incompleteStudents, schoolOptions, schoolUnits]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schoolFiltered, classes]);
 
-  // Função para imprimir relatório oficial das pendências para a Secretaria
+  // Relatório impresso das pendências da escola escolhida (com o timbre padrão).
+  // Mais de uma escola: um bloco por escola e, no final, o quadro com o total de cada uma.
   const handlePrintPendingReport = () => {
+    if (filteredList.length === 0) return;
+    const groups = new Map<string, Student[]>();
+    filteredList.forEach((s) => {
+      const id = unitIdOf(s) || NO_SCHOOL;
+      if (!groups.has(id)) groups.set(id, []);
+      groups.get(id)!.push(s);
+    });
+    // Ordem: escola escolhida (sede) primeiro, depois as demais em ordem alfabética
+    const order = Array.from(groups.keys()).sort((a, b) => {
+      if (a === selectedSchool) return -1;
+      if (b === selectedSchool) return 1;
+      const na = a === NO_SCHOOL ? '~' : unitById(a)?.name || '';
+      const nb = b === NO_SCHOOL ? '~' : unitById(b)?.name || '';
+      return na.localeCompare(nb, 'pt-BR');
+    });
+    const nameOfGroup = (id: string) => (id === NO_SCHOOL ? 'Sem escola definida no cadastro' : unitById(id)?.name || '—');
+    const th = 'padding: 5px; border: 1px solid #cbd5e1; text-align: left;';
+    const td = 'padding: 5px; border: 1px solid #e2e8f0; vertical-align: top;';
+    const sortByName = (a: Student, b: Student) => a.name.localeCompare(b.name, 'pt-BR');
+
+    const blocks = order
+      .map((id) => {
+        const rows = (groups.get(id) || []).slice().sort(sortByName);
+        return `
+        <div style="margin-top: 14px; page-break-inside: auto;">
+          <h4 style="margin: 0 0 6px 0; font-size: 12px; color: #0f172a; background: #fef3c7; padding: 5px 8px; border-left: 4px solid #d97706;">
+            ${esc(nameOfGroup(id))} — ${rows.length} aluno(s) com pendência
+          </h4>
+          <table style="width: 100%; border-collapse: collapse; font-size: 10.5px;">
+            <thead>
+              <tr style="background-color: #f1f5f9;">
+                <th style="${th} width: 28px;">Nº</th>
+                <th style="${th}">RA</th>
+                <th style="${th}">Aluno(a)</th>
+                <th style="${th}">Série / Turno</th>
+                <th style="${th}">Classificação Médica / PCD</th>
+                <th style="${th}">Laudo</th>
+                <th style="${th}">Campos pendentes para regularização</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows
+                .map(
+                  (s, idx) => `
+                <tr>
+                  <td style="${td} text-align: center;">${idx + 1}</td>
+                  <td style="${td}">${esc(s.enrollmentNumber)}</td>
+                  <td style="${td} font-weight: bold;">${esc(s.name)}</td>
+                  <td style="${td}">${esc(seriesOf(s))} (${esc(shiftOf(s))})</td>
+                  <td style="${td}">${esc(s.medicalClassification || '—')}</td>
+                  <td style="${td}">${s.hasMedicalReport ? 'SIM' : 'NÃO / PENDENTE'}</td>
+                  <td style="${td} color: #b45309;">${esc(pendingsOf(s).join(', '))}</td>
+                </tr>`
+                )
+                .join('')}
+            </tbody>
+          </table>
+        </div>`;
+      })
+      .join('');
+
+    const totals =
+      order.length > 1
+        ? `
+        <div style="margin-top: 18px; page-break-inside: avoid;">
+          <h4 style="margin: 0 0 6px 0; font-size: 12px; color: #0f172a;">Quadro totalizador</h4>
+          <table style="width: 60%; border-collapse: collapse; font-size: 10.5px;">
+            <thead><tr style="background-color: #f1f5f9;"><th style="${th}">Escola</th><th style="${th} text-align: right;">Alunos com pendência</th></tr></thead>
+            <tbody>
+              ${order.map((id) => `<tr><td style="${td}">${esc(nameOfGroup(id))}</td><td style="${td} text-align: right;">${(groups.get(id) || []).length}</td></tr>`).join('')}
+              <tr style="font-weight: bold; background: #f8fafc;"><td style="${td}">TOTAL GERAL</td><td style="${td} text-align: right;">${filteredList.length}</td></tr>
+            </tbody>
+          </table>
+        </div>`
+        : '';
+
+    const typeLabel: Record<string, string> = {
+      ALL: 'Todas as pendências',
+      LAUDO: 'Sem laudo PCD',
+      BIRTH: 'Sem data de nascimento',
+      ADDRESS: 'Sem endereço completo',
+      CPF: 'Sem CPF ou CPF inválido',
+    };
+
     const printableContent = `
-      <div style="font-family: Arial, sans-serif; padding: 20px; color: #1e293b;">
-        <div style="border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 16px;">
-          <h2 style="margin: 0; font-size: 18px; color: #0f172a;">SUCESSOEDU - GESTÃO EDUCACIONAL</h2>
-          <h3 style="margin: 4px 0 0 0; font-size: 14px; color: #b45309;">LEVANTAMENTO DE PENDÊNCIAS CADASTRAIS DE POLOS REMOTOS & CENSO ESCOLAR</h3>
-          <p style="font-size: 12px; color: #64748b; margin: 4px 0 0 0;">
-            Data de Emissão: ${new Date().toLocaleDateString('pt-BR')} | Total de Cadastros com Pendência: ${filteredList.length}
+      <div style="font-family: Arial, sans-serif; color: #1e293b;">
+        <div style="border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 6px; text-align: center;">
+          <h3 style="margin: 0; font-size: 14px; color: #0f172a;">LEVANTAMENTO DE PENDÊNCIAS CADASTRAIS (CENSO ESCOLAR)</h3>
+          <p style="font-size: 11.5px; margin: 4px 0 0 0;"><strong>Escola:</strong> ${esc(selectedSchoolLabel)}</p>
+          <p style="font-size: 11px; color: #475569; margin: 2px 0 0 0;">
+            Filtro: ${esc(typeLabel[selectedPendingType] || 'Todas as pendências')}${searchTerm ? ` | Busca: "${esc(searchTerm)}"` : ''}
+            | Emitido em ${new Date().toLocaleDateString('pt-BR')} | Total: ${filteredList.length} aluno(s)
           </p>
         </div>
-
-        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-          <thead>
-            <tr style="background-color: #f8fafc; text-align: left; border-bottom: 2px solid #cbd5e1;">
-              <th style="padding: 6px; border: 1px solid #e2e8f0;">Nº / RA</th>
-              <th style="padding: 6px; border: 1px solid #e2e8f0;">Aluno(a)</th>
-              <th style="padding: 6px; border: 1px solid #e2e8f0;">Polo / Escola</th>
-              <th style="padding: 6px; border: 1px solid #e2e8f0;">Série / Turno</th>
-              <th style="padding: 6px; border: 1px solid #e2e8f0;">Classificação Médica / PCD</th>
-              <th style="padding: 6px; border: 1px solid #e2e8f0;">Laudo</th>
-              <th style="padding: 6px; border: 1px solid #e2e8f0;">Campos Pendentes para Regularização</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${filteredList
-              .map((s, idx) => {
-                const pendings = pendingsOf(s).join(', ');
-                const school = schoolOf(s);
-                return `
-                <tr style="border-bottom: 1px solid #e2e8f0; background-color: ${idx % 2 === 0 ? '#ffffff' : '#fcfcfd'};">
-                  <td style="padding: 6px; border: 1px solid #e2e8f0;">${s.enrollmentNumber}</td>
-                  <td style="padding: 6px; border: 1px solid #e2e8f0; font-weight: bold;">${s.name}</td>
-                  <td style="padding: 6px; border: 1px solid #e2e8f0;">${school}</td>
-                  <td style="padding: 6px; border: 1px solid #e2e8f0;">${seriesOf(s)} (${shiftOf(s)})</td>
-                  <td style="padding: 6px; border: 1px solid #e2e8f0;">${s.medicalClassification || '—'}</td>
-                  <td style="padding: 6px; border: 1px solid #e2e8f0;">${s.hasMedicalReport ? 'SIM' : 'NÃO / PENDENTE'}</td>
-                  <td style="padding: 6px; border: 1px solid #e2e8f0; color: #b45309;">${pendings}</td>
-                </tr>
-              `;
-              })
-              .join('')}
-          </tbody>
-        </table>
-        <div style="margin-top: 24px; font-size: 11px; color: #64748b; border-top: 1px dashed #cbd5e1; padding-top: 8px;">
-          * Documento gerado para controle e regularização cadastral junto à Secretaria Municipal de Educação.
+        ${blocks}
+        ${totals}
+        <div style="margin-top: 20px; font-size: 10.5px; color: #64748b; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
+          Documento para controle e regularização cadastral junto à Secretaria Municipal de Educação.
         </div>
       </div>
     `;
-    triggerPrint(printableContent);
+    const letterheadUnit =
+      selectedSchool !== 'ALL' && selectedSchool !== NO_SCHOOL ? selectedSchool : scopeUnitId || undefined;
+    triggerPrint(printableContent, {
+      title: `Pendências Cadastrais - ${selectedSchoolLabel}`,
+      orientation: 'landscape',
+      schoolUnitId: letterheadUnit,
+    });
   };
 
   // Exportar CSV
@@ -253,7 +388,13 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `Pendencias_Cadastrais_Polos_${Date.now()}.csv`);
+    const fileSchool = selectedSchoolLabel
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^A-Za-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 60);
+    link.setAttribute('download', `Pendencias_Cadastrais_${fileSchool || 'Rede'}_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -299,7 +440,9 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
 
           <button
             onClick={handlePrintPendingReport}
-            className="px-3 py-2 bg-amber-800/80 hover:bg-amber-900 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+            disabled={filteredList.length === 0}
+            title={`Imprimir as pendências de: ${selectedSchoolLabel}`}
+            className="px-3 py-2 bg-amber-800/80 hover:bg-amber-900 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Printer className="h-4 w-4" />
             <span>Imprimir Guia de Cobrança</span>
@@ -347,7 +490,7 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
 
           <div className="p-3.5 bg-purple-50/70 border border-purple-200 rounded-xl">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-purple-800">Polos Afetados</span>
+              <span className="text-xs font-semibold text-purple-800">Escolas Afetadas</span>
               <Building2 className="h-4 w-4 text-purple-600" />
             </div>
             <p className="text-2xl font-black text-purple-900 mt-1">{stats.totalPolos}</p>
@@ -370,27 +513,44 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
             />
           </div>
 
-          {/* Filtro por Polo */}
-          <div className="flex items-center gap-2">
-            <Filter className="h-3.5 w-3.5 text-slate-500" />
-            <select
-              value={selectedSchool}
-              onChange={(e) => setSelectedSchool(e.target.value)}
-              className="text-xs py-2 px-3 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium text-slate-700"
+          {/* Filtro por escola: a Sede/rede escolhe; o usuário lotado vê só a escola dele */}
+          {lockedToOwnSchool ? (
+            <div
+              className="flex items-center gap-2 text-xs py-2 px-3 bg-amber-50 border border-amber-200 rounded-lg font-semibold text-amber-900 max-w-full md:max-w-[340px]"
+              title="Seu usuário está lotado nesta escola: o quadro mostra só os alunos dela."
             >
-              <option value="ALL">Todos os Polos ({incompleteStudents.length})</option>
-              {schoolOptions.map((school) => {
-                const count = incompleteStudents.filter(
-                  (s) => (s.schoolOriginName || schoolUnits.find((u) => u.id === s.schoolUnitId)?.name) === school
-                ).length;
-                return (
-                  <option key={school} value={school}>
-                    {school} ({count})
+              <Building2 className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+              <span className="truncate">{schoolOptions[0]?.name || selectedSchoolLabel}</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Filter className="h-3.5 w-3.5 text-slate-500" />
+              <select
+                value={selectedSchool}
+                onChange={(e) => {
+                  setSelectedSchool(e.target.value);
+                  setAnnexChoice([]);
+                }}
+                title="Escolha a escola para ver e imprimir as pendências dela"
+                className={`text-xs py-2 px-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium max-w-full md:max-w-[320px] truncate ${
+                  selectedSchool !== 'ALL' ? 'bg-amber-50 border-amber-300 text-amber-900' : 'bg-white border-slate-200 text-slate-700'
+                }`}
+              >
+                {!scopeUnitId && <option value="ALL">Todas as escolas ({incompleteStudents.length})</option>}
+                {schoolOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.name} ({opt.count})
                   </option>
-                );
-              })}
-            </select>
-          </div>
+                ))}
+                {!scopeUnitId && noSchoolCount > 0 && <option value={NO_SCHOOL}>Sem escola definida ({noSchoolCount})</option>}
+              </select>
+              <AnnexPicker
+                annexes={selectedAnnexes.map((a) => ({ id: a.id, name: a.name }))}
+                chosen={chosenAnnexIds(selectedSchool, schoolUnits, annexChoice)}
+                onChange={setAnnexChoice}
+              />
+            </div>
+          )}
 
           {/* Filtro por Tipo de Pendência */}
           <select
@@ -506,7 +666,7 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
 
             {filteredList.length > 50 && (
               <div className="p-3 bg-slate-50 text-center text-xs text-slate-500 border-t border-slate-200">
-                Mostrando 50 de {filteredList.length} cadastros pendentes. Filtre por escola ou utilize a busca para refinar.
+                Mostrando 50 de {filteredList.length} cadastros pendentes na tela. A impressão e o CSV saem com todos os {filteredList.length} da seleção.
               </div>
             )}
           </div>
