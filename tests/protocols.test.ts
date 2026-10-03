@@ -181,3 +181,21 @@ describe('edição, exclusão e histórico do módulo', () => {
     expect(historyAction(legacy.history[1], 1, legacy.history[0])).toBe('MOVIMENTACAO');
   });
 });
+
+describe('escola de destino', () => {
+  it('é obrigatória e a troca fica no histórico com o nome da escola', () => {
+    expect(protocolInputProblem({ ...input, schoolUnitId: '' })).toMatch(/escola/);
+    const p = createProtocol(input, actor, [], new Date(2026, 9, 3));
+    const names: Record<string, string> = { esc1: 'EMEF IRON FERNANDES', esc2: 'EMEF CASTRO ALVES' };
+    const e = editProtocol(
+      p,
+      { ...input, schoolUnitId: 'esc2', requesterRelation: p.requesterRelation, dueDate: p.dueDate },
+      actor,
+      '',
+      new Date(2026, 9, 3, 10),
+      (id) => names[id]
+    );
+    expect(e.schoolUnitId).toBe('esc2');
+    expect(e.history.at(-1)?.changes?.[0]).toMatchObject({ label: 'Escola', from: 'EMEF IRON FERNANDES', to: 'EMEF CASTRO ALVES' });
+  });
+});

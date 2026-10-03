@@ -683,7 +683,7 @@ export const ProtocolModule: React.FC<ProtocolModuleProps> = ({
           schoolUnits={schoolUnits}
           onClose={() => setEditId(null)}
           onSave={(input, reason) => {
-            onSave(editProtocol(editing, input, actor, reason));
+            onSave(editProtocol(editing, input, actor, reason, new Date(), unitName));
             setEditId(null);
           }}
         />
@@ -745,6 +745,9 @@ const NewProtocolModal: React.FC<{
   onPrint: (p: ProtocolRequest) => void;
   onNew: () => void;
 }> = ({ students, classes, schoolUnits, justCreated, onClose, onCreate, onPrint, onNew }) => {
+  const units = useMemo(() => [...schoolUnits].filter(Boolean).sort((a, b) => String(a.name).localeCompare(String(b.name), 'pt-BR')), [schoolUnits]);
+  const [schoolId, setSchoolId] = useState<string>(units.length === 1 ? units[0].id : '');
+  const [searchAllSchools, setSearchAllSchools] = useState(false);
   const [studentSearch, setStudentSearch] = useState('');
   const [student, setStudent] = useState<Student | null>(null);
   const [relation, setRelation] = useState<ProtocolRequesterRelation>('RESPONSAVEL');
@@ -756,14 +759,6 @@ const NewProtocolModal: React.FC<{
   const [dueDate, setDueDate] = useState(addDays(localIsoDate(new Date()), DEFAULT_DUE_DAYS));
   const [error, setError] = useState('');
 
-  const matches = useMemo(() => {
-    const t = fold(studentSearch).trim();
-    if (t.length < 2) return [];
-    return students
-      .filter((s) => fold(s.name).includes(t) || fold(s.enrollmentNumber).includes(t))
-      .slice(0, 8);
-  }, [students, studentSearch]);
-
   const classOf = (s?: Student | null) => (s ? classes.find((c) => c.id === s.classId) : undefined);
   const schoolOf = (s?: Student | null) => {
     if (!s) return undefined;
@@ -771,10 +766,23 @@ const NewProtocolModal: React.FC<{
     return schoolUnits.find((u) => u.id === id);
   };
 
+  // Com a escola escolhida, a busca mostra só os alunos dela (ou de todas, se marcado).
+  const matches = useMemo(() => {
+    const t = fold(studentSearch).trim();
+    if (t.length < 2) return [];
+    return students
+      .filter((s) => !schoolId || searchAllSchools || (s.schoolUnitId || classOf(s)?.schoolUnitId) === schoolId)
+      .filter((s) => fold(s.name).includes(t) || fold(s.enrollmentNumber).includes(t))
+      .slice(0, 8);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [students, studentSearch, schoolId, searchAllSchools]);
+
   const pickStudent = (s: Student) => {
     setStudent(s);
     setStudentSearch('');
     setError('');
+    // Sem escola escolhida: o protocolo vai para a escola do aluno.
+    if (!schoolId) setSchoolId(schoolOf(s)?.id || '');
     // Responsável do cadastro do aluno já vem preenchido (pode ser alterado).
     if (relation === 'RESPONSAVEL') {
       setRequesterName(formatPersonName(s.guardianName) || s.guardianName || '');
@@ -803,7 +811,7 @@ const NewProtocolModal: React.FC<{
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const input = {
-      schoolUnitId: schoolOf(student)?.id,
+      schoolUnitId: schoolId,
       studentId: student?.id,
       studentName: student?.name || '',
       enrollmentNumber: student?.enrollmentNumber,
@@ -878,6 +886,37 @@ const NewProtocolModal: React.FC<{
               </div>
             )}
 
+            {/* Escola de destino */}
+            <div>
+              <label className={labelCls}>Escola para onde o protocolo vai *</label>
+              <select
+                data-testid="protocol-school"
+                value={schoolId}
+                onChange={(e) => {
+                  setSchoolId(e.target.value);
+                  setError('');
+                }}
+                disabled={units.length === 1}
+                className={`${inputCls} disabled:bg-slate-50`}
+              >
+                {units.length !== 1 && <option value="">Escolha a escola…</option>}
+                {units.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-slate-500 mt-1">
+                A escola que vai preparar o documento. Ela vê o protocolo na lista dela e sai no comprovante.
+              </p>
+              {schoolId && units.length > 1 && (
+                <label className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer select-none">
+                  <input type="checkbox" checked={searchAllSchools} onChange={(e) => setSearchAllSchools(e.target.checked)} className="accent-teal-600" />
+                  Procurar o aluno em todas as escolas (ex.: aluno transferido que pede documento da escola antiga)
+                </label>
+              )}
+            </div>
+
             {/* Aluno */}
             <div>
               <label className={labelCls}>Aluno(a) *</label>
@@ -897,7 +936,13 @@ const NewProtocolModal: React.FC<{
                     Trocar
                   </button>
                 </div>
-              ) : (
+              ) : null}
+              {student && schoolId && schoolOf(student) && schoolOf(student)!.id !== schoolId && (
+                <p className="mt-1 text-[11px] text-amber-700 font-semibold">
+                  O aluno está na {schoolOf(student)!.name}; o protocolo vai para a {units.find((u) => u.id === schoolId)?.name}.
+                </p>
+              )}
+              {student ? null : (
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <input
@@ -925,8 +970,11 @@ const NewProtocolModal: React.FC<{
                     </div>
                   )}
                   {fold(studentSearch).trim().length >= 2 && matches.length === 0 && (
-                    <p className="text-[11px] text-slate-500 mt-1">Nenhum aluno encontrado com esse nome ou RA.</p>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Nenhum aluno encontrado com esse nome ou RA{schoolId && !searchAllSchools ? ' nesta escola' : ''}.
+                    </p>
                   )}
+
                 </div>
               )}
             </div>
@@ -1263,6 +1311,8 @@ const EditProtocolModal: React.FC<{
   onClose: () => void;
   onSave: (input: ProtocolEditInput, reason?: string) => void;
 }> = ({ p, students, classes, schoolUnits, onClose, onSave }) => {
+  const units = useMemo(() => [...schoolUnits].filter(Boolean).sort((a, b) => String(a.name).localeCompare(String(b.name), 'pt-BR')), [schoolUnits]);
+  const [schoolId, setSchoolId] = useState<string>(p.schoolUnitId || (units.length === 1 ? units[0].id : ''));
   const [studentSearch, setStudentSearch] = useState('');
   const [student, setStudent] = useState<Pick<ProtocolEditInput, 'studentId' | 'studentName' | 'enrollmentNumber' | 'className' | 'schoolUnitId'>>({
     studentId: p.studentId,
@@ -1291,6 +1341,7 @@ const EditProtocolModal: React.FC<{
 
   const input: ProtocolEditInput = {
     ...student,
+    schoolUnitId: schoolId,
     studentName: student.studentName || '',
     requesterName,
     requesterRelation: relation,
@@ -1344,6 +1395,17 @@ const EditProtocolModal: React.FC<{
             </div>
           )}
           <div>
+            <label className={labelCls}>Escola para onde o protocolo vai *</label>
+            <select data-testid="protocol-edit-school" value={schoolId} onChange={(e) => setSchoolId(e.target.value)} disabled={units.length === 1 && schoolId === units[0].id} className={`${inputCls} disabled:bg-slate-50`}>
+              {!units.some((u) => u.id === schoolId) && <option value={schoolId}>{schoolId ? 'Escola atual (fora da sua lista)' : 'Escolha a escola…'}</option>}
+              {units.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className={labelCls}>Aluno(a) *</label>
             <div className="p-3 rounded-xl border border-teal-200 bg-teal-50/60 space-y-2">
               <div className="font-bold text-slate-900 flex items-center gap-1.5">
@@ -1362,7 +1424,8 @@ const EditProtocolModal: React.FC<{
                         type="button"
                         onClick={() => {
                           const cls = classOf(s);
-                          setStudent({ studentId: s.id, studentName: s.name, enrollmentNumber: s.enrollmentNumber, className: cls?.name, schoolUnitId: s.schoolUnitId || cls?.schoolUnitId || p.schoolUnitId });
+                          setStudent({ studentId: s.id, studentName: s.name, enrollmentNumber: s.enrollmentNumber, className: cls?.name });
+                          if (!schoolId) setSchoolId(s.schoolUnitId || cls?.schoolUnitId || '');
                           setStudentSearch('');
                         }}
                         className="w-full text-left px-3 py-2 hover:bg-teal-50 border-b border-slate-100 last:border-0 cursor-pointer"

@@ -1,0 +1,51 @@
+import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
+const SP = '/tmp/claude-0/-home-claude/dcad228e-4bc6-5291-aac0-a9e57f515b7d/scratchpad';
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const ctx = await b.newContext({ viewport: { width: 1500, height: 950 } });
+await ctx.addInitScript(() => {
+  if (!sessionStorage.getItem('init')) {
+    localStorage.setItem('sucessoedu_auth_session', 'true');
+    localStorage.setItem('sucessoedu_logged_user_id', 'user-master-01');
+    sessionStorage.setItem('init', '1');
+  }
+});
+const p = await ctx.newPage();
+p.on('pageerror', (e) => console.log('PAGEERR', e.message));
+await p.goto('http://localhost:4173/', { waitUntil: 'networkidle' });
+await p.waitForTimeout(2000);
+await p.evaluate(() => {
+  const k = 'sucessoedu_master_store_v5';
+  const d = JSON.parse(localStorage.getItem(k));
+  d.schoolUnits = [{ id: 'e-iron', name: 'EMEF IRON FERNANDES', type: 'ESCOLA' }, { id: 'e-castro', name: 'EMEF CASTRO ALVES', type: 'ESCOLA' }];
+  const st = (id, name, sc) => ({ id, name, enrollmentNumber: 'RA-'+id, cpf: '', birthDate: '2018-01-01', gender: 'F', phone: '', guardianName: 'Resp '+name, guardianPhone: '', address: 'x', classId: '', schoolUnitId: sc, status: 'ACTIVE' });
+  d.students = [st('a','ANA LIMA','e-iron'), st('b','ANA SOUZA','e-castro')];
+  d.protocols = [];
+  localStorage.setItem(k, JSON.stringify(d));
+});
+await p.reload({ waitUntil: 'networkidle' });
+await p.waitForTimeout(2000);
+await p.getByText('Pular Tour').click().catch(()=>{});
+await p.keyboard.press('Alt+l');
+await p.waitForSelector('[data-testid=protocol-module]');
+await p.click('text=Novo Protocolo');
+await p.selectOption('[data-testid=protocol-school]', 'e-castro');
+await p.fill('input[placeholder="Digite o nome ou o RA do aluno..."]', 'ana');
+await p.waitForTimeout(300);
+console.log('só Castro:', await p.locator('button:has-text("ANA")').count());
+await p.check('text=Procurar o aluno em todas as escolas');
+await p.waitForTimeout(300);
+console.log('todas:', (await p.locator('button:has-text("ANA")').count()));
+await p.click('button:has-text("ANA LIMA")');
+await p.screenshot({ path: SP + '/q1.png' });
+await p.click('text=Registrar e gerar protocolo');
+await p.waitForSelector('[data-testid=protocol-created]');
+await p.click('[data-testid=protocol-created] >> text=Fechar');
+await p.waitForTimeout(300);
+console.log('linha:', (await p.locator('tbody tr').first().innerText()).replace(/\s+/g,' '));
+await p.click('[data-testid=protocol-edit]');
+await p.selectOption('[data-testid=protocol-edit-school]', 'e-iron');
+await p.click('[data-testid=protocol-edit-save]');
+await p.waitForTimeout(300);
+await p.click('[data-testid=protocol-audit-tab]');
+console.log('audit:', (await p.locator('[data-testid=protocol-audit] tbody tr').first().innerText()).replace(/\s+/g,' '));
+await b.close();
