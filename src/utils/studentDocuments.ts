@@ -46,6 +46,34 @@ export function cpfState(value: string | undefined | null): CpfState {
 /** CPF que ainda precisa ser resolvido (faltando ou inválido). */
 export const isCpfPending = (value: string | undefined | null): boolean => cpfState(value) !== 'OK';
 
+/**
+ * O aluno tem alguma pendência cadastral? Regra única para todos os contadores e filtros
+ * ("Pendências Censo", "Cadastros OK", quadro da Visão Geral): situação diferente de OK
+ * ou algum campo pendente na lista.
+ */
+export function hasCadastralPending(
+  s:
+    | {
+        cadastralStatus?: string | null;
+        pendingFields?: string[] | null;
+        cpf?: string | null;
+        medicalClassification?: string | null;
+        hasMedicalReport?: boolean | null;
+      }
+    | null
+    | undefined
+): boolean {
+  if (!s) return false;
+  const st = String(s.cadastralStatus || '').trim();
+  if (st && st !== 'OK') return true;
+  if (Array.isArray(s.pendingFields) && s.pendingFields.length > 0) return true;
+  // Sem CPF (ou CPF inválido) é pendência, mesmo que a lista de campos não diga.
+  if (isCpfPending(s.cpf)) return true;
+  // PCD declarado sem laudo entregue.
+  const med = String(s.medicalClassification || '').trim();
+  return !!med && med !== 'Não declarada' && !s.hasMedicalReport;
+}
+
 /** Nome da pendência usada em pendingFields. */
 export const CPF_PENDING_LABEL = 'CPF do Aluno';
 

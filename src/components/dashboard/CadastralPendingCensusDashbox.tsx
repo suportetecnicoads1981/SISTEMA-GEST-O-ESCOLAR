@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { isCpfPending } from '../../utils/studentDocuments';
+import { isCpfPending, hasCadastralPending } from '../../utils/studentDocuments';
 import {
   AlertTriangle,
   FileSpreadsheet,
@@ -68,26 +68,8 @@ export const CadastralPendingCensusDashbox: React.FC<CadastralPendingCensusDashb
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   // Identificar alunos com cadastros incompletos ou pendências
-  const incompleteStudents = useMemo(() => {
-    return students.filter((s) => {
-      const isStatusIncomplete =
-        s.cadastralStatus === 'INCOMPLETE' ||
-        s.cadastralStatus === 'PENDING_DOCS' ||
-        s.cadastralStatus === 'NEEDS_UPDATE';
-
-      const hasPendingFields = (s.pendingFields && s.pendingFields.length > 0);
-      // Sem CPF ou com CPF inválido: continua pendente até ser corrigido.
-      const isMissingCpf = isCpfPending(s.cpf);
-      const isMissingBirth = !s.birthDate || s.birthDate === '2020-01-01' || s.birthDate === '2012-01-01';
-      const isMissingAddress = !s.address || s.address.toLowerCase().includes('pendente');
-      const hasMedicalPending =
-        s.medicalClassification &&
-        s.medicalClassification !== 'Não declarada' &&
-        !s.hasMedicalReport;
-
-      return isStatusIncomplete || hasPendingFields || isMissingCpf || hasMedicalPending;
-    });
-  }, [students]);
+  // Mesma regra do botão "Pendências Censo" de Secretaria & Alunos (hasCadastralPending).
+  const incompleteStudents = useMemo(() => students.filter((s) => hasCadastralPending(s)), [students]);
 
   // Escola do aluno: a do cadastro; sem ela, a da turma.
   const unitIdOf = (s: Student): string =>
