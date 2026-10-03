@@ -833,14 +833,14 @@ export const HELP_MODULES: HelpModule[] = [
     faq: [
       {
         q: 'Enviei a logo da escola e ela não aparecia nos documentos. Já foi corrigido?',
-        a: 'Sim (03/10/2026). O cadastro da escola não gravava a logo ao salvar: a imagem aparecia no formulário, mas ficava de fora do registro. Agora a logo enviada é gravada, vai para a nuvem e aparece no timbre de todos os documentos e relatórios da escola, à direita, junto da logo da SEMED.',
+        a: 'Sim (03/10/2026). O cadastro da escola não gravava a logo ao salvar: a imagem aparecia no formulário, mas ficava de fora do registro. Além disso, havia dois campos de imagem ("Logo / Brasão da Escola" e "Logo da Gestão / Mantenedora") e só o primeiro saía no timbre. Agora o cadastro da escola tem um campo só, "Logo / Brasão da Escola": a imagem é gravada, vai para a nuvem e aparece no timbre de todos os documentos e relatórios da escola, à direita, junto da logo da SEMED. Imagem que tinha sido enviada no antigo campo da Gestão passa a valer como logo da escola automaticamente.',
         steps: [
           'Abra Rede Municipal & Polos e clique no lápis (Editar Unidade Escolar) da escola.',
           'Em "Logo da Escola", clique em "Enviar Logo da Escola" e escolha a imagem (PNG, JPG, SVG ou WebP, até 3 MB).',
           'Clique em Salvar.',
           'Gere um relatório da escola e confira a logo no timbre.',
         ],
-        tip: 'Logos enviadas antes desta correção não foram gravadas: é preciso enviá-las de novo uma vez.',
+        tip: 'Logos enviadas antes desta correção no campo da escola não foram gravadas: é preciso enviá-las de novo uma vez. A logo da Gestão Municipal (lado esquerdo do timbre) é cadastrada uma vez só, no cadastro da Secretaria, em Rede Municipal & Polos.',
       },
       {
         q: 'Como cadastro mais de um(a) coordenador(a) pedagógico(a) na escola?',

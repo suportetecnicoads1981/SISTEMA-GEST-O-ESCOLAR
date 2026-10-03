@@ -91,13 +91,17 @@ export function setDocumentBranding(input: {
   const s = input.settings || {};
   const sec = input.secretary || {};
   const schools = new Map<string, BrandingSchool>();
+  const networkMgmtLogo = cleanUrl(sec.managementLogoUrl) || cleanUrl(s.managementLogoUrl);
   for (const u of input.schoolUnits || []) {
     if (!u?.id) continue;
+    // Escola cuja imagem foi enviada no antigo campo "Logo da Gestão / Mantenedora" do cadastro
+    // da escola (até 03/10/2026): essa imagem é a logo dela.
+    const ownMgmt = cleanUrl((u as any).managementLogoUrl);
     schools.set(String(u.id), {
       id: String(u.id),
       name: u.name || '',
       inepCode: u.inepCode,
-      logoUrl: cleanUrl(u.logoUrl),
+      logoUrl: cleanUrl(u.logoUrl) || (ownMgmt && ownMgmt !== networkMgmtLogo ? ownMgmt : ''),
       directorName: u.directorName || '',
       coordinatorName: u.coordinatorName || '',
       secretaryName: u.secretaryName || '',
