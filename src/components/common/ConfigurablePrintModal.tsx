@@ -21,7 +21,7 @@ import {
   FileDown,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { letterheadHtml, issuerFooterHtml, preloadLogos, dedupeImagesForPrint } from '../../services/documentBranding';
+import { letterheadHtml, issuerFooterHtml, preloadLogos, dedupeImagesForPrint, schoolSignatureHtml } from '../../services/documentBranding';
 import { downloadStyledXlsx } from '../../services/styledXlsx';
 import { printFileName, setPrintTitle } from '../../utils/printIsolated';
 import { SchoolSettings } from '../../types';
@@ -267,7 +267,11 @@ ${filtersLine ? `<p class="meta">Filtros aplicados: ${filtersLine}</p>` : ''}
 <table class="grid"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
 ${groupSummary ? `<p class="meta"><b>${h(groupSummary(g.rows))}</b></p>` : ''}
 <p class="meta"><b>${h(countLabel)}:</b> ${g.rows.length} • Emitido em ${h(now)}</p>
-<table class="conf"><tr><td>Conferido por: ________________________________________</td><td>Data: ____/____/________</td><td>Assinatura: ______________________________</td></tr></table>
+${
+  // Escola do grupo com corpo diretivo cadastrado: assinatura de quem responde por ela.
+  schoolSignatureHtml({ schoolUnitId: g.schoolUnitId, classId: g.classId }) ||
+  '<table class="conf"><tr><td>Conferido por: ________________________________________</td><td>Data: ____/____/________</td><td>Assinatura: ______________________________</td></tr></table>'
+}
 </${word ? 'div' : 'section'}>`;
     });
     const cons = consolidated && groupBy ? consolidated(ordered) : null;

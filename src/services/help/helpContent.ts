@@ -832,6 +832,37 @@ export const HELP_MODULES: HelpModule[] = [
     summary: 'Escolas da rede, envio de lotes das escolas para a Sede e consolidação na Secretaria.',
     faq: [
       {
+        q: 'Enviei a logo da escola e ela não aparecia nos documentos. Já foi corrigido?',
+        a: 'Sim (03/10/2026). O cadastro da escola não gravava a logo ao salvar: a imagem aparecia no formulário, mas ficava de fora do registro. Agora a logo enviada é gravada, vai para a nuvem e aparece no timbre de todos os documentos e relatórios da escola, à direita, junto da logo da SEMED.',
+        steps: [
+          'Abra Rede Municipal & Polos e clique no lápis (Editar Unidade Escolar) da escola.',
+          'Em "Logo da Escola", clique em "Enviar Logo da Escola" e escolha a imagem (PNG, JPG, SVG ou WebP, até 3 MB).',
+          'Clique em Salvar.',
+          'Gere um relatório da escola e confira a logo no timbre.',
+        ],
+        tip: 'Logos enviadas antes desta correção não foram gravadas: é preciso enviá-las de novo uma vez.',
+      },
+      {
+        q: 'Como cadastro mais de um(a) coordenador(a) pedagógico(a) na escola?',
+        steps: [
+          'No cadastro da escola (Editar Unidade Escolar), vá em "Corpo Diretivo & Gestão Pedagógica".',
+          'Clique em "Adicionar coordenador(a)" para abrir mais um campo.',
+          'Digite um nome em cada campo (a lixeira remove um nome) e salve.',
+        ],
+        a: 'Escolas que tinham os dois nomes no mesmo campo (ex.: "Simone Menezes e Wandicleia Mota de Medeiros") já abrem com um campo para cada nome. Nos relatórios, cada coordenador(a) sai com a sua própria linha de assinatura.',
+      },
+      {
+        q: 'Quem assina os relatórios da escola?',
+        steps: [
+          'Módulos pedagógicos (Portal do Professor, Diário & Frequência, Evolução Pedagógica, Habilidades BNCC, Resultados Nível & Escola, Elaboração de Provas e Banco de Questões BNCC): o(a) Coordenador(a) Pedagógico(a). Com dois coordenadores, sai uma linha para cada um.',
+          'Secretaria (Visão Geral / Dashbox, Secretaria & Alunos, Turmas & Matrizes, Censo de Evasão & Busca Ativa e Documentos & Certificados): o(a) Secretário(a) Escolar e o(a) Diretor(a).',
+          'Comunicação (comunicados e WhatsApp): o(a) Diretor(a).',
+          'Relatório da rede inteira (sem uma escola escolhida): o(a) titular da Secretaria de Educação, como antes.',
+        ],
+        a: 'Os nomes vêm do cadastro da escola em Rede Municipal & Polos (Corpo Diretivo & Gestão Pedagógica). Se o campo estiver vazio, assina o(a) Diretor(a). Documentos que já trazem a própria assinatura (declarações, boletins etc.) continuam como estão.',
+        tip: 'Para a Sede, a escola do relatório é a escolhida no filtro do relatório ou a escola em foco no alto da tela.',
+      },
+      {
         q: 'Toda escola fica vinculada à SEMED?',
         a: 'Sim. O sistema controla toda a rede municipal de educação, então toda escola cadastrada (inclusive anexas e as criadas pela importação de planilhas) fica vinculada à SEMED por padrão. Só deixa de constar como vinculada se alguém desmarcar o vínculo no cadastro da escola.',
       },

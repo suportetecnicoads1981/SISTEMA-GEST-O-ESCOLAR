@@ -113,7 +113,7 @@ const AdminTIHub = lazyModule(() => import('./components/admin/AdminTIHub').then
 import { isTabAvailable } from './config/features';
 import { notify, confirmDialog } from './utils/dialogs';
 import { getLocalServerInfo } from './services/offline/localServerSync';
-import { setDocumentBranding } from './services/documentBranding';
+import { setDocumentBranding, setDocumentSignContext, signersForModule } from './services/documentBranding';
 import { runCloudSyncNow } from './services/offline/cloudAutoSync';
 import { normalizeSchoolLinks } from './utils/schoolDataNormalizer';
 import { isProvisionalRa, resolveProvisionalRas } from './services/raService';
@@ -472,11 +472,18 @@ export default function App() {
       secretary: (data as any).municipalSecretary,
       schoolUnits: data.schoolUnits,
       classes: data.classes,
-      defaultSchoolUnitId: currentUser?.schoolUnitId || getLocalServerInfo()?.schoolUnitId,
+      // Escola do usuário lotado; para a Sede/rede, a escola em foco escolhida no topo da tela.
+      defaultSchoolUnitId: currentUser?.schoolUnitId || focusIds[0] || getLocalServerInfo()?.schoolUnitId,
       // Todo documento sai com o nome completo de quem está logado.
       issuer: { name: currentUser?.name, role: currentUser?.roleTitle || currentUser?.sectorTitle },
     });
-  }, [data.settings, (data as any).municipalSecretary, data.schoolUnits, data.classes, currentUser?.schoolUnitId, currentUser?.name, currentUser?.roleTitle, currentUser?.sectorTitle]);
+  }, [data.settings, (data as any).municipalSecretary, data.schoolUnits, data.classes, currentUser?.schoolUnitId, currentUser?.name, currentUser?.roleTitle, currentUser?.sectorTitle, focusIds]);
+
+  // Assinatura dos documentos da escola conforme o módulo aberto:
+  // pedagógico = Coordenação Pedagógica; Secretaria = Secretário(a) Escolar e Direção.
+  useEffect(() => {
+    setDocumentSignContext(signersForModule(activeTab));
+  }, [activeTab]);
 
   // Arrumação dos vínculos escola ↔ turma ↔ aluno (ex.: turma "ESCOLA X - PRÉ I (MANHÃ)" passa a
   // "PRÉ I - MANHÃ" vinculada à escola X). Antes rodava sozinha a cada alteração em TODOS os
