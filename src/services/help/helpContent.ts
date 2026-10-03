@@ -840,7 +840,7 @@ export const HELP_MODULES: HelpModule[] = [
           'Clique em Salvar.',
           'Gere um relatório da escola e confira a logo no timbre.',
         ],
-        tip: 'Logos enviadas antes desta correção no campo da escola não foram gravadas: é preciso enviá-las de novo uma vez. A logo da Gestão Municipal (lado esquerdo do timbre) é cadastrada uma vez só, no cadastro da Secretaria, em Rede Municipal & Polos.',
+        tip: 'Tamanho e nitidez: o sistema tira sozinho a margem branca ou transparente em volta do desenho, para a logo ocupar toda a altura do timbre, e guarda a imagem com até 1000 px. Para a melhor qualidade, envie a logo original (PNG de preferência, com pelo menos 500 px). Logos enviadas antes de 03/10/2026 ficaram guardadas com no máximo 480 px: se quiser mais nitidez, envie de novo. Logos enviadas antes desta correção no campo da escola não foram gravadas: é preciso enviá-las de novo uma vez. A logo da Gestão Municipal (lado esquerdo do timbre) é cadastrada uma vez só, no cadastro da Secretaria, em Rede Municipal & Polos.',
       },
       {
         q: 'Como cadastro mais de um(a) coordenador(a) pedagógico(a) na escola?',
