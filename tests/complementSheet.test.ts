@@ -209,3 +209,23 @@ describe('importação da planilha preenchida', () => {
     expect(no.items[0].updated.pendingFields).not.toContain('Avaliação de Laudo (SIM/NÃO)');
   });
 });
+
+describe('planilha protegida', () => {
+  it('bloqueia a aba, libera só as colunas de preenchimento e põe listas de escolha', async () => {
+    const { complementLists } = await import('../src/services/students/complementSheet');
+    const rows = buildComplementRows([ana], [cls]);
+    const editIdx = COMPLEMENT_COLUMNS.map((c, i) => (c.edit ? i : -1)).filter((i) => i >= 0);
+    const blob = await buildStyledXlsx({
+      title: 'x',
+      protect: true,
+      columns: COMPLEMENT_COLUMNS.map((c) => ({ label: c.label })),
+      sections: [{ rows: rows.map((r) => COMPLEMENT_COLUMNS.map((c) => r[c.key])), inputCols: editIdx, lists: complementLists() }],
+    });
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const sheet = await zip.file('xl/worksheets/sheet1.xml')!.async('string');
+    const styles = await zip.file('xl/styles.xml')!.async('string');
+    expect(sheet).toMatch(/<sheetProtection sheet="1"/);
+    expect(sheet).toMatch(/<dataValidation type="list"[^>]*sqref="G\d+:G\d+"><formula1>&quot;M,F&quot;<\/formula1>/);
+    expect((styles.match(/<protection locked="0"\/>/g) || []).length).toBe(2);
+  });
+});

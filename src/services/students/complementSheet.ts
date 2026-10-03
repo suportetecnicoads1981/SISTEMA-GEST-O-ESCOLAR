@@ -167,13 +167,23 @@ export function buildComplementRows(students: Student[], classes: SchoolClass[],
   }));
 }
 
+/** Listas de escolha da planilha (índice da coluna -> opções). */
+export function complementLists(): Record<number, string[]> {
+  const idx = (k: ComplementKey) => COMPLEMENT_COLUMNS.findIndex((c) => c.key === k);
+  return {
+    [idx('gender')]: ['M', 'F'],
+    [idx('raceColor')]: ['Branca', 'Preta', 'Parda', 'Amarela', 'Indígena', 'Não declarada'],
+    [idx('laudo')]: ['SIM', 'NÃO'],
+  };
+}
+
 /** Instruções da aba "Como preencher". */
 export const COMPLEMENT_INSTRUCTIONS: [string, string][] = [
   ['1', 'Preencha só as células em amarelo (o que falta). Pode corrigir as que já vieram preenchidas, se estiverem erradas.'],
-  ['2', 'Não altere RA, nome, turma nem o código do sistema: é por eles que o sistema acha o aluno. Não apague nem troque linhas de lugar entre alunos.'],
+  ['2', 'RA, nome, turma e código do sistema ficam bloqueados (a planilha é protegida): é por eles que o sistema acha o aluno. Só as colunas de preenchimento aceitam digitação.'],
   ['3', 'CPF: 11 números, com ou sem pontos (ex.: 123.456.789-09). CPF errado ou repetido não é gravado.'],
   ['4', 'Data de nascimento: DD/MM/AAAA (ex.: 25/08/2018).'],
-  ['5', 'Sexo: M ou F.  Raça/Cor: Branca, Preta, Parda, Amarela, Indígena ou Não declarada.'],
+  ['5', 'Sexo, Raça/Cor e Laudo têm lista de escolha: clique na célula e use a setinha. Sexo: M ou F.  Raça/Cor: Branca, Preta, Parda, Amarela, Indígena ou Não declarada.'],
   ['6', 'PCD: escreva a deficiência só se o aluno tiver (ex.: TEA, Baixa visão).  Laudo: SIM ou NÃO.'],
   ['7', 'Célula deixada em branco não apaga nada no sistema.'],
   ['8', 'Salve como .xlsx e devolva à Secretaria: lá ela usa "Importar complementação" e confere tudo antes de gravar.'],

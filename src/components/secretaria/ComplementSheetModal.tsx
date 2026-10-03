@@ -7,6 +7,7 @@ import {
   FIELD_LABEL,
   buildComplementRows,
   complementFileName,
+  complementLists,
   parseComplementMatrix,
   planComplement,
   type ComplementPlan,
@@ -104,8 +105,11 @@ export const ComplementSheetModal: React.FC<ComplementSheetModalProps> = ({
               rows: rows.map((r) => COMPLEMENT_COLUMNS.map((c) => r[c.key])),
               countLine: `Total de alunos nesta planilha: ${rows.length}`,
               inputCols: editIdx,
+              lists: complementLists(),
             },
           ],
+          // Só as colunas de preenchimento podem ser alteradas (RA, nome, turma e código ficam bloqueados).
+          protect: true,
         },
         {
           sheetName: 'Como preencher',
@@ -115,6 +119,7 @@ export const ComplementSheetModal: React.FC<ComplementSheetModalProps> = ({
           conference: false,
           columns: [{ label: 'Passo', align: 'center' }, { label: 'O que fazer' }],
           sections: [{ rows: COMPLEMENT_INSTRUCTIONS }],
+          protect: true,
         },
       ]);
       setMessage(`Planilha gerada com ${rows.length} aluno(s). Envie para a escola completar e depois use "Importar complementação".`);

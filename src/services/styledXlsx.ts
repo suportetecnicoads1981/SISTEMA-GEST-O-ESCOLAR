@@ -42,6 +42,8 @@ export interface StyledXlsxSection {
    * e, quando vazias, pintadas de amarelo para a escola ver o que falta.
    */
   inputCols?: number[];
+  /** Listas de escolha (coluna -> opções), ex.: Sexo M/F. Vale para as linhas do bloco. */
+  lists?: Record<number, string[]>;
 }
 
 export interface StyledXlsxOptions {
@@ -56,6 +58,11 @@ export interface StyledXlsxOptions {
   /** Campo de conferência manual ao fim de cada bloco (padrão: sim). */
   conference?: boolean;
   sheetName?: string;
+  /**
+   * Protege a aba: só as colunas de preenchimento (inputCols) podem ser alteradas; o resto
+   * (ex.: RA, nome, código do sistema) fica bloqueado. Sem senha.
+   */
+  protect?: boolean;
 }
 
 const xml = (t: unknown) =>
@@ -137,8 +144,8 @@ const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
 <xf numFmtId="0" fontId="0" fillId="0" borderId="2" xfId="0" applyBorder="1"/>
 <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center" wrapText="1"/></xf>
-<xf numFmtId="49" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>
-<xf numFmtId="49" fontId="0" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="49" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1" applyProtection="1"><alignment horizontal="left" vertical="center" wrapText="1"/><protection locked="0"/></xf>
+<xf numFmtId="49" fontId="0" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1" applyAlignment="1" applyProtection="1"><alignment horizontal="left" vertical="center" wrapText="1"/><protection locked="0"/></xf>
 </cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;
@@ -190,6 +197,7 @@ function renderSheet(opts: StyledXlsxOptions): { sheet: string; images: SheetIma
   const rows: { h?: number; cells: (Cell | null)[] }[] = [];
   const merges: string[] = [];
   const breaks: number[] = [];
+  const validations: string[] = [];
   const add = (cells: (Cell | null)[], h?: number) => {
     rows.push({ cells, h });
     return rows.length; // número da linha (1..)
@@ -223,6 +231,15 @@ function renderSheet(opts: StyledXlsxOptions): { sheet: string; images: SheetIma
     if (ident) full(ident, S.ident, 20);
     const cols = sec.columns || opts.columns;
     add(cols.map((c) => ({ v: c.label, s: S.head })), 30);
+    const firstDataRow = rows.length + 1;
+    Object.entries(sec.lists || {}).forEach(([ci, options]) => {
+      if (!sec.rows.length || !options.length) return;
+      const col = colName(Number(ci));
+      const list = options.map((o) => String(o).replace(/"/g, '')).join(',');
+      validations.push(
+        `<dataValidation type="list" allowBlank="1" showInputMessage="1" showErrorMessage="1" errorTitle="Valor inválido" error="${xml(`Escolha uma das opções: ${options.join(', ')}`)}" sqref="${col}${firstDataRow}:${col}${firstDataRow + sec.rows.length - 1}"><formula1>${xml(`"${list}"`)}</formula1></dataValidation>`
+      );
+    });
     sec.rows.forEach((r, ri) => {
       const bold = sec.boldLastRow && ri === sec.rows.length - 1;
       add(
@@ -304,7 +321,9 @@ function renderSheet(opts: StyledXlsxOptions): { sheet: string; images: SheetIma
 <sheetFormatPr defaultRowHeight="15"/>
 <cols>${cols}</cols>
 <sheetData>${sheetRows}</sheetData>
+${opts.protect ? '<sheetProtection sheet="1" objects="1" scenarios="1" formatColumns="0" formatRows="0" formatCells="0"/>' : ''}
 ${merges.length ? `<mergeCells count="${merges.length}">${merges.map((m) => `<mergeCell ref="${m}"/>`).join('')}</mergeCells>` : ''}
+${validations.length ? `<dataValidations count="${validations.length}">${validations.join('')}</dataValidations>` : ''}
 <printOptions horizontalCentered="1"/>
 <pageMargins left="0.79" right="0.59" top="0.79" bottom="0.59" header="0.3" footer="0.3"/>
 <pageSetup paperSize="9" orientation="${orientation}" fitToWidth="1" fitToHeight="0"/>
