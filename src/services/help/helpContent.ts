@@ -472,7 +472,7 @@ export const HELP_MODULES: HelpModule[] = [
           'Clique em "Gravar". Os contadores de "Pendências Censo" e da Visão Geral já baixam na hora.',
         ],
         a: 'O sistema acha cada aluno pelo código do sistema (ou pelo RA, ou nome + data de nascimento). Grava só as células preenchidas: célula em branco não apaga nada, e nome, escola e turma nunca mudam. CPF inválido, repetido na planilha ou já usado por outro aluno não é gravado; data impossível e telefone incompleto também ficam de fora, com aviso na conferência. Com o CPF certo e nada mais faltando, o cadastro passa a "OK".',
-        tip: 'A planilha pode ser gerada e importada quantas vezes for preciso: gere de novo depois de importar para ver só o que ainda falta. Se o aluno for PCD e o laudo for "NÃO", a pendência de comprovação do laudo continua.',
+        tip: 'A lista de escolas da planilha segue a escola escolhida no alto da tela: com uma escola em foco, só ela aparece (já selecionada); para escolher qualquer escola, deixe "Toda a rede" no alto. Se o botão "Baixar planilha" estiver apagado, a janela explica o motivo (escola não escolhida ou nenhum aluno com pendência). A planilha pode ser gerada e importada quantas vezes for preciso: gere de novo depois de importar para ver só o que ainda falta. Se o aluno for PCD e o laudo for "NÃO", a pendência de comprovação do laudo continua.',
       },
       {
         q: 'Como a importação separa as turmas A, B, C de uma mesma série?',
