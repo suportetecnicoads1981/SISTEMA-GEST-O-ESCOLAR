@@ -467,7 +467,7 @@ export const HELP_MODULES: HelpModule[] = [
           `Em ${moduleName('STUDENTS')}, clique em "Planilha de complementação".`,
           'Na aba "1. Gerar planilha", escolha a escola (usuário lotado só vê a dele) e deixe marcado "Só alunos com algo faltando", se quiser só quem tem pendência.',
           'Clique em "Baixar planilha (.xlsx)" e envie para a escola. Cada aluno vem numa linha, com o timbre da escola, o que já existe no cadastro, a coluna "O que falta" e as células vazias em amarelo. Vai junto a aba "Como preencher".',
-          'A escola preenche CPF, data de nascimento, sexo, raça/cor, endereço, responsável, telefone, PCD e laudo (SIM/NÃO), sem mexer em RA, nome, turma e código do sistema, e devolve o arquivo.',
+          'A escola preenche CPF, data de nascimento, sexo, raça/cor, endereço, responsável, telefone, PCD e laudo (SIM/NÃO) e devolve o arquivo. A planilha é protegida: RA, nome, turma e código do sistema ficam bloqueados, e sexo, raça/cor e laudo têm lista de escolha (setinha na célula).',
           'Volte ao botão, aba "2. Importar complementação", e escolha a planilha devolvida. Confira na tela quantos alunos serão atualizados, as pendências que saem e as linhas com problema.',
           'Clique em "Gravar". Os contadores de "Pendências Censo" e da Visão Geral já baixam na hora.',
         ],
