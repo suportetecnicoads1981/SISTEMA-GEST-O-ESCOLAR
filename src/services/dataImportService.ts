@@ -651,7 +651,7 @@ export function buildSchoolUnitAndClassesFromImport(
 }
 
 // Limpa strings com caracteres como '*****', '---', etc.
-function cleanPlaceholder(val: any): string {
+export function cleanPlaceholder(val: any): string {
   if (val === null || val === undefined) return '';
   const str = String(val).trim();
   if (/^[\*\-\_\.\?]+$/.test(str) || str.toUpperCase() === 'N/A' || str.toUpperCase() === 'NI') {
@@ -661,7 +661,7 @@ function cleanPlaceholder(val: any): string {
 }
 
 // Normaliza data de nascimento (ex: 25/08/2021 ou número de série do Excel)
-function parseFlexibleDate(val: any): { isoDate: string; formatted: string; isValid: boolean } {
+export function parseFlexibleDate(val: any): { isoDate: string; formatted: string; isValid: boolean } {
   if (!val) return { isoDate: '', formatted: '', isValid: false };
 
   // Caso seja número serial do Excel

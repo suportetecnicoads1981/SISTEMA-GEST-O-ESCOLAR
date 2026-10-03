@@ -179,6 +179,7 @@ export interface Student {
   shift?: ClassShift | string; // Turno (Manhã, Tarde, Integral, Noite)
   series?: string; // Série de referência da planilha (ex: 'PRÉ II', '1º AO 5º')
   importedAt?: string; // Data da importação
+  updatedAt?: string; // Última alteração do cadastro (ex.: planilha de complementação)
 
   // Campos específicos para Evasão Escolar & Censo Educacional Municipal
   dropoutReason?: DropoutReasonKey;

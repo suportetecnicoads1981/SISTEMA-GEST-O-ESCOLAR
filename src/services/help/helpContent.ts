@@ -462,6 +462,19 @@ export const HELP_MODULES: HelpModule[] = [
         tip: 'No Word, cada tabela deve ter um título com a série (ex.: "1º ANO"). Arquivos com escola principal e escolas anexas são separados por escola.',
       },
       {
+        q: 'Como peço à escola o CPF e os outros dados que faltam, por planilha?',
+        steps: [
+          `Em ${moduleName('STUDENTS')}, clique em "Planilha de complementação".`,
+          'Na aba "1. Gerar planilha", escolha a escola (usuário lotado só vê a dele) e deixe marcado "Só alunos com algo faltando", se quiser só quem tem pendência.',
+          'Clique em "Baixar planilha (.xlsx)" e envie para a escola. Cada aluno vem numa linha, com o timbre da escola, o que já existe no cadastro, a coluna "O que falta" e as células vazias em amarelo. Vai junto a aba "Como preencher".',
+          'A escola preenche CPF, data de nascimento, sexo, raça/cor, endereço, responsável, telefone, PCD e laudo (SIM/NÃO), sem mexer em RA, nome, turma e código do sistema, e devolve o arquivo.',
+          'Volte ao botão, aba "2. Importar complementação", e escolha a planilha devolvida. Confira na tela quantos alunos serão atualizados, as pendências que saem e as linhas com problema.',
+          'Clique em "Gravar". Os contadores de "Pendências Censo" e da Visão Geral já baixam na hora.',
+        ],
+        a: 'O sistema acha cada aluno pelo código do sistema (ou pelo RA, ou nome + data de nascimento). Grava só as células preenchidas: célula em branco não apaga nada, e nome, escola e turma nunca mudam. CPF inválido, repetido na planilha ou já usado por outro aluno não é gravado; data impossível e telefone incompleto também ficam de fora, com aviso na conferência. Com o CPF certo e nada mais faltando, o cadastro passa a "OK".',
+        tip: 'A planilha pode ser gerada e importada quantas vezes for preciso: gere de novo depois de importar para ver só o que ainda falta. Se o aluno for PCD e o laudo for "NÃO", a pendência de comprovação do laudo continua.',
+      },
+      {
         q: 'Como a importação separa as turmas A, B, C de uma mesma série?',
         a: 'Pela letra escrita logo depois da série: no título da tabela ("1º ANO A Nº", "3 ANO B") ou na linha acima dela ("TURMA: PRÉ-ESCOLA I C"). Cada letra vira uma turma própria (ex.: "1º ANO A - MANHÃ", "1º ANO B - MANHÃ"). Sem letra, a série fica numa turma só.',
         tip: 'A turma nova recebe o turno dos alunos dela (coluna TURNO da planilha padrão). Se a mesma série tiver alunos em dois turnos e sem letra, a turma fica com o turno da maioria e a conferência avisa: nesse caso, informe a letra (ex.: 1º ANO A e 1º ANO B). Levantamentos sem coluna de turno entram como MANHÃ.',
